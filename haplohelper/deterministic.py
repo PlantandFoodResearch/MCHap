@@ -13,7 +13,7 @@ def llk(reads, haplotypes):
                                                    haplotypes), axis=-1)))
 
 
-class DeterministicHaplotypeAssembler(object):
+class GreedyHaplotypeAssembler(object):
 
     def __init__(self, ploidy=None):
         # check ploidy matches prior if given
@@ -57,7 +57,7 @@ class DeterministicHaplotypeAssembler(object):
         self.result = haps
 
 
-class DeterministicDosageCaller(object):
+class GreedyDosageCaller(object):
 
     def __init__(self,
                  ploidy=None,
@@ -99,7 +99,7 @@ class DeterministicDosageCaller(object):
         self.result = haps
 
 
-class DeterministicChildDosageCaller(object):
+class GreedyChildDosageCaller(object):
 
     def __init__(self,
                  ploidy=None,
