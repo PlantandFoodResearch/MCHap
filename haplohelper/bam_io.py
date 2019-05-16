@@ -2,6 +2,7 @@
 
 import numpy as np
 from collections import Counter as _Counter
+from collections import defaultdict as _defaultdict
 from functools import reduce as _reduce
 from operator import add as _add
 
@@ -99,9 +100,20 @@ def _encode_variant_data(positions, variants, alphabet):
             for pos, (char, qual) in read.items():
                 prob = util.prob_of_qual(qual)
                 array[i, pos_map[pos]] = alphabet.encode_element(char, prob)
+                if np.sum(array[i, pos_map[pos]]) < 0.9:
+                    print(char, prob, array[i, pos_map[pos]])
         arrays[name] = array
 
     return arrays
+
+
+def biallelic_translations(counts):
+    array = np.empty(len(counts), dtype='<O')
+    for i, counter in enumerate(counts):
+        array[i] = _defaultdict(lambda: 'N')
+        for j, (char, _) in enumerate(counter.most_common(2)):
+            array[i][char] = str(j)
+    return array
 
 
 def find_variants(alignment_file,
@@ -110,10 +122,12 @@ def find_variants(alignment_file,
                   min_map_qual=20,
                   min_mean_depth=10,
                   pop_min_proportion=0.1,
-                  sample_min_proportion=0.2):
+                  sample_min_proportion=0.2,
+                  return_counts=False):
 
     positions = list()
     interval = range(*interval)
+    totals = list()
 
     for pileupcolumn in alignment_file.pileup(contig,
                                               interval.start,
@@ -131,7 +145,13 @@ def find_variants(alignment_file,
 
             if selected:
                 positions.append(pileupcolumn.pos)
-    return positions
+                if return_counts:
+                    totals.append(_reduce(_add, counts.values(), _Counter()))
+
+    if return_counts:
+        return positions, totals
+    else:
+        return positions
 
 
 def encode_variants(alignment_file,
@@ -180,6 +200,7 @@ def encode_positions(alignment_file,
                      contig,
                      positions,
                      alphabet,
+                     translations=None,
                      min_map_qual=20):
     variants = dict()
     pos_map = dict(zip(positions, range(len(positions))))
@@ -190,12 +211,21 @@ def encode_positions(alignment_file,
         if pileupcolumn.pos in pos_map:
             pos = pileupcolumn.pos
 
+            if translations is None:
+                pass
+            else:
+                translation = translations[pos_map[pos]]
+
             for sample, qname, char, qual in _extract_column(pileupcolumn,
                                                              min_map_qual):
                 if sample not in variants:
                     variants[sample] = {}
                 if qname not in variants[sample]:
                     variants[sample][qname] = {}
-                variants[sample][qname][pos] = char, qual
+                if translations is None:
+                    variants[sample][qname][pos] = char, qual
+                else:
+                    variants[sample][qname][pos] = translation[char], qual
+
 
     return _encode_variant_data(positions, variants, alphabet)
