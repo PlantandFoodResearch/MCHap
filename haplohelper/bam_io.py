@@ -106,7 +106,8 @@ def _encode_variant_data(positions, variants, alphabet):
 
 def find_variants(alignment_file,
                   contig,
-                  interval,
+                  start,
+                  stop,
                   min_map_qual=20,
                   min_mean_depth=10,
                   pop_min_proportion=0.1,
@@ -114,12 +115,10 @@ def find_variants(alignment_file,
                   n_alleles=2):
 
     positions = list()
-    interval = range(*interval)
+    interval = range(start, stop)
     totals = list()
 
-    for pileupcolumn in alignment_file.pileup(contig,
-                                              interval.start,
-                                              interval.stop):
+    for pileupcolumn in alignment_file.pileup(contig, start, stop):
         if pileupcolumn.pos not in interval:
             pass
         else:
