@@ -2,7 +2,6 @@
 
 import numpy as np
 from collections import Counter as _Counter
-from collections import defaultdict as _defaultdict
 from functools import reduce as _reduce
 from operator import add as _add
 import biovector as bv
