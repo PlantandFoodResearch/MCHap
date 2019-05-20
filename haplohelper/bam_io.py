@@ -105,15 +105,6 @@ def _encode_variant_data(positions, variants, alphabet):
     return arrays
 
 
-def biallelic_translations(counts):
-    array = np.empty(len(counts), dtype='<O')
-    for i, counter in enumerate(counts):
-        array[i] = _defaultdict(lambda: 'N')
-        for j, (char, _) in enumerate(counter.most_common(2)):
-            array[i][char] = str(j)
-    return array
-
-
 def find_variants(alignment_file,
                   contig,
                   interval,
