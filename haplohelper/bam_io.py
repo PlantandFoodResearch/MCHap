@@ -5,7 +5,7 @@ from collections import Counter as _Counter
 from collections import defaultdict as _defaultdict
 from functools import reduce as _reduce
 from operator import add as _add
-
+import biovector as bv
 from haplohelper import util
 
 
@@ -100,8 +100,6 @@ def _encode_variant_data(positions, variants, alphabet):
             for pos, (char, qual) in read.items():
                 prob = util.prob_of_qual(qual)
                 array[i, pos_map[pos]] = alphabet.encode_element(char, prob)
-                if np.sum(array[i, pos_map[pos]]) < 0.9:
-                    print(char, prob, array[i, pos_map[pos]])
         arrays[name] = array
 
     return arrays
@@ -123,7 +121,7 @@ def find_variants(alignment_file,
                   min_mean_depth=10,
                   pop_min_proportion=0.1,
                   sample_min_proportion=0.2,
-                  return_counts=False):
+                  n_alleles=2):
 
     positions = list()
     interval = range(*interval)
@@ -145,65 +143,47 @@ def find_variants(alignment_file,
 
             if selected:
                 positions.append(pileupcolumn.pos)
-                if return_counts:
-                    totals.append(_reduce(_add, counts.values(), _Counter()))
+                totals.append(_reduce(_add, counts.values(), _Counter()))
 
-    if return_counts:
-        return positions, totals
-    else:
-        return positions
-
-
-def encode_variants(alignment_file,
-                    contig,
-                    interval,
-                    alphabet,
-                    min_map_qual=20,
-                    min_mean_depth=10,
-                    pop_min_proportion=0.1,
-                    sample_min_proportion=0.2):
-
-    positions = list()
-    variants = dict()
-    interval = range(*interval)
-
-    for pileupcolumn in alignment_file.pileup(contig,
-                                              interval.start,
-                                              interval.stop):
-        if pileupcolumn.pos in interval:
-            counts = _count_column_variants(pileupcolumn,
-                                            min_map_qual)
-
-            selected = _select_column(counts,
-                                      min_mean_depth,
-                                      pop_min_proportion,
-                                      sample_min_proportion)
-
-            if selected:
-                pos = pileupcolumn.pos
-                positions.append(pos)
-
-                for sample, qname, char, qual in _extract_column(pileupcolumn,
-                                                                 min_map_qual):
-                    if sample not in variants:
-                        variants[sample] = {}
-                    if qname not in variants[sample]:
-                        variants[sample][qname] = {}
-                    variants[sample][qname][pos] = char, qual
-
-    arrays = _encode_variant_data(positions, variants, alphabet)
-
-    return positions, arrays
+    return VariantLociMap.from_counts(
+        totals,
+        reference_positions=positions,
+        reference_name=alignment_file.reference_filename,
+        reference_contig=contig,
+        n_alleles=n_alleles
+    )
 
 
 def encode_positions(alignment_file,
-                     contig,
-                     positions,
-                     alphabet,
-                     translations=None,
+                     variant_loci_map=None,
+                     contig=None,
+                     positions=None,
+                     alphabet=None,
                      min_map_qual=20):
-    variants = dict()
+
+    if contig is None:
+        contig = variant_loci_map.reference_contig
+
+    if positions is None:
+        positions = variant_loci_map.reference_positions
+
+    if alphabet is None:
+        alphabet = variant_loci_map.alphabet
+
+    # extract reads
+
+    # sample: read: array of variants with phred scores
+    reads = dict()
+
+    # maps reference position to array index
     pos_map = dict(zip(positions, range(len(positions))))
+
+    # variants stored in array
+    # default values for read gaps is a null allele 'N' with probability 1
+    dtype_variant = np.dtype([('char', np.str_, 1), ('prob', np.float)])
+    template = np.empty(len(positions), dtype=dtype_variant)
+    template['char'] = 'N'
+    template['prob'] = 1.0
 
     for pileupcolumn in alignment_file.pileup(contig,
                                               np.min(positions),
@@ -211,21 +191,142 @@ def encode_positions(alignment_file,
         if pileupcolumn.pos in pos_map:
             pos = pileupcolumn.pos
 
-            if translations is None:
-                pass
-            else:
-                translation = translations[pos_map[pos]]
-
             for sample, qname, char, qual in _extract_column(pileupcolumn,
                                                              min_map_qual):
-                if sample not in variants:
-                    variants[sample] = {}
-                if qname not in variants[sample]:
-                    variants[sample][qname] = {}
-                if translations is None:
-                    variants[sample][qname][pos] = char, qual
+                if sample not in reads:
+                    reads[sample] = {}
+                if qname not in reads[sample]:
+                    reads[sample][qname] = template.copy()
+                reads[sample][qname][pos_map[pos]] = (
+                    char,
+                    util.prob_of_qual(qual)
+                )
+
+    # encode reads (reuse same dict)
+    for sample, data in reads.items():
+        array = np.empty((len(data), len(positions), alphabet.vector_size()),
+                         dtype=np.float)
+        for i, read in enumerate(data.values()):
+
+            if variant_loci_map:
+                # translate reads
+                read['char'] = tuple(variant_loci_map.as_allelic(read['char']))
+
+            array[i] = alphabet.encode(read)
+
+        reads[sample] = array
+
+    return reads
+
+
+class VariantLociMap(object):
+    """Block of variant positions
+    """
+
+    def __init__(self,
+                 iupac_to_allelic,
+                 reference_positions=None,
+                 reference_name=None,
+                 reference_contig=None,
+                 n_alleles=2):
+
+        self._iupac_to_allelic = iupac_to_allelic
+
+        if reference_positions is None:
+            reference_positions = np.repeat(np.nan, len(iupac_to_allelic))
+        self.reference_positions = reference_positions
+
+        self.reference_name = reference_name
+        self.reference_contig = reference_contig
+
+        assert n_alleles in {2, 3, 4}
+        self.n_alleles = n_alleles
+
+        self._allelic_to_iupac = np.empty(len(self._iupac_to_allelic),
+                                          dtype='<O')
+        alleles = set(map(str, range(self.n_alleles)))
+        for i, d in enumerate(self._iupac_to_allelic):
+            self._allelic_to_iupac[i] = {'N': 'N'}
+
+            for k, v in d.items():
+                if v in alleles:
+                    self._allelic_to_iupac[i][v] = k
+
+    def __len__(self):
+        return len(self._iupac_to_allelic)
+
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            item = slice(item, item + 1)
+
+        if self.reference_positions is None:
+            reference_positions = None
+        else:
+            reference_positions = self.reference_positions[item]
+
+        return VariantLociMap(self._iupac_to_allelic[item],
+                              reference_positions,
+                              reference_name=self.reference_name,
+                              reference_contig=self.reference_contig,
+                              n_alleles=self.n_alleles)
+
+    def __repr__(self):
+        header = '{0}\n{1}\nPOS\tREF\tALT\n'.format(self.reference_name,
+                                                    self.reference_contig)
+        zipped = zip(self.reference_positions,
+                     self.reference_alleles,
+                     self.alternate_alleles)
+        data = '\n'.join('{0}\t{1}\t{2}'.format(*tup) for tup in zipped)
+        return header + data
+
+    @classmethod
+    def from_counts(cls, counts, *args, **kwargs):
+        # assumes most common allele is reference (for now)
+        n_alleles = kwargs['n_alleles']
+        iupac_to_allelic = np.empty(len(counts), dtype='<O')
+        for i, counter in enumerate(counts):
+
+            iupac_to_allelic[i] = {k: 'N' for k in 'ACTGN'}
+
+            j = 0
+            for char, _ in counter.most_common(n_alleles):
+                # need to handle N as an allele
+                if char == 'N':
+                    pass
                 else:
-                    variants[sample][qname][pos] = translation[char], qual
+                    iupac_to_allelic[i][char] = str(j)
+                    j += 1
 
+        return cls(iupac_to_allelic, *args, **kwargs)
 
-    return _encode_variant_data(positions, variants, alphabet)
+    def as_allelic(self, string):
+        assert len(self) == len(string)
+        return ''.join(
+            self._iupac_to_allelic[i][char] for i, char in enumerate(string))
+
+    def as_iupac(self, string):
+        assert len(self) == len(string)
+        return ''.join(
+            self._allelic_to_iupac[i][char] for i, char in enumerate(string))
+
+    @property
+    def alphabet(self):
+        if self.n_alleles == 2:
+            return bv.Biallelic
+        elif self.n_alleles == 3:
+            return bv.Triallelic
+        elif self.n_alleles == 4:
+            return bv.Quadraallelic
+
+    def decode(self, array):
+        return self.as_iupac(self.alphabet.decode(array))
+
+    @property
+    def reference_alleles(self):
+        return self.as_iupac('0' * len(self))
+
+    @property
+    def alternate_alleles(self):
+        return tuple(','.join(k for k, v in d.items()
+                              if v not in '0N')
+                     for d in self._iupac_to_allelic)
