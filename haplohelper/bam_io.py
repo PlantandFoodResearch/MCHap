@@ -143,21 +143,11 @@ def find_variants(alignment_file,
     )
 
 
-def encode_positions(alignment_file,
-                     variant_loci_map=None,
-                     contig=None,
-                     positions=None,
-                     alphabet=None,
-                     min_map_qual=20):
-
-    if contig is None:
-        contig = variant_loci_map.reference_contig
-
-    if positions is None:
-        positions = variant_loci_map.reference_positions
-
-    if alphabet is None:
-        alphabet = variant_loci_map.alphabet
+def encode_alignment_positions(alignment_file,
+                               contig=None,
+                               positions=None,
+                               alphabet=None,
+                               min_map_qual=20):
 
     # extract reads
 
@@ -197,10 +187,6 @@ def encode_positions(alignment_file,
                          dtype=np.float)
         for i, read in enumerate(data.values()):
 
-            if variant_loci_map:
-                # translate reads
-                read['char'] = tuple(variant_loci_map.as_allelic(read['char']))
-
             array[i] = alphabet.encode(read)
 
         reads[sample] = array
@@ -230,6 +216,12 @@ class VariantLociMap(object):
 
         assert n_alleles in {2, 3, 4}
         self.n_alleles = n_alleles
+        if self.n_alleles == 2:
+            self.alphabet = bv.Biallelic
+        elif self.n_alleles == 3:
+            self.alphabet = bv.Triallelic
+        elif self.n_alleles == 4:
+            self.alphabet = bv.Quadraallelic
 
         self._allelic_to_iupac = np.empty(len(self._iupac_to_allelic),
                                           dtype='<O')
@@ -268,6 +260,9 @@ class VariantLociMap(object):
         data = '\n'.join('{0}\t{1}\t{2}'.format(*tup) for tup in zipped)
         return header + data
 
+    def vector_size(self):
+        return self.alphabet.vector_size()
+
     @classmethod
     def from_counts(cls, counts, *args, **kwargs):
         # assumes most common allele is reference (for now)
@@ -298,17 +293,37 @@ class VariantLociMap(object):
         return ''.join(
             self._allelic_to_iupac[i][char] for i, char in enumerate(string))
 
-    @property
-    def alphabet(self):
-        if self.n_alleles == 2:
-            return bv.Biallelic
-        elif self.n_alleles == 3:
-            return bv.Triallelic
-        elif self.n_alleles == 4:
-            return bv.Quadraallelic
-
     def decode(self, array):
         return self.as_iupac(self.alphabet.decode(array))
+
+    def encode(self, data):
+        assert len(data) == len(self)
+
+        data_length = len(data[0])
+        if data_length == 1:
+            # binary encoding
+            dtype = self.alphabet.dtype()
+        elif data_length == 2:
+            # probabilistic encoding
+            dtype = np.float
+        else:
+            raise ValueError('data must be a sequence of characters or '
+                             'pairs of characters with probabilities.')
+        array = np.empty((len(data), self.vector_size()), dtype=dtype)
+        for i, symbol in enumerate(data):
+            symbol = tuple(symbol)
+            array[i] = self.alphabet.encode_element(
+                self._iupac_to_allelic[i][symbol[0]],
+                *symbol[1:]
+            )
+        return array
+
+    def encode_alignment(self, alignment_file, min_map_qual=20):
+        return encode_alignment_positions(alignment_file,
+                                          alphabet=self,
+                                          contig=self.reference_contig,
+                                          positions=self.reference_positions,
+                                          min_map_qual=min_map_qual)
 
     @property
     def reference_alleles(self):
