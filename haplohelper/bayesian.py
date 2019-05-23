@@ -122,7 +122,7 @@ class BayesianDosageCaller(BayesianHaplotypeModel):
         self.fit_kwargs = kwargs
 
     def call_trace(self, **kwargs):
-        return np.sort(self.trace.get_values('inheritence',
+        return np.sort(self.trace.get_values('inheritance',
                                              **kwargs),
                        axis=1)
 
@@ -159,11 +159,11 @@ class BayesianDosageCaller(BayesianHaplotypeModel):
 
         with pymc3.Model() as model:
 
-            inheritence = pm.Categorical('inheritence',
+            inheritance = pm.Categorical('inheritance',
                                          p=prior,
                                          shape=self.ploidy)
             inhrt = pm.Deterministic('inhrt', tt.sum(
-                tt.extra_ops.to_one_hot(inheritence, nb_class=n_haps),
+                tt.extra_ops.to_one_hot(inheritance, nb_class=n_haps),
                 axis=0).reshape((1, -1)))
 
             def logp(observations):
@@ -204,12 +204,12 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
         self.fit_kwargs = kwargs
 
     def maternal_inheritance_trace(self, **kwargs):
-        return np.sort(self.trace.get_values('mum_inheritence',
+        return np.sort(self.trace.get_values('maternal_inheritance',
                                              **kwargs),
                        axis=1)
 
     def paternal_inheritance_trace(self, **kwargs):
-        return np.sort(self.trace.get_values('dad_inheritence',
+        return np.sort(self.trace.get_values('paternal_inheritance',
                                              **kwargs),
                        axis=1)
 
@@ -253,17 +253,29 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
             # flat prior
             paternal_prior = np.repeat(1, n_dad_haps) / n_dad_haps
         else:
-            paternal_prior = self.maternal_prior
+            paternal_prior = self.paternal_prior
+
+        # grid of priors with n_cats number of cells (combinations)
+        n_cats = n_mum_haps * n_dad_haps
+        prior = np.ones((n_mum_haps, n_dad_haps), dtype=np.float)
+        prior = maternal_prior.reshape(-1, 1) * prior
+        prior = paternal_prior.reshape(1, -1) * prior
 
         with pymc3.Model() as model:
-            maternal_inheritance = pm.Categorical(
+            inheritance = pm.Categorical(
+                'inheritance',
+                p=prior.ravel(),
+                shape=ploidy//2
+            )
+
+            maternal_inheritance = pm.Deterministic(
                 'maternal_inheritance',
-                p=maternal_prior,
-                shape=ploidy // 2)
-            paternal_inheritance = pm.Categorical(
+                inheritance // n_dad_haps
+            )
+            paternal_inheritance = pm.Deterministic(
                 'paternal_inheritance',
-                p=paternal_prior,
-                shape=ploidy // 2)
+                inheritance % n_dad_haps
+            )
             mum_inhrt = tt.sum(
                 tt.extra_ops.to_one_hot(maternal_inheritance,
                                         nb_class=n_mum_haps), axis=0)
