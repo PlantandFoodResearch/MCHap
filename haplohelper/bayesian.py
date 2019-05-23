@@ -64,7 +64,7 @@ class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
                               for _
                               in range(n_base * ploidy)])
         else:
-            prior = self.prior
+            prior = self.prior.reshape(n_base * ploidy, n_nucl)
 
         with pymc3.Model() as model:
 
