@@ -192,32 +192,31 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
                  ploidy=None,
                  maternal_haplotypes=None,
                  paternal_haplotypes=None,
-                 prior=None,
+                 maternal_prior=None,
+                 paternal_prior=None,
                  **kwargs):
-        # check ploidy matches prior if given
-        # check read shape matches prior if given
-        assert maternal_haplotypes.shape == paternal_haplotypes.shape
         self.ploidy = ploidy
         self.maternal_haplotypes = maternal_haplotypes
         self.paternal_haplotypes = paternal_haplotypes
         self.trace = None
-        self.prior = prior
+        self.maternal_prior = maternal_prior
+        self.paternal_prior = paternal_prior
         self.fit_kwargs = kwargs
 
-    def mum_inheritence_trace(self, **kwargs):
+    def maternal_inheritance_trace(self, **kwargs):
         return np.sort(self.trace.get_values('mum_inheritence',
                                              **kwargs),
                        axis=1)
 
-    def dad_inheritence_trace(self, **kwargs):
+    def paternal_inheritance_trace(self, **kwargs):
         return np.sort(self.trace.get_values('dad_inheritence',
                                              **kwargs),
                        axis=1)
 
     def haplotype_trace(self, sort=True, **kwargs):
         n_base, n_nucl = self.maternal_haplotypes.shape[-2:]
-        mum_trace = self.mum_inheritence_trace(**kwargs)
-        dad_trace = self.dad_inheritence_trace(**kwargs)
+        mum_trace = self.maternal_inheritance_trace(**kwargs)
+        dad_trace = self.paternal_inheritance_trace(**kwargs)
 
         trace = np.zeros((len(mum_trace),
                           self.ploidy,
@@ -236,30 +235,41 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
     def fit(self, reads):
         n_reads, n_base, n_nucl = reads.shape
         ploidy = self.ploidy
-        n_haps = ploidy * 2
+        n_mum_haps = len(self.maternal_haplotypes)
+        n_dad_haps = len(self.paternal_haplotypes)
 
         parent_haps = theano.shared(np.concatenate(
             [self.maternal_haplotypes,
              self.paternal_haplotypes])).reshape(
-            (1, 2 * ploidy, n_base, n_nucl))
+            (1, n_mum_haps + n_dad_haps, n_base, n_nucl))
 
-        if self.prior is None:
-            prior = np.repeat(1, n_haps) / n_haps
+        if self.maternal_prior is None:
+            # flat prior
+            maternal_prior = np.repeat(1, n_mum_haps) / n_mum_haps
         else:
-            prior = self.prior
+            maternal_prior = self.maternal_prior
+
+        if self.paternal_prior is None:
+            # flat prior
+            paternal_prior = np.repeat(1, n_dad_haps) / n_dad_haps
+        else:
+            paternal_prior = self.maternal_prior
 
         with pymc3.Model() as model:
-            probs = np.repeat(1, ploidy) / ploidy
-            mum_inheritence = pm.Categorical('mum_inheritence', p=probs,
-                                             shape=ploidy // 2)
-            dad_inheritence = pm.Categorical('dad_inheritence', p=probs,
-                                             shape=ploidy // 2)
+            maternal_inheritance = pm.Categorical(
+                'maternal_inheritance',
+                p=maternal_prior,
+                shape=ploidy // 2)
+            paternal_inheritance = pm.Categorical(
+                'paternal_inheritance',
+                p=paternal_prior,
+                shape=ploidy // 2)
             mum_inhrt = tt.sum(
-                tt.extra_ops.to_one_hot(mum_inheritence,
-                                        nb_class=ploidy), axis=0)
+                tt.extra_ops.to_one_hot(maternal_inheritance,
+                                        nb_class=n_mum_haps), axis=0)
             dad_inhrt = tt.sum(
-                tt.extra_ops.to_one_hot(dad_inheritence,
-                                        nb_class=ploidy), axis=0)
+                tt.extra_ops.to_one_hot(paternal_inheritance,
+                                        nb_class=n_dad_haps), axis=0)
             inhrt = pm.Deterministic('inhrt', tt.concatenate(
                 [mum_inhrt, dad_inhrt])).reshape((1, -1))
 
