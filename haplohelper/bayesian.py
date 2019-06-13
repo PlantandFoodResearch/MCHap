@@ -8,24 +8,25 @@ import biovector as bv
 
 class BayesianHaplotypeModel(object):
 
-    def haplotype_trace(self, sort=True, **kwargs):
+    def trace_haplotypes(self, sort=True, **kwargs):
         raise NotImplementedError
 
-    def haplotype_trace_counts(self, order='descending'):
-        trace = self.haplotype_trace()
+    def trace_haplotype_counts(self, order='descending', **kwargs):
+        trace = self.trace_haplotypes(**kwargs)
         n_steps, ploidy, n_base, n_nucl = trace.shape
         trace = trace.reshape((n_steps * ploidy, n_base, n_nucl))
         return bv.mset.counts(trace, order=order)
 
-    def haplotype_trace_set_counts(self, order='descending'):
-        trace = self.haplotype_trace()
+    def trace_haplotype_set_counts(self, order='descending', **kwargs):
+        trace = self.trace_haplotypes(**kwargs)
         n_steps, ploidy, n_base, n_nucl = trace.shape
         trace = trace.reshape((n_steps, ploidy * n_base, n_nucl))
         sets, counts = bv.mset.counts(trace, order=order)
         return sets.reshape(-1, ploidy, n_base, n_nucl), counts
 
-    def haplotypes(self, **kwargs):
-        return np.mean(self.haplotype_trace(**kwargs), axis=0)
+    def posterior(self, order='descending', **kwargs):
+        sets, counts = self.trace_haplotype_set_counts(order=order, **kwargs)
+        return sets, counts/np.sum(counts)
 
 
 class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
@@ -38,7 +39,7 @@ class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
         self.prior = prior
         self.fit_kwargs = kwargs
 
-    def haplotype_trace(self, sort=True, **kwargs):
+    def trace_haplotypes(self, sort=True, **kwargs):
         trace = self.trace.get_values('haplotypes', **kwargs)
         ploidy, n_base, n_nucl = trace.shape[-3:]
         trace = trace.reshape(-1,
@@ -121,14 +122,21 @@ class BayesianDosageCaller(BayesianHaplotypeModel):
         self.prior = prior
         self.fit_kwargs = kwargs
 
-    def call_trace(self, **kwargs):
+    def trace_inheritance(self, **kwargs):
         return np.sort(self.trace.get_values('inheritance',
                                              **kwargs),
                        axis=1)
 
-    def haplotype_trace(self, sort=True, **kwargs):
+    def posterior_inheritance(self, **kwargs):
+        trace = self.trace_inheritance(**kwargs)
+        array = np.zeros(len(self.reference_haplotypes))
+        for i in trace.ravel():
+            array[i] += 1
+        return array / len(trace)
+
+    def trace_haplotypes(self, sort=True, **kwargs):
         n_base, n_nucl = self.reference_haplotypes.shape[-2:]
-        calls = self.call_trace(**kwargs)
+        calls = self.trace_inheritance(**kwargs)
         trace = np.zeros((len(calls),
                           self.ploidy,
                           n_base,
@@ -203,20 +211,34 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
         self.paternal_prior = paternal_prior
         self.fit_kwargs = kwargs
 
-    def maternal_inheritance_trace(self, **kwargs):
+    def trace_maternal_inheritance(self, **kwargs):
         return np.sort(self.trace.get_values('maternal_inheritance',
                                              **kwargs),
                        axis=1)
 
-    def paternal_inheritance_trace(self, **kwargs):
+    def trace_paternal_inheritance(self, **kwargs):
         return np.sort(self.trace.get_values('paternal_inheritance',
                                              **kwargs),
                        axis=1)
 
-    def haplotype_trace(self, sort=True, **kwargs):
+    def posterior_maternal_inheritance(self, **kwargs):
+        trace = self.trace_maternal_inheritance(**kwargs)
+        array = np.zeros(len(self.maternal_haplotypes))
+        for i in trace.ravel():
+            array[i] += 1
+        return array / len(trace)
+
+    def posterior_paternal_inheritance(self, **kwargs):
+        trace = self.trace_paternal_inheritance(**kwargs)
+        array = np.zeros(len(self.paternal_haplotypes))
+        for i in trace.ravel():
+            array[i] += 1
+        return array / len(trace)
+
+    def trace_haplotypes(self, sort=True, **kwargs):
         n_base, n_nucl = self.maternal_haplotypes.shape[-2:]
-        mum_trace = self.maternal_inheritance_trace(**kwargs)
-        dad_trace = self.paternal_inheritance_trace(**kwargs)
+        mum_trace = self.trace_maternal_inheritance(**kwargs)
+        dad_trace = self.trace_paternal_inheritance(**kwargs)
 
         trace = np.zeros((len(mum_trace),
                           self.ploidy,
