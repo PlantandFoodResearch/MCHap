@@ -6,6 +6,15 @@ import theano
 import biovector as bv
 
 
+def logp(reads, haplotypes):
+    step_0 = reads * haplotypes
+    step_1 = tt.sum(step_0, axis=3)
+    step_2 = tt.prod(step_1, axis=2)
+    step_3 = tt.sum(step_2, axis=1)
+    step_4 = tt.sum(tt.log(step_3), axis=0)
+    return step_4
+
+
 class BayesianHaplotypeModel(object):
 
     def trace_haplotypes(self, sort=True, **kwargs):
@@ -40,12 +49,7 @@ class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
         self.fit_kwargs = kwargs
 
     def trace_haplotypes(self, sort=True, **kwargs):
-        trace = self.trace.get_values('haplotypes', **kwargs)
-        ploidy, n_base, n_nucl = trace.shape[-3:]
-        trace = trace.reshape(-1,
-                              ploidy,
-                              n_base,
-                              n_nucl).astype(np.int8)
+        trace = self.trace.get_values('haplotypes', **kwargs).astype(np.int8)
 
         if sort:
             for i, haps in enumerate(trace):
@@ -78,25 +82,13 @@ class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
                 tt.extra_ops.to_one_hot(
                     bases,
                     nb_class=n_nucl
-                ).reshape((1, ploidy, n_base, n_nucl))
+                ).reshape((ploidy, n_base, n_nucl))
             )
-
-            # log(P) function, observations is a list of read array
-            # in order: mum, dad, kid_0, kid_1, ...
-            def logp(observations):
-                # probabilities of reads drawn from inherited haplotypes
-                step_0 = haplotypes * observations
-                step_1 = tt.sum(step_0, axis=3)
-                step_2 = tt.prod(step_1, axis=2)
-                step_3 = tt.sum(step_2, axis=1)
-                step_4 = tt.sum(tt.log(step_3), axis=0)
-
-                return step_4
 
             # maximise log(P) for given observations
             pm.DensityDist('logp', logp, observed={
-                'observations':
-                reads.reshape(n_reads, 1, n_base, n_nucl)
+                'reads': reads.reshape(n_reads, 1, n_base, n_nucl),
+                'haplotypes': haplotypes.reshape((1, ploidy, n_base, n_nucl))
             })
 
             # trace log likelihood
@@ -151,14 +143,12 @@ class BayesianDosageCaller(BayesianHaplotypeModel):
         return trace
 
     def fit(self, reads):
+        ploidy = self.ploidy
         n_reads, n_base, n_nucl = reads.shape
         n_haps = self.reference_haplotypes.shape[0]
 
         ref_haplotypes = theano.shared(
-            self.reference_haplotypes).reshape((1,
-                                                n_haps,
-                                                n_base,
-                                                n_nucl))
+            self.reference_haplotypes)
 
         if self.prior is None:
             prior = np.repeat(1, n_haps) / n_haps
@@ -167,26 +157,19 @@ class BayesianDosageCaller(BayesianHaplotypeModel):
 
         with pymc3.Model() as model:
 
+            # indices of reference haplotypes to select
             inheritance = pm.Categorical('inheritance',
                                          p=prior,
                                          shape=self.ploidy)
-            inhrt = pm.Deterministic('inhrt', tt.sum(
-                tt.extra_ops.to_one_hot(inheritance, nb_class=n_haps),
-                axis=0).reshape((1, -1)))
 
-            def logp(observations):
-                step_0 = ref_haplotypes * observations
-                step_1 = tt.sum(step_0, axis=3)
-                step_2 = tt.prod(step_1, axis=2)
-                step_inhrt = step_2 * inhrt
-                step_3 = tt.sum(step_inhrt, axis=1)
-                step_4 = tt.sum(tt.log(step_3), axis=0)
-
-                return step_4
+            # select haplotypes from reference set
+            haplotypes = ref_haplotypes[inheritance]
 
             # maximise log(P) for given observations
             pm.DensityDist('logp', logp, observed={
-                'observations': reads.reshape(n_reads, 1, n_base, n_nucl)})
+                'reads': reads.reshape(n_reads, 1, n_base, n_nucl),
+                'haplotypes': haplotypes.reshape((1, ploidy, n_base, n_nucl))
+            })
 
             # trace log likelihood
             llk = pm.Deterministic('llk', model.logpt)
@@ -260,10 +243,8 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
         n_mum_haps = len(self.maternal_haplotypes)
         n_dad_haps = len(self.paternal_haplotypes)
 
-        parent_haps = theano.shared(np.concatenate(
-            [self.maternal_haplotypes,
-             self.paternal_haplotypes])).reshape(
-            (1, n_mum_haps + n_dad_haps, n_base, n_nucl))
+        maternal_haplotypes = theano.shared(self.maternal_haplotypes)
+        paternal_haplotypes = theano.shared(self.paternal_haplotypes)
 
         if self.maternal_prior is None:
             # flat prior
@@ -277,8 +258,7 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
         else:
             paternal_prior = self.paternal_prior
 
-        # grid of priors with n_cats number of cells (combinations)
-        n_cats = n_mum_haps * n_dad_haps
+        # grid of priors
         prior = np.ones((n_mum_haps, n_dad_haps), dtype=np.float)
         prior = maternal_prior.reshape(-1, 1) * prior
         prior = paternal_prior.reshape(1, -1) * prior
@@ -298,28 +278,17 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
                 'paternal_inheritance',
                 inheritance % n_dad_haps
             )
-            mum_inhrt = tt.sum(
-                tt.extra_ops.to_one_hot(maternal_inheritance,
-                                        nb_class=n_mum_haps), axis=0)
-            dad_inhrt = tt.sum(
-                tt.extra_ops.to_one_hot(paternal_inheritance,
-                                        nb_class=n_dad_haps), axis=0)
-            inhrt = pm.Deterministic('inhrt', tt.concatenate(
-                [mum_inhrt, dad_inhrt])).reshape((1, -1))
 
-            def logp(observations):
-                step_0 = parent_haps * observations
-                step_1 = tt.sum(step_0, axis=3)
-                step_2 = tt.prod(step_1, axis=2)
-                step_inhrt = step_2 * inhrt
-                step_3 = tt.sum(step_inhrt, axis=1)
-                step_4 = tt.sum(tt.log(step_3), axis=0)
-
-                return step_4
+            # select haplotypes from reference sets
+            mum_haps = maternal_haplotypes[maternal_inheritance]
+            dad_haps = paternal_haplotypes[paternal_inheritance]
+            haplotypes = tt.concatenate([mum_haps, dad_haps])
 
             # maximise log(P) for given observations
             pm.DensityDist('logp', logp, observed={
-                'observations': reads.reshape(n_reads, 1, n_base, n_nucl)})
+                'reads': reads.reshape(n_reads, 1, n_base, n_nucl),
+                'haplotypes': haplotypes.reshape((1, ploidy, n_base, n_nucl))
+            })
 
             # trace log likelihood
             llk = pm.Deterministic('llk', model.logpt)

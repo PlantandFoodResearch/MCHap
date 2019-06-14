@@ -7,7 +7,7 @@ from haplohelper import util
 from haplohelper import inheritence
 
 
-def llk(reads, haplotypes):
+def logp(reads, haplotypes):
     return np.sum(np.log(np.mean(bv.stats.pairwise(bv.stats.pid,
                                                    reads,
                                                    haplotypes), axis=-1)))
@@ -50,7 +50,7 @@ class GreedyHaplotypeAssembler(GreedyHaplotypeModel):
                 llk_opts = np.zeros(n_nucl)
                 for nucl in range(n_nucl):
                     haps[hap, base] = nucleotides[nucl]
-                    llk_opts[nucl] = llk(reads, haps)
+                    llk_opts[nucl] = logp(reads, haps)
 
                 choice = np.argmax(llk_opts)
                 haps[hap, base] = nucleotides[choice]
@@ -89,7 +89,7 @@ class GreedyDosageCaller(GreedyHaplotypeModel):
 
             for idx in range(n_known_haps):
                 haps[hap] = known_haps[idx]
-                llk_opts[idx] = llk(reads, haps)
+                llk_opts[idx] = logp(reads, haps)
 
             choice = np.argmax(llk_opts)
             haps[hap] = known_haps[choice]
@@ -136,7 +136,7 @@ class GreedyChildDosageCaller(GreedyHaplotypeModel):
 
                 for idx in range(n_available_haps):
                     haps[hap] = available_haps[idx]
-                    llk_opts[idx] = llk(reads, haps)
+                    llk_opts[idx] = logp(reads, haps)
 
                 choice = np.argmax(llk_opts)
                 haps[hap] = available_haps[choice]
