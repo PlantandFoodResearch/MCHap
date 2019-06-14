@@ -13,16 +13,17 @@ def llk(reads, haplotypes):
                                                    haplotypes), axis=-1)))
 
 
-class GreedyHaplotypeAssembler(object):
+class GreedyHaplotypeModel(object):
+    pass
+
+
+class GreedyHaplotypeAssembler(GreedyHaplotypeModel):
 
     def __init__(self, ploidy=None):
         # check ploidy matches prior if given
         # check read shape matches prior if given
         self.ploidy = ploidy
         self.result = None
-
-    def haplotypes(self):
-        return self.result.copy().astype(np.int8)
 
     def fit(self, reads, direction='middleout'):
         assert reads.ndim == 3
@@ -57,7 +58,7 @@ class GreedyHaplotypeAssembler(object):
         self.result = haps
 
 
-class GreedyDosageCaller(object):
+class GreedyDosageCaller(GreedyHaplotypeModel):
 
     def __init__(self,
                  ploidy=None,
@@ -67,9 +68,6 @@ class GreedyDosageCaller(object):
         self.ploidy = ploidy
         self.reference_haplotypes = reference_haplotypes
         self.result = None
-
-    def haplotypes(self):
-        return self.result.copy().astype(np.int8)
 
     def fit(self, reads):
         assert reads.ndim == self.reference_haplotypes.ndim == 3
@@ -99,7 +97,7 @@ class GreedyDosageCaller(object):
         self.result = haps
 
 
-class GreedyChildDosageCaller(object):
+class GreedyChildDosageCaller(GreedyHaplotypeModel):
 
     def __init__(self,
                  ploidy=None,
@@ -112,9 +110,6 @@ class GreedyChildDosageCaller(object):
         self.maternal_haplotypes = maternal_haplotypes
         self.paternal_haplotypes = paternal_haplotypes
         self.result = None
-
-    def haplotypes(self):
-        return self.result.copy().astype(np.int8)
 
     def fit(self, reads):
         assert reads.ndim == self.maternal_haplotypes.ndim == 3
