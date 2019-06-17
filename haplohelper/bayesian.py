@@ -20,22 +20,25 @@ class BayesianHaplotypeModel(object):
     def trace_haplotypes(self, sort=True, **kwargs):
         raise NotImplementedError
 
-    def trace_haplotype_counts(self, order='descending', **kwargs):
+    def posterior_haplotypes(self, order='descending', counts=False, **kwargs):
         trace = self.trace_haplotypes(**kwargs)
         n_steps, ploidy, n_base, n_nucl = trace.shape
         trace = trace.reshape((n_steps * ploidy, n_base, n_nucl))
-        return bv.mset.counts(trace, order=order)
+        haps, counts_ = bv.mset.counts(trace, order=order)
+        if not counts:
+            # then posterior probabilities
+            counts_ = counts_/np.sum(counts_)
+        return haps, counts_
 
-    def trace_haplotype_set_counts(self, order='descending', **kwargs):
+    def posterior(self, order='descending', counts=False, **kwargs):
         trace = self.trace_haplotypes(**kwargs)
         n_steps, ploidy, n_base, n_nucl = trace.shape
         trace = trace.reshape((n_steps, ploidy * n_base, n_nucl))
-        sets, counts = bv.mset.counts(trace, order=order)
-        return sets.reshape(-1, ploidy, n_base, n_nucl), counts
-
-    def posterior(self, order='descending', **kwargs):
-        sets, counts = self.trace_haplotype_set_counts(order=order, **kwargs)
-        return sets, counts/np.sum(counts)
+        sets, counts_ = bv.mset.counts(trace, order=order)
+        if not counts:
+            # then posterior probabilities
+            counts_ = counts_/np.sum(counts_)
+        return sets.reshape(-1, ploidy, n_base, n_nucl), counts_
 
 
 class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
@@ -47,48 +50,53 @@ class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
         self.trace = None
         self.prior = prior
         self.fit_kwargs = kwargs
+        # store read vector size when fitting to convert integers to one-hot
+        self._vector_size = None
 
-    def trace_haplotypes(self, sort=True, **kwargs):
-        trace = self.trace.get_values('haplotypes', **kwargs).astype(np.int8)
-
+    def trace_integers(self, sort=True, **kwargs):
+        trace = self.trace.get_values('integers', **kwargs)
         if sort:
             for i, haps in enumerate(trace):
-                trace[i] = bv.mset.sort_onehot(haps)
-
+                trace[i] = bv.integers.sort_integer_rows(haps)
         return trace
 
-    def fit(self, reads):
-        pass
+    def trace_haplotypes(self, sort=True, **kwargs):
+        integers = self.trace_integers(sort=sort, **kwargs)
+        return bv.integers.integers_as_onehot(integers, self._vector_size)
 
+    def fit(self, reads):
         n_reads, n_base, n_nucl = reads.shape
         ploidy = self.ploidy
 
+        # store read vector size for conversion of integers to one-hot
+        # it's more memory efficient to only store the integer encoding
+        self._vector_size = n_nucl
+
         if self.prior is None:
-            null_nucleotide = np.ones(n_nucl) / n_nucl
-            prior = np.array([null_nucleotide
-                              for _
-                              in range(n_base * ploidy)])
+            prior = np.ones(n_nucl) / n_nucl
         else:
-            prior = self.prior.reshape(n_base * ploidy, n_nucl)
+            prior = self.prior
 
         with pymc3.Model() as model:
 
-            bases = pm.Categorical(name='bases',
-                                   p=prior,
-                                   shape=(n_base * ploidy))
-
-            haplotypes = pm.Deterministic(
-                'haplotypes',
-                tt.extra_ops.to_one_hot(
-                    bases,
-                    nb_class=n_nucl
-                ).reshape((ploidy, n_base, n_nucl))
+            # propose haplotypes from categorical distribution
+            # these are stored in integer encoding in the trace
+            integers = pm.Categorical(
+                name='integers',
+                p=prior,
+                shape=(ploidy, n_base)
             )
+
+            # convert to one-hot encoding (floats) for log(P) calculation
+            haplotypes = tt.extra_ops.to_one_hot(
+                integers.reshape((ploidy * n_base,)),
+                nb_class=n_nucl
+            ).reshape((1, ploidy, n_base, n_nucl))
 
             # maximise log(P) for given observations
             pm.DensityDist('logp', logp, observed={
                 'reads': reads.reshape(n_reads, 1, n_base, n_nucl),
-                'haplotypes': haplotypes.reshape((1, ploidy, n_base, n_nucl))
+                'haplotypes': haplotypes
             })
 
             # trace log likelihood
