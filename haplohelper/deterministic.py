@@ -7,22 +7,23 @@ from haplohelper import util
 from haplohelper import inheritence
 
 
-def llk(reads, haplotypes):
+def logp(reads, haplotypes):
     return np.sum(np.log(np.mean(bv.stats.pairwise(bv.stats.pid,
                                                    reads,
                                                    haplotypes), axis=-1)))
 
 
-class GreedyHaplotypeAssembler(object):
+class GreedyHaplotypeModel(object):
+    pass
+
+
+class GreedyHaplotypeAssembler(GreedyHaplotypeModel):
 
     def __init__(self, ploidy=None):
         # check ploidy matches prior if given
         # check read shape matches prior if given
         self.ploidy = ploidy
         self.result = None
-
-    def haplotypes(self):
-        return self.result.copy().astype(np.int8)
 
     def fit(self, reads, direction='middleout'):
         assert reads.ndim == 3
@@ -49,7 +50,7 @@ class GreedyHaplotypeAssembler(object):
                 llk_opts = np.zeros(n_nucl)
                 for nucl in range(n_nucl):
                     haps[hap, base] = nucleotides[nucl]
-                    llk_opts[nucl] = llk(reads, haps)
+                    llk_opts[nucl] = logp(reads, haps)
 
                 choice = np.argmax(llk_opts)
                 haps[hap, base] = nucleotides[choice]
@@ -57,7 +58,7 @@ class GreedyHaplotypeAssembler(object):
         self.result = haps
 
 
-class GreedyDosageCaller(object):
+class GreedyDosageCaller(GreedyHaplotypeModel):
 
     def __init__(self,
                  ploidy=None,
@@ -67,9 +68,6 @@ class GreedyDosageCaller(object):
         self.ploidy = ploidy
         self.reference_haplotypes = reference_haplotypes
         self.result = None
-
-    def haplotypes(self):
-        return self.result.copy().astype(np.int8)
 
     def fit(self, reads):
         assert reads.ndim == self.reference_haplotypes.ndim == 3
@@ -91,7 +89,7 @@ class GreedyDosageCaller(object):
 
             for idx in range(n_known_haps):
                 haps[hap] = known_haps[idx]
-                llk_opts[idx] = llk(reads, haps)
+                llk_opts[idx] = logp(reads, haps)
 
             choice = np.argmax(llk_opts)
             haps[hap] = known_haps[choice]
@@ -99,7 +97,7 @@ class GreedyDosageCaller(object):
         self.result = haps
 
 
-class GreedyChildDosageCaller(object):
+class GreedyChildDosageCaller(GreedyHaplotypeModel):
 
     def __init__(self,
                  ploidy=None,
@@ -112,9 +110,6 @@ class GreedyChildDosageCaller(object):
         self.maternal_haplotypes = maternal_haplotypes
         self.paternal_haplotypes = paternal_haplotypes
         self.result = None
-
-    def haplotypes(self):
-        return self.result.copy().astype(np.int8)
 
     def fit(self, reads):
         assert reads.ndim == self.maternal_haplotypes.ndim == 3
@@ -141,7 +136,7 @@ class GreedyChildDosageCaller(object):
 
                 for idx in range(n_available_haps):
                     haps[hap] = available_haps[idx]
-                    llk_opts[idx] = llk(reads, haps)
+                    llk_opts[idx] = logp(reads, haps)
 
                 choice = np.argmax(llk_opts)
                 haps[hap] = available_haps[choice]
