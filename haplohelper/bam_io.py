@@ -194,6 +194,26 @@ def encode_alignment_positions(alignment_file,
     return reads
 
 
+# defaults for converting from Allelic to IUPAC
+_DEFAULT_ALLELIC_TO_IUPAC = (
+    ('N', 'N'),
+    ('Z', 'Z'),
+    ('.', '.'),
+    ('-', '-'),
+)
+
+# defaults for converting from to IUPAC Allelic
+_DEFAULT_IUPAC_TO_ALLELIC = (
+    ('A', 'N'),
+    ('C', 'N'),
+    ('T', 'N'),
+    ('G', 'N'),
+    ('N', 'N'),
+    ('Z', 'Z'),
+    ('.', '.'),
+    ('-', '-'),
+)
+
 class VariantLociMap(object):
     """Block of variant positions
     """
@@ -227,7 +247,7 @@ class VariantLociMap(object):
                                           dtype='<O')
         alleles = set(map(str, range(self.n_alleles)))
         for i, d in enumerate(self._iupac_to_allelic):
-            self._allelic_to_iupac[i] = {'N': 'N'}
+            self._allelic_to_iupac[i] = dict(_DEFAULT_ALLELIC_TO_IUPAC)
 
             for k, v in d.items():
                 if v in alleles:
@@ -270,7 +290,7 @@ class VariantLociMap(object):
         iupac_to_allelic = np.empty(len(counts), dtype='<O')
         for i, counter in enumerate(counts):
 
-            iupac_to_allelic[i] = {k: 'N' for k in 'ACTGN'}
+            iupac_to_allelic[i] = dict(_DEFAULT_IUPAC_TO_ALLELIC)
 
             j = 0
             for char, _ in counter.most_common(n_alleles):
@@ -332,5 +352,5 @@ class VariantLociMap(object):
     @property
     def alternate_alleles(self):
         return tuple(','.join(k for k, v in d.items()
-                              if v not in '0N')
+                              if v not in '0NZ.-')
                      for d in self._iupac_to_allelic)
