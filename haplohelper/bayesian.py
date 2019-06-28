@@ -24,7 +24,7 @@ class BayesianHaplotypeModel(object):
         trace = self.trace_haplotypes(**kwargs)
         n_steps, ploidy, n_base, n_nucl = trace.shape
         trace = trace.reshape((n_steps * ploidy, n_base, n_nucl))
-        haps, counts_ = bv.mset.counts(trace, order=order)
+        haps, counts_ = bv.mset.count_unique(trace, order=order)
         if not counts:
             # then posterior probabilities
             counts_ = counts_/np.sum(counts_)
@@ -34,7 +34,7 @@ class BayesianHaplotypeModel(object):
         trace = self.trace_haplotypes(**kwargs)
         n_steps, ploidy, n_base, n_nucl = trace.shape
         trace = trace.reshape((n_steps, ploidy * n_base, n_nucl))
-        sets, counts_ = bv.mset.counts(trace, order=order)
+        sets, counts_ = bv.mset.count_unique(trace, order=order)
         if not counts:
             # then posterior probabilities
             counts_ = counts_/np.sum(counts_)
