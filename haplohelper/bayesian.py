@@ -302,3 +302,271 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
             llk = pm.Deterministic('llk', model.logpt)
 
             self.trace = pymc3.sample(**self.fit_kwargs)
+
+
+
+
+class BayesianCrossHaplotypeModel(BayesianHaplotypeModel):
+
+    def trace_haplotypes(self, parent=None, sort=True, **kwargs):
+        # assert parent in {None, 'mother', 'father'}
+        raise NotImplementedError
+
+
+def _hwe_pop_logp(
+        maternal_reads,
+        paternal_reads,
+        progeny_reads,
+        maternal_haplotypes,
+        paternal_haplotypes,
+        progeny_haplotypes):
+    maternal = logp(maternal_reads, maternal_haplotypes)
+    paternal = logp(paternal_reads, paternal_haplotypes)
+    progeny = logp(progeny_reads, progeny_haplotypes)
+    return maternal + paternal + progeny
+
+
+class BayesianCrossHaplotypeAssembler(BayesianCrossHaplotypeModel):
+
+    def __init__(self,
+                 ploidy=None,
+                 #maternal_prior=None,
+                 #paternal_prior=None,
+                 **kwargs):
+        # check ploidy matches prior if given
+        # check read shape matches prior if given
+        self.ploidy = ploidy
+        self.trace = None
+        #self.maternal_prior = maternal_prior
+        #self.paternal_prior = paternal_prior
+        self.fit_kwargs = kwargs
+        self._vector_size = None
+
+    def trace_integers(self, parent=None, sort=True, **kwargs):
+        assert parent in {None, 'mother', 'father'}
+
+        if parent:
+            if parent == 'mother':
+                trace = self.trace.get_values('integers', **kwargs)[:, 0]
+            elif parent == 'father':
+                trace = self.trace.get_values('integers', **kwargs)[:, 1]
+
+            if sort:
+                for i, haps in enumerate(trace):
+                    trace[i] = bv.integers.sort_integer_rows(haps)
+
+        else:
+            trace = self.trace.get_values('integers', **kwargs)
+
+            if sort:
+                # sort haplotype sets independently for parents
+                for i, haps in enumerate(trace):
+                    # maternal
+                    trace[i][0] = bv.integers.sort_integer_rows(haps[0])
+                    # paternal
+                    trace[i][1] = bv.integers.sort_integer_rows(haps[1])
+
+            # return haplotypes of parents as single flattened set
+            n_steps, n_parent, ploidy, n_base = trace.shape
+            trace = trace.reshape(n_steps, n_parent * ploidy, n_base)
+
+        return trace
+
+    def trace_haplotypes(self, parent=None, sort=True, **kwargs):
+        integers = self.trace_integers(parent=parent, sort=sort, **kwargs)
+        return bv.integers.integers_as_onehot(integers, self._vector_size)
+
+    def fit(self,
+            maternal_reads=None,
+            paternal_reads=None,
+            progeny_reads=None):
+
+        # must have at least two of three read arrays provided
+
+        # TODO: handle missing reads and check shapes match
+        n_mum_reads, n_mum_base, n_mum_nucl = maternal_reads.shape
+        n_dad_reads, n_dad_base, n_dad_nucl = paternal_reads.shape
+        n_prg_reads, n_prg_base, n_prg_nucl = progeny_reads.shape
+        assert n_mum_base == n_dad_base == n_prg_base
+        assert n_mum_nucl == n_dad_nucl == n_prg_nucl
+        n_base = n_mum_base
+        n_nucl = n_mum_nucl
+        ploidy = self.ploidy
+
+        # store read vector size for conversion of integers to one-hot
+        # it's more memory efficient to only store the integer encoding
+        self._vector_size = n_nucl
+
+        #if self.maternal_prior is None:
+        #    maternal_prior = np.ones(n_nucl) / n_nucl
+        #else:
+        #    maternal_prior = self.maternal_prior
+        #if self.paternal_prior is None:
+        #    paternal_prior = np.ones(n_nucl) / n_nucl
+        #else:
+        #    paternal_prior = self.paternal_prior
+
+        # TODO: actually use custom priors for parents?
+        prior = np.ones(n_nucl) / n_nucl
+
+        with pymc3.Model() as model:
+
+            # propose haplotypes from categorical distribution
+            # these are stored in integer encoding in the trace
+            integers = pm.Categorical(
+                name='integers',
+                p=prior,
+                shape=(2, ploidy, n_base)
+            )
+
+            # convert to one-hot encoding (floats) for log(P) calculation
+            haplotypes = tt.extra_ops.to_one_hot(
+                integers.reshape((2 * ploidy * n_base,)),
+                nb_class=n_nucl
+            ).reshape((2, ploidy, n_base, n_nucl))
+
+            maternal_haplotypes = haplotypes[0].reshape(
+                (1, ploidy, n_base, n_nucl)
+            )
+            paternal_haplotypes = haplotypes[1].reshape(
+                (1, ploidy, n_base, n_nucl)
+            )
+            progeny_haplotypes = haplotypes.reshape(
+                (1, 2 * ploidy, n_base, n_nucl)
+            )
+
+            # maximise log(P) for given observations
+            pm.DensityDist('logp', _hwe_pop_logp, observed={
+                'maternal_reads': maternal_reads.reshape(
+                    (n_mum_reads, 1, n_base, n_nucl)),
+                'paternal_reads': paternal_reads.reshape(
+                    (n_dad_reads, 1, n_base, n_nucl)),
+                'progeny_reads': progeny_reads.reshape(
+                    (n_prg_reads, 1, n_base, n_nucl)),
+                'maternal_haplotypes': maternal_haplotypes,
+                'paternal_haplotypes': paternal_haplotypes,
+                'progeny_haplotypes': progeny_haplotypes
+            })
+
+            # trace log likelihood
+            llk = pm.Deterministic('llk', model.logpt)
+
+            trace = pymc3.sample(**self.fit_kwargs)
+
+        self.trace = trace
+
+
+class BayesianCrossDosageCaller(BayesianCrossHaplotypeModel):
+
+    def __init__(self,
+                 ploidy=None,
+                 reference_haplotypes=None,
+                 prior=None,  # TODO: prior per parent
+                 **kwargs):
+        # check ploidy matches prior if given
+        # check read shape matches prior if given
+        self.ploidy = ploidy
+        self.reference_haplotypes = reference_haplotypes
+        self.trace = None
+        self.prior = prior
+        self.fit_kwargs = kwargs
+
+    def trace_inheritance(self, parent=None, sort=True, **kwargs):
+        assert parent in {None, 'mother', 'father'}
+
+        if parent:
+            if parent == 'mother':
+                trace = self.trace.get_values('inheritance', **kwargs)[:, 0]
+            elif parent == 'father':
+                trace = self.trace.get_values('inheritance', **kwargs)[:, 1]
+            else:
+                assert False
+
+        else:
+            trace = self.trace.get_values('inheritance', **kwargs)
+
+            if sort:
+                trace = np.sort(trace, axis=-1)
+
+            # return haplotypes of parents as single flattened set
+            trace = trace.reshape(-1, 2*self.ploidy)
+
+        return trace
+
+    def trace_haplotypes(self, parent=None, sort=True, **kwargs):
+        calls = self.trace_inheritance(parent=parent, sort=sort, **kwargs)
+        n_steps, n_haps = calls.shape
+        n_base, n_nucl = self.reference_haplotypes.shape[-2:]
+        trace = np.zeros((n_steps,
+                          n_haps,
+                          n_base,
+                          n_nucl),
+                         dtype=np.int8)
+
+        for i, idx in enumerate(calls):
+            trace[i] = self.reference_haplotypes[idx]
+        return trace
+
+    def fit(self,
+            maternal_reads=None,
+            paternal_reads=None,
+            progeny_reads=None):
+
+        # must have at least two of three read arrays provided
+
+        # TODO: handle missing reads and check shapes match
+        n_mum_reads, n_mum_base, n_mum_nucl = maternal_reads.shape
+        n_dad_reads, n_dad_base, n_dad_nucl = paternal_reads.shape
+        n_prg_reads, n_prg_base, n_prg_nucl = progeny_reads.shape
+        assert n_mum_base == n_dad_base == n_prg_base
+        assert n_mum_nucl == n_dad_nucl == n_prg_nucl
+        n_base = n_mum_base
+        n_nucl = n_mum_nucl
+        ploidy = self.ploidy
+
+        n_haps = self.reference_haplotypes.shape[0]
+
+        ref_haplotypes = theano.shared(
+            self.reference_haplotypes)
+
+        if self.prior is None:
+            prior = np.repeat(1, n_haps) / n_haps
+        else:
+            prior = self.prior
+
+        with pymc3.Model() as model:
+
+            # indices of reference haplotypes to select
+            inheritance = pm.Categorical(
+                'inheritance',
+                p=prior,
+                shape=(2, self.ploidy)
+            )
+            # select haplotypes from reference set
+            maternal_descent = inheritance[0]
+            paternal_descent = inheritance[1]
+            progeny_descent = inheritance.reshape((2 * ploidy,))
+            maternal_haplotypes = ref_haplotypes[maternal_descent]
+            paternal_haplotypes = ref_haplotypes[paternal_descent]
+            progeny_haplotypes = ref_haplotypes[progeny_descent]
+
+            # maximise log(P) for given observations
+            # maximise log(P) for given observations
+            pm.DensityDist('logp', _hwe_pop_logp, observed={
+                'maternal_reads': maternal_reads.reshape(
+                    (n_mum_reads, 1, n_base, n_nucl)),
+                'paternal_reads': paternal_reads.reshape(
+                    (n_dad_reads, 1, n_base, n_nucl)),
+                'progeny_reads': progeny_reads.reshape(
+                    (n_prg_reads, 1, n_base, n_nucl)),
+                'maternal_haplotypes': maternal_haplotypes,
+                'paternal_haplotypes': paternal_haplotypes,
+                'progeny_haplotypes': progeny_haplotypes
+            })
+
+            # trace log likelihood
+            llk = pm.Deterministic('llk', model.logpt)
+
+            self.trace = pymc3.sample(**self.fit_kwargs)
+
+
