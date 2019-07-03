@@ -4,6 +4,7 @@ from theano import tensor as tt
 import pymc3
 import theano
 import biovector as bv
+from haplohelper import inheritence
 
 
 def logp(reads, haplotypes):
@@ -185,6 +186,59 @@ class BayesianDosageCaller(BayesianHaplotypeModel):
             self.trace = pymc3.sample(**self.fit_kwargs)
 
 
+class BayesianHaplotypeSetCaller(BayesianHaplotypeModel):
+
+    def __init__(self,
+                 ploidy=None,
+                 haplotype_sets=None,
+                 prior=None,
+                 **kwargs):
+
+        self.ploidy = ploidy
+        self.haplotype_sets = haplotype_sets
+        self.trace = None
+        self.prior = prior
+        self.fit_kwargs = kwargs
+
+    def trace_haplotypes(self, sort=False, **kwargs):
+        # genotypes probably already sorted
+        trace = self.trace.get_values('genotype', **kwargs)
+        return self.haplotype_sets[trace]
+
+    def fit(self, reads):
+        ploidy = self.ploidy
+        n_reads, n_base, n_nucl = reads.shape
+        n_sets = self.haplotype_sets.shape[0]
+
+        sets = theano.shared(self.haplotype_sets)
+
+        if self.prior is None:
+            prior = np.ones(n_sets) / n_sets
+        else:
+            prior = self.prior
+
+        with pymc3.Model() as model:
+
+            # indices of reference haplotypes to select
+            genotype = pm.Categorical('genotype',
+                                      p=prior)
+
+            # select haplotypes from reference set
+            haplotypes = sets[genotype]
+
+            # maximise log(P) for given observations
+            pm.DensityDist('logp', logp, observed={
+                'reads': reads.reshape(n_reads, 1, n_base, n_nucl),
+                'haplotypes': haplotypes.reshape((1, ploidy, n_base, n_nucl))
+            })
+
+            # trace log likelihood
+            llk = pm.Deterministic('llk', model.logpt)
+
+            self.trace = pymc3.sample(**self.fit_kwargs)
+
+
+
 class BayesianChildDosageCaller(BayesianHaplotypeModel):
 
     def __init__(self,
@@ -302,8 +356,6 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
             llk = pm.Deterministic('llk', model.logpt)
 
             self.trace = pymc3.sample(**self.fit_kwargs)
-
-
 
 
 class BayesianCrossHaplotypeModel(BayesianHaplotypeModel):
