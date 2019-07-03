@@ -44,13 +44,12 @@ class BayesianHaplotypeModel(object):
 
 class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
 
-    def __init__(self, ploidy=None, prior=None, **kwargs):
+    def __init__(self, ploidy=None, prior=None):
         # check ploidy matches prior if given
         # check read shape matches prior if given
         self.ploidy = ploidy
         self.trace = None
         self.prior = prior
-        self.fit_kwargs = kwargs
         # store read vector size when fitting to convert integers to one-hot
         self._vector_size = None
 
@@ -65,7 +64,7 @@ class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
         integers = self.trace_integers(sort=sort, **kwargs)
         return bv.integers.integers_as_onehot(integers, self._vector_size)
 
-    def fit(self, reads):
+    def fit(self, reads, **kwargs):
         n_reads, n_base, n_nucl = reads.shape
         ploidy = self.ploidy
 
@@ -103,7 +102,7 @@ class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
             # trace log likelihood
             llk = pm.Deterministic('llk', model.logpt)
 
-            trace = pymc3.sample(**self.fit_kwargs)
+            trace = pymc3.sample(**kwargs)
 
         self.trace = trace
 
@@ -113,15 +112,13 @@ class BayesianDosageCaller(BayesianHaplotypeModel):
     def __init__(self,
                  ploidy=None,
                  reference_haplotypes=None,
-                 prior=None,
-                 **kwargs):
+                 prior=None):
         # check ploidy matches prior if given
         # check read shape matches prior if given
         self.ploidy = ploidy
         self.reference_haplotypes = reference_haplotypes
         self.trace = None
         self.prior = prior
-        self.fit_kwargs = kwargs
 
     def trace_inheritance(self, **kwargs):
         return np.sort(self.trace.get_values('inheritance',
@@ -151,7 +148,7 @@ class BayesianDosageCaller(BayesianHaplotypeModel):
 
         return trace
 
-    def fit(self, reads):
+    def fit(self, reads, **kwargs):
         ploidy = self.ploidy
         n_reads, n_base, n_nucl = reads.shape
         n_haps = self.reference_haplotypes.shape[0]
@@ -183,7 +180,7 @@ class BayesianDosageCaller(BayesianHaplotypeModel):
             # trace log likelihood
             llk = pm.Deterministic('llk', model.logpt)
 
-            self.trace = pymc3.sample(**self.fit_kwargs)
+            self.trace = pymc3.sample(**kwargs)
 
 
 class BayesianHaplotypeSetCaller(BayesianHaplotypeModel):
@@ -191,21 +188,19 @@ class BayesianHaplotypeSetCaller(BayesianHaplotypeModel):
     def __init__(self,
                  ploidy=None,
                  haplotype_sets=None,
-                 prior=None,
-                 **kwargs):
+                 prior=None):
 
         self.ploidy = ploidy
         self.haplotype_sets = haplotype_sets
         self.trace = None
         self.prior = prior
-        self.fit_kwargs = kwargs
 
     def trace_haplotypes(self, sort=False, **kwargs):
         # genotypes probably already sorted
         trace = self.trace.get_values('genotype', **kwargs)
         return self.haplotype_sets[trace]
 
-    def fit(self, reads):
+    def fit(self, reads, **kwargs):
         ploidy = self.ploidy
         n_reads, n_base, n_nucl = reads.shape
         n_sets = self.haplotype_sets.shape[0]
@@ -235,7 +230,7 @@ class BayesianHaplotypeSetCaller(BayesianHaplotypeModel):
             # trace log likelihood
             llk = pm.Deterministic('llk', model.logpt)
 
-            self.trace = pymc3.sample(**self.fit_kwargs)
+            self.trace = pymc3.sample(**kwargs)
 
 
 
@@ -246,15 +241,13 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
                  maternal_haplotypes=None,
                  paternal_haplotypes=None,
                  maternal_prior=None,
-                 paternal_prior=None,
-                 **kwargs):
+                 paternal_prior=None):
         self.ploidy = ploidy
         self.maternal_haplotypes = maternal_haplotypes
         self.paternal_haplotypes = paternal_haplotypes
         self.trace = None
         self.maternal_prior = maternal_prior
         self.paternal_prior = paternal_prior
-        self.fit_kwargs = kwargs
 
     def trace_maternal_inheritance(self, **kwargs):
         return np.sort(self.trace.get_values('maternal_inheritance',
@@ -299,7 +292,7 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
 
         return trace
 
-    def fit(self, reads):
+    def fit(self, reads, **kwargs):
         n_reads, n_base, n_nucl = reads.shape
         ploidy = self.ploidy
         n_mum_haps = len(self.maternal_haplotypes)
@@ -355,7 +348,7 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
             # trace log likelihood
             llk = pm.Deterministic('llk', model.logpt)
 
-            self.trace = pymc3.sample(**self.fit_kwargs)
+            self.trace = pymc3.sample(**kwargs)
 
 
 class BayesianCrossHaplotypeModel(BayesianHaplotypeModel):
@@ -384,14 +377,13 @@ class BayesianCrossHaplotypeAssembler(BayesianCrossHaplotypeModel):
                  ploidy=None,
                  #maternal_prior=None,
                  #paternal_prior=None,
-                 **kwargs):
+                 ):
         # check ploidy matches prior if given
         # check read shape matches prior if given
         self.ploidy = ploidy
         self.trace = None
         #self.maternal_prior = maternal_prior
         #self.paternal_prior = paternal_prior
-        self.fit_kwargs = kwargs
         self._vector_size = None
 
     def trace_integers(self, parent=None, sort=True, **kwargs):
@@ -431,7 +423,8 @@ class BayesianCrossHaplotypeAssembler(BayesianCrossHaplotypeModel):
     def fit(self,
             maternal_reads=None,
             paternal_reads=None,
-            progeny_reads=None):
+            progeny_reads=None,
+            **kwargs):
 
         # must have at least two of three read arrays provided
 
@@ -503,7 +496,7 @@ class BayesianCrossHaplotypeAssembler(BayesianCrossHaplotypeModel):
             # trace log likelihood
             llk = pm.Deterministic('llk', model.logpt)
 
-            trace = pymc3.sample(**self.fit_kwargs)
+            trace = pymc3.sample(**kwargs)
 
         self.trace = trace
 
@@ -513,15 +506,13 @@ class BayesianCrossDosageCaller(BayesianCrossHaplotypeModel):
     def __init__(self,
                  ploidy=None,
                  reference_haplotypes=None,
-                 prior=None,  # TODO: prior per parent
-                 **kwargs):
+                 prior=None):
         # check ploidy matches prior if given
         # check read shape matches prior if given
         self.ploidy = ploidy
         self.reference_haplotypes = reference_haplotypes
         self.trace = None
         self.prior = prior
-        self.fit_kwargs = kwargs
 
     def trace_inheritance(self, parent=None, sort=True, **kwargs):
         assert parent in {None, 'mother', 'father'}
@@ -562,7 +553,8 @@ class BayesianCrossDosageCaller(BayesianCrossHaplotypeModel):
     def fit(self,
             maternal_reads=None,
             paternal_reads=None,
-            progeny_reads=None):
+            progeny_reads=None,
+            **kwargs):
 
         # must have at least two of three read arrays provided
 
@@ -619,7 +611,7 @@ class BayesianCrossDosageCaller(BayesianCrossHaplotypeModel):
             # trace log likelihood
             llk = pm.Deterministic('llk', model.logpt)
 
-            self.trace = pymc3.sample(**self.fit_kwargs)
+            self.trace = pymc3.sample(**kwargs)
 
 
 class BayesianCrossSetCaller(BayesianCrossHaplotypeModel):
@@ -629,8 +621,7 @@ class BayesianCrossSetCaller(BayesianCrossHaplotypeModel):
                  maternal_sets=None,
                  paternal_sets=None,
                  maternal_prior=None,
-                 paternal_prior=None,
-                 **kwargs):
+                 paternal_prior=None):
         # check ploidy matches prior if given
         # check read shape matches prior if given
         self.ploidy = ploidy
@@ -639,7 +630,6 @@ class BayesianCrossSetCaller(BayesianCrossHaplotypeModel):
         self.paternal_sets = paternal_sets
         self.maternal_prior = maternal_prior
         self.paternal_prior = paternal_prior
-        self.fit_kwargs = kwargs
         self._vector_size = None
         self._n_paternal_sets = None
 
@@ -671,7 +661,8 @@ class BayesianCrossSetCaller(BayesianCrossHaplotypeModel):
     def fit(self,
             maternal_reads=None,
             paternal_reads=None,
-            progeny_reads=None):
+            progeny_reads=None,
+            **kwargs):
 
         # must have at least two of three read arrays provided
 
@@ -737,4 +728,4 @@ class BayesianCrossSetCaller(BayesianCrossHaplotypeModel):
             # trace log likelihood
             llk = pm.Deterministic('llk', model.logpt)
 
-            self.trace = pymc3.sample(**self.fit_kwargs)
+            self.trace = pymc3.sample(**kwargs)

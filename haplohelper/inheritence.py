@@ -101,7 +101,7 @@ def _suggest_alphabet(vector_size):
         return biovector.Quadraallelic
     else:
         raise ValueError(
-            'No suitable alphabet for vector size {}'.format(n_nucl))
+            'No suitable alphabet for vector size {}'.format(vector_size))
 
 
 def gamete_probabilities(haplotype_sets,
