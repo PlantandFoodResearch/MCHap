@@ -3,6 +3,7 @@
 import numpy as np
 from itertools import islice as _islice
 from itertools import zip_longest as _zip_longest
+import biovector
 
 
 def prob_of_qual(qual):
@@ -33,3 +34,15 @@ def middle_out(sequence):
     first_half = list(_islice(gen, len(sequence) // 2))
     second_half = list(gen)
     return merge(second_half, reversed(first_half))
+
+
+def suggest_alphabet(vector_size):
+    if vector_size == 2:
+        return biovector.Biallelic
+    elif vector_size == 3:
+        return biovector.Triallelic
+    elif vector_size == 4:
+        return biovector.Quadraallelic
+    else:
+        raise ValueError(
+            'No suitable alphabet for vector size {}'.format(vector_size))
