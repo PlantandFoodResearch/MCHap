@@ -38,6 +38,13 @@ class TrioChildInheritance(object):
             result = mset.add(result, mset.subtract(self.dad, self.dad_taken))
         return mset.unique(result)
 
+    @staticmethod
+    def _mset_thin(array, max_count):
+        """Replacement for the deprecated thin in biovector"""
+        unique, counts = mset.unique_counts(array)
+        counts[counts > max_count] = max_count
+        return mset.repeat(unique, counts)
+
     def take(self, hap, check=True):
 
         if hap.ndim == 2:
@@ -61,9 +68,10 @@ class TrioChildInheritance(object):
                 mum_update = mset.intercept(self.mum, un_assigned)
             else:
                 dad_slots = (self.ploidy / 2) - len(self.dad_taken)
-                dad_heritable = mset.thin(mset.subtract(self.dad,
-                                                        self.dad_taken),
-                                          dad_slots)
+                dad_heritable = self._mset_thin(
+                    mset.subtract(self.dad, self.dad_taken),
+                    dad_slots
+                )
                 mum_update = mset.intercept(self.mum,
                                             mset.subtract(un_assigned,
                                                           dad_heritable))
@@ -80,9 +88,10 @@ class TrioChildInheritance(object):
                 dad_update = mset.intercept(self.dad, un_assigned)
             else:
                 mum_slots = (self.ploidy / 2) - len(self.mum_taken)
-                mum_heritable = mset.thin(mset.subtract(self.mum,
-                                                        self.mum_taken),
-                                          mum_slots)
+                mum_heritable = self._mset_thin(
+                    mset.subtract(self.mum, self.mum_taken),
+                    mum_slots
+                )
                 dad_update = mset.intercept(self.dad,
                                             mset.subtract(un_assigned,
                                                           mum_heritable))
@@ -162,6 +171,7 @@ def cross_probabilities(maternal_gametes,
                         paternal_probabilities,
                         order=None,
                         alphabet=None):
+    assert order in {None, 'ascending', 'descending'}
 
     # get dimensions
     half_ploidy, n_base, n_nucl = maternal_gametes.shape[-3:]
@@ -213,7 +223,30 @@ def cross_probabilities(maternal_gametes,
         return new, new_probs
 
 
+def parental_set_probabilities(maternal_sets,
+                               maternal_probabilities,
+                               paternal_sets,
+                               paternal_probabilities):
+    m_len = len(maternal_sets)
+    d_len = len(paternal_sets)
 
+    n_sets = m_len * d_len
+
+    ploidy, n_base, n_nucl = maternal_sets[0].shape
+
+    # double the ploidy dimention
+    set_shape = (2 * ploidy, n_base, n_nucl)
+
+    sets = np.empty((n_sets, *set_shape), dtype=np.int8)
+    probs = np.empty(n_sets)
+
+    for m in range(m_len):
+        for d in range(d_len):
+            i = m * d
+            sets[i][0:ploidy] = maternal_sets[m]
+            sets[i][ploidy:] = paternal_sets[d]
+            probs[i] = maternal_probabilities[m] * paternal_probabilities[d]
+    return sets, probs
 
 
 

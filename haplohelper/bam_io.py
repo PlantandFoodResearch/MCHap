@@ -143,7 +143,10 @@ def encode_alignment_positions(alignment_file,
                          dtype=np.float)
         for i, read in enumerate(data.values()):
 
-            array[i] = alphabet.encode(read)
+            array[i] = alphabet.encode_probabilistic_vectors(
+                ''.join(read['char']),
+                probabilities=read['prob']
+            )
 
         reads[sample] = array
 
@@ -181,7 +184,7 @@ class VariantLociMap(object):
                  interval=None,
                  sequence=None,
                  n_alleles=None,
-                 snps=None):  # (position, alleles) includeds reference allele
+                 snps=None):  # (position, alleles) includes reference allele
 
         self.reference = reference
         self.contig = contig
@@ -235,18 +238,73 @@ class VariantLociMap(object):
     def vector_size(self):
         return self.alphabet.vector_size()
 
-    def as_allelic(self, string):
-        assert len(self._snps) == len(string)
-        return ''.join(
-            self._iupac_to_allelic[i][char] for i, char in enumerate(string))
+    def as_allelic(self, data):
+        if isinstance(data, str):
+            assert len(self._snps) == len(data)
+            return ''.join(self._iupac_to_allelic[i][char]
+                           for i, char in enumerate(data))
+        if not hasattr(data, 'ravel') or not hasattr(data, 'shape'):
+            data = np.array(data)
+        shape = data.shape
+        array = data.ravel()
+        for i, string in enumerate(array):
+            array[i] = ''.join(self._iupac_to_allelic[i][char]
+                           for i, char in enumerate(string))
+        return array.reshape(shape)
 
-    def as_iupac(self, string):
-        assert len(self._snps) == len(string)
-        return ''.join(
-            self._allelic_to_iupac[i][char] for i, char in enumerate(string))
+    def as_iupac(self, data):
+        if isinstance(data, str):
+            assert len(self._snps) == len(data)
+            return ''.join(self._allelic_to_iupac[i][char]
+                           for i, char in enumerate(data))
+        if not hasattr(data, 'ravel') or not hasattr(data, 'shape'):
+            data = np.array(data)
+        shape = data.shape
+        array = data.ravel()
+        for i, string in enumerate(array):
+            array[i] = ''.join(self._allelic_to_iupac[i][char]
+                           for i, char in enumerate(string))
+        return array.reshape(shape)
 
     def decode(self, array):
         return self.as_iupac(self.alphabet.decode(array))
+
+    def decode_flag_integers(self, array):
+        return self.as_iupac(self.alphabet.decode_flag_integers(array))
+
+    def decode_simple_integers(self, array):
+        return self.as_iupac(self.alphabet.decode_simple_integers(array))
+
+    def decode_binary_vectors(self, array):
+        return self.as_iupac(self.alphabet.decode_binary_vectors(array))
+
+    def encode_flag_integers(self, data, **kwargs):
+        return self.alphabet.encode_flag_integers(
+            self.as_allelic(data),
+            **kwargs
+        )
+
+    def encode_simple_integers(self, data, **kwargs):
+        return self.alphabet.encode_simple_integers(
+            self.as_allelic(data),
+            **kwargs
+        )
+
+    def encode_binary_vectors(self, data, **kwargs):
+        return self.alphabet.encode_binary_vectors(
+            self.as_allelic(data),
+            **kwargs
+        )
+
+    def encode_probabilistic_vectors(self,
+                                     data,
+                                     probabilities=None,
+                                     ignore_invalid=False):
+        return self.alphabet.encode_probabilistic_vectors(
+            self.as_allelic(data),
+            probabilities=probabilities,
+            ignore_invalid=ignore_invalid
+        )
 
     def encode(self, data):
         assert len(data) == len(self._snps)
@@ -399,7 +457,7 @@ class VariantLociMap(object):
                                 sample_min_proportion=0.2):
 
         if contig is None:
-            raise ('contig is required')
+            raise ValueError('contig is required')
 
         pileup = alignment_file.pileup(contig, interval.start, interval.stop)
 
