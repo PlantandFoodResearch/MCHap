@@ -4,7 +4,6 @@ from theano import tensor as tt
 import pymc3
 import theano
 import biovector as bv
-from haplohelper import inheritence
 
 
 def logp(reads, haplotypes):
@@ -25,7 +24,7 @@ class BayesianHaplotypeModel(object):
         trace = self.trace_haplotypes(**kwargs)
         n_steps, ploidy, n_base, n_nucl = trace.shape
         trace = trace.reshape((n_steps * ploidy, n_base, n_nucl))
-        haps, counts_ = bv.mset.count_unique(trace, order=order)
+        haps, counts_ = bv.mset.unique_counts(trace, order=order)
         if not counts:
             # then posterior probabilities
             counts_ = counts_/np.sum(counts_)
@@ -35,7 +34,7 @@ class BayesianHaplotypeModel(object):
         trace = self.trace_haplotypes(**kwargs)
         n_steps, ploidy, n_base, n_nucl = trace.shape
         trace = trace.reshape((n_steps, ploidy * n_base, n_nucl))
-        sets, counts_ = bv.mset.count_unique(trace, order=order)
+        sets, counts_ = bv.mset.unique_counts(trace, order=order)
         if not counts:
             # then posterior probabilities
             counts_ = counts_/np.sum(counts_)
@@ -57,12 +56,13 @@ class BayesianHaplotypeAssembler(BayesianHaplotypeModel):
         trace = self.trace.get_values('integers', **kwargs)
         if sort:
             for i, haps in enumerate(trace):
-                trace[i] = bv.integers.sort_integer_rows(haps)
+                trace[i] = bv.util.sort_scalar_seqs(haps)
         return trace
 
     def trace_haplotypes(self, sort=True, **kwargs):
         integers = self.trace_integers(sort=sort, **kwargs)
-        return bv.integers.integers_as_onehot(integers, self._vector_size)
+        onehots = bv.BioIntegerSet(integers).as_onehot(self._vector_size)
+        return onehots.values
 
     def fit(self, reads, **kwargs):
         n_reads, n_base, n_nucl = reads.shape
@@ -144,7 +144,7 @@ class BayesianDosageCaller(BayesianHaplotypeModel):
         for i, idx in enumerate(calls):
             trace[i] = self.reference_haplotypes[idx]
             if sort:
-                trace[i] = bv.mset.sort_onehot(trace[i])
+                trace[i] = bv.util.sort_vector_seqs(trace[i])
 
         return trace
 
@@ -288,7 +288,7 @@ class BayesianChildDosageCaller(BayesianHaplotypeModel):
             trace[i] = np.concatenate([self.maternal_haplotypes[mum_idx],
                                        self.paternal_haplotypes[dad_idx]])
             if sort:
-                trace[i] = bv.mset.sort_onehot(trace[i])
+                trace[i] = bv.util.sort_vector_seqs(trace[i])
 
         return trace
 
@@ -397,7 +397,7 @@ class BayesianCrossHaplotypeAssembler(BayesianCrossHaplotypeModel):
 
             if sort:
                 for i, haps in enumerate(trace):
-                    trace[i] = bv.integers.sort_integer_rows(haps)
+                    trace[i] = bv.util.sort_scalar_seqs(haps)
 
         else:
             trace = self.trace.get_values('integers', **kwargs)
@@ -406,9 +406,9 @@ class BayesianCrossHaplotypeAssembler(BayesianCrossHaplotypeModel):
                 # sort haplotype sets independently for parents
                 for i, haps in enumerate(trace):
                     # maternal
-                    trace[i][0] = bv.integers.sort_integer_rows(haps[0])
+                    trace[i][0] = bv.util.sort_scalar_seqs(haps[0])
                     # paternal
-                    trace[i][1] = bv.integers.sort_integer_rows(haps[1])
+                    trace[i][1] = bv.util.sort_scalar_seqs(haps[1])
 
             # return haplotypes of parents as single flattened set
             n_steps, n_parent, ploidy, n_base = trace.shape
@@ -418,7 +418,8 @@ class BayesianCrossHaplotypeAssembler(BayesianCrossHaplotypeModel):
 
     def trace_haplotypes(self, parent=None, sort=True, **kwargs):
         integers = self.trace_integers(parent=parent, sort=sort, **kwargs)
-        return bv.integers.integers_as_onehot(integers, self._vector_size)
+        onehots = bv.BioIntegerSet(integers).as_onehot(self._vector_size)
+        return onehots.values
 
     def fit(self,
             maternal_reads=None,

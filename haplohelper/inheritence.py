@@ -115,14 +115,10 @@ def _suggest_alphabet(vector_size):
 
 def gamete_probabilities(haplotype_sets,
                          haplotype_set_probabilities,
-                         order=None,
-                         alphabet=None):
+                         order=None):
     assert order in {None, 'ascending', 'descending'}
 
     n_sets, ploidy, n_base, n_nucl = haplotype_sets.shape
-
-    if alphabet is None:
-        alphabet = _suggest_alphabet(n_nucl)
 
     # convert haplotypes to strings for faster hashing/comparisons
     string_to_hap = {}
@@ -130,7 +126,7 @@ def gamete_probabilities(haplotype_sets,
     for i, hap in enumerate(haplotype_sets.reshape(n_sets * ploidy,
                                                    n_base,
                                                    n_nucl)):
-        string = alphabet.decode(hap)
+        string = hap.tostring()
         string_to_hap[string] = hap
         string_sets[i] = string
     string_sets = np.sort(string_sets.reshape(n_sets, ploidy), axis=-1)
@@ -169,17 +165,12 @@ def cross_probabilities(maternal_gametes,
                         maternal_probabilities,
                         paternal_gametes,
                         paternal_probabilities,
-                        order=None,
-                        alphabet=None):
+                        order=None):
     assert order in {None, 'ascending', 'descending'}
 
     # get dimensions
     half_ploidy, n_base, n_nucl = maternal_gametes.shape[-3:]
     ploidy = half_ploidy * 2
-
-    # get alphabet
-    if alphabet is None:
-        alphabet = _suggest_alphabet(n_nucl)
 
     # compute genotypes and probabilities
     genotype_probs = {}
@@ -192,7 +183,7 @@ def cross_probabilities(maternal_gametes,
             idx = 0
             for gamete in [m_gamete, p_gamete]:
                 for hap in gamete:
-                    string = alphabet.decode(hap)
+                    string = hap.tostring()
                     genotype[idx] = string
                     idx += 1
                     if string not in string_to_haplotype:

@@ -3,14 +3,18 @@
 import numpy as np
 import biovector as bv
 
+from biovector.util import integer_vectors_as_probabilistic as _as_probs
+
 from haplohelper import util
 from haplohelper import inheritence
 
 
 def logp(reads, haplotypes):
-    return np.sum(np.log(np.mean(bv.stats.pairwise(bv.stats.pid,
-                                                   reads,
-                                                   haplotypes), axis=-1)))
+    mtx = bv.stats.probabalistic.pairwise(
+        bv.stats.probabalistic.ibs_prob,
+        reads,
+        haplotypes)
+    return np.sum(np.log(np.mean(mtx, axis=-1)))
 
 
 class GreedyHaplotypeModel(object):
@@ -35,7 +39,7 @@ class GreedyHaplotypeAssembler(GreedyHaplotypeModel):
         haps = np.zeros((ploidy, n_base, n_nucl))
         haps[:] = 0.25
 
-        nucleotides = bv.as_probabilities(np.identity(n_nucl))
+        nucleotides = _as_probs(np.identity(n_nucl))
 
         assert direction in {'middleout', 'forward', 'reverse'}
         if direction == 'middleout':
