@@ -19,6 +19,14 @@ def logp(reads, haplotypes):
     return np.sum(np.log(np.mean(mtx, axis=-1)))
 
 
+def nan_logp(reads, haplotypes):
+    mtx = bv.stats.probabalistic.pairwise(
+        bv.stats.probabalistic.nan_ibs_prob,
+        reads,
+        haplotypes)
+    return np.sum(np.log(np.mean(mtx, axis=-1)))
+
+
 class GreedyHaplotypeModel(object):
     pass
 

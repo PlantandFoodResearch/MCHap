@@ -15,6 +15,18 @@ def logp(reads, haplotypes):
     return step_4
 
 
+def nan_logp(reads, haplotypes):
+    step_0 = reads * haplotypes
+    step_1 = tt.sum(step_0, axis=3)
+
+    step_1a = tt.switch(tt.isnan(step_1), 1., step_1)
+
+    step_2 = tt.prod(step_1a, axis=2)
+    step_3 = tt.sum(step_2, axis=1)
+    step_4 = tt.sum(tt.log(step_3), axis=0)
+    return step_4
+
+
 class BayesianHaplotypeModel(object):
 
     def trace_haplotypes(self, sort=True, **kwargs):
