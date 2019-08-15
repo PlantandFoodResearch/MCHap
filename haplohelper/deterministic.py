@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import numpy as np
+from itertools import  combinations as _combinations
+
 import biovector as bv
 
 from biovector.util import integer_vectors_as_probabilistic as _as_probs
@@ -60,6 +62,55 @@ class GreedyHaplotypeAssembler(GreedyHaplotypeModel):
                 haps[hap, base] = nucleotides[choice]
 
         self.result = haps
+
+
+class GreedyRecombiner(GreedyHaplotypeModel):
+
+    def __init__(self,
+                 ploidy=None,
+                 reference_haplotypes=None):
+        # check ploidy matches prior if given
+        # check read shape matches prior if given
+        self.ploidy = ploidy
+        self.reference_haplotypes = reference_haplotypes
+        self.result = None
+
+    def fit(self, reads, direction='middleout'):
+        assert reads.ndim == 3
+
+        ploidy, n_base, n_nucl = self.reference_haplotypes.shape
+        assert self.ploidy == ploidy
+
+        assert direction in {'middleout', 'forward', 'reverse'}
+        if direction == 'middleout':
+            base_order = list(util.middle_out(range(n_base)))
+        elif direction == 'forward':
+            base_order = list(range(n_base))
+        else:  # direction == 'reverse'
+            base_order = list(reversed(range(n_base)))
+
+        pairs = list(_combinations(list(range(ploidy)), 2))
+
+        result = self.reference_haplotypes.copy()
+
+        # for each position try all hap combinations and pick best
+        for pos in base_order:
+            for i, (x, y) in enumerate(pairs):
+                haps = result.copy()
+
+                current = logp(reads, result)
+
+                x_content = haps[x][pos:].copy()
+                y_content = haps[y][pos:].copy()
+                haps[x][pos:] = y_content
+                haps[y][pos:] = x_content
+
+                score = logp(reads, haps)
+
+                if score > current:
+                    result = haps
+
+        self.result = result
 
 
 class GreedyDosageCaller(GreedyHaplotypeModel):
