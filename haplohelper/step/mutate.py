@@ -29,6 +29,12 @@ def jit_log_like(reads, integer_haps):
     return llk
 
 
+# TODO: break mutation cycle into one step per haplotype per base.
+# A cycle of steps would then be a step over every base/haplotype combination in a randomised order.
+# Each individual step updates the state and returns a log liklihood.
+# Each step can then re-use the previous log liklihood for it's initial state and only calculate log-liklihoods for other allele
+# This would halve the number of log-liklihood calculations for biallelic SNPs
+
 @jit(nopython=True)
 def mutate_step(haplotype_state, reads):
     """Iterates through every allele of every haplotype"""

@@ -3,35 +3,6 @@ from numba import jit
 
 from haplohelper.step import util
 
-
-@jit(nopython=True)
-def calculate_dosage(integer_haplotypes, dosage_array):
-    """Calculates the dosage of a set of integer encoded haplotypes by 
-    checking for array identity.
-    
-    Dosages are set in the pssed array.
-    A dosage of 0 indicates that that haplotype is a duplicate of a previous haplotype
-    """
-    # start with assumption that all are unique
-    dosage_array[:] = 1
-    
-    ploidy, n_base = integer_haplotypes.shape
-    
-    for h in range(ploidy):
-        if dosage_array[h] == 0:
-            # this haplotype has already been identified as equal to another
-            pass
-        else:
-            # iterate through remaining haps
-            for p in range(h+1, ploidy):
-                if dosage_array[p] == 0:
-                    # this haplotype has already been identified as equal to another
-                    pass
-                else:
-                    if util.array_equal(integer_haplotypes[h], integer_haplotypes[p]):
-                        dosage_array[h] += 1
-                        dosage_array[p] = 0
-
 @jit(nopython=True)
 def calculate_n_dosage_swap_options(dosage_array):
     n_donors = 0
