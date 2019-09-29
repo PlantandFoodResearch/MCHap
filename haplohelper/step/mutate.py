@@ -103,7 +103,7 @@ def base_step(genotype, reads, llk, h, j):
     conditionals /= np.sum(conditionals)
 
     # if a prior is used then it can be multiplied by probs here
-    choice = util.rand_choice(alleles, conditionals)
+    choice = util.random_choice(alleles, conditionals)
 
     # update state
     genotype[h, j] = choice
