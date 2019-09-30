@@ -87,7 +87,7 @@ def recombination_step(haplotype_state, reads, dosage_array, recombination_point
     ploidy, n_base = haplotype_state.shape
     
     # set the current dosage
-    util.calculate_dosage(haplotype_state, dosage_array)
+    util.genotype_dosage(haplotype_state, dosage_array)
     
     n_unique_recombination_options = calculate_n_unique_recombination_options(dosage_array)
     options = np.arange(n_unique_recombination_options)
@@ -124,7 +124,7 @@ def recombination_step(haplotype_state, reads, dosage_array, recombination_point
     conditionals /= np.sum(conditionals)
     
     # choose new dosage based on conditional probabilities
-    choice = util.rand_choice(options, conditionals)
+    choice = util.random_choice(options, conditionals)
        
     if choice == 0:
         # the state is not changed
@@ -144,7 +144,7 @@ def recombination_step(haplotype_state, reads, dosage_array, recombination_point
             haplotype_state[h_y, j] = j_x
                 
     # set the new dosage
-    util.calculate_dosage(haplotype_state, dosage_array)
+    util.genotype_dosage(haplotype_state, dosage_array)
 
     # return llk of new state
     return llks[choice]

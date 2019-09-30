@@ -1,6 +1,7 @@
 import numpy as np
 from numba import jit
 
+
 @jit(nopython=True)
 def sum_log_prob(x, y):
     """Sum of probabilities in log space.
@@ -129,4 +130,42 @@ def genotype_dosage(genotype, dosage):
                     if array_equal(genotype[h], genotype[p]):
                         dosage[h] += 1
                         dosage[p] = 0
-                        
+
+
+@jit(nopython=True)
+def set_genotype_dosage(genotype, dosage):
+    """Set a genotype to a new dosage.
+
+    Parameters
+    ----------
+    genotype : array_like, int, shape (ploidy, n_base)
+        Initial state of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
+    dosage : array_like, int, shape (ploidy)
+        Array to update with dosage of each haplotype.
+
+    Returns
+    -------
+    None
+    
+    Notes
+    -----
+    The `dosage` variable is updated in place.
+    The `dosage` array should always sum to the number of haplotypes in the `genotype`.
+
+    """    
+    ploidy = len(genotype)
+    
+    h_y = 0
+    
+    for h_x in range(ploidy):
+
+        while dosage[h_x] > 1:
+            
+            # don't iter over dosages we know are no longer 0
+            for h_y in range(h_y, ploidy):
+                
+                if dosage[h_y] == 0:
+                    
+                    genotype[h_y] = genotype[h_x]
+                    dosage[h_x] -= 1
+                    dosage[h_y] += 1
