@@ -134,9 +134,9 @@ def log_likelihood_dosage(reads, genotype, dosage):
         
         for h in range(n_haps):
             
-            dosage = dosage[h]
+            dose = dosage[h]
             
-            if dosage == 0:
+            if dose == 0:
                 # this hap is not used (e.g. it's a copy of another)
                 pass
             else:
@@ -147,7 +147,7 @@ def log_likelihood_dosage(reads, genotype, dosage):
                     i = genotype[h, j]
 
                     read_hap_prod *= reads[r, j, i]
-                read_prob += (read_hap_prod/ploidy) * dosage
+                read_prob += (read_hap_prod/ploidy) * dose
         
         llk += np.log(read_prob)
                     
