@@ -218,10 +218,10 @@ def dosage_swap_step(genotype, reads, dosage, llk):
         pass
     else:
         # set the new dosage
-        dosage = alt_dosage_options[choice]
+        dosage[:] = alt_dosage_options[choice, :]
     
-        # update the state of the haplotypes
-        util.set_genotype_dosage(genotype, dosage)
+        # set the state of the haplotypes to the new dosage
+        util.set_genotype_to_dosage(genotype, dosage)
     
     # return log-likelihood for the chosen dosage
     return llks[choice]

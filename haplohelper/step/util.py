@@ -89,7 +89,7 @@ def array_equal(x, y):
 
 
 @jit(nopython=True)
-def genotype_dosage(genotype, dosage):
+def set_dosage_to_genotype(genotype, dosage):
     """Calculates the dosage of a set of integer encoded haplotypes by 
     checking for array equality.
     
@@ -133,7 +133,7 @@ def genotype_dosage(genotype, dosage):
 
 
 @jit(nopython=True)
-def set_genotype_dosage(genotype, dosage):
+def set_genotype_to_dosage(genotype, dosage):
     """Set a genotype to a new dosage.
 
     Parameters
@@ -141,7 +141,7 @@ def set_genotype_dosage(genotype, dosage):
     genotype : array_like, int, shape (ploidy, n_base)
         Initial state of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
     dosage : array_like, int, shape (ploidy)
-        Array to update with dosage of each haplotype.
+        Array with dose of each haplotype.
 
     Returns
     -------
@@ -153,6 +153,8 @@ def set_genotype_dosage(genotype, dosage):
     The `dosage` array should always sum to the number of haplotypes in the `genotype`.
 
     """    
+    dosage = dosage.copy()
+
     ploidy = len(genotype)
     
     h_y = 0
