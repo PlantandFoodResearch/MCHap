@@ -38,6 +38,7 @@ def dosage_step_n_options(dosage):
     return n_donors * (n_recievers - 1)
 
 
+@jit(nopython=True)
 def dosage_step_options(dosage):
     """Calculate all alternative dosages within one steps distance.
     Dosages must include at least one copy of each unique haplotype.
@@ -49,9 +50,9 @@ def dosage_step_options(dosage):
 
     Returns
     -------
-    dosage_options : array_like, int, shape (n, ploidy)
+    options : array_like, int, shape (n, ploidy)
         Dosages within one step of the current (excluding the current dosage).
-    
+
     Notes
     -----
     A value of `0` in the `dosage` array indicates that that haplotype is a duplicate of another.
@@ -62,11 +63,12 @@ def dosage_step_options(dosage):
 
     n_options = dosage_step_n_options(dosage)
 
-    # array of dosage options as row-vectors
-    dosage_options = np.empty((n_options, ploidy), dtype=np.int)
-    dosage_options[:] = dosage
+    # matrix to be filled with row-vectors of dosage options
+    # start with current dosage
+    options = np.empty((n_options, ploidy), dtype=np.int16)
+    options[:] = dosage
     
-    option = 0
+    opt = 0
     
     for d in range(ploidy):
         if dosage[d] <= 1:
@@ -83,13 +85,12 @@ def dosage_step_options(dosage):
                 else:
                     # this is a valid reciever
                     # remove 1 copy from the donor and assign it to the reciever
-                    dosage_options[option, d] -= 1
-                    dosage_options[option, r] += 1
+                    options[opt, d] -= 1
+                    options[opt, r] += 1
                     
                     # incriment to the next option
-                    option += 1
-
-    return dosage_options
+                    opt += 1
+    return options
 
 
 @jit(nopython=True)
@@ -154,7 +155,7 @@ def log_likelihood_dosage(reads, genotype, dosage):
     return llk
 
 
-
+@jit(nopython=True)
 def dosage_swap_step(genotype, reads, dosage, llk):
     """Dosage swap Gibbs sampler step for all haplotypes in a genotype.
 
