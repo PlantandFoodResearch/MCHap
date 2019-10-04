@@ -6,7 +6,25 @@ from haplohelper.step import util
 
 
 
-def recombination_point_probabilities(n_base, a=1, b=1):
+def point_beta_probabilities(n_base, a=1, b=1):
+    """Return probabilies for selecting a recombination point
+    following a beta distribution
+
+    Parameters
+    ----------
+    n_base : int
+        Number of base positions in this genotype.
+    a : float
+        Alpha parameter for beta distribution.
+    b : float
+        Beta parameter for beta distribution.
+
+    Returns
+    -------
+    probs : array_like, int, shape (n_base - 1)
+        Probabilities for recombination point.
+    
+    """
     dist = scipy.stats.beta(a, b)
     points = np.arange(1, n_base ) / (n_base - 1)
     probs = dist.cdf(points)
@@ -15,40 +33,101 @@ def recombination_point_probabilities(n_base, a=1, b=1):
 
 
 @jit(nopython=True)
-def calculate_n_unique_recombination_options(dosage_array):
-    ploidy = len(dosage_array)
+def recombination_step_n_options(dosage):
+    """Count number of possible recombinations between pairs of unique haplotypes.
+
+    Parameters
+    ----------
+    dosage : array_like, int, shape (ploidy)
+        Array of dosages for unique haplotypes in the genotype.
+
+    Returns
+    -------
+    n : int
+        The number of possible recombinations between pairs of unique haplotypes based on the dosage.
+    
+    Notes
+    -----
+    A value of `0` in the `dosage` array indicates that that haplotype is a duplicate of another.
+
+    """
+    ploidy = len(dosage)
     n_unique_haps = 0
     for h in range(ploidy):
-        if dosage_array[h] > 0:
+        if dosage[h] > 0:
             n_unique_haps += 1
-    return ((n_unique_haps -1) * n_unique_haps) // 2 + 1  # + 1 for no change
+    return ((n_unique_haps -1) * n_unique_haps) // 2
 
 
 @jit(nopython=True)
-def calculate_unique_recombination_options(dosage_array, recombination_option_array):
-    ploidy = len(dosage_array)
+def recombination_step_options(dosage):
+    """Possible recombinations between pairs of unique haplotypes.
+
+    Parameters
+    ----------
+    dosage : array_like, int, shape (ploidy)
+        Array of dosages for unique haplotypes in the genotype.
+
+    Returns
+    -------
+    options : array_like, int, shape (n_options, 2)
+        Possible recombinations between pairs of unique haplotypes based on the dosage.
     
-    # first option is no change
-    # TODO: the first option shouldn't need to be recalculated
-    recombination_option_array[0, :] = 0
-    opt = 1
+    Notes
+    -----
+    A value of `0` in the `dosage` array indicates that that haplotype is a duplicate of another.
+
+    """
+    ploidy = len(dosage)
+    
+    n_options = recombination_step_n_options(dosage)
+    options = np.empty((n_options, 2), np.int8)
+    opt = 0
     for h_0 in range(ploidy):
-        if dosage_array[h_0] < 1:
+        if dosage[h_0] < 1:
             pass
         else:
             for h_1 in range(h_0 + 1, ploidy):
-                if dosage_array[h_1] < 1:
+                if dosage[h_1] < 1:
                     pass
                 else:
-                    recombination_option_array[opt, 0] = h_0
-                    recombination_option_array[opt, 1] = h_1
+                    options[opt, 0] = h_0
+                    options[opt, 1] = h_1
                     opt+=1
+    return options
 
 
 @jit(nopython=True)
-def jit_log_like_recombination(reads, integer_haps, h_x, h_y, point):
-    
-    ploidy, n_base = integer_haps.shape
+def log_likelihood_recombination(reads, genotype, h_x, h_y, point):
+    """Log likelihood of observed reads given recombination point and pair of 
+    haplotypes to recombine at that point.
+
+    Parameters
+    ----------
+    reads : array_like, float, shape (n_reads, n_base, n_nucl)
+        Observed reads encoded as an array of probabilistic matrices.
+    genotype : array_like, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
+    h_x : int
+        Index of haplotype x in genotype to recombine with haplotype y.
+    h_y : int
+        Index of haplotype y in genotype to recombine with haplotype x.
+    point : int
+        Base position at which recombination should occur.
+
+    Returns
+    -------
+    llk : float
+        Log-likelihood of the observed reads given the genotype with recombined haplotypes.
+
+    Notes
+    -----
+    Recombination point should be a value in range(1, n_base) where n_base is the 
+    number of base positions in the genotype.
+
+    """
+
+    ploidy, n_base = genotype.shape
     n_reads = len(reads)
        
     llk = 0.0
@@ -63,11 +142,11 @@ def jit_log_like_recombination(reads, integer_haps, h_x, h_y, point):
             for j in range(n_base):
                 
                 if h == h_x and j >= point:
-                    i = integer_haps[h_y, j]
+                    i = genotype[h_y, j]
                 elif h == h_y and j >= point:
-                    i = integer_haps[h_x, j]
+                    i = genotype[h_x, j]
                 else:
-                    i = integer_haps[h, j]
+                    i = genotype[h, j]
 
                 read_hap_prod *= reads[r, j, i]
                 
@@ -78,73 +157,121 @@ def jit_log_like_recombination(reads, integer_haps, h_x, h_y, point):
     return llk
 
 
-def recombination_step(haplotype_state, reads, dosage_array, recombination_point):
-    """haplotype_state is updated in place, log liklihood is returned.
-    Assumes you have already calculated the dossage.
+def recombine(genotype, h_x, h_y, point):
+    """Recombine a pair of haplotypes within a genotype
+
+    Parameters
+    ----------
+    genotype : array_like, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
+    h_x : int
+        Index of haplotype x in genotype to recombine with haplotype y.
+    h_y : int
+        Index of haplotype y in genotype to recombine with haplotype x.
+    point : int
+        Base position at which recombination should occur.
+    
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Variables `genotype` is updated in place.
+
     """
+    _, n_base = genotype.shape
+
+    # swap bases from the recombination point
+    for j in range(point, n_base):
+        
+        j_x = genotype[h_x, j].copy()
+        j_y = genotype[h_y, j].copy()
+        
+        genotype[h_x, j] = j_y
+        genotype[h_y, j] = j_x
+
+
+def recombination_step(genotype, reads, dosage, llk, point):
+    """Recombination Gibbs sampler step between two non-identical haplotypes within a genotype at 
+    a given recombination point.
+
+    Parameters
+    ----------
+    genotype : array_like, int, shape (ploidy, n_base)
+        Initial state of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
+    reads : array_like, float, shape (n_reads, n_base, n_nucl)
+        Observed reads encoded as an array of probabilistic matrices.
+    dosage : array_like, int, shape (ploidy)
+        Array of initial dosages.        
+    llk : float
+        Log-likelihood of the initial haplotype state given the observed reads.
+    point : int
+        Integer index of recombination point which should be a value in range(1, n_base).
     
-    # haplotypes are encoded as integers
-    ploidy, n_base = haplotype_state.shape
-    
-    # set the current dosage
-    util.set_dosage_to_genotype(haplotype_state, dosage_array)
-    
-    n_unique_recombination_options = calculate_n_unique_recombination_options(dosage_array)
-    options = np.arange(n_unique_recombination_options)
-    
-    # can we avoid creating this array dynamically by iterating options one at a time?
-    # this would alow for a fixed size array
-    recombination_option_array = np.zeros((n_unique_recombination_options, 2), dtype=np.int8)
-    calculate_unique_recombination_options(dosage_array, recombination_option_array)
-    
+    Returns
+    -------
+    llk : float
+        New log-likelihood of observed reads given the updated genotype dosage.
+
+    Notes
+    -----
+    Variables `genotype` and `dosage` are updated in place.
+
+    """
+    # recombination options
+    # does not include the option of no recombination
+    recomb_options = recombination_step_options(dosage)
+
+    # total number of options including no recombination
+    n_options = len(recomb_options) + 1
+
     # log liklihood for each recombination option
-    llks = np.empty(n_unique_recombination_options)
+    llks = np.empty(n_options)
     
-    for opt in range(n_unique_recombination_options):
-        llks[opt] = jit_log_like_recombination(
+    # iterate through recombination options and calculate log-likelihood
+    for opt in range(n_options -1):
+        llks[opt] = log_likelihood_recombination(
             reads, 
-            haplotype_state, 
-            recombination_option_array[opt, 0],
-            recombination_option_array[opt, 1],
-            recombination_point
+            genotype, 
+            recomb_options[opt, 0],
+            recomb_options[opt, 1],
+            point
         )
+
+    # final option is to keep the initial genotype (no recombination)
+    llks[-1] = llk
 
     # calculated denominator in log space
     log_denominator = llks[0]
-    for opt in range(1, n_unique_recombination_options):
+    for opt in range(1, n_options):
         log_denominator = util.sum_log_prob(log_denominator, llks[opt])
 
     # calculate conditional probabilities
-    conditionals = np.empty(n_unique_recombination_options)
-    
-    for opt in range(n_unique_recombination_options):
+    conditionals = np.empty(n_options)
+    for opt in range(n_options):
         conditionals[opt] = np.exp(llks[opt] - log_denominator)
 
     # ensure conditional probabilities are normalised 
     conditionals /= np.sum(conditionals)
     
     # choose new dosage based on conditional probabilities
+    options = np.arange(n_options)
     choice = util.random_choice(options, conditionals)
        
-    if choice == 0:
+    if choice == (n_options - 1):
         # the state is not changed
         pass
     else:
         # set the state of the recombinated haplotypes
-        h_x = recombination_option_array[choice, 0]
-        h_y = recombination_option_array[choice, 1]
+        h_x = recomb_options[choice, 0]
+        h_y = recomb_options[choice, 1]
         
         # swap bases from the recombination point
-        for j in range(recombination_point, n_base):
-            
-            j_x = haplotype_state[h_x, j].copy()
-            j_y = haplotype_state[h_y, j].copy()
-            
-            haplotype_state[h_x, j] = j_y
-            haplotype_state[h_y, j] = j_x
+        recombine(genotype, h_x, h_y, point)
                 
-    # set the new dosage
-    util.set_dosage_to_genotype(haplotype_state, dosage_array)
+        # set the new dosage
+        util.set_dosage_to_genotype(genotype, dosage)
 
     # return llk of new state
     return llks[choice]
