@@ -25,7 +25,7 @@ def sum_log_prob(x, y):
 
 
 @jit(nopython=True)
-def random_choice(options, probabilities):
+def random_choice(probabilities):
     """Random choice of options given a set of probabilities.
 
     Parameters
@@ -41,7 +41,7 @@ def random_choice(options, probabilities):
         A value from `options` selected at random with using `probabilities`.
 
     """
-    return options[np.searchsorted(np.cumsum(probabilities), np.random.random(), side="right")]
+    return np.searchsorted(np.cumsum(probabilities), np.random.random(), side="right")
 
 
 @jit(nopython=True)

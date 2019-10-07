@@ -72,8 +72,6 @@ def base_step(genotype, reads, llk, h, j):
     """
     _, _, n_nucl = reads.shape
     
-    alleles = np.arange(0, n_nucl)
-    
     # cache of log likelihoods calculated with each allele
     llks = np.empty(n_nucl)
     conditionals = np.empty(n_nucl)
@@ -103,7 +101,7 @@ def base_step(genotype, reads, llk, h, j):
     conditionals /= np.sum(conditionals)
 
     # if a prior is used then it can be multiplied by probs here
-    choice = util.random_choice(alleles, conditionals)
+    choice = util.random_choice(conditionals)
 
     # update state
     genotype[h, j] = choice

@@ -210,8 +210,7 @@ def dosage_swap_step(genotype, reads, dosage, llk):
     conditionals /= np.sum(conditionals)
     
     # choose new dosage based on conditional probabilities
-    options = np.arange(n_options)
-    choice = util.random_choice(options, conditionals)
+    choice = util.random_choice(conditionals)
     
     # update dosage
     if choice == (n_options - 1):

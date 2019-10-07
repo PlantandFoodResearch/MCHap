@@ -157,6 +157,7 @@ def log_likelihood_recombination(reads, genotype, h_x, h_y, point):
     return llk
 
 
+@jit(nopython=True)
 def recombine(genotype, h_x, h_y, point):
     """Recombine a pair of haplotypes within a genotype
 
@@ -185,13 +186,14 @@ def recombine(genotype, h_x, h_y, point):
     # swap bases from the recombination point
     for j in range(point, n_base):
         
-        j_x = genotype[h_x, j].copy()
-        j_y = genotype[h_y, j].copy()
+        j_x = genotype[h_x, j]
+        j_y = genotype[h_y, j]
         
         genotype[h_x, j] = j_y
         genotype[h_y, j] = j_x
 
 
+@jit(nopython=True)
 def recombination_step(genotype, reads, dosage, llk, point):
     """Recombination Gibbs sampler step between two non-identical haplotypes within a genotype at 
     a given recombination point.
@@ -256,8 +258,7 @@ def recombination_step(genotype, reads, dosage, llk, point):
     conditionals /= np.sum(conditionals)
     
     # choose new dosage based on conditional probabilities
-    options = np.arange(n_options)
-    choice = util.random_choice(options, conditionals)
+    choice = util.random_choice(conditionals)
        
     if choice == (n_options - 1):
         # the state is not changed
