@@ -65,7 +65,7 @@ def greedy_choice(options, probabilities):
 
 
 @jit(nopython=True)
-def array_equal(x, y):
+def array_equal(x, y, interval=(0, -1)):
     """Check if two one-dimentional integer arrays are equal.
 
     Parameters
@@ -81,24 +81,26 @@ def array_equal(x, y):
         True if `x` and `y` are equal, else False.
 
     """
-    n = len(x)
-    for i in range(n):
+    if interval == (0, -1):
+        interval = (0, len(x))
+    
+    for i in range(interval[0], interval[1]):
         if x[i] != y[i]:
             return False
     return True
 
 
 @jit(nopython=True)
-def set_dosage_to_genotype(genotype, dosage):
+def get_dosage(dosage, genotype, interval=(0, -1)):
     """Calculates the dosage of a set of integer encoded haplotypes by 
     checking for array equality.
     
     Parameters
     ----------
-    genotype : array_like, int, shape (ploidy, n_base)
-        Initial state of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
     dosage : array_like, int, shape (ploidy)
         Array to update with dosage of each haplotype.
+    genotype : array_like, int, shape (ploidy, n_base)
+        Initial state of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
 
     Returns
     -------
@@ -114,7 +116,10 @@ def set_dosage_to_genotype(genotype, dosage):
     # start with assumption that all are unique
     dosage[:] = 1
     
-    ploidy, _ = genotype.shape
+    ploidy, n_base = genotype.shape
+    
+    if interval == (0, -1):
+        interval = (0, n_base)
     
     for h in range(ploidy):
         if dosage[h] == 0:
@@ -127,13 +132,13 @@ def set_dosage_to_genotype(genotype, dosage):
                     # this haplotype has already been identified as equal to another
                     pass
                 else:
-                    if array_equal(genotype[h], genotype[p]):
+                    if array_equal(genotype[h], genotype[p], interval=interval):
                         dosage[h] += 1
                         dosage[p] = 0
 
 
 @jit(nopython=True)
-def set_genotype_to_dosage(genotype, dosage):
+def set_dosage(genotype, dosage):
     """Set a genotype to a new dosage.
 
     Parameters

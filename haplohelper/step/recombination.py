@@ -272,7 +272,7 @@ def recombination_step(genotype, reads, dosage, llk, point):
         recombine(genotype, h_x, h_y, point)
                 
         # set the new dosage
-        util.set_dosage_to_genotype(genotype, dosage)
+        util.get_dosage(dosage, genotype)
 
     # return llk of new state
     return llks[choice]
