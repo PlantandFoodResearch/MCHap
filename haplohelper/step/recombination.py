@@ -33,69 +33,90 @@ def point_beta_probabilities(n_base, a=1, b=1):
 
 
 @jit(nopython=True)
-def recombination_step_n_options(dosage):
-    """Count number of possible recombinations between pairs of unique haplotypes.
-
+def recombination_step_n_options(labels):
+    """Calculate number of unique haplotype recombination options.
+    
     Parameters
     ----------
-    dosage : array_like, int, shape (ploidy)
-        Array of dosages for unique haplotypes in the genotype.
+    labels : array_like, int, shape (n_haps, 2)
+        Labels for haplotype sections (excluding duplicated haplotypes).
 
     Returns
     -------
     n : int
-        The number of possible recombinations between pairs of unique haplotypes based on the dosage.
-    
+        Number of unique haplotype recombination options
+
     Notes
     -----
-    A value of `0` in the `dosage` array indicates that that haplotype is a duplicate of another.
+    Duplicate copies of haplotypes must be excluded from the labels array.
 
     """
-    ploidy = len(dosage)
-    n_unique_haps = 0
-    for h in range(ploidy):
-        if dosage[h] > 0:
-            n_unique_haps += 1
-    return ((n_unique_haps -1) * n_unique_haps) // 2
+    ploidy = len(labels)
+    n = 0
+    for h_0 in range(ploidy):
+        for h_1 in range(h_0 + 1, ploidy):
+            if (labels[h_0, 0] == labels[h_1, 0]) or (labels[h_0, 1] == labels[h_1, 1]):
+                # this will result in equivilent genotypes
+                pass
+            else:
+                n += 1
+    return n
 
 
 @jit(nopython=True)
-def recombination_step_options(dosage):
+def recombination_step_options(genotype, interval=None):
     """Possible recombinations between pairs of unique haplotypes.
 
     Parameters
     ----------
-    dosage : array_like, int, shape (ploidy)
-        Array of dosages for unique haplotypes in the genotype.
+    genotype : array_like, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
+    interval : array_like, int, size 2
+        Lower and upper bounds of the recombined region. May use negative indicies.
 
     Returns
     -------
     options : array_like, int, shape (n_options, 2)
         Possible recombinations between pairs of unique haplotypes based on the dosage.
-    
-    Notes
-    -----
-    A value of `0` in the `dosage` array indicates that that haplotype is a duplicate of another.
 
     """
-    ploidy = len(dosage)
+    ploidy, n_base = genotype.shape
     
-    n_options = recombination_step_n_options(dosage)
-    options = np.empty((n_options, 2), np.int8)
+    #labels for the mutating section and remander 
+    labels = np.zeros((ploidy, 2), np.int8)
+    
+    # temprarily use label array to store dosage
+    # the dosage is used as a simple way to skip compleately duplicated haplotypes
+    util.get_dosage(labels[:,0], genotype)
+    # boolean mask for unique haplotypes
+    duplicate = labels[:,0] == 0
+    
+    #labels
+    util.label_haplotypes(labels[:,0], genotype, interval)
+    # TODO: clean up code
+    mask = util._interval_inverse_mask(interval, n_base)
+    util.label_haplotypes(labels[:,1], genotype[:, mask])
+    
+    # remove extra copies of fully duplicate haplotypes 
+    labels = labels[~duplicate]
+    
+    # calculate number of options to create empty array
+    n_options = recombination_step_n_options(labels)
+    options = np.zeros((n_options, 2), np.int8)
+    
+    # populate array with options
     opt = 0
     for h_0 in range(ploidy):
-        if dosage[h_0] < 1:
-            pass
-        else:
-            for h_1 in range(h_0 + 1, ploidy):
-                if dosage[h_1] < 1:
-                    pass
-                else:
-                    options[opt, 0] = h_0
-                    options[opt, 1] = h_1
-                    opt+=1
-    return options
+        for h_1 in range(h_0 + 1, ploidy):
+            if (labels[h_0, 0] == labels[h_1, 0]) or (labels[h_0, 1] == labels[h_1, 1]):
+                # this will result in equivilent genotypes
+                pass
+            else:
+                options[opt, 0] = h_0
+                options[opt, 1] = h_1
+                opt+=1
 
+    return options
 
 @jit(nopython=True)
 def log_likelihood_recombination(reads, genotype, h_x, h_y, point):
