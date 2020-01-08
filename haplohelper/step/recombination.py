@@ -52,69 +52,76 @@ def recombination_step_n_options(labels):
 
     """
     ploidy = len(labels)
+
+    # the dosage is used as a simple way to skip compleately duplicated haplotypes
+    dosage = np.empty(ploidy, np.int8)
+    util.get_dosage(dosage, labels)
+
     n = 0
     for h_0 in range(ploidy):
-        for h_1 in range(h_0 + 1, ploidy):
-            if (labels[h_0, 0] == labels[h_1, 0]) or (labels[h_0, 1] == labels[h_1, 1]):
-                # this will result in equivilent genotypes
-                pass
-            else:
-                n += 1
+        if dosage[h_0] == 0:
+            # this is a duplicate copy of a haplotype
+            pass
+        else:
+            for h_1 in range(h_0 + 1, ploidy):
+                if dosage[h_1] == 0:
+                    # this is a duplicate copy of a haplotype
+                    pass
+                elif (labels[h_0, 0] == labels[h_1, 0]) or (labels[h_0, 1] == labels[h_1, 1]):
+                    # this will result in equivilent genotypes
+                    pass
+                else:
+                    n += 1
     return n
 
 
 @jit(nopython=True)
-def recombination_step_options(genotype, interval=None):
+def recombination_step_options(labels):
     """Possible recombinations between pairs of unique haplotypes.
 
     Parameters
     ----------
-    genotype : array_like, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    interval : array_like, int, size 2
-        Lower and upper bounds of the recombined region. May use negative indicies.
+    labels : array_like, int, shape (ploidy, 2)
+        Labels for haplotype sections.
 
     Returns
     -------
-    options : array_like, int, shape (n_options, 2)
+    options : array_like, int, shape (n_options, ploidy)
         Possible recombinations between pairs of unique haplotypes based on the dosage.
 
     """
-    ploidy, n_base = genotype.shape
-    
-    #labels for the mutating section and remander 
-    labels = np.zeros((ploidy, 2), np.int8)
-    
-    # temprarily use label array to store dosage
+    ploidy = len(labels)
     # the dosage is used as a simple way to skip compleately duplicated haplotypes
-    util.get_dosage(labels[:,0], genotype)
-    # boolean mask for unique haplotypes
-    duplicate = labels[:,0] == 0
+    dosage = np.empty(ploidy, np.int8)
+    util.get_dosage(dosage, labels)
     
-    #labels
-    util.label_haplotypes(labels[:,0], genotype, interval)
-    # TODO: clean up code
-    mask = util._interval_inverse_mask(interval, n_base)
-    util.label_haplotypes(labels[:,1], genotype[:, mask])
-    
-    # remove extra copies of fully duplicate haplotypes 
-    labels = labels[~duplicate]
-    
-    # calculate number of options to create empty array
+    # calculate number of options
     n_options = recombination_step_n_options(labels)
-    options = np.zeros((n_options, 2), np.int8)
+    # create options array and default to no change
+    options = np.empty((n_options, ploidy), np.int8)
+    for i in range(n_options):
+        for j in range(ploidy):
+            options[i, j] = j
     
-    # populate array with options
+    # populate array with actual changes
     opt = 0
     for h_0 in range(ploidy):
-        for h_1 in range(h_0 + 1, ploidy):
-            if (labels[h_0, 0] == labels[h_1, 0]) or (labels[h_0, 1] == labels[h_1, 1]):
-                # this will result in equivilent genotypes
-                pass
-            else:
-                options[opt, 0] = h_0
-                options[opt, 1] = h_1
-                opt+=1
+        if dosage[h_0] == 0:
+            # this is a duplicate copy of a haplotype
+            pass
+        else:
+            for h_1 in range(h_0 + 1, ploidy):
+                if dosage[h_1] == 0:
+                    # this is a duplicate copy of a haplotype
+                    pass
+                elif (labels[h_0, 0] == labels[h_1, 0]) or (labels[h_0, 1] == labels[h_1, 1]):
+                    # this will result in equivilent genotypes
+                    pass
+                else:
+                    # specify recombination
+                    options[opt, h_0] = h_1
+                    options[opt, h_1] = h_0
+                    opt+=1
 
     return options
 
