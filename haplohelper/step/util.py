@@ -1,6 +1,53 @@
 import numpy as np
-from numba import jit
+import math
+from numba import jit, njit
 
+_FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=np.int64)
+
+@njit
+def factorial(x):
+    if x in range(0, 21):
+        return _FACTORIAL_LOOK_UP[x]
+    else:
+        raise ValueError('factorial functuion is only supported for values 0 to 20')
+
+@njit
+def array_to_pair(array):
+    """Returns the first two elements of an array as a tuple.
+    
+    This is a work around because numba tuples are typed by length.
+    """
+    return array[0], array[1]
+
+
+@njit
+def array_to_triple(array):
+    """Returns the first three elements of an array as a tuple.
+    
+    This is a work around because numba tuples are typed by length.
+    """
+    return array[0], array[1], array[1]
+
+
+@njit
+def interval_as_range(interval, max_range):
+    if interval is None:
+        return range(max_range)
+    else:
+        if len(interval) == 2:
+            return range(interval[0], interval[1])
+        else:
+            raise ValueError('Interval must be `None` or array of length 2')
+
+
+@jit(nopython=True)
+def _interval_inverse_mask(interval, n):
+    if interval is None:
+        mask = np.zeros(n, np.bool8)
+    else:
+        mask = np.ones(n, np.bool8)
+        mask[interval[0]:interval[1]] = 0
+    return mask
 
 @jit(nopython=True)
 def sum_log_prob(x, y):
@@ -30,42 +77,38 @@ def random_choice(probabilities):
 
     Parameters
     ----------
-    options : array_like, int
-        An array of options to choose from.
     probabilities : array_like, float
-        An array of probabilities asociated with each value in `options`.
+        An array of probabilities that sum to one.
 
     Returns
     -------
     choice : int
-        A value from `options` selected at random with using `probabilities`.
+        The index of a randomly selected probability.
 
     """
     return np.searchsorted(np.cumsum(probabilities), np.random.random(), side="right")
 
 
 @jit(nopython=True)
-def greedy_choice(options, probabilities):
+def greedy_choice(probabilities):
     """Greedy choice of options given a set of probabilities.
 
     Parameters
     ----------
-    options : array_like, int
-        An array of options to choose from.
     probabilities : array_like, float
-        An array of probabilities asociated with each value in `options`.
+        An array of probabilities that sum to one.
 
     Returns
     -------
     choice : int
-        The value in `options` with the largest corresponding value in `probabilities`.
+        The index of the largest probability.
 
     """
-    return options[np.argmax(probabilities)]
+    return np.argmax(probabilities)
 
 
 @jit(nopython=True)
-def array_equal(x, y, interval=(0, -1)):
+def array_equal(x, y, interval=None):
     """Check if two one-dimentional integer arrays are equal.
 
     Parameters
@@ -81,17 +124,16 @@ def array_equal(x, y, interval=(0, -1)):
         True if `x` and `y` are equal, else False.
 
     """
-    if interval == (0, -1):
-        interval = (0, len(x))
+    r = interval_as_range(interval, len(x))
     
-    for i in range(interval[0], interval[1]):
+    for i in r:
         if x[i] != y[i]:
             return False
     return True
 
 
 @jit(nopython=True)
-def get_dosage(dosage, genotype, interval=(0, -1)):
+def get_dosage(dosage, genotype, interval=None):
     """Calculates the dosage of a set of integer encoded haplotypes by 
     checking for array equality.
     
@@ -117,10 +159,7 @@ def get_dosage(dosage, genotype, interval=(0, -1)):
     dosage[:] = 1
     
     ploidy, n_base = genotype.shape
-    
-    if interval == (0, -1):
-        interval = (0, n_base)
-    
+        
     for h in range(ploidy):
         if dosage[h] == 0:
             # this haplotype has already been identified as equal to another
@@ -177,6 +216,52 @@ def set_dosage(genotype, dosage):
                     dosage[h_x] -= 1
                     dosage[h_y] += 1
 
+
+@njit
+def label_haplotypes(labels, genotype, interval=None):
+
+    ploidy, n_base = genotype.shape
+    labels[:] = 0
+
+    r = interval_as_range(interval, n_base)
+
+    for i in r:
+        for j in range(1, ploidy):
+            if genotype[j][i] == genotype[labels[j]][i]:
+                # matches current assigned class
+                pass
+            else:
+                # store previous assignment
+                prev_label = labels[j]
+                # assign to new label based on index
+                # 'j' is the index and the label id
+                labels[j] = j
+                # check if following arrays match the new label
+                for k in range(j + 1, ploidy):
+                    if labels[k] == prev_label and genotype[j][i] == genotype[k][i]:
+                        # this array is identical to the jth array
+                        labels[k] = j
+
+
+def haplotype_segment_labels(genotype, interval=None):
+    """Create a labels matrix in whihe the first coloumn contains
+    labels for haplotype segments within the specified range and
+    the second column contains labels for the remander of the 
+    haplotypes.
+
+    If no interval is speciefied then the first column will contain
+    labels for the full haplotypes and the second column will 
+    contain zeros
+    """
+    ploidy, n_base = genotype.shape
+
+    labels = np.zeros((ploidy, 2), np.int8)
+    label_haplotypes(labels[:, 0], genotype, interval=interval)
+    mask = _interval_inverse_mask(interval, n_base)
+    label_haplotypes(labels[:, 1], genotype[:, mask], interval=None)
+    return labels
+
+
 @jit(nopython=True)
 def conditional_probabilities(lnprobs):
     n = len(lnprobs)
@@ -195,7 +280,7 @@ def conditional_probabilities(lnprobs):
 
 
 @jit(nopython=True)
-def overwrite(genotype, h_x, h_y, interval=(0, -1)):
+def overwrite(genotype, h_x, h_y, interval=None):
     """Overwrite (sub-)haplotype y with values from (sub-)haplotype x of a genotype.
 
     Parameters
@@ -218,18 +303,18 @@ def overwrite(genotype, h_x, h_y, interval=(0, -1)):
     Variables `genotype` is updated in place.
 
     """
+    ploidy, n_base = genotype.shape
     
-    if interval == (0, -1):
-        interval = (0, genotype.shape[-1])
+    r = interval_as_range(interval, n_base)
     
     # swap bases from the recombination point
-    for j in range(interval[0], interval[1]):
+    for j in r:
         
         genotype[h_y, j] = genotype[h_x, j]
 
 
 @jit(nopython=True)
-def swap(genotype, h_x, h_y, interval=(0, -1)):
+def swap(genotype, h_x, h_y, interval=None):
     """Swap a pair of (sub-)haplotypes within a genotype.
 
     Parameters
@@ -253,11 +338,12 @@ def swap(genotype, h_x, h_y, interval=(0, -1)):
 
     """
     
-    if interval == (0, -1):
-        interval = (0, genotype.shape[-1])
+    ploidy, n_base = genotype.shape
+    
+    r = interval_as_range(interval, n_base)
     
     # swap bases from the recombination point
-    for j in range(interval[0], interval[1]):
+    for j in r:
         
         j_x = genotype[h_x, j]
         j_y = genotype[h_y, j]
@@ -267,7 +353,7 @@ def swap(genotype, h_x, h_y, interval=(0, -1)):
 
 
 @jit(nopython=True)
-def structural_change(genotype, haplotypes, interval=(0, -1)):
+def structural_change(genotype, haplotypes, interval=None):
     """Mutate genotype by re-arranging haplotypes within a given interval.
 
     Parameters
@@ -290,13 +376,12 @@ def structural_change(genotype, haplotypes, interval=(0, -1)):
     """
     
     ploidy, n_base = genotype.shape
-    
-    if interval == (0, -1):
-        interval = (0, n_base)
-    
+        
     cache = np.empty(ploidy, dtype=np.int8)
+
+    r = interval_as_range(interval, n_base)
     
-    for j in range(interval[0], interval[1]):
+    for j in r:
         
         # copy to cache 
         for h in range(ploidy):
@@ -308,7 +393,7 @@ def structural_change(genotype, haplotypes, interval=(0, -1)):
 
 
 @jit(nopython=True)
-def log_likelihood_structural_change(reads, genotype, haplotypes, interval=(0, -1)):
+def log_likelihood_structural_change(reads, genotype, haplotypes, interval=None):
     """Log likelihood of observed reads given a genotype given a structural change.
 
     Parameters
@@ -329,11 +414,8 @@ def log_likelihood_structural_change(reads, genotype, haplotypes, interval=(0, -
     """
     ploidy, n_base = genotype.shape
     n_reads = len(reads)
-    
-    if interval == (0, -1):
-        interval = (0, n_base)
-    
-    interval_ = range(interval[0], interval[1])
+        
+    r = interval_as_range(interval, n_base)
        
     llk = 0.0
     
@@ -347,7 +429,7 @@ def log_likelihood_structural_change(reads, genotype, haplotypes, interval=(0, -
             for j in range(n_base):
                 
                 # check if in the altered region
-                if j in interval_:
+                if j in r:
                     # use base from alternate hap
                     h_ = haplotypes[h]
                 else:
