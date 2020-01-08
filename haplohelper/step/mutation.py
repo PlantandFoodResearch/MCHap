@@ -165,8 +165,21 @@ def genotype_compound_step(genotype, reads, llk):
     Variable `genotype` is updated in place.
 
     """
-    ploidy, _ = genotype.shape
-    
-    for h in np.random.permutation(np.arange(0, ploidy)):
-        llk = haplotype_compound_step(genotype, reads, llk, h)
+    ploidy, n_base = genotype.shape
+
+    # matrix of haplotype-base combinations
+    substeps = np.empty((ploidy * n_base, 2), dtype=np.int8) 
+
+    for h in range(ploidy):
+        for j in range(n_base):
+            substep = (h * n_base) + j
+            substeps[substep, 0] = h
+            substeps[substep, 1] = j
+
+    # random order
+    np.random.shuffle(substeps)
+
+    for i in range(ploidy * n_base):
+        h, j = substeps[i]
+        llk = base_step(genotype, reads, llk, h, j)
     return llk
