@@ -4,92 +4,126 @@ from numba import jit
 from haplohelper.step import util
 
 @jit(nopython=True)
-def dosage_step_n_options(dosage):
+def dosage_step_n_options(labels, allow_deletions=False):
     """Calculate the number of alternative dosages within one steps distance.
     Dosages must include at least one copy of each unique haplotype.
 
     Parameters
     ----------
-    dosage : array_like, int, shape (ploidy)
+    labels : array_like, int, shape (ploidy, 2)
         Array of dosages.
 
     Returns
     -------
     n : int
         The number of dosages within one step of the current dosage (excluding the current dosage).
-    
-    Notes
-    -----
-    A value of `0` in the `dosage` array indicates that that haplotype is a duplicate of another.
+ 
 
     """
-    n_donors = 0
-    n_recievers = 0
-    ploidy = len(dosage)
-    for h in range(ploidy):
-        if dosage[h] == 1:
-            n_recievers += 1
-        elif dosage[h] > 1:
-            n_recievers += 1
-            n_donors += 1
-        else:
-            # 0 is an empty slot
+    ploidy = len(labels)
+
+    # dosage of full haplotypes
+    haplotype_dosage = np.empty(ploidy, np.int8)
+    util.get_dosage(haplotype_dosage, labels)
+
+    # dosage of the segment of interest
+    segment_dosage = np.empty(ploidy, np.int8)
+    util.get_dosage(segment_dosage, labels[:,0:1])
+
+    # number of options
+    n = 0
+
+    # h_0 is the potential reciever and h_1 the potential donator
+    for h_0 in range(ploidy):
+        if haplotype_dosage[h_0] == 0:
+            # this is a full duplicate of a haplotype that has already been visited
             pass
-    return n_donors * (n_recievers - 1)
+        elif (not allow_deletions) and (segment_dosage[h_0] == 1):
+            # if segment dosage is 1 then it is the only copy of this segment
+            # hence overwriting it will delete the only copy of this segment
+            # NOTE: if segment dosage is 0 then it is a duplicate so there must be
+            # more than one copy and hence it is ok to continue and overwrite
+            # likewise if segment dosage is > 1 there is more than one copy
+            pass
+        else:
+            # h_0 has a segment that may be overwritten
+            for h_1 in range(ploidy):
+                if segment_dosage[h_1] == 0:
+                    # this segment is a duplicate of another that has allready been visited
+                    pass
+                elif labels[h_0, 0] == labels[h_1, 0]:
+                    # the haplotypes are different but the segment is identical
+                    pass
+                else:
+                    # overwriting the segment of h_0 with the segment of h_1 will result 
+                    # in a novel genotype
+                    n += 1
+    return n
+
 
 
 @jit(nopython=True)
-def dosage_step_options(dosage):
-    """Calculate all alternative dosages within one steps distance.
+def dosage_step_options(labels, allow_deletions=False):
+    """Calculate the number of alternative dosages within one steps distance.
     Dosages must include at least one copy of each unique haplotype.
 
     Parameters
     ----------
-    dosage : array_like, int, shape (ploidy)
+    labels : array_like, int, shape (ploidy, 2)
         Array of dosages.
 
     Returns
     -------
-    options : array_like, int, shape (n, ploidy)
-        Dosages within one step of the current (excluding the current dosage).
-
-    Notes
-    -----
-    A value of `0` in the `dosage` array indicates that that haplotype is a duplicate of another.
+    n : int
+        The number of dosages within one step of the current dosage (excluding the current dosage).
+ 
 
     """
-    
-    ploidy = len(dosage)
+    ploidy = len(labels)
 
-    n_options = dosage_step_n_options(dosage)
+    # dosage of full haplotypes
+    haplotype_dosage = np.empty(ploidy, np.int8)
+    util.get_dosage(haplotype_dosage, labels)
 
-    # matrix to be filled with row-vectors of dosage options
-    # start with current dosage
-    options = np.empty((n_options, ploidy), dtype=np.int16)
-    options[:] = dosage
-    
+    # dosage of the segment of interest
+    segment_dosage = np.empty(ploidy, np.int8)
+    util.get_dosage(segment_dosage, labels[:,0:1])
+
+    # number of options
+    n_options = dosage_step_n_options(labels, allow_deletions=allow_deletions)
+    # create options array and default to no change
+    options = np.empty((n_options, ploidy), np.int8)
+    for i in range(n_options):
+        for j in range(ploidy):
+            options[i, j] = j
+
+    # h_0 is the potential reciever and h_1 the potential donator
     opt = 0
-    
-    for d in range(ploidy):
-        if dosage[d] <= 1:
-            # this is not a valid donor
+    for h_0 in range(ploidy):
+        if haplotype_dosage[h_0] == 0:
+            # this is a full duplicate of a haplotype that has already been visited
+            pass
+        elif (not allow_deletions) and (segment_dosage[h_0] == 1):
+            # if segment dosage is 1 then it is the only copy of this segment
+            # hence overwriting it will delete the only copy of this segment
+            # NOTE: if segment dosage is 0 then it is a duplicate so there must be
+            # more than one copy and hence it is ok to continue and overwrite
+            # likewise if segment dosage is > 1 there is more than one copy
             pass
         else:
-            for r in range(ploidy):
-                if r == d:
-                    # can't donate to yourself
+            # h_0 has a segment that may be overwritten
+            for h_1 in range(ploidy):
+                if segment_dosage[h_1] == 0:
+                    # this segment is a duplicate of another that has allready been visited
                     pass
-                elif dosage[r] == 0:
-                    # this is an empty gap
+                elif labels[h_0, 0] == labels[h_1, 0]:
+                    # the haplotypes are different but the segment is identical
                     pass
                 else:
-                    # this is a valid reciever
-                    # remove 1 copy from the donor and assign it to the reciever
-                    options[opt, d] -= 1
-                    options[opt, r] += 1
-                    
-                    # incriment to the next option
-                    opt += 1
+                    # overwriting the segment of h_0 with the segment of h_1 will result 
+                    # in a novel genotype
+                    options[opt, h_0] = h_1
+                    opt+=1
     return options
 
 
