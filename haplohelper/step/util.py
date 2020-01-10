@@ -22,6 +22,30 @@ def interval_as_range(interval, max_range):
         else:
             raise ValueError('Interval must be `None` or array of length 2')
 
+@njit
+def random_interval(n, size_probs=None):
+    if size_probs is None:
+        # uniform distribution of positive sizes smaller than n
+        size = np.random.randint(1, np.floor(n*1.3))
+    else:
+        # use provided distribution
+        size = random_choice(size_probs)
+
+    # center of the interval
+    center = np.random.randint(0, n+1)
+    
+    lower = center - size // 2
+    upper = center + size // 2
+
+    if size % 2:
+        # odd size so randomize longer end
+        if np.random.random() < 0.5:
+            lower -= 1
+        else:
+            upper += 1
+    return max(lower, 0), min(upper, n)
+    
+
 @jit(nopython=True)
 def _interval_inverse_mask(interval, n):
     if interval is None:
@@ -240,6 +264,7 @@ def label_haplotypes(labels, genotype, interval=None):
                         labels[k] = j
 
 
+@njit
 def haplotype_segment_labels(genotype, interval=None):
     """Create a labels matrix in whihe the first coloumn contains
     labels for haplotype segments within the specified range and
@@ -339,7 +364,7 @@ def log_likelihood_structural_change(reads, genotype, haplotype_indices, interva
     ploidy, n_base = genotype.shape
     n_reads = len(reads)
         
-    r = interval_as_range(interval, n_base)
+    intvl = interval_as_range(interval, n_base)
        
     llk = 0.0
     
@@ -353,7 +378,7 @@ def log_likelihood_structural_change(reads, genotype, haplotype_indices, interva
             for j in range(n_base):
                 
                 # check if in the altered region
-                if j in r:
+                if j in intvl:
                     # use base from alternate hap
                     h_ = haplotype_indices[h]
                 else:
