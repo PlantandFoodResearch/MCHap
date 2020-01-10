@@ -11,23 +11,6 @@ def factorial(x):
     else:
         raise ValueError('factorial functuion is only supported for values 0 to 20')
 
-@njit
-def array_to_pair(array):
-    """Returns the first two elements of an array as a tuple.
-    
-    This is a work around because numba tuples are typed by length.
-    """
-    return array[0], array[1]
-
-
-@njit
-def array_to_triple(array):
-    """Returns the first three elements of an array as a tuple.
-    
-    This is a work around because numba tuples are typed by length.
-    """
-    return array[0], array[1], array[1]
-
 
 @njit
 def interval_as_range(interval, max_range):
@@ -38,7 +21,6 @@ def interval_as_range(interval, max_range):
             return range(interval[0], interval[1])
         else:
             raise ValueError('Interval must be `None` or array of length 2')
-
 
 @jit(nopython=True)
 def _interval_inverse_mask(interval, n):
@@ -69,6 +51,21 @@ def sum_log_prob(x, y):
         return x + np.log1p(np.exp(y - x))
     else:
         return y + np.log1p(np.exp(x - y))
+
+
+@njit
+def log_likelihoods_as_conditionals(llks):
+    # calculated denominator in log space
+    n = len(llks)
+    log_denominator = llks[0]
+    for opt in range(1, n):
+        log_denominator = sum_log_prob(log_denominator, llks[opt])
+
+    # calculate conditional probabilities
+    conditionals = np.empty(n)
+    for opt in range(n):
+        conditionals[opt] = np.exp(llks[opt] - log_denominator)
+    return conditionals
 
 
 @jit(nopython=True)
@@ -280,87 +277,14 @@ def conditional_probabilities(lnprobs):
 
 
 @jit(nopython=True)
-def overwrite(genotype, h_x, h_y, interval=None):
-    """Overwrite (sub-)haplotype y with values from (sub-)haplotype x of a genotype.
-
-    Parameters
-    ----------
-    genotype : array_like, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    h_x : int
-        Index of haplotype x in genotype to recombine with haplotype y.
-    h_y : int
-        Index of haplotype y in genotype to recombine with haplotype x.
-    interval : tuple, int
-        Interval of base-positions to overwrite (defaults to all base positions).
-    
-    Returns
-    -------
-    None
-
-    Notes
-    -----
-    Variables `genotype` is updated in place.
-
-    """
-    ploidy, n_base = genotype.shape
-    
-    r = interval_as_range(interval, n_base)
-    
-    # swap bases from the recombination point
-    for j in r:
-        
-        genotype[h_y, j] = genotype[h_x, j]
-
-
-@jit(nopython=True)
-def swap(genotype, h_x, h_y, interval=None):
-    """Swap a pair of (sub-)haplotypes within a genotype.
-
-    Parameters
-    ----------
-    genotype : array_like, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    h_x : int
-        Index of haplotype x in genotype to recombine with haplotype y.
-    h_y : int
-        Index of haplotype y in genotype to recombine with haplotype x.
-    interval : tuple, int
-        Interval of base-positions to swap (defaults to all base positions).
-    
-    Returns
-    -------
-    None
-
-    Notes
-    -----
-    Variables `genotype` is updated in place.
-
-    """
-    
-    ploidy, n_base = genotype.shape
-    
-    r = interval_as_range(interval, n_base)
-    
-    # swap bases from the recombination point
-    for j in r:
-        
-        j_x = genotype[h_x, j]
-        j_y = genotype[h_y, j]
-        
-        genotype[h_x, j] = j_y
-        genotype[h_y, j] = j_x
-
-
-@jit(nopython=True)
-def structural_change(genotype, haplotypes, interval=None):
+def structural_change(genotype, haplotype_indices, interval=None):
     """Mutate genotype by re-arranging haplotypes within a given interval.
 
     Parameters
     ----------
     genotype : array_like, int, shape (ploidy, n_base)
         Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    haplotypes : array_like, int, shape (ploidy)
+    haplotype_indices : array_like, int, shape (ploidy)
         Indicies of haplotypes to use within the changed interval.
     interval : tuple, int
         Interval of base-positions to swap (defaults to all base positions).
@@ -389,11 +313,11 @@ def structural_change(genotype, haplotypes, interval=None):
         
         # copy new bases back to genotype
         for h in range(ploidy):
-            genotype[h, j] = cache[haplotypes[h]]
+            genotype[h, j] = cache[haplotype_indices[h]]
 
 
 @jit(nopython=True)
-def log_likelihood_structural_change(reads, genotype, haplotypes, interval=None):
+def log_likelihood_structural_change(reads, genotype, haplotype_indices, interval=None):
     """Log likelihood of observed reads given a genotype given a structural change.
 
     Parameters
@@ -402,7 +326,7 @@ def log_likelihood_structural_change(reads, genotype, haplotypes, interval=None)
         Observed reads encoded as an array of probabilistic matrices.
     genotype : array_like, int, shape (ploidy, n_base)
         Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    haplotypes : array_like, int, shape (ploidy)
+    haplotype_indices : array_like, int, shape (ploidy)
         Indicies of haplotypes to use within the changed interval.
     interval : tuple, int
         Interval of base-positions to swap (defaults to all base positions).
@@ -431,7 +355,7 @@ def log_likelihood_structural_change(reads, genotype, haplotypes, interval=None)
                 # check if in the altered region
                 if j in r:
                     # use base from alternate hap
-                    h_ = haplotypes[h]
+                    h_ = haplotype_indices[h]
                 else:
                     # use base from current hap
                     h_ = h
