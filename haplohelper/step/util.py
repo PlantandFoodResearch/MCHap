@@ -79,6 +79,34 @@ def interval_windows(size, maximum):
     return intervals
 
 
+@njit
+def random_breaks(breaks, n):
+    
+    if breaks >= n:
+        raise ValueError('breaks must be smaller then n')
+    
+    indicies = np.ones(n+1, np.bool8)
+    indicies[0] = False
+    indicies[-1] = False
+    
+    for _ in range(breaks):
+        options = np.where(indicies)[0]
+        if len(options) == 0:
+            break
+        else:
+            point = np.random.choice(options)
+            indicies[point] = False
+            
+    points = np.where(~indicies)[0]
+    
+    intervals = np.zeros((breaks + 1, 2), dtype = np.int64)
+    
+    for i in range(breaks + 1):
+        intervals[i, 0] = points[i]
+        intervals[i, 1] = points[i + 1]
+    return intervals
+
+
 @jit(nopython=True)
 def _interval_inverse_mask(interval, n):
     if interval is None:

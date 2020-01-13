@@ -57,6 +57,26 @@ def interval_step(genotype, reads, llk, interval=None, allow_deletions=False):
 
 
 @njit
+def compound_step(genotype, reads, llk, intervals, randomise=True, allow_deletions=False):
+    
+    n_intervals = len(intervals)
+
+    if randomise:
+        intervals = intervals[np.random.permutation(np.arange(n_intervals))]
+
+    # step through every iterval
+    for i in range(n_intervals):
+        llk = interval_step(
+            genotype, 
+            reads, 
+            llk, 
+            interval=intervals[i], 
+            allow_deletions=allow_deletions
+        )
+    return llk
+
+
+@njit
 def compound_windowed_step(genotype, reads, llk, window_size, allow_deletions=False):
 
     _, n_base = genotype.shape
