@@ -4,7 +4,7 @@ from numba import njit
 from haplohelper.step import util, recombination, dosage_swap
 
 @njit
-def structural_step(genotype, reads, llk, interval=None, allow_deletions=False):
+def interval_step(genotype, reads, llk, interval=None, allow_deletions=False):
 
     ploidy, _ = genotype.shape
 
@@ -56,3 +56,31 @@ def structural_step(genotype, reads, llk, interval=None, allow_deletions=False):
     return llks[choice]
 
 
+@njit
+def compound_windowed_step(genotype, reads, llk, window_size, allow_deletions=False):
+
+    _, n_base = genotype.shape
+    
+    # create intervals windowed across genotype
+    intervals = util.interval_windows(window_size, n_base)
+    n_intervals = len(intervals)
+
+    # randomise interval order
+    intervals = intervals[np.random.permutation(np.arange(n_intervals))]
+
+    # step through every iterval
+    for i in range(n_intervals):
+        llk = interval_step(
+            genotype, 
+            reads, 
+            llk, 
+            interval=intervals[i], 
+            allow_deletions=allow_deletions
+        )
+    return llk
+
+
+
+
+
+    

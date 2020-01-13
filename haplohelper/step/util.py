@@ -44,7 +44,40 @@ def random_interval(n, size_probs=None):
         else:
             upper += 1
     return max(lower, 0), min(upper, n)
+
+
+@njit
+def interval_windows(size, maximum):
+    upper = np.random.randint(size)
     
+    # full sized intervals
+    n_intervals = (maximum - upper) // size
+    
+    if (maximum - upper) % size:
+        # add an interval for the remander
+        n_intervals += 1
+    
+    if upper > 0 :
+        # add an initial interval
+        n_intervals += 1
+        lower = 0
+    else:
+        # upper is 0  so skip first interval
+        lower = 0
+        upper = size
+
+    intervals = np.empty((n_intervals, 2), np.int64)
+ 
+    for i in range(n_intervals):
+        intervals[i, 0] = lower
+        intervals[i, 1] = upper
+        lower = upper
+        upper += size
+    
+    intervals[-1, 1] = maximum
+
+    return intervals
+
 
 @jit(nopython=True)
 def _interval_inverse_mask(interval, n):
