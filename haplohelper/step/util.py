@@ -123,6 +123,35 @@ def random_breaks(breaks, n):
     return intervals
 
 
+@njit
+def haplotype_of_int(array, integer, n_nucl):
+    n_base = len(array)
+    if integer >= n_nucl ** n_base:
+        raise ValueError('Integers larger larger than or equal to `n_base ** n_nucl` will cause overflow')
+    
+    array[:] = 0
+    
+    i = n_base - 1
+    while integer:
+        array[i] = integer % n_nucl
+        integer = integer // n_nucl
+        i -= 1
+        
+
+@njit
+def haplotype_as_int(array, n_nucl):
+    # TODO: check for overflows
+    n_base = len(array)
+    power = n_base - 1
+    integer = 0
+    for i in range(n_base):
+        element = array[i]
+        if element:
+            integer += n_nucl ** power
+        power -= 1
+    return integer
+    
+
 @jit(nopython=True)
 def _interval_inverse_mask(interval, n):
     if interval is None:
@@ -156,10 +185,10 @@ def add_log_prob(x, y):
 
 @njit
 def sum_log_probs(array):
-    cumulative = array[0]
+    acumulate = array[0]
     for i in range(1, len(array)):
-        cumulative = util.add_log_prob(log_denominator, array[i])
-    return cumulative
+        acumulate = add_log_prob(acumulate, array[i])
+    return acumulate
 
 
 @njit
