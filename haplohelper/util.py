@@ -51,7 +51,7 @@ def suggest_alphabet(vector_size):
 
 
 def count_unique_haplotypes(n_base, n_nucl):
-    return n_base ** n_nucl
+    return n_nucl ** n_base
 
 
 def count_unique_genotypes(u_haps, ploidy):

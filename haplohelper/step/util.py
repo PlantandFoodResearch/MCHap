@@ -5,11 +5,27 @@ from numba import jit, njit
 _FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=np.int64)
 
 @njit
-def factorial(x):
+def factorial_20(x):
     if x in range(0, 21):
         return _FACTORIAL_LOOK_UP[x]
     else:
         raise ValueError('factorial functuion is only supported for values 0 to 20')
+
+
+@njit
+def count_genotype_perterbations_20(dosage):
+    """Counts the total number of equivilent genotype perterbation based on the dosage.
+
+    A genotype is an unsorted set of haplotypes hence the genotype `{A, B}` is equivielnt
+    to the genotype `{B, A}`.
+    A fully homozygous genotype e.g. `{A, A}` has only one possible perterbation.
+    """
+    ploidy = np.sum(dosage)
+    numerator = factorial_20(ploidy)
+    denominator = 1
+    for i in range(len(dosage)):
+        denominator *= factorial_20(dosage[i])
+    return numerator // denominator
 
 
 @njit
@@ -117,8 +133,8 @@ def _interval_inverse_mask(interval, n):
     return mask
 
 @jit(nopython=True)
-def sum_log_prob(x, y):
-    """Sum of probabilities in log space.
+def add_log_prob(x, y):
+    """Sum of two probabilities in log space.
 
     Parameters
     ----------
@@ -139,12 +155,20 @@ def sum_log_prob(x, y):
 
 
 @njit
+def sum_log_probs(array):
+    cumulative = array[0]
+    for i in range(1, len(array)):
+        cumulative = util.add_log_prob(log_denominator, array[i])
+    return cumulative
+
+
+@njit
 def log_likelihoods_as_conditionals(llks):
     # calculated denominator in log space
     n = len(llks)
     log_denominator = llks[0]
     for opt in range(1, n):
-        log_denominator = sum_log_prob(log_denominator, llks[opt])
+        log_denominator = add_log_prob(log_denominator, llks[opt])
 
     # calculate conditional probabilities
     conditionals = np.empty(n)
@@ -352,7 +376,7 @@ def conditional_probabilities(lnprobs):
     # calculated denominator in log space
     log_denominator = lnprobs[0]
     for i in range(1, n):
-        log_denominator = sum_log_prob(log_denominator, lnprobs[i])
+        log_denominator = add_log_prob(log_denominator, lnprobs[i])
 
     # calculate conditional probabilities
     conditionals = np.empty(n)

@@ -1,5 +1,5 @@
 import numpy as np
-import scipy
+from scipy import stats as _stats
 from numba import jit
 
 from haplohelper.step import util
@@ -25,8 +25,8 @@ def point_beta_probabilities(n_base, a=1, b=1):
         Probabilities for recombination point.
     
     """
-    dist = scipy.stats.beta(a, b)
-    points = np.arange(1, n_base ) / (n_base - 1)
+    dist = _stats.beta(a, b)
+    points = np.arange(1, n_base + 1) / (n_base)
     probs = dist.cdf(points)
     probs[1:] = probs[1:] - probs[:-1]
     return probs
@@ -275,7 +275,7 @@ def recombination_step(genotype, reads, dosage, llk, point):
     # calculated denominator in log space
     log_denominator = llks[0]
     for opt in range(1, n_options):
-        log_denominator = util.sum_log_prob(log_denominator, llks[opt])
+        log_denominator = util.add_log_prob(log_denominator, llks[opt])
 
     # calculate conditional probabilities
     conditionals = np.empty(n_options)

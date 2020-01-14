@@ -91,7 +91,7 @@ def base_step(genotype, reads, llk, h, j):
     # calculated denominator in log space
     log_denominator = llks[0]
     for i in range(1, n_nucl):
-        log_denominator = util.sum_log_prob(log_denominator, llks[i])
+        log_denominator = util.add_log_prob(log_denominator, llks[i])
 
     # calculate conditional probabilities
     for i in range(n_nucl):
