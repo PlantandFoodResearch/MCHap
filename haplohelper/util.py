@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import numpy as np
+
+from scipy import stats as _stats
 from itertools import islice as _islice
 from itertools import zip_longest as _zip_longest
 
@@ -35,3 +37,29 @@ def middle_out(sequence):
     first_half = list(_islice(gen, len(sequence) // 2))
     second_half = list(gen)
     return merge(second_half, reversed(first_half))
+
+
+def point_beta_probabilities(n_base, a=1, b=1):
+    """Return probabilies for selecting a recombination point
+    following a beta distribution
+
+    Parameters
+    ----------
+    n_base : int
+        Number of base positions in this genotype.
+    a : float
+        Alpha parameter for beta distribution.
+    b : float
+        Beta parameter for beta distribution.
+
+    Returns
+    -------
+    probs : array_like, int, shape (n_base - 1)
+        Probabilities for recombination point.
+    
+    """
+    dist = _stats.beta(a, b)
+    points = np.arange(1, n_base + 1) / (n_base)
+    probs = dist.cdf(points)
+    probs[1:] = probs[1:] - probs[:-1]
+    return probs
