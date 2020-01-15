@@ -4,15 +4,29 @@ from numba import njit
 from haplohelper.step import util, recombination, dosage_swap
 
 @njit
-def interval_step(genotype, reads, llk, interval=None, allow_deletions=False):
+def interval_step(
+        genotype, 
+        reads, 
+        llk, 
+        interval=None, 
+        allow_recombinations=True,
+        allow_dosage_swaps=True,
+        allow_deletions=False
+    ):
 
     ploidy, _ = genotype.shape
 
     labels = util.haplotype_segment_labels(genotype, interval)
 
     # calculate number of potential steps from current state
-    n_recombine = recombination.recombination_step_n_options(labels)
-    n_dosage = dosage_swap.dosage_step_n_options(labels, allow_deletions)
+    if allow_recombinations:
+        n_recombine = recombination.recombination_step_n_options(labels)
+    else:
+        n_recombine = 0
+    if allow_dosage_swaps:
+        n_dosage = dosage_swap.dosage_step_n_options(labels, allow_deletions)
+    else:
+        n_dosage = 0
     n_steps = n_recombine + n_dosage
 
     # not stepping is also an option
@@ -20,8 +34,10 @@ def interval_step(genotype, reads, llk, interval=None, allow_deletions=False):
 
     # array of step options
     steps = np.empty((n_steps, ploidy), np.int8)
-    steps[0:n_recombine] = recombination.recombination_step_options(labels)
-    steps[n_recombine:] = dosage_swap.dosage_step_options(labels, allow_deletions)
+    if allow_recombinations:
+        steps[0:n_recombine] = recombination.recombination_step_options(labels)
+    if allow_dosage_swaps:
+        steps[n_recombine:] = dosage_swap.dosage_step_options(labels, allow_deletions)
 
     # log liklihood for each new option and the current state
     llks = np.empty(n_options)
@@ -57,7 +73,15 @@ def interval_step(genotype, reads, llk, interval=None, allow_deletions=False):
 
 
 @njit
-def compound_step(genotype, reads, llk, intervals, randomise=True, allow_deletions=False):
+def compound_step(
+        genotype, 
+        reads, 
+        llk, 
+        intervals, 
+        randomise=True, 
+        allow_recombinations=True,
+        allow_dosage_swaps=True,
+        allow_deletions=False):
     
     n_intervals = len(intervals)
 
@@ -71,36 +95,8 @@ def compound_step(genotype, reads, llk, intervals, randomise=True, allow_deletio
             reads, 
             llk, 
             interval=intervals[i], 
+            allow_recombinations=allow_recombinations,
+            allow_dosage_swaps=allow_dosage_swaps,
             allow_deletions=allow_deletions
         )
     return llk
-
-
-@njit
-def compound_windowed_step(genotype, reads, llk, window_size, allow_deletions=False):
-
-    _, n_base = genotype.shape
-    
-    # create intervals windowed across genotype
-    intervals = util.interval_windows(window_size, n_base)
-    n_intervals = len(intervals)
-
-    # randomise interval order
-    intervals = intervals[np.random.permutation(np.arange(n_intervals))]
-
-    # step through every iterval
-    for i in range(n_intervals):
-        llk = interval_step(
-            genotype, 
-            reads, 
-            llk, 
-            interval=intervals[i], 
-            allow_deletions=allow_deletions
-        )
-    return llk
-
-
-
-
-
-    
