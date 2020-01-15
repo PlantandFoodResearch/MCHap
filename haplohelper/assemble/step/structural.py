@@ -3,7 +3,7 @@
 import numpy as np
 import numba
 
-from haplohelper.step import util
+from haplohelper.assemble.step import util
 
 
 
