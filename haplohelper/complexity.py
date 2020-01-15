@@ -22,7 +22,7 @@ def count_genotype_perterbations(dosage):
     to the genotype `{B, A}`.
     A fully homozygous genotype e.g. `{A, A}` has only one possible perterbation.
     """
-    ploidy = np.sum(dosage)
+    ploidy = sum(dosage)
     numerator = factorial(ploidy)
     denominator = 1
     for i in range(len(dosage)):
