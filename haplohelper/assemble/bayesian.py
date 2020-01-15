@@ -45,16 +45,16 @@ def _denovo_gibbs_sampler(
             
             # compound step
             llk = structural.compound_step(
-                genotype, 
-                reads, 
-                llk, 
-                intervals,
-                allow_recombinations,
-                allow_dosage_swaps,
-                allow_deletions
+                genotype=genotype, 
+                reads=reads, 
+                llk=llk, 
+                intervals=intervals,
+                allow_recombinations=allow_recombinations,
+                allow_dosage_swaps=allow_dosage_swaps,
+                allow_deletions=allow_deletions
             )
         
-        genotype_trace[i] = genotype
+        genotype_trace[i] = genotype.copy() # TODO: is this copy needed?
         llk_trace[i] = llk
     return genotype_trace, llk_trace
 
@@ -114,20 +114,26 @@ class DeNovoGibbsAssembler(object):
         if self.initial is None:
             genotype = np.random.randint(0, n_nucl, (self.ploidy, n_base), dtype=np.int8)
         else:
-            genotype = self.initial
+            genotype = self.initial.copy()
             
         # distribution to draw number of break points from
-        break_dist = point_beta_probabilities(n_base, self.alpha, self.beta)
+        if self.n_intervals is None:
+            # random number of intervals based on beta distribution
+            break_dist = point_beta_probabilities(n_base, self.alpha, self.beta)
+        else:
+            # this is a hack to fix number of intervals
+            break_dist = np.zeros(self.n_intervals, dtype=np.float64)
+            break_dist[-1] = 1  # 100% probability of n_intervals -1 break points
         
         self.genotype_trace, self.llk_trace = _denovo_gibbs_sampler(
             genotype, 
             reads, 
-            self.ratio, 
-            self.steps, 
-            break_dist,
-            self.allow_recombinations,
-            self.allow_dosage_swaps,
-            self.allow_deletions
+            ratio=self.ratio, 
+            steps=self.steps, 
+            break_dist=break_dist,
+            allow_recombinations=self.allow_recombinations,
+            allow_dosage_swaps=self.allow_dosage_swaps,
+            allow_deletions=self.allow_deletions
         )
         
     def sorted_trace(self):
