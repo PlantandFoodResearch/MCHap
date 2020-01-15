@@ -393,11 +393,12 @@ def compound_step(
         genotype, 
         reads, 
         llk, 
-        intervals, 
-        randomise=True, 
+        intervals,  
         allow_recombinations=True,
         allow_dosage_swaps=True,
-        allow_deletions=False):
+        allow_deletions=False,
+        randomise=True
+    ):
     
     n_intervals = len(intervals)
 
