@@ -1,10 +1,10 @@
 import numpy as np
 import math
-from numba import jit, njit
+import numba
 
 _FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=np.int64)
 
-@njit
+@numba.njit
 def factorial_20(x):
     if x in range(0, 21):
         return _FACTORIAL_LOOK_UP[x]
@@ -12,7 +12,7 @@ def factorial_20(x):
         raise ValueError('factorial functuion is only supported for values 0 to 20')
 
 
-@njit
+@numba.njit
 def count_genotype_perterbations_20(dosage):
     """Counts the total number of equivilent genotype perterbation based on the dosage.
 
@@ -28,7 +28,7 @@ def count_genotype_perterbations_20(dosage):
     return numerator // denominator
 
 
-@njit
+@numba.njit
 def interval_as_range(interval, max_range):
     if interval is None:
         return range(max_range)
@@ -38,64 +38,8 @@ def interval_as_range(interval, max_range):
         else:
             raise ValueError('Interval must be `None` or array of length 2')
 
-@njit
-def random_interval(n, size_probs=None):
-    if size_probs is None:
-        # uniform distribution of positive sizes smaller than n
-        size = np.random.randint(1, np.floor(n*1.3))
-    else:
-        # use provided distribution
-        size = random_choice(size_probs)
 
-    # center of the interval
-    center = np.random.randint(0, n+1)
-    
-    lower = center - size // 2
-    upper = center + size // 2
-
-    if size % 2:
-        # odd size so randomize longer end
-        if np.random.random() < 0.5:
-            lower -= 1
-        else:
-            upper += 1
-    return max(lower, 0), min(upper, n)
-
-
-@njit
-def interval_windows(size, maximum):
-    upper = np.random.randint(size)
-    
-    # full sized intervals
-    n_intervals = (maximum - upper) // size
-    
-    if (maximum - upper) % size:
-        # add an interval for the remander
-        n_intervals += 1
-    
-    if upper > 0 :
-        # add an initial interval
-        n_intervals += 1
-        lower = 0
-    else:
-        # upper is 0  so skip first interval
-        lower = 0
-        upper = size
-
-    intervals = np.empty((n_intervals, 2), np.int64)
- 
-    for i in range(n_intervals):
-        intervals[i, 0] = lower
-        intervals[i, 1] = upper
-        lower = upper
-        upper += size
-    
-    intervals[-1, 1] = maximum
-
-    return intervals
-
-
-@njit
+@numba.njit
 def random_breaks(breaks, n):
     
     if breaks >= n:
@@ -123,7 +67,7 @@ def random_breaks(breaks, n):
     return intervals
 
 
-@njit
+@numba.njit
 def haplotype_of_int(array, integer, n_nucl):
     n_base = len(array)
     if integer >= n_nucl ** n_base:
@@ -138,7 +82,7 @@ def haplotype_of_int(array, integer, n_nucl):
         i -= 1
         
 
-@njit
+@numba.njit
 def haplotype_as_int(array, n_nucl):
     # TODO: check for overflows
     n_base = len(array)
@@ -150,18 +94,9 @@ def haplotype_as_int(array, n_nucl):
             integer += n_nucl ** power
         power -= 1
     return integer
-    
 
-@jit(nopython=True)
-def _interval_inverse_mask(interval, n):
-    if interval is None:
-        mask = np.zeros(n, np.bool8)
-    else:
-        mask = np.ones(n, np.bool8)
-        mask[interval[0]:interval[1]] = 0
-    return mask
 
-@jit(nopython=True)
+@numba.njit
 def add_log_prob(x, y):
     """Sum of two probabilities in log space.
 
@@ -183,7 +118,7 @@ def add_log_prob(x, y):
         return y + np.log1p(np.exp(x - y))
 
 
-@njit
+@numba.njit
 def sum_log_probs(array):
     acumulate = array[0]
     for i in range(1, len(array)):
@@ -191,22 +126,20 @@ def sum_log_probs(array):
     return acumulate
 
 
-@njit
+@numba.njit
 def log_likelihoods_as_conditionals(llks):
     # calculated denominator in log space
-    n = len(llks)
-    log_denominator = llks[0]
-    for opt in range(1, n):
-        log_denominator = add_log_prob(log_denominator, llks[opt])
+    log_denominator = sum_log_probs(llks)
 
     # calculate conditional probabilities
+    n = len(llks)
     conditionals = np.empty(n)
     for opt in range(n):
         conditionals[opt] = np.exp(llks[opt] - log_denominator)
     return conditionals
 
 
-@jit(nopython=True)
+@numba.njit
 def random_choice(probabilities):
     """Random choice of options given a set of probabilities.
 
@@ -224,7 +157,7 @@ def random_choice(probabilities):
     return np.searchsorted(np.cumsum(probabilities), np.random.random(), side="right")
 
 
-@jit(nopython=True)
+@numba.njit
 def greedy_choice(probabilities):
     """Greedy choice of options given a set of probabilities.
 
@@ -242,7 +175,7 @@ def greedy_choice(probabilities):
     return np.argmax(probabilities)
 
 
-@jit(nopython=True)
+@numba.njit
 def array_equal(x, y, interval=None):
     """Check if two one-dimentional integer arrays are equal.
 
@@ -267,7 +200,7 @@ def array_equal(x, y, interval=None):
     return True
 
 
-@jit(nopython=True)
+@numba.njit
 def get_dosage(dosage, genotype, interval=None):
     """Calculates the dosage of a set of integer encoded haplotypes by 
     checking for array equality.
@@ -293,7 +226,7 @@ def get_dosage(dosage, genotype, interval=None):
     # start with assumption that all are unique
     dosage[:] = 1
     
-    ploidy, n_base = genotype.shape
+    ploidy, _ = genotype.shape
         
     for h in range(ploidy):
         if dosage[h] == 0:
@@ -311,7 +244,7 @@ def get_dosage(dosage, genotype, interval=None):
                         dosage[p] = 0
 
 
-@jit(nopython=True)
+@numba.njit
 def set_dosage(genotype, dosage):
     """Set a genotype to a new dosage.
 
@@ -352,7 +285,7 @@ def set_dosage(genotype, dosage):
                     dosage[h_y] += 1
 
 
-@njit
+@numba.njit
 def label_haplotypes(labels, genotype, interval=None):
 
     ploidy, n_base = genotype.shape
@@ -378,7 +311,17 @@ def label_haplotypes(labels, genotype, interval=None):
                         labels[k] = j
 
 
-@njit
+@numba.njit
+def _interval_inverse_mask(interval, n):
+    if interval is None:
+        mask = np.zeros(n, np.bool8)
+    else:
+        mask = np.ones(n, np.bool8)
+        mask[interval[0]:interval[1]] = 0
+    return mask
+
+
+@numba.njit
 def haplotype_segment_labels(genotype, interval=None):
     """Create a labels matrix in whihe the first coloumn contains
     labels for haplotype segments within the specified range and
@@ -396,117 +339,3 @@ def haplotype_segment_labels(genotype, interval=None):
     mask = _interval_inverse_mask(interval, n_base)
     label_haplotypes(labels[:, 1], genotype[:, mask], interval=None)
     return labels
-
-
-@jit(nopython=True)
-def conditional_probabilities(lnprobs):
-    n = len(lnprobs)
-
-    # calculated denominator in log space
-    log_denominator = lnprobs[0]
-    for i in range(1, n):
-        log_denominator = add_log_prob(log_denominator, lnprobs[i])
-
-    # calculate conditional probabilities
-    conditionals = np.empty(n)
-    for i in range(n):
-        conditionals[i] = np.exp(lnprobs[i] - log_denominator)
-    
-    return conditionals
-
-
-@jit(nopython=True)
-def structural_change(genotype, haplotype_indices, interval=None):
-    """Mutate genotype by re-arranging haplotypes within a given interval.
-
-    Parameters
-    ----------
-    genotype : array_like, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    haplotype_indices : array_like, int, shape (ploidy)
-        Indicies of haplotypes to use within the changed interval.
-    interval : tuple, int
-        Interval of base-positions to swap (defaults to all base positions).
-    
-    Returns
-    -------
-    None
-
-    Notes
-    -----
-    Variables `genotype` is updated in place.
-
-    """
-    
-    ploidy, n_base = genotype.shape
-        
-    cache = np.empty(ploidy, dtype=np.int8)
-
-    r = interval_as_range(interval, n_base)
-    
-    for j in r:
-        
-        # copy to cache 
-        for h in range(ploidy):
-            cache[h] = genotype[h, j]
-        
-        # copy new bases back to genotype
-        for h in range(ploidy):
-            genotype[h, j] = cache[haplotype_indices[h]]
-
-
-@jit(nopython=True)
-def log_likelihood_structural_change(reads, genotype, haplotype_indices, interval=None):
-    """Log likelihood of observed reads given a genotype given a structural change.
-
-    Parameters
-    ----------
-    reads : array_like, float, shape (n_reads, n_base, n_nucl)
-        Observed reads encoded as an array of probabilistic matrices.
-    genotype : array_like, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    haplotype_indices : array_like, int, shape (ploidy)
-        Indicies of haplotypes to use within the changed interval.
-    interval : tuple, int
-        Interval of base-positions to swap (defaults to all base positions).
-
-    Returns
-    -------
-    llk : float
-        Log-likelihood of the observed reads given the genotype.
-    """
-    ploidy, n_base = genotype.shape
-    n_reads = len(reads)
-        
-    intvl = interval_as_range(interval, n_base)
-       
-    llk = 0.0
-    
-    for r in range(n_reads):
-        
-        read_prob = 0
-        
-        for h in range(ploidy):
-            read_hap_prod = 1.0
-            
-            for j in range(n_base):
-                
-                # check if in the altered region
-                if j in intvl:
-                    # use base from alternate hap
-                    h_ = haplotype_indices[h]
-                else:
-                    # use base from current hap
-                    h_ = h
-                
-                # get nucleotide index
-                i = genotype[h_, j]
-
-                read_hap_prod *= reads[r, j, i]
-                
-            read_prob += read_hap_prod/ploidy
-        
-        llk += np.log(read_prob)
-                    
-    return llk
-

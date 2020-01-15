@@ -1,7 +1,107 @@
+#!/usr/bin/env python3
+
 import numpy as np
 import numba
 
 from haplohelper.step import util
+
+
+
+@numba.njit
+def structural_change(genotype, haplotype_indices, interval=None):
+    """Mutate genotype by re-arranging haplotypes within a given interval.
+
+    Parameters
+    ----------
+    genotype : array_like, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
+    haplotype_indices : array_like, int, shape (ploidy)
+        Indicies of haplotypes to use within the changed interval.
+    interval : tuple, int
+        Interval of base-positions to swap (defaults to all base positions).
+    
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Variables `genotype` is updated in place.
+
+    """
+    
+    ploidy, n_base = genotype.shape
+        
+    cache = np.empty(ploidy, dtype=np.int8)
+
+    r = util.interval_as_range(interval, n_base)
+    
+    for j in r:
+        
+        # copy to cache 
+        for h in range(ploidy):
+            cache[h] = genotype[h, j]
+        
+        # copy new bases back to genotype
+        for h in range(ploidy):
+            genotype[h, j] = cache[haplotype_indices[h]]
+
+
+@numba.njit
+def log_likelihood_structural_change(reads, genotype, haplotype_indices, interval=None):
+    """Log likelihood of observed reads given a genotype given a structural change.
+
+    Parameters
+    ----------
+    reads : array_like, float, shape (n_reads, n_base, n_nucl)
+        Observed reads encoded as an array of probabilistic matrices.
+    genotype : array_like, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
+    haplotype_indices : array_like, int, shape (ploidy)
+        Indicies of haplotypes to use within the changed interval.
+    interval : tuple, int
+        Interval of base-positions to swap (defaults to all base positions).
+
+    Returns
+    -------
+    llk : float
+        Log-likelihood of the observed reads given the genotype.
+    """
+    ploidy, n_base = genotype.shape
+    n_reads = len(reads)
+        
+    intvl = util.interval_as_range(interval, n_base)
+       
+    llk = 0.0
+    
+    for r in range(n_reads):
+        
+        read_prob = 0
+        
+        for h in range(ploidy):
+            read_hap_prod = 1.0
+            
+            for j in range(n_base):
+                
+                # check if in the altered region
+                if j in intvl:
+                    # use base from alternate hap
+                    h_ = haplotype_indices[h]
+                else:
+                    # use base from current hap
+                    h_ = h
+                
+                # get nucleotide index
+                i = genotype[h_, j]
+
+                read_hap_prod *= reads[r, j, i]
+                
+            read_prob += read_hap_prod/ploidy
+        
+        llk += np.log(read_prob)
+                    
+    return llk
+
 
 @numba.njit
 def recombination_step_n_options(labels):
@@ -261,7 +361,7 @@ def interval_step(
     
     # iterate through new options and calculate log-likelihood
     for opt in range(n_steps):
-        llks[opt] = util.log_likelihood_structural_change(
+        llks[opt] = log_likelihood_structural_change(
             reads, 
             genotype, 
             steps[opt],
@@ -274,7 +374,6 @@ def interval_step(
     # calculate conditional probs
     conditionals = util.log_likelihoods_as_conditionals(llks)
 
-
     # choose new dosage based on conditional probabilities
     choice = util.random_choice(conditionals)
        
@@ -283,7 +382,7 @@ def interval_step(
         pass
     else:
         # update the genotype state
-        util.structural_change(genotype, steps[choice], interval)
+        structural_change(genotype, steps[choice], interval)
 
     # return llk of new state
     return llks[choice]

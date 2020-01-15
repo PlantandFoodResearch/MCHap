@@ -1,10 +1,12 @@
+#!/usr/bin/env python3
+
 import numpy as np 
-from numba import jit
+import numba
 
 from haplohelper.step import util
 from haplohelper.likelihood import log_likelihood
 
-@jit(nopython=True)
+@numba.njit
 def base_step(genotype, reads, llk, h, j):
     """Mutation Gibbs sampler step for the jth base position of the hth haplotype.
 
@@ -49,17 +51,8 @@ def base_step(genotype, reads, llk, h, j):
             genotype[h, j] = i
             llks[i] = log_likelihood(reads, genotype)
 
-    # calculated denominator in log space
-    log_denominator = llks[0]
-    for i in range(1, n_nucl):
-        log_denominator = util.add_log_prob(log_denominator, llks[i])
-
     # calculate conditional probabilities
-    for i in range(n_nucl):
-        conditionals[i] = np.exp(llks[i] - log_denominator)
-
-    # ensure conditional probabilities are normalised 
-    conditionals /= np.sum(conditionals)
+    conditionals util.log_likelihoods_as_conditionals(llks)
 
     # if a prior is used then it can be multiplied by probs here
     choice = util.random_choice(conditionals)
@@ -71,7 +64,7 @@ def base_step(genotype, reads, llk, h, j):
     return llks[choice]
 
 
-@jit(nopython=True)
+@numba.njit
 def haplotype_compound_step(genotype, reads, llk, h):
     """Mutation compound Gibbs sampler step for all base positions of the hth haplotype.
 
@@ -103,7 +96,7 @@ def haplotype_compound_step(genotype, reads, llk, h):
     return llk
 
 
-@jit(nopython=True)
+@numba.njit
 def genotype_compound_step(genotype, reads, llk):
     """Mutation compound Gibbs sampler step for all base positions of all haplotypes in a genotype.
 
