@@ -52,7 +52,7 @@ def base_step(genotype, reads, llk, h, j):
             llks[i] = log_likelihood(reads, genotype)
 
     # calculate conditional probabilities
-    conditionals util.log_likelihoods_as_conditionals(llks)
+    conditionals = util.log_likelihoods_as_conditionals(llks)
 
     # if a prior is used then it can be multiplied by probs here
     choice = util.random_choice(conditionals)
