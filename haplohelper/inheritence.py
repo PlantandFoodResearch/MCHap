@@ -101,40 +101,26 @@ class TrioChildInheritance(object):
                 improving = True
 
 
-def _suggest_alphabet(vector_size):
-    if vector_size == 2:
-        return biovector.Biallelic
-    elif vector_size == 3:
-        return biovector.Triallelic
-    elif vector_size == 4:
-        return biovector.Quadraallelic
-    else:
-        raise ValueError(
-            'No suitable alphabet for vector size {}'.format(vector_size))
-
-
-def gamete_probabilities(haplotype_sets,
-                         haplotype_set_probabilities,
+def gamete_probabilities(genotypes,
+                         probabilities,
                          order=None):
     assert order in {None, 'ascending', 'descending'}
 
-    n_sets, ploidy, n_base, n_nucl = haplotype_sets.shape
+    n_gens, ploidy, n_base = genotypes.shape
 
     # convert haplotypes to strings for faster hashing/comparisons
     string_to_hap = {}
-    string_sets = np.empty(n_sets * ploidy, dtype='<O')
-    for i, hap in enumerate(haplotype_sets.reshape(n_sets * ploidy,
-                                                   n_base,
-                                                   n_nucl)):
+    genotype_strings = np.empty(n_gens * ploidy, dtype='<O')
+    for i, hap in enumerate(genotypes.reshape(n_gens * ploidy, n_base)):
         string = hap.tostring()
         string_to_hap[string] = hap
-        string_sets[i] = string
-    string_sets = np.sort(string_sets.reshape(n_sets, ploidy), axis=-1)
+        genotype_strings[i] = string
+    genotype_strings = np.sort(genotype_strings.reshape(n_gens, ploidy), axis=-1)
 
     # calculate gamete probs
     gamete_probs = {}
-    for string_set, set_prob in zip(string_sets, haplotype_set_probabilities):
-        gametes = list(_combinations(string_set, ploidy // 2))
+    for genotype_string, set_prob in zip(genotype_strings, probabilities):
+        gametes = list(_combinations(genotype_string, ploidy // 2))
         n_gametes = len(gametes)
         for gamete, count in _Counter(gametes).items():
             prob = set_prob * (count / n_gametes)
@@ -145,7 +131,7 @@ def gamete_probabilities(haplotype_sets,
 
     # convert from hash map of string: prob back to arrays
     n_gametes = len(gamete_probs)
-    new = np.empty((n_gametes, ploidy // 2, n_base, n_nucl), dtype=np.int8)
+    new = np.empty((n_gametes, ploidy // 2, n_base), dtype=np.int8)
     new_probs = np.empty(n_gametes, dtype=np.float)
     for i, (strings, prob) in enumerate(gamete_probs.items()):
         new_probs[i] = prob
@@ -169,41 +155,42 @@ def cross_probabilities(maternal_gametes,
     assert order in {None, 'ascending', 'descending'}
 
     # get dimensions
-    half_ploidy, n_base, n_nucl = maternal_gametes.shape[-3:]
+    half_ploidy, n_base = maternal_gametes.shape[-2:]
     ploidy = half_ploidy * 2
 
     # compute genotypes and probabilities
     genotype_probs = {}
-    string_to_haplotype = {}
-    for i, (m_gamete, m_prob) in enumerate(zip(maternal_gametes,
-                                               maternal_probabilities)):
-        for j, (p_gamete, p_prob) in enumerate(zip(paternal_gametes,
-                                                   paternal_probabilities)):
-            genotype = np.empty(ploidy, dtype='<O')
+    string_to_genotype = {}
+    for m_gamete, m_prob in zip(maternal_gametes,
+                                maternal_probabilities):
+        for p_gamete, p_prob in zip(paternal_gametes,
+                                    paternal_probabilities):
+            genotype = np.empty((ploidy, n_base), dtype=np.int8)
             idx = 0
             for gamete in [m_gamete, p_gamete]:
                 for hap in gamete:
-                    string = hap.tostring()
-                    genotype[idx] = string
+                    genotype[idx] = hap
                     idx += 1
-                    if string not in string_to_haplotype:
-                        string_to_haplotype[string] = hap
-            genotype = tuple(np.sort(genotype))
+
+            genotype = biovector.integer.sort(genotype)
+            string = genotype.tostring()
+            if string not in string_to_genotype:
+                string_to_genotype[string] = genotype
+
             prob =  m_prob * p_prob
-            if genotype in genotype_probs:
-                genotype_probs[genotype] += prob
+            if string in genotype_probs:
+                genotype_probs[string] += prob
             else:
-                genotype_probs[genotype] = prob
+                genotype_probs[string] = prob
 
     # convert genotypes bac to arrays
     n_genotypes = len(genotype_probs)
-    new = np.empty((n_genotypes, ploidy, n_base, n_nucl), dtype=np.int8)
+    new = np.empty((n_genotypes, ploidy, n_base), dtype=np.int8)
     new_probs = np.empty(n_genotypes, dtype=np.float)
 
-    for i, (genotype, prob) in enumerate(genotype_probs.items()):
+    for i, (string, prob) in enumerate(genotype_probs.items()):
         new_probs[i] = prob
-        for j, string in enumerate(genotype):
-            new[i,j] = string_to_haplotype[string]
+        new[i] = string_to_genotype[string]
 
     if order:
         idx = np.argsort(new_probs)
@@ -212,33 +199,4 @@ def cross_probabilities(maternal_gametes,
         return new[idx], new_probs[idx]
     else:
         return new, new_probs
-
-
-def parental_set_probabilities(maternal_sets,
-                               maternal_probabilities,
-                               paternal_sets,
-                               paternal_probabilities):
-    m_len = len(maternal_sets)
-    d_len = len(paternal_sets)
-
-    n_sets = m_len * d_len
-
-    ploidy, n_base, n_nucl = maternal_sets[0].shape
-
-    # double the ploidy dimention
-    set_shape = (2 * ploidy, n_base, n_nucl)
-
-    sets = np.empty((n_sets, *set_shape), dtype=np.int8)
-    probs = np.empty(n_sets)
-
-    for m in range(m_len):
-        for d in range(d_len):
-            i = m * d
-            sets[i][0:ploidy] = maternal_sets[m]
-            sets[i][ploidy:] = paternal_sets[d]
-            probs[i] = maternal_probabilities[m] * paternal_probabilities[d]
-    return sets, probs
-
-
-
 
