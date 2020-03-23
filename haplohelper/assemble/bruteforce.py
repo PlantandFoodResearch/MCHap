@@ -4,8 +4,8 @@ import numpy as np
 import numba
 
 from haplohelper.assemble.step import util
-from haplohelper import complexity
-from haplohelper.likelihood import log_likelihood
+from haplohelper.assemble import complexity
+from haplohelper.assemble.likelihood import log_likelihood
 
 
 @numba.njit

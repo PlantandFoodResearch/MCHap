@@ -4,7 +4,7 @@ import numpy as np
 import numba
 
 from haplohelper.assemble.step import util
-from haplohelper.likelihood import log_likelihood
+from haplohelper.assemble.likelihood import log_likelihood
 
 @numba.njit
 def base_step(genotype, reads, llk, h, j):

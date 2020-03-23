@@ -5,7 +5,7 @@ import numba
 
 import biovector as bv
 from haplohelper.assemble.step import util, mutation, structural
-from haplohelper.likelihood import log_likelihood
+from haplohelper.assemble.likelihood import log_likelihood
 from haplohelper.util import point_beta_probabilities
 
 
