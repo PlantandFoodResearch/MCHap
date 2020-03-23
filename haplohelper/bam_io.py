@@ -5,7 +5,11 @@ from collections import Counter as _Counter
 from functools import reduce as _reduce
 from operator import add as _add
 from haplohelper import util
+import biovector
 
+# NGS error rate per base estimated by Pfeiffer et al 2018
+# "Systematic evaluation of error rates and causes in short samples in next-generation sequencing"
+Pfeiffer_2018_error = .0024
 
 # pileupcolumn functions
 
@@ -99,10 +103,74 @@ def _extract_column(pileupcolumn, min_map_qual=0):
             yield sample, qname, char, qual
 
 
+def _read_snp_dicts(alignment_file,
+                    contig=None,
+                    positions=None,
+                    min_map_qual=20):
+
+    # extract reads
+
+    # sample: read: array of variants with phred scores
+    data = dict()
+
+    # maps reference position to array index
+    pos_map = dict(zip(positions, range(len(positions))))
+
+    # variants stored in array
+    # default values for read gaps is a null allele 'N' with probability 1
+    dtype_variant = np.dtype([('char', np.str_, 1), ('qual', np.int8)])
+    template = np.empty(len(positions), dtype=dtype_variant)
+    template['char'] = 'N'
+    template['qual'] = 0
+
+    for pileupcolumn in alignment_file.pileup(contig,
+                                              np.min(positions),
+                                              np.max(positions)):
+        if pileupcolumn.pos in pos_map:
+            pos = pileupcolumn.pos
+
+            for sample, qname, char, qual in _extract_column(pileupcolumn,
+                                                             min_map_qual):
+                if sample not in data:
+                    data[sample] = {}
+                if qname not in data[sample]:
+                    data[sample][qname] = template.copy()
+                data[sample][qname][pos_map[pos]] = (char, qual)
+    return data
+
+
+def read_snps(alignment_file,
+              contig=None,
+              positions=None,
+              min_map_qual=20):
+    
+    data = _read_snp_dicts(alignment_file, contig, positions, min_map_qual)
+
+    sample_reads = {}
+    sample_quals = {}
+
+    for sample, d in data.items():
+        n_reads = len(d)
+        n_base = len(positions)
+        strings = np.empty(n_reads, dtype='<U{0}'.format(n_base))
+        quals = np.empty((n_reads, n_base), dtype=np.int8)
+        for i, array in enumerate(d.values()):
+            strings[i] = ''.join(array['char'])
+            quals[i] = array['qual']
+        sample_reads[sample] = strings
+        sample_quals[sample] = quals
+    
+    return sample_reads, sample_quals
+
+
+
+
+
+
 def encode_alignment_positions(alignment_file,
                                contig=None,
                                positions=None,
-                               alphabet=None,
+                               #alphabet=None,
                                min_map_qual=20):
 
     # extract reads
@@ -136,21 +204,23 @@ def encode_alignment_positions(alignment_file,
                     char,
                     util.prob_of_qual(qual)
                 )
+    return reads
 
-    # encode reads (reuse same dict)
+"""     # encode reads (reuse same dict)
     for sample, data in reads.items():
-        array = np.empty((len(data), len(positions), alphabet.vector_size()),
-                         dtype=np.float)
+        array = np.empty(
+            (len(data), len(positions), alphabet.binary.nalleles()),
+            dtype=np.float)
         for i, read in enumerate(data.values()):
 
-            array[i] = alphabet.encode_probabilistic_vectors(
+            array[i] = alphabet.binary.encode(
                 ''.join(read['char']),
-                probabilities=read['prob']
+                #probabilities=read['prob']
             )
 
         reads[sample] = array
 
-    return reads
+    return reads """
 
 
 # defaults for converting from Allelic to IUPAC
@@ -174,6 +244,72 @@ _DEFAULT_IUPAC_TO_ALLELIC = (
 )
 
 
+class TranslatorEncoder(object):
+    """Wraps an Encoder object and translates strings before/after
+    calling encode/decode.
+    """
+    def __init__(self, encoder, translate_to_wrapped, translate_from_wrapped):
+        assert len(translate_to_wrapped) == len(translate_from_wrapped)
+        self.encoder=encoder
+        self._translate_to_wrapped = translate_to_wrapped
+        self._translate_from_wrapped = translate_from_wrapped
+
+    def element_shape(self):
+        return self.encoder.element_shape()
+
+    def sequence_dims(self):
+        return self.encoder.sequence_dims()
+
+    def dtype(self):
+        return self.encoder.dtype()
+
+    def nalleles(self):
+        return self.encoder.nalleles()
+
+    def _translate(self, data, translator):
+        if isinstance(data, str):
+            return ''.join(translator[i][char] for i, char in enumerate(data))
+
+        # assume as array of strings
+        if not isinstance(data, np.ndarray):
+            data = np.array(data)
+
+        # copy to mutate in place
+        data = data.copy()
+        long = data.ravel()
+        for j, string in enumerate(long):
+            long[j] = ''.join(translator[i][char] for i, char in enumerate(string))
+        return data
+
+    def translate_to_wrapped(self, data):
+        return self._translate(data, self._translate_to_wrapped)
+
+    def translate_from_wrapped(self, data):
+        return self._translate(data, self._translate_from_wrapped)
+
+    def encode_string(self, string, dtype=None):
+        # translate
+        string = self.translate_to_wrapped(string)
+        return self.encoder.encode_string(string, dtype=dtype)
+
+    def decode_sequence(self, array):
+        string = self.encoder.decode_sequence(array)
+        # translate
+        return self.translate_from_wrapped(string)
+
+    def encode(self, string, dtype=None):
+        # translate
+        string = self.translate_to_wrapped(string)
+        return self.encoder.encode(string, dtype=dtype)
+
+    def decode(self, array, dtype=None):
+        string = self.encoder.decode(array, dtype=dtype)
+        # translate
+        return self.translate_from_wrapped(string)
+
+
+
+
 class VariantLociMap(object):
     """Block of variant positions
     """
@@ -191,7 +327,14 @@ class VariantLociMap(object):
         self._interval = interval  # interval translates seq pos to ref pos
         self._sequence = sequence
         self._n_alleles = n_alleles
-        self.alphabet = util.suggest_alphabet(n_alleles)
+        if n_alleles == 2:
+            self.alphabet = biovector.alphabet.biallelic
+        elif n_alleles == 3:
+            self.alphabet = biovector.alphabet.triallelic
+        elif n_alleles == 4:
+            self.alphabet = biovector.alphabet.quadraallelic
+        else:
+            raise ValueError('n_alleles must be 2, 3, or 4')
 
         # template for creating full sequences
         snp_positions = {snp[0] for snp in snps}
@@ -221,6 +364,24 @@ class VariantLociMap(object):
                 i2a[char] = str(integer)
             self._allelic_to_iupac[i] = a2i
             self._iupac_to_allelic[i] = i2a
+        
+        self.binary = TranslatorEncoder(
+            self.alphabet.binary,
+            self._iupac_to_allelic,
+            self._allelic_to_iupac
+        )
+
+        self.integer = TranslatorEncoder(
+            self.alphabet.integer,
+            self._iupac_to_allelic,
+            self._allelic_to_iupac
+        )
+
+        self.intflag = TranslatorEncoder(
+            self.alphabet.intflag,
+            self._iupac_to_allelic,
+            self._allelic_to_iupac
+        )
 
         # store snp position and alleles
         snps_dtype = np.dtype(
@@ -234,108 +395,6 @@ class VariantLociMap(object):
             '{0}\t{1}\t{2}'.format(snp[0], snp[1][0], snp[1][1:]) for snp in
             self._snps)
         return header + data
-
-    def vector_size(self):
-        return self.alphabet.vector_size()
-
-    def as_allelic(self, data):
-        if isinstance(data, str):
-            assert len(self._snps) == len(data)
-            return ''.join(self._iupac_to_allelic[i][char]
-                           for i, char in enumerate(data))
-        if not hasattr(data, 'ravel') or not hasattr(data, 'shape'):
-            data = np.array(data)
-        shape = data.shape
-        array = data.ravel()
-        for i, string in enumerate(array):
-            array[i] = ''.join(self._iupac_to_allelic[i][char]
-                           for i, char in enumerate(string))
-        return array.reshape(shape)
-
-    def as_iupac(self, data):
-        if isinstance(data, str):
-            assert len(self._snps) == len(data)
-            return ''.join(self._allelic_to_iupac[i][char]
-                           for i, char in enumerate(data))
-        if not hasattr(data, 'ravel') or not hasattr(data, 'shape'):
-            data = np.array(data)
-        shape = data.shape
-        array = data.ravel()
-        for i, string in enumerate(array):
-            array[i] = ''.join(self._allelic_to_iupac[i][char]
-                           for i, char in enumerate(string))
-        return array.reshape(shape)
-
-    def decode(self, array):
-        return self.as_iupac(self.alphabet.decode(array))
-
-    def decode_flag_integers(self, array):
-        return self.as_iupac(self.alphabet.decode_flag_integers(array))
-
-    def decode_simple_integers(self, array):
-        return self.as_iupac(self.alphabet.decode_simple_integers(array))
-
-    def decode_binary_vectors(self, array):
-        return self.as_iupac(self.alphabet.decode_binary_vectors(array))
-
-    def encode_flag_integers(self, data, **kwargs):
-        return self.alphabet.encode_flag_integers(
-            self.as_allelic(data),
-            **kwargs
-        )
-
-    def encode_simple_integers(self, data, **kwargs):
-        return self.alphabet.encode_simple_integers(
-            self.as_allelic(data),
-            **kwargs
-        )
-
-    def encode_binary_vectors(self, data, **kwargs):
-        return self.alphabet.encode_binary_vectors(
-            self.as_allelic(data),
-            **kwargs
-        )
-
-    def encode_probabilistic_vectors(self,
-                                     data,
-                                     probabilities=None,
-                                     ignore_invalid=False):
-        return self.alphabet.encode_probabilistic_vectors(
-            self.as_allelic(data),
-            probabilities=probabilities,
-            ignore_invalid=ignore_invalid
-        )
-
-    def encode(self, data):
-        assert len(data) == len(self._snps)
-
-        data_length = len(data[0])
-        if data_length == 1:
-            # binary encoding
-            dtype = self.alphabet.dtype()
-        elif data_length == 2:
-            # probabilistic encoding
-            dtype = np.float
-        else:
-            raise ValueError('data must be a sequence of characters or '
-                             'pairs of characters with probabilities.')
-        array = np.empty((len(data), self.vector_size()), dtype=dtype)
-        for i, symbol in enumerate(data):
-            symbol = tuple(symbol)
-            array[i] = self.alphabet.encode_element(
-                self._iupac_to_allelic[i][symbol[0]],
-                *symbol[1:]
-            )
-        return array
-
-    def encode_alignment(self, alignment_file, min_map_qual=20):
-        return encode_alignment_positions(
-            alignment_file,
-            alphabet=self,
-            contig=self.contig,
-            positions=self.snp_positions,
-            min_map_qual=min_map_qual
-        )
 
     @property
     def reference_sequence(self):
