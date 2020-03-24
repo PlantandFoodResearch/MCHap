@@ -1,2 +1,3 @@
 from .sequence import *
-from .transcode import as_probabilistic
+from .transcode import *
+from .kmer import *
