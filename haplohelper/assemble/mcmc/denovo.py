@@ -3,7 +3,8 @@
 import numpy as np 
 import numba
 
-import biovector as bv
+from haplohelper import mset
+from haplohelper.encoding import allelic
 from haplohelper.assemble.step import util, mutation, structural
 from haplohelper.assemble.likelihood import log_likelihood
 from haplohelper.util import point_beta_probabilities
@@ -139,7 +140,7 @@ class DeNovoGibbsAssembler(object):
     def sorted_trace(self):
         trace = self.genotype_trace.copy()
         for i in range(len(trace)):
-            trace[i] = bv.integer.sort(trace[i])
+            trace[i] = allelic.sort(trace[i])
         return trace
     
     def posterior(self, burn=0, probabilities=True, sort=True):
@@ -148,7 +149,7 @@ class DeNovoGibbsAssembler(object):
         trace = self.sorted_trace()[burn:]
         
         # unique genotypes and their counts
-        genotypes, counts = bv.mset.unique_counts(trace)
+        genotypes, counts = mset.unique_counts(trace)
         
         if probabilities:
             probs = counts / np.sum(counts)

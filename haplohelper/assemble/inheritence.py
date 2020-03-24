@@ -3,8 +3,9 @@
 import numpy as np
 from itertools import combinations as _combinations
 from collections import Counter as _Counter
-import biovector
-from biovector import mset
+
+from haplohelper import mset
+from haplohelper.encoding import allelic
 
 
 class TrioChildInheritance(object):
@@ -172,7 +173,7 @@ def cross_probabilities(maternal_gametes,
                     genotype[idx] = hap
                     idx += 1
 
-            genotype = biovector.integer.sort(genotype)
+            genotype = allelic.sort(genotype)
             string = genotype.tostring()
             if string not in string_to_genotype:
                 string_to_genotype[string] = genotype
