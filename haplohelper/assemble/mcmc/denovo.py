@@ -5,6 +5,7 @@ import numba
 
 from haplohelper import mset
 from haplohelper.encoding import allelic
+from haplohelper.encoding import probabilistic
 from haplohelper.assemble.step import util, mutation, structural
 from haplohelper.assemble.likelihood import log_likelihood
 from haplohelper.util import point_beta_probabilities
@@ -27,6 +28,9 @@ def _denovo_gibbs_sampler(
     genotype_trace = np.empty((steps,) + genotype.shape, np.int8)
     llk_trace = np.empty(steps, np.float64)
     for i in range(steps):
+
+        if np.isnan(llk):
+            raise ValueError('Encountered log likelihood of nan')
         
         # chance of mutation step
         choice = ratio > np.random.random()
@@ -113,7 +117,10 @@ class DeNovoGibbsAssembler(object):
         
         # initial state
         if self.initial is None:
-            genotype = np.random.randint(0, n_nucl, (self.ploidy, n_base), dtype=np.int8)
+            # random sample of mean of reads
+            genotype = np.empty((self.ploidy, n_base), dtype=np.int8)
+            for i in range(self.ploidy):
+                genotype[i] = probabilistic.sample_alleles(reads.mean(axis=-3))
         else:
             genotype = self.initial.copy()
             

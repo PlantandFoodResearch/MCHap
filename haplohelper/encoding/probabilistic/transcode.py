@@ -3,7 +3,7 @@
 import numpy as np
 import numba
 
-from haplohelper.assemble.step.util import random_choice
+from haplohelper.assemble.step.util import random_choice as _random_choice
 
 
 @numba.njit
@@ -53,7 +53,7 @@ def _sample_alleles(array, new):
                 break
 
             else:
-                new[i] = random_choice(array[i])
+                new[i] = _random_choice(array[i])
 
 
 
@@ -74,7 +74,7 @@ def sample_alleles(array, dtype=np.int8):
     vector_size = array.shape[-1]
     probs = array.reshape(-1, vector_size)
     new = np.empty(len(probs), dtype=dtype)
-    _sample_alleles(array, new)
+    _sample_alleles(probs, new)
     new_shape = array.shape[0:-1]
 
     return new.reshape(new_shape)
