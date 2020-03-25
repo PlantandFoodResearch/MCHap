@@ -17,7 +17,7 @@ def _denovo_brute_force(reads, ploidy, u_alleles, u_haps, u_gens, keep_n=0):
         keep_n = 0
     
     # complexity bounds
-    _, n_base, n_nucl = reads.shape
+    _, n_base, _ = reads.shape
     
     # log of number of total posible genotype permutations
     # this is used to calculate prior probability of each genotype
@@ -56,6 +56,9 @@ def _denovo_brute_force(reads, ploidy, u_alleles, u_haps, u_gens, keep_n=0):
     
     # llk adjusted by prior for first genotype
     llk_adj = llk + (np.log(g_perms) - log_u_perms)
+
+    # store adjusted llk for first genotype
+    genotype_llk_array[0] = llk_adj
     
     # start summing all lk_adj within log space
     llk_adj_sum = llk_adj
