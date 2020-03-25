@@ -28,7 +28,7 @@ def _is_base_vec(vector, precision):
         return False
 
     # now check any remaining values are all nan
-    for j in range(i, n):
+    for j in range(i + 1, n):
         if np.isnan(vector[j]):
             pass
         else:
@@ -84,7 +84,7 @@ def is_base(array, precision=None):
 
 def is_valid(array, precision=None):
     if precision is None:
-        precision = np.finfo(np.float).precision
+        precision = np.finfo(np.float).precision - 2
     shape = array.shape[0: -1]
     if shape is ():
         return _is_valid_vec(array, precision)
