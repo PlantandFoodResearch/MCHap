@@ -8,6 +8,7 @@ from haplohelper.encoding import allelic
 from haplohelper.encoding import probabilistic
 from haplohelper.assemble.step import util, mutation, structural
 from haplohelper.assemble.likelihood import log_likelihood
+from haplohelper.assemble import complexity
 from haplohelper.util import point_beta_probabilities
 
 
@@ -116,7 +117,7 @@ class DeNovoGibbsAssembler(object):
         self.n_base = n_base
         self.n_nucl = n_nucl
 
-        n_alleles = probabilistic.allele_counts(reads)
+        n_alleles = complexity.count_unique_alleles(reads)
         
         # initial state
         if self.initial is None:

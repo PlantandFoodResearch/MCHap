@@ -98,17 +98,6 @@ def is_known(array, p=0.95):
     return np.any(array >= p, axis=-1)
 
 
-def allele_counts(reads):
-    check_all = np.sum(~np.all(np.isnan(reads), axis=-3), axis=-1)
-    check_any = np.sum(~np.any(np.isnan(reads), axis=-3), axis=-1)
-    
-    if np.array_equal(check_all, check_any):
-        return check_all
-    
-    else:
-        raise ValueError('Incongruent allele distributions')
-
-
 def depth(array, counts=None, precision=None):
     """Calculate sequence depth of one or more biological 
     sequences that are encoded as probabilistic row vectors.

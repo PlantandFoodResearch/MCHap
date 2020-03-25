@@ -68,17 +68,17 @@ def random_breaks(breaks, n):
 
 
 @numba.njit
-def haplotype_of_int(array, integer, n_nucl):
+def haplotype_of_int(array, integer, n_alleles):
     n_base = len(array)
-    if integer >= n_nucl ** n_base:
-        raise ValueError('Integers larger larger than or equal to `n_base ** n_nucl` will cause overflow')
+    if integer >= np.prod(n_alleles):
+        raise ValueError('Integer to large for haplotype bounds')
     
     array[:] = 0
     
     i = n_base - 1
     while integer:
-        array[i] = integer % n_nucl
-        integer = integer // n_nucl
+        array[i] = integer % n_alleles[i]
+        integer = integer // n_alleles[i]
         i -= 1
         
 

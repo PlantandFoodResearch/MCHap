@@ -1,10 +1,24 @@
 #!/usr/bin/env python3
+
+import numpy as np
 from math import factorial
 
-def count_unique_haplotypes(n_base, n_nucl):
+
+def count_unique_alleles(reads):
+    check_all = np.sum(~np.all(np.isnan(reads), axis=-3), axis=-1)
+    check_any = np.sum(~np.any(np.isnan(reads), axis=-3), axis=-1)
+    
+    if np.array_equal(check_all, check_any):
+        return check_all
+    
+    else:
+        raise ValueError('Incongruent allele distributions')
+
+
+def count_unique_haplotypes(u_alleles):
     """Calculates number of unique haplotypes based on constraints.
     """
-    return n_nucl ** n_base
+    return np.prod(u_alleles)
 
 
 def count_unique_genotypes(u_haps, ploidy):
@@ -14,11 +28,11 @@ def count_unique_genotypes(u_haps, ploidy):
     return factorial(u_haps + ploidy -1) // (factorial(ploidy) * factorial(u_haps-1))
 
 
-def count_unique_genotype_permutations(ploidy, n_base, n_nucl):
+def count_unique_genotype_permutations(u_haps, ploidy):
     """Calculates number of genotypes based on constraints,
     including equivilent permutations.
     """
-    return (n_nucl ** n_base) ** ploidy
+    return u_haps ** ploidy
 
 
 def count_haplotype_universial_occurance(u_haps, ploidy):

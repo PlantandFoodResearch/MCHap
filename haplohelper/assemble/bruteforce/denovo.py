@@ -9,7 +9,7 @@ from haplohelper.assemble.likelihood import log_likelihood
 
 
 @numba.njit
-def _denovo_brute_force(reads, ploidy, u_haps, u_gens, keep_n=0):
+def _denovo_brute_force(reads, ploidy, u_alleles, u_haps, u_gens, keep_n=0):
     
     # sanity check
     if keep_n > u_gens:
@@ -21,7 +21,7 @@ def _denovo_brute_force(reads, ploidy, u_haps, u_gens, keep_n=0):
     
     # log of number of total posible genotype permutations
     # this is used to calculate prior probability of each genotype
-    log_u_perms = np.log((n_nucl ** n_base) ** ploidy)
+    log_u_perms = np.log(u_haps ** ploidy)
     
     # ready arrays for storing genotypes and associated adjusted log likelihoods
     if keep_n:
@@ -76,7 +76,7 @@ def _denovo_brute_force(reads, ploidy, u_haps, u_gens, keep_n=0):
                     hap_indicies[i] += 1
 
                     # update haplotype and dosage
-                    util.haplotype_of_int(genotype[i], hap_indicies[i], n_nucl)
+                    util.haplotype_of_int(genotype[i], hap_indicies[i], u_alleles)
 
                     searching = False
 
@@ -91,7 +91,7 @@ def _denovo_brute_force(reads, ploidy, u_haps, u_gens, keep_n=0):
                 # zero out remaining values
                 hap_indicies[i] = 0
                 # update genotype
-                util.haplotype_of_int(genotype[i], 0, n_nucl)
+                util.haplotype_of_int(genotype[i], 0, u_alleles)
 
                 
         # update dosage  
@@ -163,9 +163,9 @@ class DeNovoBruteAssembler(object):
     def fit(self, reads):
 
         # calculate complexity bounds
-        _, n_base, n_nucl = reads.shape
+        u_alleles = complexity.count_unique_alleles(reads)
 
-        u_haps = complexity.count_unique_haplotypes(n_base, n_nucl)
+        u_haps = complexity.count_unique_haplotypes(u_alleles)
 
         u_gens = complexity.count_unique_genotypes(u_haps, self.ploidy)
 
@@ -173,6 +173,7 @@ class DeNovoBruteAssembler(object):
         genotypes, probs = _denovo_brute_force(
             reads, 
             ploidy=self.ploidy, 
+            u_alleles=u_alleles,
             u_haps=u_haps, 
             u_gens=u_gens, 
             keep_n=self.keep_n
