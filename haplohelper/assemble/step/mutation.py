@@ -7,7 +7,7 @@ from haplohelper.assemble.step import util
 from haplohelper.assemble.likelihood import log_likelihood
 
 @numba.njit
-def base_step(genotype, reads, llk, h, j):
+def base_step(genotype, reads, llk, h, j, n_alleles=None):
     """Mutation Gibbs sampler step for the jth base position of the hth haplotype.
 
     Parameters
@@ -33,17 +33,18 @@ def base_step(genotype, reads, llk, h, j):
     Variable `genotype` is updated in place.
 
     """
-    _, _, n_nucl = reads.shape
-    
+    if n_alleles is None:
+        n_alleles = reads.shape[-1]
+
     # cache of log likelihoods calculated with each allele
-    llks = np.empty(n_nucl)
-    conditionals = np.empty(n_nucl)
+    llks = np.empty(n_alleles)
+    conditionals = np.empty(n_alleles)
     
     # reuse likelihood for current state
     current_nucleotide = genotype[h, j]
     llks[current_nucleotide] = llk
     
-    for i in range(n_nucl):
+    for i in range(n_alleles):
         if i == current_nucleotide:
             # no need to recalculate likelihood
             pass
@@ -63,41 +64,8 @@ def base_step(genotype, reads, llk, h, j):
     # return final log liklihood
     return llks[choice]
 
-
 @numba.njit
-def haplotype_compound_step(genotype, reads, llk, h):
-    """Mutation compound Gibbs sampler step for all base positions of the hth haplotype.
-
-    Parameters
-    ----------
-    genotype : array_like, int, shape (ploidy, n_base)
-        Initial state of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    reads : array_like, float, shape (n_reads, n_base, n_nucl)
-        Observed reads encoded as an array of probabilistic matrices.
-    llk : float
-        Log-likelihood of the initial haplotype state given the observed reads.
-    h : int
-        Index of the haplotype to be muteated.
-    
-    Returns
-    -------
-    llk : float
-        New log-likelihood of observed reads given the updated genotype.
-
-    Notes
-    -----
-    Variable `genotype` is updated in place.
-
-    """
-    _, n_base, _ = reads.shape
-    
-    for j in np.random.permutation(np.arange(0, n_base)):
-        llk = base_step(genotype, reads, llk, h, j)
-    return llk
-
-
-@numba.njit
-def genotype_compound_step(genotype, reads, llk):
+def genotype_compound_step(genotype, reads, llk, n_alleles=None):
     """Mutation compound Gibbs sampler step for all base positions of all haplotypes in a genotype.
 
     Parameters
@@ -108,6 +76,8 @@ def genotype_compound_step(genotype, reads, llk):
         Observed reads encoded as an array of probabilistic matrices.
     llk : float
         Log-likelihood of the initial haplotype state given the observed reads.
+    n_alleles : array_like, int, shape (n_base, )
+        Number of alleles to sample from at each step. Vector size used by default
     
     Returns
     -------
@@ -120,6 +90,9 @@ def genotype_compound_step(genotype, reads, llk):
 
     """
     ploidy, n_base = genotype.shape
+
+    if n_alleles is None:
+        n_alleles = np.repeat(reads.shape[-1], n_base)
 
     # matrix of haplotype-base combinations
     substeps = np.empty((ploidy * n_base, 2), dtype=np.int8) 
@@ -135,5 +108,5 @@ def genotype_compound_step(genotype, reads, llk):
 
     for i in range(ploidy * n_base):
         h, j = substeps[i]
-        llk = base_step(genotype, reads, llk, h, j)
+        llk = base_step(genotype, reads, llk, h, j, n_alleles[j])
     return llk

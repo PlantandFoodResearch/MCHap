@@ -15,6 +15,7 @@ from haplohelper.util import point_beta_probabilities
 def _denovo_gibbs_sampler(
         genotype, 
         reads, 
+        n_alleles,
         ratio, 
         steps, 
         break_dist,
@@ -37,7 +38,7 @@ def _denovo_gibbs_sampler(
         
         if choice:
             # mutation step
-            llk = mutation.genotype_compound_step(genotype, reads, llk)
+            llk = mutation.genotype_compound_step(genotype, reads, llk, n_alleles)
         
         else:
             # structural step
@@ -114,6 +115,8 @@ class DeNovoGibbsAssembler(object):
         
         self.n_base = n_base
         self.n_nucl = n_nucl
+
+        n_alleles = probabilistic.allele_counts(reads)
         
         # initial state
         if self.initial is None:
@@ -136,6 +139,7 @@ class DeNovoGibbsAssembler(object):
         self.genotype_trace, self.llk_trace = _denovo_gibbs_sampler(
             genotype, 
             reads, 
+            n_alleles,
             ratio=self.ratio, 
             steps=self.steps, 
             break_dist=break_dist,
