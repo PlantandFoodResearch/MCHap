@@ -88,7 +88,7 @@ def encode_alignment_read_variants(locus, bams, sample='ID', min_quality=20, set
                 if sample is 'ID':
                     sample_key = read.get_tag('RG')
                 elif sample is 'SM':
-                    sample_key = sample_keys[read.get_tag('RG')]['SM']
+                    sample_key = sample_keys[read.get_tag('RG')]
                 else:
                     # sample key defined above
                     pass

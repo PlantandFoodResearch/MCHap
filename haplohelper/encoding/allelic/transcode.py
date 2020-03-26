@@ -43,7 +43,7 @@ def _as_probabilistic(array, new, n_alleles, probs, vector_size, gap_as_nan):
                 new[i, j] = np.nan 
 
 
-def as_probabilistic(array, n_alleles, p=1.0, vector_size=None, gap_as_nan=True, dtype=np.float):
+def as_probabilistic(array, n_alleles, p=1.0, vector_size=None, gap_as_nan=False, dtype=np.float):
 
     if not isinstance(n_alleles, np.ndarray):
         n = n_alleles
