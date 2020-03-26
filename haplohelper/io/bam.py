@@ -7,7 +7,7 @@ import numpy as np
 from haplohelper.io import util
 
 
-def encode_alignment_read_variants(locus, bams, sample='ID', min_quality=20):
+def encode_alignment_read_variants(locus, bams, sample='ID', min_quality=20, set_sequence=False):
     """Read variants defined for a locus from an alignment file
     
     Sample is used as the sample identifier and may refere to any field in 
@@ -27,6 +27,13 @@ def encode_alignment_read_variants(locus, bams, sample='ID', min_quality=20):
     
     # create mapping of ref position to variant index
     positions = {pos: i for i, pos in enumerate(locus.positions)}
+
+    if set_sequence:
+        # create an empty array to gather reference chars
+        # use a set to keep track of remaining chars to get 
+        ref_sequence = np.empty(locus.interval.stop - locus.interval.start, dtype = 'U1')
+        ref_sequence[:] = 'N'  # default to unknown allele
+        ref_sequence_remaining = set(locus.interval)
     
     data={}
     
@@ -99,7 +106,18 @@ def encode_alignment_read_variants(locus, bams, sample='ID', min_quality=20):
                     # reuse array for first read in pair
                     array = sample_data[read.qname]
 
-                for read_pos, ref_pos in read.get_aligned_pairs(matches_only=True):
+                for read_pos, ref_pos, ref_char in read.get_aligned_pairs(matches_only=True, with_seq=True):
+                    
+                    # check if (still) setting reference sequences
+                    if set_sequence and ref_sequence_remaining:
+                        # check if this pos still needs to be set
+                        if ref_pos in ref_sequence_remaining:
+                            # set character (may be lower case if read varies)
+                            ref_sequence[ref_pos - locus.interval.start] = ref_char.upper()
+                            # remove position from remaining
+                            ref_sequence_remaining.remove(ref_pos)
+
+                    # if this is a variant position then extract the call and qual
                     if ref_pos in positions:
                         idx = positions[ref_pos]
                                                 
@@ -125,11 +143,23 @@ def encode_alignment_read_variants(locus, bams, sample='ID', min_quality=20):
                             else:
                                 # conflicting calls so treat as null
                                 array[idx] = (-1, 0)
+    
+    # check if setting reference sequence
+    if set_sequence:
+        # check that all positions were recovered
+        if ref_sequence_remaining:
+            warning = 'Reference sequence not recoverd at positions {}.'
+            warning += 'This is likely due to a read depth of 0.'
+            Warning(warning.format(ref_sequence_remaining))
+        
+        # set the sequence
+        locus.sequence = ''.join(ref_sequence)
+    
     return data
 
 
-def encode_alignment_variants(locus, bams, sample='ID', min_quality=20):
-    data =  encode_alignment_read_variants(locus, bams, sample, min_quality)
+def encode_alignment_variants(locus, bams, sample='ID', min_quality=20, set_sequence=False):
+    data =  encode_alignment_read_variants(locus, bams, sample, min_quality, set_sequence)
     for sample, reads in data.items():
         data[sample] = np.array(list(reads.values()))
     return data
