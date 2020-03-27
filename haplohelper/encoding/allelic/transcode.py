@@ -5,7 +5,7 @@ import numba
 
 
 @numba.njit
-def _as_probabilistic(array, new, n_alleles, probs, vector_size, gap_as_nan):
+def _as_probabilistic(array, new, n_alleles, probs, vector_size, gaps, pad):
 
     for i in range(len(array)):
         a = array[i]  # allele index
@@ -14,16 +14,16 @@ def _as_probabilistic(array, new, n_alleles, probs, vector_size, gap_as_nan):
 
         # deal with gap
         if a == -1: # this is a gap
-            if gap_as_nan:
-                val = np.nan
+            if gaps:
+                new[i] = np.nan  # fill vector with nan
             else:
                 val = 1.0 / n
-            for j in range(n):
-                new[i, j] = val
-            
-            # pad with nan
-            for j in range(n, vector_size):
-                new[i, j] = np.nan # pad
+                for j in range(n):
+                    new[i, j] = val
+                
+                # pad distribution
+                for j in range(n, vector_size):
+                    new[i, j] = pad # pad
         
         # deal with regular allele
         else:
@@ -38,12 +38,18 @@ def _as_probabilistic(array, new, n_alleles, probs, vector_size, gap_as_nan):
                     # non-called allele
                     new[i, j] = inv
 
-            # pad with nan
+            # pad
             for j in range(n, vector_size):
-                new[i, j] = np.nan 
+                new[i, j] = pad 
 
 
-def as_probabilistic(array, n_alleles, p=1.0, vector_size=None, gap_as_nan=False, dtype=np.float):
+def as_probabilistic(array, 
+                     n_alleles, 
+                     p=1.0, 
+                     vector_size=None, 
+                     gaps=True, 
+                     nan_pad=False,
+                     dtype=np.float):
 
     if not isinstance(n_alleles, np.ndarray):
         n = n_alleles
@@ -66,6 +72,11 @@ def as_probabilistic(array, n_alleles, p=1.0, vector_size=None, gap_as_nan=False
     n_base = np.prod(array.shape)
     new = np.empty((n_base, vector_size), dtype=dtype)
 
+    # determine pad type
+    if nan_pad:
+        pad = np.nan
+    else:
+        pad = 0.0
 
     _as_probabilistic(
         array.ravel(),
@@ -73,7 +84,8 @@ def as_probabilistic(array, n_alleles, p=1.0, vector_size=None, gap_as_nan=False
         n_alleles.ravel(),
         p.ravel(),
         vector_size,
-        gap_as_nan,
+        gaps,
+        pad
     )
 
     shape = array.shape + (vector_size, )

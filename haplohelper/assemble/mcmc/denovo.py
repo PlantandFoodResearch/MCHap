@@ -16,7 +16,7 @@ from haplohelper.util import point_beta_probabilities
 def _denovo_gibbs_sampler(
         genotype, 
         reads, 
-        n_alleles,
+        mask,
         ratio, 
         steps, 
         break_dist,
@@ -39,7 +39,7 @@ def _denovo_gibbs_sampler(
         
         if choice:
             # mutation step
-            llk = mutation.genotype_compound_step(genotype, reads, llk, n_alleles)
+            llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask)
         
         else:
             # structural step
@@ -117,7 +117,12 @@ class DeNovoGibbsAssembler(object):
         self.n_base = n_base
         self.n_nucl = n_nucl
 
-        n_alleles = complexity.count_unique_alleles(reads)
+        # Automatically mask out alleles for which all 
+        # reads have a probability of 0.
+        # A probability of 0 indicates that the allele is invalid.
+        # Masking alleles stops that allele being assessed in the
+        # mcmc and hence reduces paramater space and compute time.
+        mask = np.all(reads == 0, axis=-3)
         
         # initial state
         if self.initial is None:
@@ -140,7 +145,7 @@ class DeNovoGibbsAssembler(object):
         self.genotype_trace, self.llk_trace = _denovo_gibbs_sampler(
             genotype, 
             reads, 
-            n_alleles,
+            mask=mask,
             ratio=self.ratio, 
             steps=self.steps, 
             break_dist=break_dist,

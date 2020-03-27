@@ -6,38 +6,12 @@ import numba
 from haplohelper.assemble.step.util import random_choice as _random_choice
 
 
-@numba.njit
-def _call_alleles(array, new, p,):
-    n_base, n_allele = array.shape
-    for i in range(n_base):
-        new[i] = -1  # default value is a gap
-
-        for j in range(n_allele):
-            val = array[i, j]
-
-            if np.isnan(val):
-                break
-
-            elif val >= p:
-                new[i] = j
-                break
-
-            else:
-                # no alleles meet threshold
-                pass
-
-
 def call_alleles(array, p=0.95, dtype=np.int8):
-    if not (0.5 < p <= 1.0):
-        raise ValueError('p must be a probability in the interval 0.5 < p <= 1')
-
-    vector_size = array.shape[-1]
-    probs = array.reshape(-1, vector_size)
-    new = np.empty(len(probs), dtype=dtype)
-    _call_alleles(array, new, p)
-    new_shape = array.shape[0:-1]
-
-    return new.reshape(new_shape)
+    assert 0.5 < p <= 1.0 
+    calls = np.zeros(array.shape[0:-1], dtype=dtype) -1
+    indices = np.where(np.nan_to_num(array) >= p)
+    calls[indices[0:-1]] = indices[-1]
+    return calls
 
 
 @numba.njit

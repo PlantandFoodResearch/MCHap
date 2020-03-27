@@ -4,98 +4,25 @@ import numpy as np
 import numba
 
 
-@numba.njit
-def _is_gap_vec(vector):
-    return np.all(np.isnan(vector))
-
-
-@numba.njit
-def _is_base_vec(vector, precision):
-    # must be a sequence of numbers suming to 1
-    # may be followed by 0 or more nans
-    total = 0.0
-    n = len(vector)
-
-    # first add numbers
-    for i in range(n):
-        if np.isnan(vector[i]):
-            break
-        else:
-            total += vector[i]
-
-    total = np.round(total, precision)
-    if total != 1.0:
-        return False
-
-    # now check any remaining values are all nan
-    for j in range(i + 1, n):
-        if np.isnan(vector[j]):
-            pass
-        else:
-            return False
-    
-    return True
-
-
-@numba.njit
-def _is_valid_vec(vector, precision):
-    return _is_base_vec(vector, precision) or _is_gap_vec(vector)
-
-
-@numba.jit
-def _is_gap(array, result):
-    for i in range(len(result)):
-        result[i] = _is_gap_vec(array[i])
-
-
-@numba.jit
-def _is_base(array, result, precision):
-    for i in range(len(result)):
-        result[i] = _is_base_vec(array[i], precision)
-
-
-@numba.jit
-def _is_valid(array, result, precision):
-    for i in range(len(result)):
-        result[i] = _is_valid_vec(array[i], precision)
-
-
 def is_gap(array):
-    shape = array.shape[0: -1]
-    if shape is ():
-        return _is_gap_vec(array)
-    length = np.prod(shape)
-    result = np.empty(length, np.bool)
-    _is_gap(array.reshape(length, -1), result)
-    return result.reshape(shape)
+    """Gaps are not expressed without nans"""
+    return np.all(np.isnan(array), axis=-1)
 
 
-def is_base(array, precision=None):
+def is_dist(array, precision=None, nan_padded=False):
     if precision is None:
         precision = np.finfo(np.float).precision
-    shape = array.shape[0: -1]
-    if shape is ():
-        return _is_base_vec(array, precision)
-    length = np.prod(shape)
-    result = np.empty(length, np.bool)
-    _is_base(array.reshape(length, -1), result, precision)
-    return result.reshape(shape)
+    if nan_padded:
+        return np.round(np.nansum(array, axis=-1), precision) == 1
+    else:
+        return np.round(np.sum(array, axis=-1), precision) == 1
 
 
-def is_valid(array, precision=None):
-    if precision is None:
-        precision = np.finfo(np.float).precision - 2
-    shape = array.shape[0: -1]
-    if shape is ():
-        return _is_valid_vec(array, precision)
-    length = np.prod(shape)
-    result = np.empty(length, np.bool)
-    _is_valid(array.reshape(length, -1), result, precision)
-    return result.reshape(shape)
-
-
-def is_known(array, p=0.95):
-    return np.any(array >= p, axis=-1)
+def is_valid(array, precision=None, nan_padded=False):
+    return np.logical_or(
+        is_dist(array, precision, nan_padded), 
+        is_gap(array)
+    )
 
 
 def depth(array, counts=None, precision=None):
@@ -106,7 +33,7 @@ def depth(array, counts=None, precision=None):
     if array.ndim == 2:
         array = np.expand_dims(array, 0)
 
-    array = is_base(array, precision=precision).astype(np.int)
+    array = is_dist(array, precision=precision).astype(np.int)
     if counts:
         array *= counts
 

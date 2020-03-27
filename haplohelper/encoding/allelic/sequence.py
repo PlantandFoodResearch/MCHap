@@ -7,7 +7,7 @@ def is_gap(array):
     return array == -1
 
 
-def is_base(array):
+def is_call(array):
     return array >= 0
 
 
