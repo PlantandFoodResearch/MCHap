@@ -66,7 +66,7 @@ def test_intercept():
     pytest.param(['000', '000', '111', '001'], ['000', '000', '111', '001'], True, id='0'),
     pytest.param(['000', '000', '111', '001'], ['000', '111', '001', '000'], True, id='1'),
     pytest.param(['000', '000', '111', '001'], ['000', '111', '111', '001'], False, id='2'),
-    pytest.param(['000', '000', '111', '001'], ['000', '000', '111', '011'], False, id='2'),
+    pytest.param(['000', '000', '111', '001'], ['000', '000', '111', '011'], False, id='3'),
 ])
 def test_equal(query_x, query_y, answer):
     array_x = from_strings(query_x)
