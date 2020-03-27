@@ -4,15 +4,10 @@ import numpy as np
 from math import factorial
 
 
-def count_unique_alleles(reads, nan_padded=False):
-    if nan_padded:
-        # distributions are padded by nans
-        check_all = np.sum(~np.all(np.isnan(reads), axis=-3), axis=-1)
-        check_any = np.sum(~np.any(np.isnan(reads), axis=-3), axis=-1)
-    else:
-        # distributions are padded by 0 prob
-        check_all = np.sum(~np.all(reads == 0, axis=-3), axis=-1)
-        check_any = np.sum(~np.any(reads == 0, axis=-3), axis=-1)
+def count_possible_alleles(reads):
+    # distributions are padded by 0 prob
+    check_all = np.sum(~np.all(reads == 0, axis=-3), axis=-1)
+    check_any = np.sum(~np.any(reads == 0, axis=-3), axis=-1)
     
     # all read distributions should be in agreement
     if np.array_equal(check_all, check_any):
@@ -20,6 +15,10 @@ def count_unique_alleles(reads, nan_padded=False):
     
     else:
         raise ValueError('Incongruent allele distributions')
+
+
+def count_unique_alleles(locus):
+    return np.fromiter(map(len, locus.alleles), dtype=np.int)
 
 
 def count_unique_haplotypes(u_alleles):

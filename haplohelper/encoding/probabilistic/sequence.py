@@ -9,18 +9,15 @@ def is_gap(array):
     return np.all(np.isnan(array), axis=-1)
 
 
-def is_dist(array, precision=None, nan_padded=False):
+def is_dist(array, precision=None):
     if precision is None:
         precision = np.finfo(np.float).precision
-    if nan_padded:
-        return np.round(np.nansum(array, axis=-1), precision) == 1
-    else:
-        return np.round(np.sum(array, axis=-1), precision) == 1
+    return np.round(np.sum(array, axis=-1), precision) == 1
 
 
-def is_valid(array, precision=None, nan_padded=False):
+def is_valid(array, precision=None):
     return np.logical_or(
-        is_dist(array, precision, nan_padded), 
+        is_dist(array, precision=precision), 
         is_gap(array)
     )
 

@@ -5,7 +5,7 @@ import numba
 
 
 @numba.njit
-def _as_probabilistic(array, new, n_alleles, probs, vector_size, gaps, pad):
+def _as_probabilistic(array, new, n_alleles, probs, vector_size, gaps):
 
     for i in range(len(array)):
         a = array[i]  # allele index
@@ -23,7 +23,7 @@ def _as_probabilistic(array, new, n_alleles, probs, vector_size, gaps, pad):
                 
                 # pad distribution
                 for j in range(n, vector_size):
-                    new[i, j] = pad # pad
+                    new[i, j] = 0.0 # pad
         
         # deal with regular allele
         else:
@@ -40,7 +40,7 @@ def _as_probabilistic(array, new, n_alleles, probs, vector_size, gaps, pad):
 
             # pad
             for j in range(n, vector_size):
-                new[i, j] = pad 
+                new[i, j] = 0.0 
 
 
 def as_probabilistic(array, 
@@ -48,7 +48,6 @@ def as_probabilistic(array,
                      p=1.0, 
                      vector_size=None, 
                      gaps=True, 
-                     nan_pad=False,
                      dtype=np.float):
 
     if not isinstance(n_alleles, np.ndarray):
@@ -72,20 +71,13 @@ def as_probabilistic(array,
     n_base = np.prod(array.shape)
     new = np.empty((n_base, vector_size), dtype=dtype)
 
-    # determine pad type
-    if nan_pad:
-        pad = np.nan
-    else:
-        pad = 0.0
-
     _as_probabilistic(
         array.ravel(),
         new,
         n_alleles.ravel(),
         p.ravel(),
         vector_size,
-        gaps,
-        pad
+        gaps
     )
 
     shape = array.shape + (vector_size, )

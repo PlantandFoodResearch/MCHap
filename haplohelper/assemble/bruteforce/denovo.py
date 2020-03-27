@@ -166,7 +166,7 @@ class DeNovoBruteAssembler(object):
     def fit(self, reads):
 
         # calculate complexity bounds
-        u_alleles = complexity.count_unique_alleles(reads)
+        u_alleles = complexity.count_possible_alleles(reads)
 
         u_haps = complexity.count_unique_haplotypes(u_alleles)
 
