@@ -127,23 +127,9 @@ def sum_log_probs(array):
 
 
 @numba.njit
-def nan_sum_log_probs(array):
-    acumulate = array[0]
-    if np.isnan(acumulate):
-        raise ValueError('First value must not be nan')
-    for i in range(1, len(array)):
-        val = array[i]
-        if np.isnan(val):
-            pass
-        else:
-            acumulate = add_log_prob(acumulate, array[i])
-    return acumulate
-
-
-@numba.njit
 def log_likelihoods_as_conditionals(llks):
     # calculated denominator in log space
-    log_denominator = nan_sum_log_probs(llks)
+    log_denominator = sum_log_probs(llks)
 
     # calculate conditional probabilities
     n = len(llks)
