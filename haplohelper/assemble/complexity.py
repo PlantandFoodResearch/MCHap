@@ -6,7 +6,7 @@ from math import factorial
 
 def count_possible_alleles(reads):
     # distributions are padded by 0 prob
-    check_all = np.sum(~np.all(reads == 0, axis=-3), axis=-1)
+    check_all = np.sum(~np.all(np.nan_to_num(reads) == 0, axis=-3), axis=-1)
     check_any = np.sum(~np.any(reads == 0, axis=-3), axis=-1)
     
     # all read distributions should be in agreement
