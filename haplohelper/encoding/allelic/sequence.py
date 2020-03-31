@@ -26,3 +26,13 @@ def sort(array):
     """Sort a set of biological sequences that are encoded as scalars.
     """
     return array[argsort(array)]
+
+
+def depth(array, counts=None):
+    if counts is None:
+        return np.sum(is_call(array), axis=-2)
+    else:
+        counts = np.expand_dims(counts, -1)
+        return np.sum(is_call(array).astype(np.int) * counts, axis=-2)
+
+
