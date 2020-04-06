@@ -31,9 +31,9 @@ def encode_alignment_read_variants(locus, bams, sample='ID', min_quality=20, set
     if set_sequence:
         # create an empty array to gather reference chars
         # use a set to keep track of remaining chars to get 
-        ref_sequence = np.empty(locus.interval.stop - locus.interval.start, dtype = 'U1')
+        ref_sequence = np.empty(locus.stop - locus.start, dtype = 'U1')
         ref_sequence[:] = 'N'  # default to unknown allele
-        ref_sequence_remaining = set(locus.interval)
+        ref_sequence_remaining = set(locus.range)
     
     data={}
     
@@ -71,7 +71,7 @@ def encode_alignment_read_variants(locus, bams, sample='ID', min_quality=20, set
             data[sample_key] = {}
 
         # iterate through reads
-        reads = bam.fetch(locus.contig, locus.interval.start, locus.interval.stop)
+        reads = bam.fetch(locus.contig, locus.start, locus.stop)
         for read in reads:
             
             if read.is_unmapped:
@@ -113,7 +113,7 @@ def encode_alignment_read_variants(locus, bams, sample='ID', min_quality=20, set
                         # check if this pos still needs to be set
                         if ref_pos in ref_sequence_remaining:
                             # set character (may be lower case if read varies)
-                            ref_sequence[ref_pos - locus.interval.start] = ref_char.upper()
+                            ref_sequence[ref_pos - locus.start] = ref_char.upper()
                             # remove position from remaining
                             ref_sequence_remaining.remove(ref_pos)
 

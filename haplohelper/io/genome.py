@@ -8,24 +8,33 @@ class Locus:
     __slots__ = (
         'reference', 
         'contig', 
-        'interval', 
+        'start', 
+        'stop', 
         'positions', 
         'alleles', 
         'sequence'
     )
     reference: str
     contig: str
-    interval: range
+    start: int
+    stop: int
     positions: list
     alleles: list
     sequence: str
+
+    @property
+    def range(self):
+        return range(self.start, self.stop)
+
+    def as_dict(self):
+        return {slot: getattr(self, slot) for slot in self.__slots__}
 
 
 def _template_sequence(locus):
     chars = list(locus.sequence)
     ref_alleles = (tup[0] for tup in locus.alleles)
     for pos, string in zip(locus.positions, ref_alleles):
-        idx = pos - locus.interval.start
+        idx = pos - locus.start
         for offset, char in enumerate(string):
             if chars[idx+offset] != char:
                 message = 'Reference allele does not match sequence at position {}:{}'

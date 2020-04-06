@@ -81,7 +81,8 @@ def _select_column_variants(samples,
 def build_locus(alignment_file=None,
                 reference=None,
                 contig=None,
-                interval=None,
+                start=None,
+                stop=None,
                 max_allele=2,
                 min_map_qual=20,
                 min_mean_depth=10,
@@ -95,16 +96,16 @@ def build_locus(alignment_file=None,
     if contig is None:
         raise ValueError('contig is required')
 
-    pileup = alignment_file.pileup(contig, interval.start, interval.stop)
+    pileup = alignment_file.pileup(contig, start, stop)
 
-    ref_chars = np.empty(len(interval), dtype='U1')
+    ref_chars = np.empty(len(range(start, stop)), dtype='U1')
     alleles = []
     positions = []
 
     for column in pileup:
-        if column.pos in interval:
+        if column.pos in range(start, stop):
             ref_char = _column_reference(column)
-            ref_chars[column.pos - interval.start] = ref_char
+            ref_chars[column.pos - start] = ref_char
 
             allele_counts = _column_variants(
                 column,
@@ -129,7 +130,8 @@ def build_locus(alignment_file=None,
     return Locus(
         reference=reference,
         contig=contig,
-        interval=interval,
+        start=start,
+        stop=stop,
         positions=positions,
         alleles=alleles,
         sequence=sequence
