@@ -2,6 +2,7 @@
 
 import numpy as np
 import numba
+from haplohelper.util import tile_to_shape as _tile_to_shape
 
 
 @numba.njit
@@ -50,19 +51,8 @@ def as_probabilistic(array,
                      gaps=True, 
                      dtype=np.float):
 
-    if not isinstance(n_alleles, np.ndarray):
-        n = n_alleles
-        n_alleles = np.empty(array.shape, dtype=np.int)
-        n_alleles[:] = [n]
-    else:
-        assert array.shape == n_alleles.shape
-
-    if not isinstance(p, np.ndarray):
-        p_scalar = p
-        p = np.empty(array.shape, dtype=np.float)
-        p[:] = [p_scalar]
-    else:
-        assert array.shape == p.shape
+    n_alleles = _tile_to_shape(n_alleles, array.shape)
+    p = _tile_to_shape(p, array.shape)
 
     if vector_size is None:
         vector_size = np.max(n_alleles)

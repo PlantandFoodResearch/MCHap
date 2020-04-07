@@ -63,3 +63,11 @@ def point_beta_probabilities(n_base, a=1, b=1):
     probs = dist.cdf(points)
     probs[1:] = probs[1:] - probs[:-1]
     return probs
+
+
+def tile_to_shape(x, shape):
+    ndims = np.ndim(x)
+    diff = len(shape) - ndims
+    assert np.shape(x) == shape[diff:]
+    template = shape[:diff] + tuple(1 for _ in range(ndims))
+    return np.tile(x, template)
