@@ -51,12 +51,11 @@ def as_probabilistic(array,
                      gaps=True, 
                      dtype=np.float):
 
-    n_alleles = _tile_to_shape(n_alleles, array.shape)
-    p = _tile_to_shape(p, array.shape)
-
     if vector_size is None:
         vector_size = np.max(n_alleles)
 
+    n_alleles = _tile_to_shape(n_alleles, array.shape)
+    p = _tile_to_shape(p, array.shape)
 
     n_base = np.prod(array.shape)
     new = np.empty((n_base, vector_size), dtype=dtype)

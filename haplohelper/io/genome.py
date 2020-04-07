@@ -57,6 +57,9 @@ class Locus:
     def as_dict(self):
         return {slot: getattr(self, slot) for slot in self.__slots__}
 
+    def count_alleles(self):
+        return [len(tup) for tup in self.alleles]
+
 
 def _template_sequence(locus):
     chars = list(locus.sequence)
@@ -137,7 +140,7 @@ def write_loci(loci, path, loci_type='HaplotypeInterval'):
                 f.write(line)
 
 
-def read_loci(path, loci_type='HaplotypeInterval'):
+def read_loci(path, loci_type='HaplotypeInterval', skip_non_variable=True):
 
     loci = {}
 
@@ -196,8 +199,10 @@ def read_loci(path, loci_type='HaplotypeInterval'):
                     loci[locus_name].positions.append(pos)
                     loci[locus_name].alleles.append(alleles)
 
-    loci = list(loci.values())
-    loci.sort()
+    if skip_non_variable:
+        loci = [locus for locus in loci.values() if len(locus.positions) > 0]
+    else:
+        loci = list(loci.values())
     return loci
 
 
