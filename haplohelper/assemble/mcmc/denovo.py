@@ -66,6 +66,107 @@ def _denovo_gibbs_sampler(
     return genotype_trace, llk_trace
 
 
+def denovo_mcmc(
+        reads,
+        ploidy,
+        steps=1000,
+        initial=None,
+        ratio=0.75,
+        alpha=1, 
+        beta=3,
+        n_intervals=None,
+        allow_recombinations=True,
+        allow_dosage_swaps=True,
+        allow_deletions=False
+    ):
+
+    if n_intervals:
+        # the following are not used
+        alpha = None
+        beta = None
+        
+    if ratio == 1:
+        # mutation only model
+        alpha = None
+        beta = None
+        n_intervals = None
+    
+    _, n_base, n_nucl = reads.shape
+
+    # Automatically mask out alleles for which all 
+    # reads have a probability of 0.
+    # A probability of 0 indicates that the allele is invalid.
+    # Masking alleles stops that allele being assessed in the
+    # mcmc and hence reduces paramater space and compute time.
+    mask = np.all(reads == 0, axis=-3)
+    
+    # initial genotype state
+    if initial is None:
+        # random sample of mean of reads
+        genotype = np.empty((ploidy, n_base), dtype=np.int8)
+        for i in range(ploidy):
+            genotype[i] = probabilistic.sample_alleles(reads.mean(axis=-3))
+    else:
+        # use the provided array
+        assert initial.shape == (ploidy, n_base)
+        genotype = initial.copy()
+        
+    # distribution to draw number of break points from
+    if n_intervals is None:
+        # random number of intervals based on beta distribution
+        break_dist = point_beta_probabilities(n_base, alpha, beta)
+    else:
+        # this is a hack to fix number of intervals to a constant
+        break_dist = np.zeros(n_intervals, dtype=np.float64)
+        break_dist[-1] = 1  # 100% probability of n_intervals -1 break points
+    
+    # run the sampler
+    genotype_trace, llk_trace = _denovo_gibbs_sampler(
+        genotype, 
+        reads, 
+        mask=mask,
+        ratio=ratio, 
+        steps=steps, 
+        break_dist=break_dist,
+        allow_recombinations=allow_recombinations,
+        allow_dosage_swaps=allow_dosage_swaps,
+        allow_deletions=allow_deletions
+    )
+
+    # ensure haplotypes within each genotype are in consistant order
+    # this is important for calculating posteriors etc
+    for i in range(len(genotype_trace)):
+        genotype_trace[i] = allelic.sort(genotype_trace[i])
+
+    return genotype_trace, llk_trace
+
+
+def posterior_dist(trace, burn=0, probabilities=True, sort=True):
+    # TODO: should this be generic for traces from multiple sorces?
+
+    # burn sorted trace
+    trace = trace[burn:]
+    
+    # unique states and their counts
+    states, counts = mset.unique_counts(trace)
+    
+    if probabilities:
+        probs = counts / np.sum(counts)
+    else:
+        probs = counts
+    
+    if sort:
+        idx = np.flip(np.argsort(probs))
+        return states[idx], probs[idx]
+    else:
+        return states, probs
+
+
+def posterior_max(trace, burn=0):
+    states, probs = posterior_dist(trace, burn=burn)
+    return states[0], probs[0]
+
+
 class DeNovoGibbsAssembler(object):
     
     def __init__(
@@ -112,69 +213,27 @@ class DeNovoGibbsAssembler(object):
         
     def fit(self, reads):
         
-        _, n_base, n_nucl = reads.shape
-        
-        self.n_base = n_base
-        self.n_nucl = n_nucl
+        self.genotype_trace, self.llk_trace = denovo_mcmc(
+                reads,
+                ploidy=self.ploidy,
+                steps=self.steps,
+                initial=self.initial,
+                ratio=self.ratio,
+                alpha=self.alpha, 
+                beta=self.beta,
+                n_intervals=self.n_intervals,
+                allow_recombinations=self.allow_recombinations,
+                allow_dosage_swaps=self.allow_dosage_swaps,
+                allow_deletions=self.allow_deletions
+            )
 
-        # Automatically mask out alleles for which all 
-        # reads have a probability of 0.
-        # A probability of 0 indicates that the allele is invalid.
-        # Masking alleles stops that allele being assessed in the
-        # mcmc and hence reduces paramater space and compute time.
-        mask = np.all(reads == 0, axis=-3)
-        
-        # initial state
-        if self.initial is None:
-            # random sample of mean of reads
-            genotype = np.empty((self.ploidy, n_base), dtype=np.int8)
-            for i in range(self.ploidy):
-                genotype[i] = probabilistic.sample_alleles(reads.mean(axis=-3))
-        else:
-            genotype = self.initial.copy()
-            
-        # distribution to draw number of break points from
-        if self.n_intervals is None:
-            # random number of intervals based on beta distribution
-            break_dist = point_beta_probabilities(n_base, self.alpha, self.beta)
-        else:
-            # this is a hack to fix number of intervals
-            break_dist = np.zeros(self.n_intervals, dtype=np.float64)
-            break_dist[-1] = 1  # 100% probability of n_intervals -1 break points
-        
-        self.genotype_trace, self.llk_trace = _denovo_gibbs_sampler(
-            genotype, 
-            reads, 
-            mask=mask,
-            ratio=self.ratio, 
-            steps=self.steps, 
-            break_dist=break_dist,
-            allow_recombinations=self.allow_recombinations,
-            allow_dosage_swaps=self.allow_dosage_swaps,
-            allow_deletions=self.allow_deletions
-        )
-        
-    def sorted_trace(self):
-        trace = self.genotype_trace.copy()
-        for i in range(len(trace)):
-            trace[i] = allelic.sort(trace[i])
-        return trace
-    
     def posterior(self, burn=0, probabilities=True, sort=True):
-        
-        # burn sorted trace
-        trace = self.sorted_trace()[burn:]
-        
-        # unique genotypes and their counts
-        genotypes, counts = mset.unique_counts(trace)
-        
-        if probabilities:
-            probs = counts / np.sum(counts)
-        else:
-            probs = counts
-        
-        if sort:
-            idx = np.flip(np.argsort(probs))
-            return genotypes[idx], probs[idx]
-        else:
-            return genotypes, probs
+        return posterior_dist(
+            self.genotype_trace, 
+            burn=burn, 
+            probabilities=probabilities, 
+            sort=sort
+        )
+
+    def best(self, burn=0):
+        return posterior_max(self.genotype_trace, burn=burn)
