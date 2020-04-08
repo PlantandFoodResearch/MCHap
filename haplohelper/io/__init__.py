@@ -2,5 +2,5 @@
 
 from .genome import *
 from .util import *
-from .bam import encode_alignment_variants
-
+from .bam import extract_read_calls
+from .bam import read_sample_ids
