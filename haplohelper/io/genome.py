@@ -40,6 +40,16 @@ class Locus:
     def __ge__(self, other):
         return self.as_locus_tuple() >= other.as_locus_tuple()
 
+    def __hash__(self):
+        return hash ((
+            self.reference,
+            self.start,
+            self.stop,
+            tuple(self.positions),
+            tuple(self.alleles),
+            self.sequence
+        ))
+
     def as_locus_tuple(self):
         chars = ''
         digits = ''
@@ -60,31 +70,29 @@ class Locus:
     def count_alleles(self):
         return [len(tup) for tup in self.alleles]
 
+    def _template_sequence(self):
+        chars = list(self.sequence)
+        ref_alleles = (tup[0] for tup in self.alleles)
+        for pos, string in zip(self.positions, ref_alleles):
+            idx = pos - self.start
+            for offset, char in enumerate(string):
+                if chars[idx+offset] != char:
+                    message = 'Reference allele does not match sequence at position {}:{}'
+                    raise ValueError(message.format(self.contig, pos + offset))
+                
+                # remove chars
+                chars[idx+offset] = ''
+                
+            # add template position
+            chars[idx] = '{}'
+        
+        # join and return
+        return ''.join(chars)
 
-def _template_sequence(locus):
-    chars = list(locus.sequence)
-    ref_alleles = (tup[0] for tup in locus.alleles)
-    for pos, string in zip(locus.positions, ref_alleles):
-        idx = pos - locus.start
-        for offset, char in enumerate(string):
-            if chars[idx+offset] != char:
-                message = 'Reference allele does not match sequence at position {}:{}'
-                raise ValueError(message.format(locus.contig, pos + offset))
-            
-            # remove chars
-            chars[idx+offset] = ''
-            
-        # add template position
-        chars[idx] = '{}'
-    
-    # join and return
-    return ''.join(chars)
-
-
-def format_haplotype(locus, alleles, gap='N'):
-    """Format integer encoded alleles as a haplotype string"""
-    variants = (locus.alleles[i][a] if a >= 0 else gap for i, a in enumerate(alleles))
-    return _template_sequence(locus).format(*variants)
+    def format_haplotype(self, alleles, gap='N'):
+        """Format integer encoded alleles as a haplotype string"""
+        variants = (self.alleles[i][a] if a >= 0 else gap for i, a in enumerate(alleles))
+        return self._template_sequence().format(*variants)
 
 
 def write_loci(loci, path, loci_type='HaplotypeInterval'):
@@ -197,7 +205,7 @@ def read_loci(path, loci_type='HaplotypeInterval', skip_non_variable=True):
                         raise IOError('Variant on line {} not within Locus "{}"'.format(line_number, locus_name))
 
                     loci[locus_name].positions.append(pos)
-                    loci[locus_name].alleles.append(alleles)
+                    loci[locus_name].alleles.append(tuple(alleles))
 
     if skip_non_variable:
         loci = [locus for locus in loci.values() if len(locus.positions) > 0]
