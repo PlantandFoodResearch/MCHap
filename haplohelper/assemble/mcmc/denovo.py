@@ -91,7 +91,7 @@ def denovo_mcmc(
         beta = None
         n_intervals = None
     
-    _, n_base, n_nucl = reads.shape
+    _, n_base, _ = reads.shape
 
     # Automatically mask out alleles for which all 
     # reads have a probability of 0.
