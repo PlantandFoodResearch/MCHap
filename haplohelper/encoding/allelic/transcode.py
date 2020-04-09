@@ -124,15 +124,18 @@ def from_strings(data, gaps='-', length=None, dtype=np.int8):
     return array.reshape(shape)
 
 
-def vector_as_string(vector, gap='-'):
-    return ''.join(str(i) if i >= 0 else gap for i in vector)
+def vector_as_string(vector, gap='-', alleles=None):
+    if alleles is None:
+        return ''.join(str(a) if a >= 0 else gap for a in vector)
+    else:
+        return ''.join(alleles[i][a] if a >= 0 else gap for i, a in enumerate(vector))
 
 
-def as_strings(array, gap='-'):
+def as_strings(array, gap='-', alleles=None):
     if not isinstance(array, np.ndarray):
         array = np.array(array, copy=False)
     if array.ndim == 1:
-        return vector_as_string(array, gap=gap)
+        return vector_as_string(array, gap=gap, alleles=alleles)
 
     shape = array.shape[:-1]
     length = array.shape[-1]
@@ -143,11 +146,39 @@ def as_strings(array, gap='-'):
     strings = np.empty(n_seq, dtype=dtype)
 
     for i in range(n_seq):
-        strings[i] = vector_as_string(vectors[i], gap=gap)
+        strings[i] = vector_as_string(vectors[i], gap=gap, alleles=alleles)
 
     return strings.reshape(shape)
 
 
-
+def vector_as_characters(vector, gap='-', alleles=None):
+    if alleles is None:
+        return np.fromiter(
+            (str(a) if a >= 0 else gap for a in vector), 
+            dtype='U1', 
+            count=len(vector)
+        )
+    else:
+        return np.fromiter((alleles[i][a] if a >= 0 else gap for i, a in enumerate(vector)), 
+            dtype='U1', 
+            count=len(vector)
+        )
 
     
+def as_characters(array, gap='-', alleles=None):
+
+    if not isinstance(array, np.ndarray):
+        array = np.array(array, copy=False)
+    if array.ndim == 1:
+        return vector_as_characters(array, gap=gap, alleles=alleles)
+
+    shape = array.shape
+    n_seq = np.prod(shape[:-1])
+    vectors = array.reshape(n_seq, -1)
+
+    chars = np.empty(vectors.shape, dtype='U1')
+
+    for i in range(n_seq):
+        chars[i] = vector_as_characters(vectors[i], gap=gap, alleles=alleles)
+
+    return chars.reshape(shape)
