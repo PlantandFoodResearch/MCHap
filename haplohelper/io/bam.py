@@ -128,6 +128,7 @@ def extract_read_calls(
                     # reuse array for first read in pair
                     array = sample_data[read.qname]
 
+                # TODO: split this section into a sub function once `set_sequence` option is removed
                 for read_pos, ref_pos, ref_char in read.get_aligned_pairs(matches_only=True, with_seq=True):
                     
                     # check if (still) setting reference sequences
