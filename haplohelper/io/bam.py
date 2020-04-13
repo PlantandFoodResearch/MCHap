@@ -35,7 +35,7 @@ def extract_read_calls(
         locus, 
         path, 
         samples=None,
-        use_id='ID',   # TODO: remove option of using bam name
+        rg_field='ID',
         min_quality=20, 
         read_dicts=False, 
         set_sequence=False  # TODO: remove this
@@ -46,7 +46,7 @@ def extract_read_calls(
     a reads read-group e.g. 'ID' or 'SM'.
     """
     
-    assert use_id in {'ID', 'SM'}
+    assert rg_field in {'ID', 'SM'}
 
     # a single sample name may be given as a string
     if isinstance(samples, str):
@@ -71,38 +71,27 @@ def extract_read_calls(
 
     bam = pysam.AlignmentFile(path)
     
-    # check for duplicate samples
-    if use_id is 'ID':
-        # check no sample ID is reused from another bam
-        for dictionary in bam.header['RG']:
-            sample_key = dictionary['ID']
-            if sample_key in data:
-                raise IOError('Duplicate read group ID: {}'.format(sample_key))
-            elif samples and sample_key not in samples:
-                # this read is not from a sample in the specified set
-                pass
-            else:
-                # add sample to the dict
-                data[sample_key] = {}
-    
-    elif use_id is 'SM':
-        # store sample ids in dict for easy access
-        # sample_keys is a map of RG ID to ID or SM
-        sample_keys = {}
-        # check no sample SM is reused from another bam
-        for dictionary in bam.header['RG']:
-            sample_key = dictionary['SM']
-            if sample_key in data:
-                raise IOError('Duplicate read group SM: {}'.format(sample_key))
-            elif samples and sample_key not in samples:
-                # this read is not from a sample in the specified set
-                pass
-            else:
-                # add sample to the dict
-                data[sample_key] = {}
-            # map read group ID to SM field
-            # this is done for all samples in bam even if a subset is specified
-            sample_keys[dictionary['ID']] = dictionary['SM']
+    # store sample ids in dict for easy access
+    # sample_keys is a map of RG ID to ID or SM
+    sample_keys = {}
+    for dictionary in bam.header['RG']:
+
+        # sample key based on a user defined readgroup field
+        sample_key = dictionary[rg_field]
+
+        # map read group ID to RG field (may be ID to ID)
+        sample_keys[dictionary['ID']] = sample_key
+
+        # check no sample id is reused from another bam
+        if sample_key in data:
+            raise IOError('Duplicate sample id: {}'.format(sample_key))
+        # only add specified samples to returned dict
+        elif samples and sample_key not in samples:
+            # this read is not from a sample in the specified set
+            pass
+        else:
+            # add sample to the dict
+            data[sample_key] = {}
 
     # iterate through reads
     reads = bam.fetch(locus.contig, locus.start, locus.stop)
@@ -118,13 +107,9 @@ def extract_read_calls(
         
         else:
             
-            # sample identifier
-            if use_id is 'ID':
-                sample_key = read.get_tag('RG')
-            elif use_id is 'SM':
-                sample_key = sample_keys[read.get_tag('RG')]
-            else:
-                raise ValueError('Unrecognised read group tag "{}".'.format(use_id))
+            # look up sample identifier based on RG ID
+            sample_key = sample_keys[read.get_tag('RG')]
+
             if samples and sample_key not in samples:
                 # this read is not from a sample in the specified set
                 pass
@@ -198,8 +183,8 @@ def extract_read_calls(
     
     else:
         # return a dict of matrices
-        for use_id, reads in data.items():
-            data[use_id] = np.array(list(reads.values()))
+        for rg_field, reads in data.items():
+            data[rg_field] = np.array(list(reads.values()))
 
     return data
 
