@@ -35,7 +35,7 @@ def extract_read_calls(
         locus, 
         path, 
         samples=None,
-        rg_field='ID',
+        id='ID',
         min_quality=20, 
         read_dicts=False, 
         set_sequence=False  # TODO: remove this
@@ -46,7 +46,7 @@ def extract_read_calls(
     a reads read-group e.g. 'ID' or 'SM'.
     """
     
-    assert rg_field in {'ID', 'SM'}
+    assert id in {'ID', 'SM'}
 
     # a single sample name may be given as a string
     if isinstance(samples, str):
@@ -77,7 +77,7 @@ def extract_read_calls(
     for dictionary in bam.header['RG']:
 
         # sample key based on a user defined readgroup field
-        sample_key = dictionary[rg_field]
+        sample_key = dictionary[id]
 
         # map read group ID to RG field (may be ID to ID)
         sample_keys[dictionary['ID']] = sample_key
@@ -184,8 +184,8 @@ def extract_read_calls(
     
     else:
         # return a dict of matrices
-        for rg_field, reads in data.items():
-            data[rg_field] = np.array(list(reads.values()))
+        for id, reads in data.items():
+            data[id] = np.array(list(reads.values()))
 
     return data
 
