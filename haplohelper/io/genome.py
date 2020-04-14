@@ -24,22 +24,22 @@ class Locus:
     sequence: str
 
     def __eq__(self, other):
-        return self.as_locus_tuple() == other.as_locus_tuple()
+        return self._sort_value() == other._sort_value()
 
     def __ne__(self, other):
-        return self.as_locus_tuple() != other.as_locus_tuple()
+        return self._sort_value() != other._sort_value()
 
     def __lt__(self, other):
-        return self.as_locus_tuple() < other.as_locus_tuple()
+        return self._sort_value() < other._sort_value()
 
     def __le__(self, other):
-        return self.as_locus_tuple() <= other.as_locus_tuple()
+        return self._sort_value() <= other._sort_value()
 
     def __gt__(self, other):
-        return self.as_locus_tuple() > other.as_locus_tuple()
+        return self._sort_value() > other._sort_value()
 
     def __ge__(self, other):
-        return self.as_locus_tuple() >= other.as_locus_tuple()
+        return self._sort_value() >= other._sort_value()
 
     def __hash__(self):
         return hash ((
@@ -51,7 +51,7 @@ class Locus:
             self.sequence
         ))
 
-    def as_locus_tuple(self):
+    def contig_value(self):
         chars = ''
         digits = ''
         for i in self.contig:
@@ -59,7 +59,11 @@ class Locus:
                 digits += i
             else:
                 chars += i
-        return chars, int(digits), self.start, self.stop
+        return chars, int(digits),
+
+    def _sort_value(self):
+        chars, number = self.contig_value()
+        return chars, number, (self.start, self.stop)
 
     @property
     def range(self):
