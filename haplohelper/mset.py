@@ -121,6 +121,20 @@ def unique(array):
     return array[unique_idx(array)]
 
 
+def categorize(array, categories):
+    assert categories.ndim == array.ndim
+    assert categories.dtype == array.dtype
+    # category indices are category labels
+    labels = {}
+    for i, cat in enumerate(categories):
+        labels[cat.tostring()] = i
+    labeled = np.empty(len(array), np.int)
+    for i, a in enumerate(array):
+        label = labels.get(a.tostring(), -1)  # -1 is unlabeled
+        labeled[i] = label
+    return labeled
+
+
 def count(array, categories):
     assert categories.ndim == array.ndim
     assert categories.dtype == array.dtype
