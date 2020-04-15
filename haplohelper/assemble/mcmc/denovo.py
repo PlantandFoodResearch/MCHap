@@ -2,6 +2,7 @@
 
 import numpy as np 
 import numba
+from scipy import stats as _stats
 
 from haplohelper import mset
 from haplohelper.encoding import allelic
@@ -9,7 +10,32 @@ from haplohelper.encoding import probabilistic
 from haplohelper.assemble.step import util, mutation, structural
 from haplohelper.assemble.likelihood import log_likelihood
 from haplohelper.assemble import complexity
-from haplohelper.util import point_beta_probabilities
+
+
+def _point_beta_probabilities(n_base, a=1, b=1):
+    """Return probabilies for selecting a recombination point
+    following a beta distribution
+
+    Parameters
+    ----------
+    n_base : int
+        Number of base positions in this genotype.
+    a : float
+        Alpha parameter for beta distribution.
+    b : float
+        Beta parameter for beta distribution.
+
+    Returns
+    -------
+    probs : array_like, int, shape (n_base - 1)
+        Probabilities for recombination point.
+    
+    """
+    dist = _stats.beta(a, b)
+    points = np.arange(1, n_base + 1) / (n_base)
+    probs = dist.cdf(points)
+    probs[1:] = probs[1:] - probs[:-1]
+    return probs
 
 
 @numba.njit
@@ -114,7 +140,7 @@ def denovo_mcmc(
     # distribution to draw number of break points from
     if n_intervals is None:
         # random number of intervals based on beta distribution
-        break_dist = point_beta_probabilities(n_base, alpha, beta)
+        break_dist = _point_beta_probabilities(n_base, alpha, beta)
     else:
         # this is a hack to fix number of intervals to a constant
         break_dist = np.zeros(n_intervals, dtype=np.float64)
