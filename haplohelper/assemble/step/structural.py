@@ -6,7 +6,6 @@ import numba
 from haplohelper.assemble.step import util
 
 
-
 @numba.njit
 def structural_change(genotype, haplotype_indices, interval=None):
     """Mutate genotype by re-arranging haplotypes within a given interval.
@@ -321,6 +320,62 @@ def dosage_step_options(labels, allow_deletions=False):
 
 
 @numba.njit
+def _label_haplotypes(labels, genotype, interval=None):
+
+    ploidy, n_base = genotype.shape
+    labels[:] = 0
+
+    r = util.interval_as_range(interval, n_base)
+
+    for i in r:
+        for j in range(1, ploidy):
+            if genotype[j][i] == genotype[labels[j]][i]:
+                # matches current assigned class
+                pass
+            else:
+                # store previous assignment
+                prev_label = labels[j]
+                # assign to new label based on index
+                # 'j' is the index and the label id
+                labels[j] = j
+                # check if following arrays match the new label
+                for k in range(j + 1, ploidy):
+                    if labels[k] == prev_label and genotype[j][i] == genotype[k][i]:
+                        # this array is identical to the jth array
+                        labels[k] = j
+
+
+@numba.njit
+def _interval_inverse_mask(interval, n):
+    if interval is None:
+        mask = np.zeros(n, np.bool8)
+    else:
+        mask = np.ones(n, np.bool8)
+        mask[interval[0]:interval[1]] = 0
+    return mask
+
+
+@numba.njit
+def haplotype_segment_labels(genotype, interval=None):
+    """Create a labels matrix in whihe the first coloumn contains
+    labels for haplotype segments within the specified range and
+    the second column contains labels for the remander of the 
+    haplotypes.
+
+    If no interval is speciefied then the first column will contain
+    labels for the full haplotypes and the second column will 
+    contain zeros
+    """
+    ploidy, n_base = genotype.shape
+
+    labels = np.zeros((ploidy, 2), np.int8)
+    _label_haplotypes(labels[:, 0], genotype, interval=interval)
+    mask = _interval_inverse_mask(interval, n_base)
+    _label_haplotypes(labels[:, 1], genotype[:, mask], interval=None)
+    return labels
+
+
+@numba.njit
 def interval_step(
         genotype, 
         reads, 
@@ -333,7 +388,7 @@ def interval_step(
 
     ploidy, _ = genotype.shape
 
-    labels = util.haplotype_segment_labels(genotype, interval)
+    labels = haplotype_segment_labels(genotype, interval)
 
     # calculate number of potential steps from current state
     if allow_recombinations:

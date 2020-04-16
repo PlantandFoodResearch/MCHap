@@ -4,29 +4,6 @@ import numba
 
 _FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=np.int64)
 
-@numba.njit
-def factorial_20(x):
-    if x in range(0, 21):
-        return _FACTORIAL_LOOK_UP[x]
-    else:
-        raise ValueError('factorial functuion is only supported for values 0 to 20')
-
-
-@numba.njit
-def count_genotype_perterbations_20(dosage):
-    """Counts the total number of equivilent genotype perterbation based on the dosage.
-
-    A genotype is an unsorted set of haplotypes hence the genotype `{A, B}` is equivielnt
-    to the genotype `{B, A}`.
-    A fully homozygous genotype e.g. `{A, A}` has only one possible perterbation.
-    """
-    ploidy = np.sum(dosage)
-    numerator = factorial_20(ploidy)
-    denominator = 1
-    for i in range(len(dosage)):
-        denominator *= factorial_20(dosage[i])
-    return numerator // denominator
-
 
 @numba.njit
 def interval_as_range(interval, max_range):
@@ -37,63 +14,6 @@ def interval_as_range(interval, max_range):
             return range(interval[0], interval[1])
         else:
             raise ValueError('Interval must be `None` or array of length 2')
-
-
-@numba.njit
-def random_breaks(breaks, n):
-    
-    if breaks >= n:
-        raise ValueError('breaks must be smaller then n')
-    
-    indicies = np.ones(n+1, np.bool8)
-    indicies[0] = False
-    indicies[-1] = False
-    
-    for _ in range(breaks):
-        options = np.where(indicies)[0]
-        if len(options) == 0:
-            break
-        else:
-            point = np.random.choice(options)
-            indicies[point] = False
-            
-    points = np.where(~indicies)[0]
-    
-    intervals = np.zeros((breaks + 1, 2), dtype = np.int64)
-    
-    for i in range(breaks + 1):
-        intervals[i, 0] = points[i]
-        intervals[i, 1] = points[i + 1]
-    return intervals
-
-
-@numba.njit
-def haplotype_of_int(array, integer, n_alleles):
-    n_base = len(array)
-    if integer >= np.prod(n_alleles):
-        raise ValueError('Integer to large for haplotype bounds')
-    
-    array[:] = 0
-    
-    i = n_base - 1
-    while integer:
-        array[i] = integer % n_alleles[i]
-        integer = integer // n_alleles[i]
-        i -= 1
-        
-
-@numba.njit
-def haplotype_as_int(array, n_nucl):
-    # TODO: check for overflows
-    n_base = len(array)
-    power = n_base - 1
-    integer = 0
-    for i in range(n_base):
-        element = array[i]
-        if element:
-            integer += n_nucl ** power
-        power -= 1
-    return integer
 
 
 @numba.njit
@@ -286,56 +206,24 @@ def set_dosage(genotype, dosage):
 
 
 @numba.njit
-def label_haplotypes(labels, genotype, interval=None):
-
-    ploidy, n_base = genotype.shape
-    labels[:] = 0
-
-    r = interval_as_range(interval, n_base)
-
-    for i in r:
-        for j in range(1, ploidy):
-            if genotype[j][i] == genotype[labels[j]][i]:
-                # matches current assigned class
-                pass
-            else:
-                # store previous assignment
-                prev_label = labels[j]
-                # assign to new label based on index
-                # 'j' is the index and the label id
-                labels[j] = j
-                # check if following arrays match the new label
-                for k in range(j + 1, ploidy):
-                    if labels[k] == prev_label and genotype[j][i] == genotype[k][i]:
-                        # this array is identical to the jth array
-                        labels[k] = j
-
-
-@numba.njit
-def _interval_inverse_mask(interval, n):
-    if interval is None:
-        mask = np.zeros(n, np.bool8)
+def factorial_20(x):
+    if x in range(0, 21):
+        return _FACTORIAL_LOOK_UP[x]
     else:
-        mask = np.ones(n, np.bool8)
-        mask[interval[0]:interval[1]] = 0
-    return mask
+        raise ValueError('factorial functuion is only supported for values 0 to 20')
 
 
 @numba.njit
-def haplotype_segment_labels(genotype, interval=None):
-    """Create a labels matrix in whihe the first coloumn contains
-    labels for haplotype segments within the specified range and
-    the second column contains labels for the remander of the 
-    haplotypes.
+def count_equivalent_permutations(dosage):
+    """Counts the total number of equivilent genotype perterbation based on the dosage.
 
-    If no interval is speciefied then the first column will contain
-    labels for the full haplotypes and the second column will 
-    contain zeros
+    A genotype is an unsorted set of haplotypes hence the genotype `{A, B}` is equivielnt
+    to the genotype `{B, A}`.
+    A fully homozygous genotype e.g. `{A, A}` has only one possible perterbation.
     """
-    ploidy, n_base = genotype.shape
-
-    labels = np.zeros((ploidy, 2), np.int8)
-    label_haplotypes(labels[:, 0], genotype, interval=interval)
-    mask = _interval_inverse_mask(interval, n_base)
-    label_haplotypes(labels[:, 1], genotype[:, mask], interval=None)
-    return labels
+    ploidy = np.sum(dosage)
+    numerator = factorial_20(ploidy)
+    denominator = 1
+    for i in range(len(dosage)):
+        denominator *= factorial_20(dosage[i])
+    return numerator // denominator

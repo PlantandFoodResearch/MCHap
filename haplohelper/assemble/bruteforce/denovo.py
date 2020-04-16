@@ -8,6 +8,38 @@ from haplohelper.assemble import complexity
 from haplohelper.assemble.likelihood import log_likelihood
 
 
+# TODO: avoid haplotype-int convertions
+# these will overflow with larger haplotypes
+
+@numba.njit
+def _haplotype_of_int(array, integer, n_alleles):
+    n_base = len(array)
+    if integer >= np.prod(n_alleles):
+        raise ValueError('Integer to large for haplotype bounds')
+    
+    array[:] = 0
+    
+    i = n_base - 1
+    while integer:
+        array[i] = integer % n_alleles[i]
+        integer = integer // n_alleles[i]
+        i -= 1
+        
+
+@numba.njit
+def _haplotype_as_int(array, n_nucl):
+    # TODO: check for overflows
+    n_base = len(array)
+    power = n_base - 1
+    integer = 0
+    for i in range(n_base):
+        element = array[i]
+        if element:
+            integer += n_nucl ** power
+        power -= 1
+    return integer
+
+
 @numba.njit
 def _denovo_brute_force(reads, ploidy, u_alleles, u_haps, u_gens, keep_n=0):
     
@@ -79,7 +111,7 @@ def _denovo_brute_force(reads, ploidy, u_alleles, u_haps, u_gens, keep_n=0):
                     hap_indicies[i] += 1
 
                     # update haplotype and dosage
-                    util.haplotype_of_int(genotype[i], hap_indicies[i], u_alleles)
+                    _haplotype_of_int(genotype[i], hap_indicies[i], u_alleles)
 
                     searching = False
 
@@ -94,14 +126,14 @@ def _denovo_brute_force(reads, ploidy, u_alleles, u_haps, u_gens, keep_n=0):
                 # zero out remaining values
                 hap_indicies[i] = 0
                 # update genotype
-                util.haplotype_of_int(genotype[i], 0, u_alleles)
+                _haplotype_of_int(genotype[i], 0, u_alleles)
 
                 
         # update dosage  
         util.get_dosage(dosage, hap_indicies.reshape(-1,1))
         
         # count permutations for this dosage
-        g_perms = util.count_genotype_perterbations_20(dosage)
+        g_perms = util.count_equivalent_permutations(dosage)
         
         # log likelihood for this genotype
         llk = log_likelihood(reads, genotype)
