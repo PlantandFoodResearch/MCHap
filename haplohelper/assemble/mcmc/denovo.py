@@ -7,9 +7,9 @@ from scipy import stats as _stats
 from haplohelper import mset
 from haplohelper.encoding import allelic
 from haplohelper.encoding import probabilistic
-from haplohelper.assemble.step import util, mutation, structural
+from haplohelper.assemble.mcmc.step import mutation, structural
 from haplohelper.assemble.likelihood import log_likelihood
-from haplohelper.assemble import complexity
+from haplohelper.assemble import util, complexity
 
 
 def _point_beta_probabilities(n_base, a=1, b=1):
@@ -74,7 +74,7 @@ def _denovo_gibbs_sampler(
             n_breaks = util.random_choice(break_dist)
             
             # break into intervals
-            intervals = util.random_breaks(n_breaks, n_base)
+            intervals = structural.random_breaks(n_breaks, n_base)
             
             # compound step
             llk = structural.compound_step(

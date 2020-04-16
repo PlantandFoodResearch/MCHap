@@ -3,7 +3,7 @@
 import numpy as np 
 import numba
 
-from haplohelper.assemble.step import util
+from haplohelper.assemble import util
 from haplohelper.assemble import complexity
 from haplohelper.assemble.likelihood import log_likelihood
 
