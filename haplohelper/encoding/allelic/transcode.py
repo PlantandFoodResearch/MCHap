@@ -2,7 +2,6 @@
 
 import numpy as np
 import numba
-from haplohelper.util import tile_to_shape as _tile_to_shape
 
 
 @numba.njit
@@ -42,6 +41,14 @@ def _as_probabilistic(array, new, n_alleles, probs, vector_size, gaps):
             # pad
             for j in range(n, vector_size):
                 new[i, j] = 0.0 
+
+
+def _tile_to_shape(x, shape):
+    ndims = np.ndim(x)
+    diff = len(shape) - ndims
+    assert np.shape(x) == shape[diff:]
+    template = shape[:diff] + tuple(1 for _ in range(ndims))
+    return np.tile(x, template)
 
 
 def as_probabilistic(array, 

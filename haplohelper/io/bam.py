@@ -143,6 +143,9 @@ def extract_read_calls(
                     # if this is a variant position then extract the call and qual
                     if ref_pos in positions:
                         idx = positions[ref_pos]
+
+                        # references allele in bam should match reference allele in locus
+                        assert locus.alleles[idx][0].upper() == ref_char.upper()
                                                 
                         char = read.seq[read_pos]
                         qual = util.qual_of_char(read.qual[read_pos])
