@@ -176,139 +176,6 @@ def write_loci(loci, path):
                 f.write(line)
 
 
-def read_loci(path, skip_non_variable=True):
-
-    loci_types = set()
-    variant_types = set()
-
-    loci_data = {}
-
-    # expect bgzip for compression
-    compress = path.endswith('.gz') 
-    open_ = bgzf.open if compress else open
-
-    with open_(path, 'r') as f:
-        for line_number, line in enumerate(f):
-            
-            if line.startswith('#LOCI='):
-                line = line.split('=')[1]
-                loci_types |= {string.strip() for string in line.split(';')}
-
-            elif line.startswith('#VARIANTS='):
-                line = line.split('=')[1]
-                variant_types |= {string.strip() for string in line.split(';')}
-
-            elif line[0] == '#':
-                pass
-            
-            else:
-                line = line.split()
-
-                if line[4] in loci_types:
-                    # this is a locus line
-
-                    locus = {
-                        'contig': line[0],
-                        'start': int(line[1]),
-                        'stop': int(line[2]),
-                        'name': line[3],
-                        'category': line[4],
-                        'variants': [],
-                        'sequence': line[5]
-                    }
-
-                    locus_name = locus['name']
-
-                    if locus_name is '.':
-                        raise IOError('Unnamed Locus on line {}'.format(line_number))
-                    
-                    elif locus_name in loci_data:
-                        raise IOError('Duplicate Locus on line {}'.format(line_number))
-
-                    loci_data[locus_name] = locus
-                
-                else:
-                    # assume this is a variant line
-
-                    parent = line[7]
-
-                    if parent is '.':
-                        raise IOError('Variant without locus on line {}'.format(line_number))
-
-                    elif parent not in loci_data:
-                        raise IOError('Variant on line {} found before Locus "{}"'.format(line_number, parent))
-
-                    var = Variant(
-                        contig=line[0],
-                        start=int(line[1]),
-                        stop=int(line[2]),
-                        name=line[3],
-                        category=line[4],
-                        alleles=tuple((line[5] + ',' + line[6]).split(',')),
-                    )
-
-                    #locus_interval = loci[locus_name].range
-                    #if pos not in locus_interval:
-                    #    raise IOError('Variant on line {} not within Locus "{}"'.format(line_number, locus_name))
-
-                    loci_data[parent]['variants'].append(var)
-
-    loci = {}
-    for name, data in loci_data.items():
-        data['variants'] = tuple(data['variants'])
-        locus = Locus(**data)
-        r = locus.range
-        for var in locus.variants:
-            if (var.start not in r) or ((var.stop - 1) not in r):
-                raise IOError('Variant location {}-{} not within Locus "{}"'.format(var.start, var.stop, name))
-        loci[name] = locus
-        if skip_non_variable and len(locus.variants) == 0:
-            del loci[name]
-
-    return list(loci.values())
-
-
-def read_bed(path, locus_category='interval'):
-
-    names = set()
-
-    with open(path, 'r') as f:
-        for line_number, line in enumerate(f): 
-
-            if line[0] == '#':
-                pass
-
-            else:
-                line = line.split()
-
-                contig = line[0].strip()
-                start = int(line[1].strip())
-                stop = int(line[2].strip())
-                if len(line) > 3:
-                    # assume bed 4 so next column in name
-                    name = line[3].strip()
-                else:
-                    name = '{}:{}-{}'.format(contig, start, stop)
-                category = locus_category
-
-                if name in names:
-                    raise ValueError('Loci with duplicate name found on line {}'.format(line_number))
-                else:
-                    names.add(name)
-
-                locus = Locus(
-                    contig=contig,
-                    start=start,
-                    stop=stop,
-                    name=name,
-                    category=category,
-                    sequence=None,
-                    variants=None
-                )
-
-                yield locus
-
-
 def set_loci_sequence(loci, path):
 
     with pysam.Fastafile(path) as fasta:
@@ -355,3 +222,156 @@ def set_loci_variants(loci, path):
             yield locus
 
 
+class Bed4File(pysam.Tabixfile):
+    
+    def fetch(self, *args, **kwargs):
+        
+        names = set()
+        
+        lines = super().fetch(*args, **kwargs)
+        
+        for line_number, line in enumerate(lines):
+            
+            if line[0] == '#':
+                pass
+            
+            else:
+                line = line.split()
+
+                contig = line[0].strip()
+                start = int(line[1].strip())
+                stop = int(line[2].strip())
+                if len(line) > 3:
+                    # assume bed 4 so next column in name
+                    name = line[3].strip()
+                else:
+                    name = '{}:{}-{}'.format(contig, start, stop)
+
+                if name in names:
+                    raise ValueError('Loci with duplicate name found on line {}'.format(line_number))
+                else:
+                    names.add(name)
+
+                locus = Locus(
+                    contig=contig,
+                    start=start,
+                    stop=stop,
+                    name=name,
+                    category='interval',
+                    sequence=None,
+                    variants=None
+                )
+
+                yield locus
+
+
+class LociFile(pysam.Tabixfile):
+    
+    @property
+    def header(self):
+        data = {
+            'LOCI': set(),
+            'VARIANTS': set(),
+        }
+        
+        for line in super().header:
+            if line.startswith('#LOCI='):
+                line = line.split('=')[1]
+                data['LOCI'] |= {string.strip() for string in line.split(';')}
+            elif line.startswith('#VARIANTS='):
+                line = line.split('=')[1]
+                data['VARIANTS'] |= {string.strip() for string in line.split(';')}
+            
+        return data
+    
+    def fetch(self, *args, **kwargs):
+        
+        header_data = self.header
+        loci_types = header_data['LOCI']
+        variant_types = header_data['VARIANTS']
+        
+        names = set()
+        
+        lines = super().fetch(*args, **kwargs)
+        
+        locus = None
+        
+        for line in lines:
+                        
+            line = line.split()
+            
+            if line[4] in loci_types:
+                
+                
+                if locus:
+                    # yield the previous locus with its variants
+                    yield locus.set(variants=tuple(variants))
+                
+                else:
+                    pass
+                
+                # create a locus without variants
+                locus = Locus(
+                    contig=line[0],
+                    start=int(line[1]),
+                    stop=int(line[2]),
+                    name=line[3],
+                    category=line[4],
+                    variants=None,
+                    sequence=line[5]
+                )
+                
+                # new list to collect variants
+                variants = []
+                                
+                if locus.name is '.':
+                    raise IOError('Unnamed Locus at "{}:{}-{}"'.format(
+                        locus['contig'],
+                        locus['start'],
+                        locus['stop']
+                    ))
+                
+                elif locus.name in names:
+                    raise IOError('Duplicate Locus named "{}"'.format(locus.name))
+                    
+                names.add(locus.name)
+                
+            if line[4] in variant_types:
+                
+                var = Variant(
+                    contig=line[0],
+                    start=int(line[1]),
+                    stop=int(line[2]),
+                    name=line[3],
+                    category=line[4],
+                    alleles=tuple((line[5] + ',' + line[6]).split(',')),
+                )
+                
+                # name for reporting errors
+                name = var.name if var.name not in {'.', None} else '{}:{}-{}'.format(var.contig, var.start, var.stop)
+                
+                parent = line[7]
+                
+                # check theat there is a locus 
+                if not locus:
+                    raise IOError('Variant "{}" found before locus "{}"'.format(name, parent))
+                
+                # check that variant matches the current locus
+                elif locus.name != parent:
+                    
+                    if parent in names:
+                        raise IOError('Variant "{}" found after locus "{}"'.format(name, parent))
+                        
+                    else:
+                        raise IOError('Variant "{}" found before locus "{}"'.format(name, parent))
+                        
+                # check that variant is within the locus interval
+                if var.start not in locus.range:
+                    raise IOError('Variant "{}" does not fall within locus "{}"'.format(name, parent))
+                    
+                # append variant to list started for the locus
+                variants.append(var)
+        
+        if locus:
+            # yield the final locus with its variants
+            yield locus.set(variants=tuple(variants))
