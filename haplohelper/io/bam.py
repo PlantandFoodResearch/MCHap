@@ -38,7 +38,6 @@ def extract_read_calls(
         id='ID',
         min_quality=20, 
         read_dicts=False, 
-        set_sequence=False  # TODO: remove this
     ):
     """Read variants defined for a locus from an alignment file
     
@@ -59,13 +58,6 @@ def extract_read_calls(
     
     # create mapping of ref position to variant index
     positions = {pos: i for i, pos in enumerate(locus.positions)}
-
-    if set_sequence:
-        # create an empty array to gather reference chars
-        # use a set to keep track of remaining chars to get 
-        ref_sequence = np.empty(locus.stop - locus.start, dtype = 'U1')
-        ref_sequence[:] = 'N'  # default to unknown allele
-        ref_sequence_remaining = set(locus.range)
     
     data={}
 
@@ -128,17 +120,7 @@ def extract_read_calls(
                     # reuse array for first read in pair
                     array = sample_data[read.qname]
 
-                # TODO: split this section into a sub function once `set_sequence` option is removed
                 for read_pos, ref_pos, ref_char in read.get_aligned_pairs(matches_only=True, with_seq=True):
-                    
-                    # check if (still) setting reference sequences
-                    if set_sequence and ref_sequence_remaining:
-                        # check if this pos still needs to be set
-                        if ref_pos in ref_sequence_remaining:
-                            # set character (may be lower case if read varies)
-                            ref_sequence[ref_pos - locus.start] = ref_char.upper()
-                            # remove position from remaining
-                            ref_sequence_remaining.remove(ref_pos)
 
                     # if this is a variant position then extract the call and qual
                     if ref_pos in positions:
@@ -169,17 +151,6 @@ def extract_read_calls(
                             else:
                                 # conflicting calls so treat as null
                                 array[idx] = (-1, 0)
-
-    # check if setting reference sequence
-    if set_sequence:
-        # check that all positions were recovered
-        if ref_sequence_remaining:
-            warning = 'Reference sequence not recoverd at positions {}.'
-            warning += 'This is likely due to a read depth of 0.'
-            Warning(warning.format(ref_sequence_remaining))
-        
-        # set the sequence
-        locus.sequence = ''.join(ref_sequence)
     
     if read_dicts:
         # return a dict of dicts of arrays
