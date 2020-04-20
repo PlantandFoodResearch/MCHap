@@ -304,47 +304,47 @@ def read_bed(path, locus_category='interval'):
 
 def set_loci_sequence(loci, path):
 
-    fasta = pysam.Fastafile(path)
+    with pysam.Fastafile(path) as fasta:
 
-    for locus in loci:
+        for locus in loci:
 
-        sequence = fasta.fetch(locus.contig, locus.start, locus.stop).upper()
+            sequence = fasta.fetch(locus.contig, locus.start, locus.stop).upper()
 
-        locus = locus.set(sequence=sequence)
+            locus = locus.set(sequence=sequence)
 
-        yield locus
+            yield locus
 
 
 def set_loci_variants(loci, path):
 
-    vcf = pysam.VariantFile(path)
+    with pysam.VariantFile(path) as vcf:
 
-    for locus in loci:
-        variants = []
+        for locus in loci:
+            variants = []
 
-        for var in vcf.fetch(locus.contig, locus.start, locus.stop):
+            for var in vcf.fetch(locus.contig, locus.start, locus.stop):
 
-            if var.stop - var.start == 1:
-                # SNP
-                variants.append(
-                    Variant(
-                        contig=var.contig,
-                        start=var.start,
-                        stop=var.stop,
-                        name=var.id if var.id else '.',
-                        category='SNP',
-                        alleles=(var.ref, ) + var.alts,
+                if var.stop - var.start == 1:
+                    # SNP
+                    variants.append(
+                        Variant(
+                            contig=var.contig,
+                            start=var.start,
+                            stop=var.stop,
+                            name=var.id if var.id else '.',
+                            category='SNP',
+                            alleles=(var.ref, ) + var.alts,
+                        )
                     )
-                )
 
-            else:
-                # not a SNP
-                pass
+                else:
+                    # not a SNP
+                    pass
 
-        variants=tuple(variants)
+            variants=tuple(variants)
 
-        locus = locus.set(variants=variants)
+            locus = locus.set(variants=variants)
 
-        yield locus
+            yield locus
 
 
