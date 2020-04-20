@@ -2,6 +2,7 @@
 
 import pysam
 from dataclasses import dataclass
+from Bio import bgzf
 
 from haplohelper.encoding import allelic
 
@@ -58,7 +59,6 @@ class Locus:
         data.update(kwargs)
         return type(self)(**data)
         
-
 
 def contig_value(contig):
     chars = ''
@@ -127,9 +127,13 @@ def write_loci(loci, path):
     # make sure loci and variants are never the same type
     intercept = loci_types & variant_types
     if intercept:
-        raise IOError('Found loci and variants of types "{}"'.format(intercept))
+        raise IOError('Found both loci and variants of types "{}"'.format(intercept))
 
-    with open(path, 'w') as f:
+    # use bgzip for compression
+    compress = path.endswith('.gz') 
+    open_ = bgzf.open if compress else open
+
+    with open_(path, 'w') as f:
 
         # write header line:
         f.write('#HaploHelper Loci Format v0.01\n')
@@ -177,10 +181,13 @@ def read_loci(path, skip_non_variable=True):
     loci_types = set()
     variant_types = set()
 
-
     loci_data = {}
 
-    with open(path, 'r') as f:
+    # expect bgzip for compression
+    compress = path.endswith('.gz') 
+    open_ = bgzf.open if compress else open
+
+    with open_(path, 'r') as f:
         for line_number, line in enumerate(f):
             
             if line.startswith('#LOCI='):
