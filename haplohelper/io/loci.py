@@ -5,76 +5,69 @@ from dataclasses import dataclass
 from haplohelper.encoding import allelic
 
 
-@dataclass
-class Locus:
-    __slots__ = (
-        'reference', 
-        'contig', 
-        'start', 
-        'stop', 
-        'positions', 
-        'alleles', 
-        'sequence'
-    )
-    reference: str
+@dataclass(frozen=True, order=True)
+class Variant:
     contig: str
     start: int
     stop: int
-    positions: list
-    alleles: list
+    name: str
+    category: str
+    alleles: tuple
+
+
+@dataclass(frozen=True, order=True)
+class Locus:
+
+    contig: str
+    start: int
+    stop: int
+    name: str
+    category: str
     sequence: str
+    variants: tuple
 
-    def __eq__(self, other):
-        return self._sort_value() == other._sort_value()
+    @property
+    def positions(self):
+        return [v.start for v in self.variants]
 
-    def __ne__(self, other):
-        return self._sort_value() != other._sort_value()
-
-    def __lt__(self, other):
-        return self._sort_value() < other._sort_value()
-
-    def __le__(self, other):
-        return self._sort_value() <= other._sort_value()
-
-    def __gt__(self, other):
-        return self._sort_value() > other._sort_value()
-
-    def __ge__(self, other):
-        return self._sort_value() >= other._sort_value()
-
-    def __hash__(self):
-        return hash ((
-            self.reference,
-            self.start,
-            self.stop,
-            tuple(self.positions),
-            tuple(self.alleles),
-            self.sequence
-        ))
-
-    def contig_value(self):
-        chars = ''
-        digits = ''
-        for i in self.contig:
-            if i.isdigit():
-                digits += i
-            else:
-                chars += i
-        return chars, int(digits),
-
-    def _sort_value(self):
-        chars, number = self.contig_value()
-        return chars, number, (self.start, self.stop)
+    @property
+    def alleles(self):
+        return [v.alleles for v in self.variants]
 
     @property
     def range(self):
         return range(self.start, self.stop)
 
-    def as_dict(self):
-        return {slot: getattr(self, slot) for slot in self.__slots__}
-
     def count_alleles(self):
         return [len(tup) for tup in self.alleles]
+
+    def as_dict(self):
+        return dict(
+            contig=self.contig,
+            start=self.start,
+            stop=self.stop,
+            name=self.name,
+            category=self.category,
+            sequence=self.sequence,
+            variants=self.variants,
+        )
+
+    def set(self, **kwargs):
+        data = self.as_dict()
+        data.update(kwargs)
+        return type(self)(**data)
+        
+
+
+def contig_value(contig):
+    chars = ''
+    digits = ''
+    for i in contig:
+        if i.isdigit():
+            digits += i
+        else:
+            chars += i
+    return chars, int(digits)
 
 
 def _template_sequence(locus):
@@ -109,27 +102,46 @@ def format_variants(locus, array, gap='-'):
     return allelic.as_characters(array, gap=gap, alleles=locus.alleles)
 
 
-def write_loci(loci, path, loci_type='HaplotypeInterval'):
+def write_loci(loci, path):
     columns = (
         'CHROM',
         'START',
         'STOP',
         'NAME',
-        'TYPE',
+        'CATEGORY',
         'REF',
         'ALT',
         'WITHIN',
     )
 
+    loci_types = set()
+    variant_types = set()
+
+    # need to iter twice to get types
+    for locus in loci:
+        loci_types.add(locus.category)
+        for var in locus.variants:
+            variant_types.add(var.category)
+
+    # make sure loci and variants are never the same type
+    intercept = loci_types & variant_types
+    if intercept:
+        raise IOError('Found loci and variants of types "{}"'.format(intercept))
+
     with open(path, 'w') as f:
 
         # write header line:
         f.write('#HaploHelper Loci Format v0.01\n')
+        f.write('#LOCI=' + ';'.join(loci_types) + '\n')
+        f.write('#VARIANTS=' + ';'.join(variant_types) + '\n')
         f.write('#' + '\t'.join(columns) + '\n')
 
         for locus in loci:
 
-            locus_name = '{}:{}-{}'.format(locus.contig, locus.start, locus.stop)
+            if locus.name in {None, '.'}:
+                locus_name = '{}:{}-{}'.format(locus.contig, locus.start, locus.stop)
+            else:
+                locus_name = locus.name
 
             # write locus line:
             line = '\t'.join([
@@ -137,95 +149,116 @@ def write_loci(loci, path, loci_type='HaplotypeInterval'):
                 str(locus.start),
                 str(locus.stop),
                 locus_name,
-                loci_type,
+                locus.category,
                 locus.sequence if locus.sequence else '.',
                 '.',
-                '.',
-                '\n'
-            ])
+                '.'
+            ]) + '\n'
             f.write(line)
-            
-            for position, alleles in zip(locus.positions, locus.alleles):
 
-                # write variant line:
+            for var in locus.variants:
+
                 line = '\t'.join([
-                    locus.contig,
-                    str(position),
-                    str(position + 1),  # interval of length 1 for snp
-                    '.',
-                    'SNP',
-                    alleles[0],
-                    ','.join(alleles[1:]),
+                    var.contig,
+                    str(var.start),
+                    str(var.stop),
+                    var.name,
+                    var.category,
+                    var.alleles[0],
+                    ','.join(var.alleles[1:]),
                     locus_name,
-                    '\n'
-                ])
+                ]) + '\n'
                 f.write(line)
 
 
-def read_loci(path, loci_type='HaplotypeInterval', skip_non_variable=True):
+def read_loci(path, skip_non_variable=True):
 
-    loci = {}
+    loci_types = set()
+    variant_types = set()
+
+
+    loci_data = {}
 
     with open(path, 'r') as f:
         for line_number, line in enumerate(f):
             
-            if line[0] == '#':
+            if line.startswith('#LOCI='):
+                line = line.split('=')[1]
+                loci_types |= {string.strip() for string in line.split(';')}
+
+            elif line.startswith('#VARIANTS='):
+                line = line.split('=')[1]
+                variant_types |= {string.strip() for string in line.split(';')}
+
+            elif line[0] == '#':
                 pass
             
             else:
                 line = line.split()
 
-                if line[3] == loci_type:
+                if line[4] in loci_types:
                     # this is a locus line
 
-                    locus = Locus(
-                        reference=None,
-                        contig=line[0],
-                        start=int(line[1]),
-                        stop=int(line[2]),
-                        positions=[],
-                        alleles=[],
-                        sequence=line[5]
-                    )
+                    locus = {
+                        'contig': line[0],
+                        'start': int(line[1]),
+                        'stop': int(line[2]),
+                        'name': line[3],
+                        'category': line[4],
+                        'variants': [],
+                        'sequence': line[5]
+                    }
 
-                    locus_name = line[4]
+                    locus_name = locus['name']
 
                     if locus_name is '.':
                         raise IOError('Unnamed Locus on line {}'.format(line_number))
                     
-                    elif locus_name in loci:
+                    elif locus_name in loci_data:
                         raise IOError('Duplicate Locus on line {}'.format(line_number))
 
-                    loci[locus_name] = locus
+                    loci_data[locus_name] = locus
                 
                 else:
                     # assume this is a variant line
 
-                    locus_name = line[7]
+                    parent = line[7]
 
-                    if locus_name is '.':
+                    if parent is '.':
                         raise IOError('Variant without locus on line {}'.format(line_number))
 
-                    elif locus_name not in loci:
-                        raise IOError('Variant on line {} found before Locus "{}"'.format(line_number, locus_name))
+                    elif parent not in loci_data:
+                        raise IOError('Variant on line {} found before Locus "{}"'.format(line_number, parent))
 
-                    pos=int(line[1])
-                    ref = line[5]
-                    alts = line[6]
-                    alleles = (ref + ',' + alts).split(',')
+                    var = Variant(
+                        contig=line[0],
+                        start=int(line[1]),
+                        stop=int(line[2]),
+                        name=line[3],
+                        category=line[4],
+                        alleles=tuple((line[5] + ',' + line[6]).split(',')),
+                    )
 
-                    locus_interval = loci[locus_name].range
-                    if pos not in locus_interval:
-                        raise IOError('Variant on line {} not within Locus "{}"'.format(line_number, locus_name))
+                    #locus_interval = loci[locus_name].range
+                    #if pos not in locus_interval:
+                    #    raise IOError('Variant on line {} not within Locus "{}"'.format(line_number, locus_name))
 
-                    loci[locus_name].positions.append(pos)
-                    loci[locus_name].alleles.append(tuple(alleles))
+                    loci_data[parent]['variants'].append(var)
 
-    if skip_non_variable:
-        loci = [locus for locus in loci.values() if len(locus.positions) > 0]
-    else:
-        loci = list(loci.values())
-    return loci
+    loci = {}
+    for name, data in loci_data.items():
+        data['variants'] = tuple(data['variants'])
+        locus = Locus(**data)
+        r = locus.range
+        for var in locus.variants:
+            if (var.start not in r) or ((var.stop - 1) not in r):
+                raise IOError('Variant location {}-{} not within Locus "{}"'.format(var.start, var.stop, name))
+        loci[name] = locus
+        if skip_non_variable and len(locus.variants) == 0:
+            del loci[name]
+
+    return list(loci.values())
+
 
 
 
