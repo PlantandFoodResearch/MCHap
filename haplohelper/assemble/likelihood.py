@@ -36,7 +36,13 @@ def log_likelihood(reads, genotype):
             for j in range(n_base):
                 i = genotype[h, j]
 
-                read_hap_prod *= reads[r, j, i]
+                val = reads[r, j, i]
+
+                if np.isnan(val):
+                    pass
+                else:
+                    read_hap_prod *= val
+            
             read_prob += read_hap_prod/ploidy
         
         llk += np.log(read_prob)
@@ -98,7 +104,13 @@ def log_likelihood_dosage(reads, genotype, dosage):
                 for j in range(n_base):
                     i = genotype[h, j]
 
-                    read_hap_prod *= reads[r, j, i]
+                    val = reads[r, j, i]
+
+                    if np.isnan(val):
+                        pass
+                    else:
+                        read_hap_prod *= val
+
                 read_prob += (read_hap_prod/ploidy) * dose
         
         llk += np.log(read_prob)
