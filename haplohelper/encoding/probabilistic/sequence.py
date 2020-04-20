@@ -6,7 +6,7 @@ import numba
 
 def is_gap(array):
     """Gaps are not expressed without nans"""
-    return np.all(np.isnan(array), axis=-1)
+    return np.any(np.isnan(array), axis=-1)
 
 
 def is_dist(array, precision=None):

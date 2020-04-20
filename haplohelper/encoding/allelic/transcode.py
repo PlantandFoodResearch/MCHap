@@ -15,15 +15,15 @@ def _as_probabilistic(array, new, n_alleles, probs, vector_size, gaps):
         # deal with gap
         if a == -1: # this is a gap
             if gaps:
-                new[i] = np.nan  # fill vector with nan
+                val = np.nan
             else:
                 val = 1.0 / n
-                for j in range(n):
-                    new[i, j] = val
-                
-                # pad distribution
-                for j in range(n, vector_size):
-                    new[i, j] = 0.0 # pad
+            for j in range(n):
+                new[i, j] = val
+            
+            # always pad distribution with 0, even a gap
+            for j in range(n, vector_size):
+                new[i, j] = 0.0 # pad
         
         # deal with regular allele
         else:
@@ -54,12 +54,10 @@ def _tile_to_shape(x, shape):
 def as_probabilistic(array, 
                      n_alleles, 
                      p=1.0, 
-                     vector_size=None, 
                      gaps=True, 
                      dtype=np.float):
 
-    if vector_size is None:
-        vector_size = np.max(n_alleles)
+    vector_size = np.max(n_alleles)
 
     n_alleles = _tile_to_shape(n_alleles, array.shape)
     p = _tile_to_shape(p, array.shape)
