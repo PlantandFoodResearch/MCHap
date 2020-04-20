@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import pysam
 from dataclasses import dataclass
 
 from haplohelper.encoding import allelic
@@ -260,5 +261,90 @@ def read_loci(path, skip_non_variable=True):
     return list(loci.values())
 
 
+def read_bed(path, locus_category='interval'):
+
+    names = set()
+
+    with open(path, 'r') as f:
+        for line_number, line in enumerate(f): 
+
+            if line[0] == '#':
+                pass
+
+            else:
+                line = line.split()
+
+                contig = line[0].strip()
+                start = int(line[1].strip())
+                stop = int(line[2].strip())
+                if len(line) > 3:
+                    # assume bed 4 so next column in name
+                    name = line[3].strip()
+                else:
+                    name = '{}:{}-{}'.format(contig, start, stop)
+                category = locus_category
+
+                if name in names:
+                    raise ValueError('Loci with duplicate name found on line {}'.format(line_number))
+                else:
+                    names.add(name)
+
+                locus = Locus(
+                    contig=contig,
+                    start=start,
+                    stop=stop,
+                    name=name,
+                    category=category,
+                    sequence=None,
+                    variants=None
+                )
+
+                yield locus
+
+
+def set_loci_sequence(loci, path):
+
+    fasta = pysam.Fastafile(path)
+
+    for locus in loci:
+
+        sequence = fasta.fetch(locus.contig, locus.start, locus.stop).upper()
+
+        locus = locus.set(sequence=sequence)
+
+        yield locus
+
+
+def set_loci_variants(loci, path):
+
+    vcf = pysam.VariantFile(path)
+
+    for locus in loci:
+        variants = []
+
+        for var in vcf.fetch(locus.contig, locus.start, locus.stop):
+
+            if var.stop - var.start == 1:
+                # SNP
+                variants.append(
+                    Variant(
+                        contig=var.contig,
+                        start=var.start,
+                        stop=var.stop,
+                        name=var.id if var.id else '.',
+                        category='SNP',
+                        alleles=(var.ref, ) + var.alts,
+                    )
+                )
+
+            else:
+                # not a SNP
+                pass
+
+        variants=tuple(variants)
+
+        locus = locus.set(variants=variants)
+
+        yield locus
 
 
