@@ -117,14 +117,17 @@ def denovo_mcmc(
     
     # initial genotype state
     if initial is None:
-        # random sample of mean of reads
+        # for each haplotype, take a random sample of mean of reads
         genotype = np.empty((ploidy, n_base), dtype=np.int8)
-        dist = np.nanmean(reads, axis=-3)
+
+        # work around to avoid nan values caused by gaps
+        dist = reads.copy()
+        dist[np.isnan(dist)] = 1
+        dist /= np.expand_dims(dist.sum(axis=-1), -1)
+        dist = np.mean(dist, axis=-3)
+        
         for i in range(ploidy):
             genotype[i] = probabilistic.sample_alleles(dist)
-        # if there is a compleate absence of observations for a position it will be a gap
-        # so replace gaps with reference allele to be sure
-        genotype[genotype < 0] = 0
 
     else:
         # use the provided array
