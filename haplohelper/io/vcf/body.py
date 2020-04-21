@@ -77,7 +77,11 @@ def col_ALT_haplotypes(locus, genotypes):
     mask = ~np.all(alts == 0, axis=-1)
     alts = alts[mask]
 
-    return ','.join(_format_haplotypes(locus, alts))
+    if np.size(alts) == 0:
+        # special case if there are no alts
+        return '.'
+    else:
+        return ','.join(_format_haplotypes(locus, alts))
 
 
 def col_CHROM(locus):

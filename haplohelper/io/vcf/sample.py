@@ -32,8 +32,11 @@ def kmer_representation(read_calls, haplotype_calls, k=3):
     # depth of total kmers
     depth = allelic.depth(read_kmers, read_kmer_counts)
 
-    # return 
-    return 1 - (unique_depth / depth)
+    # avoid divide by zero 
+    with np.errstate(divide='ignore',invalid='ignore'):
+        result = 1 - np.where(depth > 0, unique_depth / depth, 0)
+
+    return result
 
 
 def kmer_variant_filter(read_calls, genotype, k=3, threshold=0.95):
