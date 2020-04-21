@@ -121,7 +121,12 @@ def log_likelihood_structural_change(reads, genotype, haplotype_indices, interva
                 # get nucleotide index
                 i = genotype[h_, j]
 
-                read_hap_prod *= reads[r, j, i]
+                val = reads[r, j, i]
+
+                if np.isnan(val):
+                    pass
+                else:
+                    read_hap_prod *= val
                 
             read_prob += read_hap_prod/ploidy
         

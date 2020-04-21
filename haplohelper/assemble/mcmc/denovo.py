@@ -105,17 +105,6 @@ def denovo_mcmc(
         allow_dosage_swaps=True,
         allow_deletions=False
     ):
-
-    if n_intervals:
-        # the following are not used
-        alpha = None
-        beta = None
-        
-    if ratio == 1:
-        # mutation only model
-        alpha = None
-        beta = None
-        n_intervals = None
     
     _, n_base, _ = reads.shape
 
@@ -130,8 +119,13 @@ def denovo_mcmc(
     if initial is None:
         # random sample of mean of reads
         genotype = np.empty((ploidy, n_base), dtype=np.int8)
+        dist = np.nanmean(reads, axis=-3)
         for i in range(ploidy):
-            genotype[i] = probabilistic.sample_alleles(reads.mean(axis=-3))
+            genotype[i] = probabilistic.sample_alleles(dist)
+        # if there is a compleate absence of observations for a position it will be a gap
+        # so replace gaps with reference allele to be sure
+        genotype[genotype < 0] = 0
+
     else:
         # use the provided array
         assert initial.shape == (ploidy, n_base)
