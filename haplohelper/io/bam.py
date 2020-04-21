@@ -6,6 +6,7 @@ import numpy as np
 
 from haplohelper.io import util
 from haplohelper.encoding.allelic import as_probabilistic as _as_probabilistic
+from haplohelper.encoding.symbolic import as_allelic as _as_allelic
 
 
 # dtype for allele call with qual score
@@ -31,7 +32,7 @@ def extract_sample_ids(bam_paths, id='ID'):
     return data
 
 
-def extract_read_calls(
+def extract_read_variants(
         locus, 
         path, 
         samples=None,
@@ -52,9 +53,6 @@ def extract_read_calls(
         samples = {samples}
     
     n_positions = len(locus.positions)
-    
-    # create list of mappings of variants to allele integers
-    encodings = [{string: i for i, string in enumerate(var)} for var in locus.alleles]
     
     # create mapping of ref position to variant index
     positions = {pos: i for i, pos in enumerate(locus.positions)}
@@ -112,13 +110,14 @@ def extract_read_calls(
 
                 if read.qname not in sample_data:
                     # default is array of gaps with qual of 0
-                    array = np.zeros(n_positions, dtype=dtype_allele_call)
-                    array['allele'] -= 1
-                    sample_data[read.qname] = array
+                    chars = np.empty(n_positions, dtype='U1')
+                    chars[:] = '-'
+                    quals = np.zeros(n_positions, dtype=np.int8)
+                    sample_data[read.qname] = [chars, quals]
                     
                 else:
-                    # reuse array for first read in pair
-                    array = sample_data[read.qname]
+                    # reuse arrays for first read in pair
+                    chars, quals = sample_data[read.qname]
 
                 for read_pos, ref_pos, ref_char in read.get_aligned_pairs(matches_only=True, with_seq=True):
 
@@ -132,25 +131,19 @@ def extract_read_calls(
                         char = read.seq[read_pos]
                         qual = util.qual_of_char(read.qual[read_pos])
                         
-                        # Only proceed if char is a recognised allele.
-                        # Note that if reads overlap and one is not a 
-                        # recognised allele then it is ignored and other
-                        # allele is used.
-                        # If both are recognised but conflicting alleles
-                        # then it's treated as a null/gap
-                        # TODO: find a better way to handle this
-                        if char in encodings[idx]:
-                            allele = encodings[idx][char]
+                        if  chars[idx] == '-':
+                            # first observation
+                            chars[idx] = char
+                            quals[idx] = qual
                         
-                            if array[idx]['allele'] == -1:
-                                # first observation of this position in this read pair
-                                array[idx] = (allele, qual)
-                            elif array[idx]['allele'] == allele:
-                                # second observation of same allele
-                                array[idx]['qual'] += qual  # combine qual
-                            else:
-                                # conflicting calls so treat as null
-                                array[idx] = (-1, 0)
+                        elif chars[idx] == char:
+                            # second call is congruent
+                             quals[idx] += qual
+                                
+                        else:
+                            # incongruent calls
+                            chars[idx] = 'N'
+                            quals[idx] += 0
     
     if read_dicts:
         # return a dict of dicts of arrays
@@ -159,21 +152,33 @@ def extract_read_calls(
     else:
         # return a dict of matrices
         for id, reads in data.items():
-            data[id] = np.array(list(reads.values()))
+            tuples = list(reads.values())
+            chars = np.array([tup[0] for tup in tuples])
+            quals = np.array([tup[1] for tup in tuples])
+            data[id] = (chars, quals)
 
     return data
 
 
-def encode_read_calls(locus, read_calls, error_rate=util.PFEIFFER_ERROR, use_quals=True):
-    alleles = read_calls['allele']
+def encode_read_alleles(locus, symbols):
+    if np.size(symbols) == 0:
+        # This is a hack to let static computation graphs compleate 
+        # when there are no reads for a sample
+        # by specifying a single read of gaps only, the posterior
+        # should approximate the prior
+        symbols = np.array(['-'] * len(locus.variants))
+
+    return _as_allelic(symbols, alleles=locus.alleles)
+
+
+def encode_read_distributions(locus, calls, quals, error_rate=util.PFEIFFER_ERROR, gaps=True):
 
     # convert error_rate to prob of correct call
-    probs = np.ones((alleles.shape), dtype=np.float) * (1 - error_rate)
+    probs = np.ones((calls.shape), dtype=np.float) * (1 - error_rate)
 
-    if use_quals:
-        # convert qual scores to probs and multiply
-        probs *= util.prob_of_qual(read_calls['qual'])
+    # convert qual scores to probs and multiply
+    probs *= util.prob_of_qual(quals)
     
     n_alleles = locus.count_alleles()
-    encoded = _as_probabilistic(alleles, n_alleles, probs, gaps=False)
+    encoded = _as_probabilistic(calls, n_alleles, probs, gaps=gaps)
     return encoded
