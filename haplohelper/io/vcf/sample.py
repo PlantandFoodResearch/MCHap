@@ -6,6 +6,7 @@ from haplohelper.encoding import allelic
 from haplohelper.io.bam import dtype_allele_call as _dtype_allele_call
 
 _PASS_CODE = 'PASS'
+_NULL_CODE = '.'
 _KMER_CODE = 'k{k}<{threshold}'
 _DEPTH_CODE = 'd<{threshold}'
 _PROB_CODE = 'p<{threshold}'
@@ -40,6 +41,11 @@ def kmer_representation(read_calls, haplotype_calls, k=3):
 
 
 def kmer_variant_filter(read_calls, genotype, k=3, threshold=0.95):
+    n_pos = read_calls.shape[-1]
+    if n_pos < k:
+        # can't apply kmer filter
+        return [_NULL_CODE for _ in range(n_pos)]
+
     if read_calls.dtype == _dtype_allele_call:
         # we only need the allele calls not the quals
         read_calls = read_calls['allele']
@@ -50,6 +56,11 @@ def kmer_variant_filter(read_calls, genotype, k=3, threshold=0.95):
 
 
 def kmer_haplotype_filter(read_calls, genotype, k=3, threshold=0.95):
+    n_pos = read_calls.shape[-1]
+    if n_pos < k:
+        # can't apply kmer filter
+        return _NULL_CODE
+
     if read_calls.dtype == _dtype_allele_call:
         # we only need the allele calls not the quals
         read_calls = read_calls['allele']
@@ -99,6 +110,11 @@ def prob_filter(p, threshold=0.95):
 
 def combine_filters(*args):
     if np.ndim(args) == 1:
+
+        args = [arg for arg in args if arg != _NULL_CODE]
+        if len(args) == 0:
+            # no filters applied
+            return _NULL_CODE
         string = ';'.join((arg for arg in args if arg != _PASS_CODE))
         if string:
             return string
