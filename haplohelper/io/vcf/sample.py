@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 from haplohelper import mset
 from haplohelper.encoding import allelic, symbolic
-from haplohelper.io.bam import dtype_allele_call as _dtype_allele_call
 
 _PASS_CODE = 'PASS'
 _NULL_CODE = '.'

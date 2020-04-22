@@ -9,10 +9,6 @@ from haplohelper.encoding.allelic import as_probabilistic as _as_probabilistic
 from haplohelper.encoding.symbolic import as_allelic as _as_allelic
 
 
-# dtype for allele call with qual score
-dtype_allele_call = np.dtype([('allele', np.int8), ('qual', np.uint8)])
-
-
 def extract_sample_ids(bam_paths, id='ID'):
    
     if id is None:
