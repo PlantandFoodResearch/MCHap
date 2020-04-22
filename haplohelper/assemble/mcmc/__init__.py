@@ -1,1 +1,1 @@
-from .denovo import DeNovoGibbsAssembler
+from .denovo import DenovoMCMC
