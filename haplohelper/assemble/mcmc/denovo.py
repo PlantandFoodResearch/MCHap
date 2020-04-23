@@ -3,6 +3,7 @@
 import numpy as np 
 import numba
 from scipy import stats as _stats
+from itertools import combinations_with_replacement as _combinations_with_replacement
 from dataclasses import dataclass
 
 from haplohelper import mset
@@ -103,6 +104,61 @@ def _read_mean_dist(reads):
     return dist
 
 
+def _homozygosity_probabilities(reads, ploidy):
+    """Returns posterior probabilities of each base position being homozygous for each alllele.
+    THe posterior probability is calculated for each base position independently of other base positions.
+    """
+    # probability of homozygousity for each allele at each base position
+    probs = np.zeros(reads.shape[-2:], dtype=reads.dtype)
+    
+    # mask out zeros used to pad ragged arrays
+    mask = np.all(reads == 0, axis=-3)
+    
+    # iterate through each base position
+    for i in range(len(probs)):
+        # number of valid alleles at this base position
+        n_alleles = np.sum(~mask[i]).astype(np.int)
+        
+        # vector of unique alleles 
+        alleles = np.arange(n_alleles, dtype=np.int8)
+        
+        # array of every possible genotype (at this single base position)
+        genotypes = list(_combinations_with_replacement(alleles, ploidy))
+        genotypes = np.expand_dims(np.array(genotypes, dtype=np.int8), -1)
+        
+        # read probabilities for this base position
+        sub_reads = reads[:, i:i+1, :]
+        
+        # array to store llks
+        llks = np.empty(len(genotypes), dtype = np.float)
+        
+        # array to store dosage
+        dosage = np.ones(ploidy, dtype=np.int8)
+        
+        # keep indices of homozygous genotypes
+        homozygous_genotypes = []
+        
+        for j in range(len(llks)):
+            
+            # calculate llk
+            llks[j] = log_likelihood(sub_reads, genotypes[j])
+            
+            # adjust llk for possible permutations of this genotype based on it's dosage
+            util.get_dosage(dosage, genotypes[j])
+            perms = complexity.count_genotype_permutations(dosage)
+            llks[j] += np.log(perms)
+            
+            # homozygous genotypes only have a single permutation
+            if perms == 1:
+                homozygous_genotypes.append(j)
+        
+        # insert probabilities for homozygous genotypes into the returned array
+        probs[i, 0:n_alleles] = util.log_likelihoods_as_conditionals(llks)[homozygous_genotypes]
+        
+    return probs
+
+
+
 @dataclass
 class DenovoMCMC(Assembler):
 
@@ -112,47 +168,60 @@ class DenovoMCMC(Assembler):
     alpha: float = 1.0
     beta: float = 3.0
     n_intervals: int = None
+    fix_homozygous: float = 0.999
     allow_recombinations: bool = True
     allow_dosage_swaps: bool = True
     allow_deletions: bool = False
 
     def fit(self, reads, initial=None):
 
+        # identify base positions that are overwhelmingly likely
+        # to be homozygous
+        # these can be 'fixed' to reduce computational complexity
+        hom_probs = _homozygosity_probabilities(reads, self.ploidy)
+        fixed = hom_probs >= self.fix_homozygous
+        homozygous = np.any(fixed, axis=-1)
+        heterozygous = ~homozygous
+
+        # subset of read positions which have not been identified 
+        # as homozygous
+        reads_het = reads[:, heterozygous]
+
+        # counts of total number of bases and number of het bases
         _, n_base, _ = reads.shape
+        _, n_het_base, _ = reads_het.shape
 
+        # set the initial genotype
         if initial is None:
-            dist = _read_mean_dist(reads)
             # for each haplotype, take a random sample of mean of reads
-            genotype = np.empty((self.ploidy, n_base), dtype=np.int8)
+            var_dist = _read_mean_dist(reads_het)
+            genotype = np.empty((self.ploidy, n_het_base), dtype=np.int8)
             for i in range(self.ploidy):
-                genotype[i] = probabilistic.sample_alleles(dist)
-
+                genotype[i] = probabilistic.sample_alleles(var_dist)
         else:
             # use the provided array
-            assert initial.shape == (self.ploidy, n_base)
+            assert initial.shape == (self.ploidy, n_het_base)
             genotype = initial.copy()
 
-
-        # distribution to draw number of break points from
+        # distribution to draw number of break points from for structural steps
         if self.n_intervals is None:
             # random number of intervals based on beta distribution
-            break_dist = _point_beta_probabilities(n_base, self.alpha, self.beta)
+            break_dist = _point_beta_probabilities(n_het_base, self.alpha, self.beta)
         else:
             # this is a hack to fix number of intervals to a constant
             break_dist = np.zeros(self.n_intervals, dtype=np.float64)
             break_dist[-1] = 1  # 100% probability of n_intervals -1 break points
 
-        # Automatically mask out alleles for which all 
-        # reads have a probability of 0.
-        # A probability of 0 indicates that the allele is invalid.
+        # Automatically mask out alleles for which all reads have a probability of 0
+        # A probability of 0 indicates that the allele is invalid (zero padding)
         # Masking alleles stops that allele being assessed in the
         # mcmc and hence reduces paramater space and compute time.
-        mask = np.all(reads == 0, axis=-3)
+        mask = np.all(reads_het == 0, axis=-3)
 
-        # run the sampler
+        # run the sampler on the heterozygous positions
         genotypes, llks = _denovo_gibbs_sampler(
             genotype, 
-            reads, 
+            reads_het, 
             mask=mask,
             ratio=self.ratio, 
             steps=self.steps, 
@@ -162,4 +231,19 @@ class DenovoMCMC(Assembler):
             allow_deletions=self.allow_deletions
         )
 
-        return GenotypeTrace(genotypes, llks)
+        # return the genotype trace and llks
+        if n_het_base == n_base:
+            # no fixed homozygous alleles to add back in
+            return GenotypeTrace(genotypes, llks)
+
+        else:
+            # add back in the fixed alleles that where removed
+            # create a template of the fized alleles
+            idx, vals = np.where(fixed)
+            template = np.zeros(n_base, dtype=genotypes.dtype)
+            template[idx] = vals
+            # tile for each haplotype in each step
+            template = np.tile(template, (self.steps, self.ploidy, 1))
+            # add in the heterozygous alleles from the real trace
+            template[:, :, heterozygous] = genotypes
+            return GenotypeTrace(template, llks)
