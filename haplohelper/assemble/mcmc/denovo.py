@@ -171,7 +171,7 @@ class DenovoMCMC(Assembler):
     fix_homozygous: float = 0.999
     allow_recombinations: bool = True
     allow_dosage_swaps: bool = True
-    allow_deletions: bool = False
+    allow_deletions: bool = True
 
     def fit(self, reads, initial=None):
 
