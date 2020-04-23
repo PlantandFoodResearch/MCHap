@@ -191,6 +191,19 @@ class DenovoMCMC(Assembler):
         _, n_base, _ = reads.shape
         _, n_het_base, _ = reads_het.shape
 
+        # if all bases are fixed homozygous we don't need to sample anything
+        if n_het_base == 0:
+            # create a haplotype of the fixed alleles
+            idx, vals = np.where(fixed)
+            haplotype = np.zeros(n_base, dtype=np.int8)
+            haplotype[idx] = vals
+            # tile for each haplotype in each "step"
+            genotypes = np.tile(haplotype, (self.steps, self.ploidy, 1))
+            # set likelihoods to nan
+            llks = np.empty(self.steps, dtype=np.float)
+            llks[:] = np.nan
+            return GenotypeTrace(genotypes, llks)
+
         # set the initial genotype
         if initial is None:
             # for each haplotype, take a random sample of mean of reads
