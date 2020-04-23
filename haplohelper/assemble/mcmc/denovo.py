@@ -94,23 +94,13 @@ def _point_beta_probabilities(n_base, a=1, b=1):
     return probs
 
 
-def _random_initial_genotype(reads, ploidy):
-
-    _, n_base, _ = reads.shape
-
-    # for each haplotype, take a random sample of mean of reads
-    genotype = np.empty((ploidy, n_base), dtype=np.int8)
-
+def _read_mean_dist(reads):
     # work around to avoid nan values caused by gaps
     dist = reads.copy()
     dist[np.isnan(dist)] = 1
     dist /= np.expand_dims(dist.sum(axis=-1), -1)
     dist = np.mean(dist, axis=-3)
-    
-    for i in range(ploidy):
-        genotype[i] = probabilistic.sample_alleles(dist)
-
-    return genotype
+    return dist
 
 
 @dataclass
@@ -131,7 +121,11 @@ class DenovoMCMC(Assembler):
         _, n_base, _ = reads.shape
 
         if initial is None:
-            genotype = _random_initial_genotype(reads, self.ploidy)
+            dist = _read_mean_dist(reads)
+            # for each haplotype, take a random sample of mean of reads
+            genotype = np.empty((self.ploidy, n_base), dtype=np.int8)
+            for i in range(self.ploidy):
+                genotype[i] = probabilistic.sample_alleles(dist)
 
         else:
             # use the provided array
