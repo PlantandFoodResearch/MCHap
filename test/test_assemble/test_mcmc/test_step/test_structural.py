@@ -4,6 +4,40 @@ import pytest
 from haplohelper.assemble.mcmc.step import structural
 
 
+@pytest.mark.parametrize('breaks,n', [
+    pytest.param(0, 1),
+    pytest.param(2, 5),
+    pytest.param(0, 11),
+    pytest.param(1, 11),
+    pytest.param(3, 11),
+    pytest.param(10, 11),
+        pytest.param(20, 100),
+])
+def test_random_breaks(breaks, n):
+
+    intervals = structural.random_breaks(breaks, n)
+
+    # number of intervals produced is 1 + the break points between intervals
+    assert len(intervals) == breaks + 1
+
+    # all intervals must be of length 1 or greater
+    lengths = intervals[:,1] - intervals[:,0]
+    assert np.all(lengths > 0)
+
+    # all positions must be contained in one and only one interval
+    # i.e. the end of one interval must be the start of the next
+
+    # check first interval starts at 0
+    assert intervals[0, 0] == 0
+
+    # check last interval ends at end point
+    assert intervals[-1, 1] == n
+
+    # check all intervalls are adjacent 
+    stops = intervals[1:,0]  # all but first interval
+    starts = intervals[:-1,1] # all but last interval
+    np.testing.assert_array_equal(stops, starts)
+
 
 @pytest.mark.parametrize('genotype,haplotype_indices,interval,answer', [
     pytest.param(
