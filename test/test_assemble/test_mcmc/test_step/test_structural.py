@@ -196,3 +196,64 @@ def test_recombination_step_options(labels, answer):
 
     assert len(query) == n_options
     np.testing.assert_array_equal(query, answer)
+
+
+
+@pytest.mark.parametrize('labels,allow_deletions,answer', [
+    pytest.param(
+        [[0, 0], [0, 0]],
+        False,
+        np.empty((0, 2), dtype=np.int8),  # no options
+        id='2x-hom'),
+    pytest.param(
+        [[0, 0], [0, 0]],
+        True,
+        np.empty((0, 2), dtype=np.int8),  # no options
+        id='2x-hom-del'),
+    pytest.param(
+        [[0, 0], [1, 0]],
+        False,
+        np.empty((0, 2), dtype=np.int8),  # no options
+        id='2x-0'),
+    pytest.param(
+        [[0, 0], [1, 0]],
+        True,
+        [[1, 1],
+         [0, 0]],  # no options
+        id='2x-del-2'),
+    pytest.param(
+        [[0, 0], [0, 0], [0, 0], [3, 0]],
+        False,
+        [[3, 1, 2, 3]],
+        id='4x-1'),
+    pytest.param(
+        [[0, 0], [0, 0], [0, 0], [3, 0]],
+        True,
+        [[3, 1, 2, 3],
+         [0, 1, 2, 0]],
+        id='4x-del-2'),
+    pytest.param(
+        [[0, 0], [0, 1], [2, 0], [2, 0]],
+        False,
+        [[2, 1, 2, 3],
+         [0, 2, 2, 3],
+         [0, 1, 0, 3]],
+        id='4x-3'),
+    pytest.param(
+        [[0, 0], [0, 1], [2, 0], [2, 0]],
+        True,
+        [[2, 1, 2, 3],
+         [0, 2, 2, 3],
+         [0, 1, 0, 3]],
+        id='4x-del-3'),
+])
+def test_dosage_step_options(labels, allow_deletions, answer):
+
+    labels = np.array(labels)
+    answer = np.array(answer)
+
+    n_options = structural.dosage_step_n_options(labels, allow_deletions)
+    query = structural.dosage_step_options(labels, allow_deletions)
+
+    assert len(query) == n_options
+    np.testing.assert_array_equal(query, answer)
