@@ -1,6 +1,7 @@
 import numpy as np
+import pytest
 
-from haplohelper.assemble.likelihood import log_likelihood
+from haplohelper.assemble.likelihood import *
 
 
 def reference_likelihood(reads, genotype):
@@ -50,7 +51,7 @@ def reference_likelihood(reads, genotype):
     return probs
 
 
-def test_logliklihood():
+def test_log_likelihood():
     reads = np.array([
         [[0.8, 0.2],
          [0.8, 0.2],
@@ -74,6 +75,66 @@ def test_logliklihood():
     assert np.round(query, 10) == np.round(answer, 10)
 
 
+@pytest.mark.parametrize("reads, genotype, haplotype_indices, interval, final_genotype", [
+    pytest.param(
+        [
+            [[0.8, 0.2],
+             [0.8, 0.2],
+             [0.8, 0.2]],
+            [[0.8, 0.2],
+             [0.8, 0.2],
+             [0.2, 0.8]],
+            [[0.8, 0.2],
+             [0.8, 0.2],
+             [np.nan, np.nan]]
+        ],
+        [
+            [0, 0, 0],
+            [0, 0, 1]
+        ],
+        [0, 1],
+        None,
+        [
+            [0, 0, 0],
+            [0, 0, 1]
+        ],
+        id='2x-no-change'
+    ),
+    pytest.param(
+        [
+            [[0.8, 0.2],
+             [0.8, 0.2],
+             [0.8, 0.2]],
+            [[0.8, 0.2],
+             [0.8, 0.2],
+             [0.2, 0.8]],
+            [[0.8, 0.2],
+             [0.8, 0.2],
+             [np.nan, np.nan]]
+        ],
+        [
+            [0, 0, 0],
+            [0, 0, 1]
+        ],
+        [1, 1],
+        None,
+        [
+            [0, 0, 1],
+            [0, 0, 1]
+        ],
+        id='2x-overwrite'
+    ),
+])
+def test_log_likelihood_structural_change(reads, genotype, haplotype_indices, interval, final_genotype):
 
+    reads = np.array(reads, dtype=np.float)
+    genotype = np.array(genotype, dtype=np.int8)
+    haplotype_indices = np.array(haplotype_indices, dtype=np.int)
+    final_genotype = np.array(final_genotype, dtype=np.int8)
 
+    query = log_likelihood_structural_change(reads, genotype, haplotype_indices, interval=interval)
+    answer = log_likelihood(reads, final_genotype)
+    reference =  np.log(reference_likelihood(reads, final_genotype))
 
+    assert query == answer
+    assert np.round(query, 10) == np.round(reference, 10)
