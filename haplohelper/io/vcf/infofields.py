@@ -8,7 +8,7 @@ class InfoField(object):
     type: str
     descr: str
 
-    def header(self):
+    def __str__(self):
         template = '##INFO=<ID={id},Number={number},Type={type},Description="{descr}">'
         return template.format(
             id=self.id,

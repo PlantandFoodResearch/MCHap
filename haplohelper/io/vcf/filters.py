@@ -18,7 +18,7 @@ class FilterHeader(object):
     id: str
     descr: str
 
-    def header(self):
+    def __str__(self):
         template = '##FILTER=<ID={id},Description="{descr}">'
         return template.format(
             id=self.id,

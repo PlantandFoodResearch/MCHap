@@ -7,7 +7,7 @@ class MetaHeader(object):
     id: str
     descr: str
 
-    def header(self):
+    def __str__(self):
         return '##{id}={descr}'.format(id=self.id, descr=self.descr)
 
 

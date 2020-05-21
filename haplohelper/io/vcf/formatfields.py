@@ -8,7 +8,7 @@ class FormatField(object):
     type: str
     descr: str
 
-    def header(self):
+    def __str__(self):
         template = '##FORMAT=<ID={id},Number={number},Type={type},Description="{descr}">'
         return template.format(
             id=self.id,

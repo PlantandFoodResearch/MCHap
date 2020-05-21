@@ -33,19 +33,19 @@ class VCFHeader(object):
     def lines(self):
 
         for obj in self.meta:
-            yield obj.header()
+            yield str(obj)
 
         for obj in self.contigs:
-            yield obj.header()
+            yield str(obj)
 
         for obj in self.filters:
-            yield obj.header()
+            yield str(obj)
 
         for obj in self.info_fields:
-            yield obj.header()
+            yield str(obj)
 
         for obj in self.format_fields:
-            yield obj.header()
+            yield str(obj)
 
         yield '#' + '\t'.join(self.columns())
         
