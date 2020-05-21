@@ -56,6 +56,10 @@ class FilterCallSet(object):
             else:
                 return 'PASS'
 
+    @classmethod
+    def new(cls, *args):
+        return cls(tuple(args))
+
 
 def kmer_representation(variants, haplotype_calls, k=3):
     """ Calculates position-wise frequency of read_calls kmers which 
