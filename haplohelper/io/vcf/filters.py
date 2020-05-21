@@ -1,14 +1,60 @@
 import numpy as np
+from dataclasses import dataclass
 
 from haplohelper import mset
 from haplohelper.encoding import allelic, symbolic
-from haplohelper.io.vcf.classes import FilterCall, FilterCallSet
+
 
 _PASS_CODE = 'PASS'
 _NULL_CODE = '.'
 _KMER_CODE = 'k{k}<{threshold}'
 _DEPTH_CODE = 'd<{threshold}'
 _PROB_CODE = 'p<{threshold}'
+_FILTER_HEADER = '##FILTER=<ID={code},Description="{desc}">\n'
+
+
+@dataclass(frozen=True)
+class FilterHeader(object):
+    id: str
+    descr: str
+
+    def header(self):
+        template = '##FILTER=<ID={id},Description="{descr}">'
+        return template.format(
+            id=self.id,
+            descr=self.descr
+        )
+
+
+@dataclass(frozen=True)
+class FilterCall(object):
+    id: str
+    failed: bool
+    applied: bool = True
+    
+    def __str__(self):
+        if self.applied:
+            return self.id if self.failed else 'PASS'
+        else: 
+            return '.'
+
+
+@dataclass(frozen=True)
+class FilterCallSet(object):
+    calls: tuple
+        
+    def __str__(self):
+        calls = [call for call in self.calls if call.applied]
+
+        if len(calls) == 0:
+            return '.'
+        else:
+            failed = [call for call in calls if call.failed]
+            
+            if failed:
+                return ','.join(map(str, failed))
+            else:
+                return 'PASS'
 
 
 def kmer_representation(variants, haplotype_calls, k=3):
@@ -33,6 +79,12 @@ def kmer_representation(variants, haplotype_calls, k=3):
         result = 1 - np.where(depth > 0, unique_depth / depth, 0)
 
     return result
+
+
+def kmer_filter_header(k=3, threshold=0.95):
+    code = _KMER_CODE.format(k=k, threshold=threshold)
+    descr = 'Less than {} % of samples read-variant {}-mers '.format(threshold * 100, k)
+    return FilterHeader(code, descr)
 
 
 def kmer_variant_filter(variants, genotype, k=3, threshold=0.95):
@@ -61,6 +113,11 @@ def kmer_haplotype_filter(variants, genotype, k=3, threshold=0.95):
     return FilterCall(code, fail)
 
 
+def depth_filter_header(threshold=5.0):
+    code = _DEPTH_CODE.format(threshold=threshold)
+    descr = 'Sample has mean read depth less than {}.'.format(threshold)
+    return FilterHeader(code, descr)
+
 
 def depth_variant_filter(depths, threshold=5.0, gap='-'):
     fails = depths < threshold
@@ -72,6 +129,12 @@ def depth_haplotype_filter(depths, threshold=5.0, gap='-'):
     code = _DEPTH_CODE.format(threshold=threshold)
     fail = np.mean(depths) < threshold
     return FilterCall(code, fail)
+
+
+def prob_filter_header(threshold=0.95):
+    descr = 'Samples genotype posterior probability < {}.'.format(threshold)
+    code = 'p<{}'.format(threshold)
+    return FilterHeader(code, descr)
 
 
 def prob_filter(p, threshold=0.95):

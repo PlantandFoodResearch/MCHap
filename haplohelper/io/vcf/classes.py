@@ -1,14 +1,6 @@
 import numpy as np 
 from dataclasses import dataclass
 
-@dataclass(frozen=True)
-class MetaHeader(object):
-    id: str
-    descr: str
-
-    def header(self):
-        return '##{id}={descr}'.format(id=self.id, descr=self.descr)
-
 
 @dataclass(frozen=True)
 class ContigHeader(object):
@@ -17,96 +9,6 @@ class ContigHeader(object):
 
     def header(self):
         return '##contig=<ID={id},length={length}>'.format(id=self.id, length=self.length)
-
-
-@dataclass(frozen=True)
-class FilterHeader(object):
-    id: str
-    descr: str
-
-    def header(self):
-        template = '##FILTER=<ID={id},Description="{descr}">'
-        return template.format(
-            id=self.id,
-            descr=self.descr
-        )
-
-
-@dataclass(frozen=True)
-class InfoField(object):
-    id: str
-    number: str
-    type: str
-    descr: str
-    dtype: np.dtype = np.object
-
-    def header(self):
-        template = '##INFO=<ID={id},Number={number},Type={type},Description="{descr}">'
-        return template.format(
-            id=self.id,
-            number=self.number,
-            type=self.type,
-            descr=self.descr
-        )
-
-
-@dataclass(frozen=True)
-class FormatField(object):
-    id: str
-    number: str
-    type: str
-    descr: str
-    dtype: np.dtype = np.object
-
-    def header(self):
-        template = '##FORMAT=<ID={id},Number={number},Type={type},Description="{descr}">'
-        return template.format(
-            id=self.id,
-            number=self.number,
-            type=self.type,
-            descr=self.descr
-        )
-
-
-@dataclass(frozen=True)
-class Genotype(object):
-    alleles: tuple
-    phased: bool = False
-
-    def __str__(self):
-        sep = '|' if self.phased else '/'
-        return sep.join((str(i) if i >= 0 else '.' for i in self.alleles))
-
-
-@dataclass(frozen=True)
-class FilterCall(object):
-    id: str
-    failed: bool
-    applied: bool = True
-    
-    def __str__(self):
-        if self.applied:
-            return self.id if self.failed else 'PASS'
-        else: 
-            return '.'
-
-
-@dataclass(frozen=True)
-class FilterCallSet(object):
-    calls: tuple
-        
-    def __str__(self):
-        calls = [call for call in self.calls if call.applied]
-
-        if len(calls) == 0:
-            return '.'
-        else:
-            failed = [call for call in calls if call.failed]
-            
-            if failed:
-                return ','.join(map(str, failed))
-            else:
-                return 'PASS'
 
 
 @dataclass(frozen=True)
