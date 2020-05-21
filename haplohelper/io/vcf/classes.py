@@ -3,15 +3,6 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class ContigHeader(object):
-    id: str
-    length: int
-
-    def header(self):
-        return '##contig=<ID={id},length={length}>'.format(id=self.id, length=self.length)
-
-
-@dataclass(frozen=True)
 class VCFHeader(object):
     meta: tuple = ()
     contigs: tuple = ()
