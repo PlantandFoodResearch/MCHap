@@ -1,5 +1,6 @@
 import numpy as np 
 from dataclasses import dataclass
+from Bio import bgzf
 
 
 @dataclass(frozen=True)
@@ -128,4 +129,12 @@ class VCF(object):
         yield from self.header.lines()
         yield from self.data_lines()
 
+
+    def write(self, path, bgzip=False):
+
+        open_ = bgzf.open if bgzip else open
+
+        with open_(path, 'w') as f:
+            for line in self.lines():
+                f.write(line + '\n')
             
