@@ -1,8 +1,8 @@
 import numpy as np
-from dataclasses import dataclass
 
 from haplohelper import mset
 from haplohelper.encoding import allelic, symbolic
+from haplohelper.io.vcf.classes import FilterCall, FilterCallSet
 
 _PASS_CODE = 'PASS'
 _NULL_CODE = '.'
@@ -48,17 +48,18 @@ def kmer_variant_filter(variants, genotype, k=3, threshold=0.95):
 
 
 def kmer_haplotype_filter(variants, genotype, k=3, threshold=0.95):
+    code = _KMER_CODE.format(k=k, threshold=threshold)
+
     n_pos = variants.shape[-1]
     if n_pos < k:
         # can't apply kmer filter
-        return _NULL_CODE
+        return FilterCall(code, None, applied=False)
 
     freqs = kmer_representation(variants, genotype, k=k)
     fail = np.any(freqs < threshold)
-    if fail:
-        return _KMER_CODE.format(k=k, threshold=threshold)
-    else:
-        return _PASS_CODE
+
+    return FilterCall(code, fail)
+
 
 
 def depth_variant_filter(depths, threshold=5.0, gap='-'):
@@ -68,11 +69,9 @@ def depth_variant_filter(depths, threshold=5.0, gap='-'):
 
 
 def depth_haplotype_filter(depths, threshold=5.0, gap='-'):
+    code = _DEPTH_CODE.format(threshold=threshold)
     fail = np.mean(depths) < threshold
-    if fail:
-        return _DEPTH_CODE.format(threshold=threshold)
-    else:
-        return _PASS_CODE
+    return FilterCall(code, fail)
 
 
 def prob_filter(p, threshold=0.95):
@@ -80,26 +79,7 @@ def prob_filter(p, threshold=0.95):
     code = 'p<{}'.format(threshold)
     if np.shape(p) == ():
         # scalar
-        if fails:
-            return code
-        else:
-            return _PASS_CODE
+        return FilterCall(code, fails)
     else:
         # iterable
         return [code if fail else _PASS_CODE for fail in fails]
-
-
-def combine_filters(*args):
-    if np.ndim(args) == 1:
-
-        args = [arg for arg in args if arg != _NULL_CODE]
-        if len(args) == 0:
-            # no filters applied
-            return _NULL_CODE
-        string = ';'.join((arg for arg in args if arg != _PASS_CODE))
-        if string:
-            return string
-        else:
-            return _PASS_CODE
-    else:
-        return [combine_filters(arg) for arg in np.transpose(args)]

@@ -13,3 +13,5 @@ from .sample import \
     kmer_variant_filter, \
     depth_haplotype_filter, \
     depth_variant_filter
+
+from .classes import *
