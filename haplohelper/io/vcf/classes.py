@@ -49,6 +49,10 @@ class VCFHeader(object):
             yield str(obj)
 
         yield '#' + '\t'.join(self.columns())
+
+    def __str__(self):
+        return '\n'.join(self.lines())
+
         
 
 def vcfstr(obj):
@@ -128,6 +132,24 @@ class VCF(object):
 
         yield from self.header.lines()
         yield from self.data_lines()
+
+
+    def view(self, n=5, header=False):
+
+        lines = self.data_lines()
+        if n:
+            string = '\n'.join(line for line, _ in zip(lines, range(n)))
+        else:
+            string = '\n'.join(lines)
+
+        if header:
+            string = str(self.header) + '\n' + string
+
+        return string
+
+    
+    def __str__(self):
+        return self.view(n=False, header=True)
 
 
     def write(self, path, bgzip=False):
