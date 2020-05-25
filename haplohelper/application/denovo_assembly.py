@@ -171,7 +171,7 @@ class program(object):
         )
     
 
-    def assemble(self):
+    def run(self):
 
         # io
         samples = list(self.sample_bam.keys())
