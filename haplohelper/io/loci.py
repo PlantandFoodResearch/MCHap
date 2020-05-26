@@ -96,10 +96,7 @@ def format_haplotypes(locus, array, gap='-'):
     """Format integer encoded alleles as a haplotype string"""
     variants = allelic.as_characters(array, gap=gap, alleles=locus.alleles)
     template = _template_sequence(locus)
-    if np.ndim(variants) == 1:
-        return template.format(*variants)
-    else:
-        return [template.format(*hap) for hap in variants]
+    return [template.format(*hap) for hap in variants]
 
 
 def format_variants(locus, array, gap='-'):

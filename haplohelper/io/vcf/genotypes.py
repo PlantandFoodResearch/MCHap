@@ -95,8 +95,8 @@ class HaplotypeAlleleLabeler(object):
         alleles = list(alleles)
         alleles.sort()
         alleles = tuple(alleles)
-        nulls = tuple(-1 for _ in range(ploidy - len(alleles)))
-        phenotype = Genotype(alleles + nulls)
+        #nulls = tuple(-1 for _ in range(ploidy - len(alleles)))
+        #phenotype = Genotype(alleles + nulls)
 
         # all possible genotypes for this phenotype with prob of 0
         genotypes = {}
@@ -123,7 +123,7 @@ class HaplotypeAlleleLabeler(object):
         genotypes = [genotypes[i] for i in idx]
         probs = [probs[i] for i in idx]
 
-        return phenotype, genotypes, probs
+        return genotypes, probs
 
     def ref_array(self):
         """Returns reference allele array.

@@ -35,28 +35,51 @@ class PosteriorGenotypeDistribution(object):
         idx = np.argmax(self.probabilities)
         return self.genotypes[idx], self.probabilities[idx]
 
-    def mode_phenotype(self):
+    def mode_phenotype(self, genotypes=False):
+        _, ploidy, n_pos = self.genotypes.shape
         labels = np.zeros(len(self.genotypes), dtype=np.int)
-        phenotypes = {}
-        probs = {}
-        
+        phenotype_labels = {}  # string: int
+        probs = {}  # int: float
+        phenotypes = {}  # int: array
+
         for i, gen in enumerate(self.genotypes):
             phenotype = mset.unique(gen)
             string = phenotype.tostring()
-            if string not in phenotypes:
-                phenotypes[string] = i
+            if string not in phenotype_labels:
                 label = i
+                phenotype_labels[string] = label
                 probs[label] = self.probabilities[i]
+                phenotypes[label] = phenotype
             else:
-                label = phenotypes[string]
+                label = phenotype_labels[string]
                 probs[label] += self.probabilities[i]
             labels[i] = label
-            
-        phenotypes, probs = (zip(*probs.items()))
-        mode = phenotypes[np.argmax(probs)]
-        idx = labels == mode
+
+        phenotype_labels, probs = (zip(*probs.items()))
+        mode = phenotype_labels[np.argmax(probs)]
+        phenotype = phenotypes[mode]
+        phenotype_prob = np.max(probs)
         
-        return self.genotypes[idx], self.probabilities[idx]
+        n_allele = len(phenotype)
+        if n_allele < ploidy:
+            # add nulls to phenotype
+            nulls = np.zeros(
+                (ploidy - n_allele, n_pos), 
+                dtype=phenotype.dtype
+            ) - 1
+            phenotype = np.concatenate([phenotype, nulls])
+
+        if not genotypes:
+            return phenotype, phenotype_prob
+
+        else:
+            idx = labels == mode
+            return (
+                phenotype, 
+                phenotype_prob,
+                self.genotypes[idx], 
+                self.probabilities[idx]
+            )
 
 
 @dataclass

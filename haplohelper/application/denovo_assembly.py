@@ -25,6 +25,7 @@ class program(object):
     loci: list
     sample_bam: dict
     sample_ploidy: dict
+    call_phenotypes: bool = False
     read_group_field: str = 'SM'
     mcmc_steps: int = 1000
     mcmc_burn: int = 500
@@ -72,6 +73,14 @@ class program(object):
             nargs=1,
             default=[None],
             help='Loci file containing intervals and SNPs.',
+        )
+
+        parser.set_defaults(call_phenotypes=False)
+        parser.add_argument(
+            '--phenotypes',
+            dest='call_phenotypes',
+            action='store_true',
+            help='call phenotypes in place of genotypes'
         )
 
         parser.add_argument(
@@ -154,6 +163,7 @@ class program(object):
             loci,
             sample_bam,
             sample_ploidy,
+            call_phenotypes=args.call_phenotypes,
             read_group_field=read_group_field,
             mcmc_steps=args.mcmc_steps[0],
             mcmc_burn=args.mcmc_burn[0],
@@ -178,38 +188,49 @@ class program(object):
         samples = list(self.sample_bam.keys())
 
         # define vcf template
+        meta_fields=(
+            vcf.headermeta.fileformat('v4.3'),
+            vcf.headermeta.filedate(),
+            vcf.headermeta.phasing('None'),
+        )
+
+        filters=(
+            vcf.filters.kmer_filter_header(
+                k=self.kmer_filter_k,
+                threshold=self.kmer_filter_theshold,
+            ),
+            vcf.filters.depth_filter_header(
+                threshold=self.depth_filter_threshold,
+            ),
+            vcf.filters.prob_filter_header(
+                threshold=self.probability_filter_threshold,
+            ),
+        )
+
+        info_fields=(
+            vcf.infofields.AN,
+            vcf.infofields.AC,
+            vcf.infofields.NS,
+            vcf.infofields.END,
+            vcf.infofields.VP,
+        )
+
+        format_fields=(
+            vcf.formatfields.GT,
+            vcf.formatfields.GQ,
+            vcf.formatfields.DP,
+            vcf.formatfields.FT,
+        )
+
+        if self.call_phenotypes:
+            format_fields += (vcf.formatfields.MPGP, )            
+
         vcf_header = vcf.VCFHeader(
-            meta=(
-                vcf.headermeta.fileformat('v4.3'),
-                vcf.headermeta.filedate(),
-                vcf.headermeta.phasing('None'),
-            ),
+            meta=meta_fields,
             contigs=vcf.contig_headers(self.loci),
-            filters=(
-                vcf.filters.kmer_filter_header(
-                    k=self.kmer_filter_k,
-                    threshold=self.kmer_filter_theshold,
-                ),
-                vcf.filters.depth_filter_header(
-                    threshold=self.depth_filter_threshold,
-                ),
-                vcf.filters.prob_filter_header(
-                    threshold=self.probability_filter_threshold,
-                ),
-            ),
-            info_fields=(
-                vcf.infofields.AN,
-                vcf.infofields.AC,
-                vcf.infofields.NS,
-                vcf.infofields.END,
-                vcf.infofields.VP,
-            ),
-            format_fields=(
-                vcf.formatfields.GT,
-                vcf.formatfields.GQ,
-                vcf.formatfields.DP,
-                vcf.formatfields.FT,
-            ),
+            filters=filters,
+            info_fields=info_fields,
+            format_fields=format_fields,
             samples=tuple(samples),
         )
 
@@ -223,6 +244,10 @@ class program(object):
             
             # need genotypes arrays to lable haplotype alts
             sample_genotype_arrays = {}
+
+            # if using phenotypes then store genotype dist
+            if self.call_phenotypes:
+                sample_genotype_dists = {}
 
             # samples must be in same order as in header
             for sample in samples:
@@ -244,10 +269,25 @@ class program(object):
                     allow_deletions=self.mcmc_allow_deletions,
                 ).fit(reads)
 
-                # posterior max (call)
-                best = trace.burn(self.mcmc_burn).posterior().mode()
-                genotype = best[0]
-                probability = best[1]
+                # posterior dist
+                posterior = trace.burn(self.mcmc_burn).posterior()
+
+                # posterior mode
+                if self.call_phenotypes:
+                    # posterior mode phenotype
+                    mode = posterior.mode_phenotype(genotypes=True)
+                    genotype = mode[0]  # this is a phenotype as a genotype array
+                    probability = mode[1]
+                    genotype_dist = mode[2]  # observed genotypes of this phenotype
+                    genotype_probs = mode[3]  # probs of observed genotypes
+                    sample_genotype_dists[sample] = (genotype_dist, genotype_probs)
+                else:
+                    # posterior mode genotype
+                    mode = posterior.mode()
+                    genotype = mode[0]
+                    probability = mode[1]
+
+                # store genotype/phenotype
                 sample_genotype_arrays[sample] = genotype
                 
                 # depth 
@@ -278,7 +318,7 @@ class program(object):
             # label haplotypes for haplotype vcf
             observed_genotypes = list(sample_genotype_arrays.values())
             labeler = delayed(vcf.HaplotypeAlleleLabeler.from_obs)(observed_genotypes)
-            ref_seq = delayed(format_haplotypes)(locus, labeler.ref_array())
+            ref_seq = locus.sequence
             alt_seqs = delayed(format_haplotypes)(locus, labeler.alt_array())
             allele_counts = labeler.count_obs(observed_genotypes)
 
@@ -286,6 +326,16 @@ class program(object):
             for sample in samples:
                 genotype = sample_genotype_arrays[sample]
                 haplotype_vcf_sample_data[sample]['GT'] = labeler.label(genotype)
+
+                # use labeler to sort gentype probs within phenotype
+                if self.call_phenotypes:
+                    dist = sample_genotype_dists[sample]
+                    genotypes = dist[0]
+                    probs = dist[1]
+                    pair = labeler.label_phenotype_posterior(genotypes, probs)
+                    ordered_probs = pair[1]
+                    haplotype_vcf_sample_data[sample]['MPGP'] = ordered_probs
+
             
             # append to haplotype vcf
             vcf_template.append(
