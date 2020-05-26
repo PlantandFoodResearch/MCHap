@@ -11,7 +11,8 @@ from haplohelper.io import \
     extract_read_variants, \
     encode_read_alleles, \
     encode_read_distributions, \
-    qual_of_prob
+    qual_of_prob, \
+    format_haplotypes
 
 from haplohelper.assemble.mcmc.denovo import DenovoMCMC
 
@@ -275,29 +276,31 @@ class program(object):
                 )
             
             # label haplotypes for haplotype vcf
-            alleles_counts_genotypes = delayed(vcf.label_haplotypes)(locus, sample_genotype_arrays)
-            alleles = alleles_counts_genotypes[0]
-            allele_counts = alleles_counts_genotypes[1]
-            genotypes = alleles_counts_genotypes[2]
-            
+            observed_genotypes = list(sample_genotype_arrays.values())
+            labeler = delayed(vcf.HaplotypeAlleleLabeler.from_obs)(observed_genotypes)
+            ref_seq = delayed(format_haplotypes)(locus, labeler.ref_array())
+            alt_seqs = delayed(format_haplotypes)(locus, labeler.alt_array())
+            allele_counts = labeler.count_obs(observed_genotypes)
+
             # add genotypes to sample data
             for sample in samples:
-                haplotype_vcf_sample_data[sample]['GT'] = genotypes[sample]
+                genotype = sample_genotype_arrays[sample]
+                haplotype_vcf_sample_data[sample]['GT'] = labeler.label(genotype)
             
             # append to haplotype vcf
             vcf_template.append(
                 chrom=locus.contig, 
                 pos=locus.start, 
                 id=locus.name, 
-                ref=alleles[0], 
-                alt=alleles[1:], 
+                ref=ref_seq, 
+                alt=alt_seqs, 
                 qual=None, 
                 filter=None, 
                 info=dict(
                     END=locus.stop,
                     VP=','.join(str(pos - locus.start) for pos in locus.positions),
                     NS=len(samples),
-                    AC=allele_counts[1:],
+                    AC=allele_counts[1:],  # exclude reference count
                     AN=delayed(np.sum)(delayed(np.greater)(allele_counts, 0)),
                 ), 
                 format=haplotype_vcf_sample_data,

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import numpy as np
 import pysam
 from dataclasses import dataclass
 from Bio import bgzf
@@ -95,7 +96,10 @@ def format_haplotypes(locus, array, gap='-'):
     """Format integer encoded alleles as a haplotype string"""
     variants = allelic.as_characters(array, gap=gap, alleles=locus.alleles)
     template = _template_sequence(locus)
-    return [template.format(*hap) for hap in variants]
+    if np.ndim(variants) == 1:
+        return template.format(*variants)
+    else:
+        return [template.format(*hap) for hap in variants]
 
 
 def format_variants(locus, array, gap='-'):

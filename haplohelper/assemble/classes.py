@@ -35,6 +35,29 @@ class PosteriorGenotypeDistribution(object):
         idx = np.argmax(self.probabilities)
         return self.genotypes[idx], self.probabilities[idx]
 
+    def mode_phenotype(self):
+        labels = np.zeros(len(self.genotypes), dtype=np.int)
+        phenotypes = {}
+        probs = {}
+        
+        for i, gen in enumerate(self.genotypes):
+            phenotype = mset.unique(gen)
+            string = phenotype.tostring()
+            if string not in phenotypes:
+                phenotypes[string] = i
+                label = i
+                probs[label] = self.probabilities[i]
+            else:
+                label = phenotypes[string]
+                probs[label] += self.probabilities[i]
+            labels[i] = label
+            
+        phenotypes, probs = (zip(*probs.items()))
+        mode = phenotypes[np.argmax(probs)]
+        idx = labels == mode
+        
+        return self.genotypes[idx], self.probabilities[idx]
+
 
 @dataclass
 class GenotypeTrace(object):
