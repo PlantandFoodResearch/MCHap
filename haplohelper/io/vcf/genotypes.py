@@ -6,6 +6,15 @@ from itertools import combinations_with_replacement
 from haplohelper.io import format_haplotypes
 
 
+def _allele_sort(alleles):
+    """Sort alleles for VCF output, null alleles follow called alleles.
+    """
+    calls = [i for i in alleles if i >= 0]
+    nulls = [i for i in alleles if i < 0]
+    calls.sort()
+    return tuple(calls + nulls)
+
+
 @dataclass(order=True, frozen=True)
 class Genotype(object):
     alleles: tuple
@@ -15,6 +24,15 @@ class Genotype(object):
         sep = '|' if self.phased else '/'
         return sep.join((str(i) if i >= 0 else '.' for i in self.alleles))
 
+    def sorted(self):
+        if self.phased:
+            # can't sort phased data
+            raise ValueError('Cannot sort a phased genotype.')
+        else:
+            # values < 0 must come last
+            alleles = _allele_sort(self.alleles)
+            return type(self)(alleles)
+
 
 @dataclass
 class HaplotypeAlleleLabeler(object):
@@ -23,7 +41,7 @@ class HaplotypeAlleleLabeler(object):
     @classmethod
     def from_obs(cls, genotypes):
         """Construct a new instance with alternate alleles ordered
-        by frequency amoung observed genotypes (highest to lowest).
+        by frequency among observed genotypes (highest to lowest).
         """
         haplotypes = np.concatenate(genotypes)
         _, n_pos = haplotypes.shape
@@ -69,11 +87,11 @@ class HaplotypeAlleleLabeler(object):
 
         labels = {a: i for i, a in enumerate(self.alleles)}
 
-        alleles = [labels.get(tuple(hap), -1) for hap in array]
+        alleles = tuple(labels.get(tuple(hap), -1) for hap in array)
         if not phased:
-            alleles.sort()
+            alleles = _allele_sort(alleles)
         
-        return Genotype(tuple(alleles))
+        return Genotype(alleles)
 
     def label_phenotype_posterior(self, array, probs, unobserved=True):
         """Create a VCF genotype from one or more genotype arrays
@@ -95,12 +113,8 @@ class HaplotypeAlleleLabeler(object):
         # these should be identical in all observed genotypes
         assert all(alleles == set(gen.alleles) for gen in observed)
 
-        # phenotype
-        alleles = list(alleles)
-        alleles.sort()
-        alleles = tuple(alleles)
-        #nulls = tuple(-1 for _ in range(ploidy - len(alleles)))
-        #phenotype = Genotype(alleles + nulls)
+        # phenotype as a sorted tuple
+        alleles = _allele_sort(alleles)
 
         # all possible genotypes for this phenotype with prob of 0
         genotypes = {}
@@ -109,11 +123,9 @@ class HaplotypeAlleleLabeler(object):
         if unobserved:
             opts = combinations_with_replacement(alleles, ploidy - len(alleles))
             for opt in opts:
-                t = alleles + opt
-                l = list(t)
-                l.sort()
-                g = Genotype(tuple(l))
-                genotypes[g] = 0.0
+                opt = _allele_sort(alleles + opt)
+                opt = Genotype(opt)
+                genotypes[opt] = 0.0
 
         # add observed probs
         for obs, prob in zip(observed, probs):
