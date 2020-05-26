@@ -42,6 +42,7 @@ class program(object):
     kmer_filter_k: int = 3
     kmer_filter_theshold: float = 0.95
     n_cores: int = 1
+    precision: int = 3
 
     @classmethod
     def cli(cls, command):
@@ -233,7 +234,12 @@ class program(object):
         )
 
         if self.call_phenotypes:
-            format_fields += (vcf.formatfields.MPGP, )            
+            format_fields += (
+                vcf.formatfields.PPM, 
+                vcf.formatfields.MPGP
+            )
+        else:
+            format_fields += (vcf.formatfields.GPM, )
 
         vcf_header = vcf.VCFHeader(
             meta=meta_fields,
@@ -290,11 +296,13 @@ class program(object):
                     probability = mode[1]
                     genotype_dist = mode[2]  # observed genotypes of this phenotype
                     genotype_probs = mode[3]  # probs of observed genotypes
+                    haplotype_vcf_sample_data[sample]['PPM'] = probability
                 else:
                     # posterior mode genotype
                     mode = posterior.mode()
                     genotype = mode[0]
                     probability = mode[1]
+                    haplotype_vcf_sample_data[sample]['GPM'] = probability
                 
                 # depth 
                 depth = delayed(symbolic.depth)(read_symbols)
