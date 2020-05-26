@@ -26,6 +26,7 @@ class program(object):
     sample_bam: dict
     sample_ploidy: dict
     call_phenotypes: bool = False
+    call_filtered: bool = False
     read_group_field: str = 'SM'
     mcmc_steps: int = 1000
     mcmc_burn: int = 500
@@ -80,7 +81,15 @@ class program(object):
             '--phenotypes',
             dest='call_phenotypes',
             action='store_true',
-            help='call phenotypes in place of genotypes'
+            help='Call phenotypes in place of genotypes.'
+        )
+
+        parser.set_defaults(call_filtered=False)
+        parser.add_argument(
+            '--call-filtered',
+            dest='call_filtered',
+            action='store_true',
+            help='Include genotypes of filtered samples.'
         )
 
         parser.add_argument(
@@ -164,6 +173,7 @@ class program(object):
             sample_bam,
             sample_ploidy,
             call_phenotypes=args.call_phenotypes,
+            call_filtered=args.call_filtered,
             read_group_field=read_group_field,
             mcmc_steps=args.mcmc_steps[0],
             mcmc_burn=args.mcmc_burn[0],
@@ -280,15 +290,11 @@ class program(object):
                     probability = mode[1]
                     genotype_dist = mode[2]  # observed genotypes of this phenotype
                     genotype_probs = mode[3]  # probs of observed genotypes
-                    sample_genotype_dists[sample] = (genotype_dist, genotype_probs)
                 else:
                     # posterior mode genotype
                     mode = posterior.mode()
                     genotype = mode[0]
                     probability = mode[1]
-
-                # store genotype/phenotype
-                sample_genotype_arrays[sample] = genotype
                 
                 # depth 
                 depth = delayed(symbolic.depth)(read_symbols)
@@ -298,7 +304,7 @@ class program(object):
                 haplotype_vcf_sample_data[sample]['GQ'] = delayed(str)(delayed(qual_of_prob)(probability))
 
                 # filters
-                haplotype_vcf_sample_data[sample]['FT'] = delayed(vcf.filters.FilterCallSet.new)(
+                filter_results = delayed(vcf.filters.FilterCallSet.new)(
                     delayed(vcf.filters.prob_filter)(
                         probability,
                         threshold=self.probability_filter_threshold,
@@ -314,6 +320,26 @@ class program(object):
                         threshold=self.kmer_filter_theshold,
                     ),
                 )
+                haplotype_vcf_sample_data[sample]['FT'] = filter_results
+
+                # store sample genotypes/phenotypes for labeling
+                if self.call_filtered:
+                    # store genotype/phenotype 
+                    sample_genotype_arrays[sample] = genotype
+
+                    if self.call_phenotypes:
+                        # store observed genotypes of mode phenotype
+                        sample_genotype_dists[sample] = (genotype_dist, genotype_probs)
+
+                else:
+                    # filter genotype/phenotype and store
+                    genotype_filtered = delayed(vcf.filters.null_filtered_array)(genotype, filter_results.failed)
+                    sample_genotype_arrays[sample] = genotype_filtered
+
+                    if self.call_phenotypes:
+                        # store observed genotypes of mode phenotype
+                        genotype_dist_filtered = delayed(vcf.filters.null_filtered_array)(genotype_dist, filter_results.failed)
+                        sample_genotype_dists[sample] = (genotype_dist_filtered, genotype_probs)
             
             # label haplotypes for haplotype vcf
             observed_genotypes = list(sample_genotype_arrays.values())

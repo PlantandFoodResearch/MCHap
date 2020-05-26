@@ -82,6 +82,10 @@ class HaplotypeAlleleLabeler(object):
         n_gen, ploidy, n_pos = np.shape(array)
         assert len(array) == len(probs)
 
+        if np.all(array < 0):
+            # null alleles
+            return [Genotype(tuple(-1 for _ in range(ploidy)))], [None]
+
         # label observed genotypes
         observed = [self.label(gen) for gen in array]
 
