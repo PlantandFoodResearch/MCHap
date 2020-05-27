@@ -3,5 +3,5 @@ from haplohelper.io.vcf import infofields
 from haplohelper.io.vcf import formatfields
 from haplohelper.io.vcf import filters
 from .classes import *
-from .genotypes import Genotype, HaplotypeAlleleLabeler
+from .genotypes import Genotype, HaplotypeAlleleLabeler, call_phenotype
 from .contigs import ContigHeader, contig_headers

@@ -292,11 +292,19 @@ class program(object):
                 if self.call_phenotypes:
                     # posterior mode phenotype
                     mode = posterior.mode_phenotype(genotypes=True)
-                    genotype = mode[0]  # this is a phenotype as a genotype array
-                    probability = mode[1]
-                    genotype_dist = mode[2]  # observed genotypes of this phenotype
-                    genotype_probs = mode[3]  # probs of observed genotypes
+                    #genotype = mode[0]  # this is a phenotype as a genotype array
+                    #probability = mode[1]
+                    genotype_dist = mode[0]  # observed genotypes of this phenotype
+                    genotype_probs = mode[1]  # probs of observed genotypes
+
+                    # probability of this phenotype
+                    probability = delayed(np.sum)(genotype_probs)
                     haplotype_vcf_sample_data[sample]['PPM'] = probability
+
+                    # most complete genotype of this phenotype (may have nulls)
+                    call = delayed(vcf.call_phenotype)(genotype_dist, genotype_probs)
+                    genotype = call[0]
+                    
                 else:
                     # posterior mode genotype
                     mode = posterior.mode()
