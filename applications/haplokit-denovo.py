@@ -2,7 +2,7 @@
 
 import sys
 
-from haplohelper.application.denovo_assembly import program
+from haplokit.application.denovo_assembly import program
 
 
 def main():

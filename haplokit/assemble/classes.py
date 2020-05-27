@@ -1,7 +1,8 @@
 import numpy as np
 from dataclasses import dataclass
-from haplohelper import mset
-from haplohelper.encoding import allelic
+
+from haplokit import mset
+from haplokit.encoding import allelic
 
 
 @dataclass

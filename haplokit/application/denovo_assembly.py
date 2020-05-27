@@ -5,7 +5,7 @@ import numpy as np
 from dataclasses import dataclass
 
 
-from haplohelper.io import \
+from haplokit.io import \
     LociFile, \
     extract_sample_ids, \
     extract_read_variants, \
@@ -14,10 +14,10 @@ from haplohelper.io import \
     qual_of_prob, \
     format_haplotypes
 
-from haplohelper.assemble.mcmc.denovo import DenovoMCMC
+from haplokit.assemble.mcmc.denovo import DenovoMCMC
 
-from haplohelper.io import vcf
-from haplohelper.encoding import symbolic
+from haplokit.io import vcf
+from haplokit.encoding import symbolic
 
 
 @dataclass

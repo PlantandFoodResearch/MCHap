@@ -2,7 +2,7 @@ import numpy as np
 import math
 import pytest
 
-from haplohelper.assemble import util
+from haplokit.assemble import util
 
 
 def test_add_log_prob():

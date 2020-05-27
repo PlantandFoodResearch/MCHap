@@ -2,8 +2,8 @@ import pytest
 import numpy as np
 from collections import Counter
 
-from haplohelper import mset
-from haplohelper.encoding.allelic import from_strings, as_strings
+from haplokit import mset
+from haplokit.encoding.allelic import from_strings, as_strings
 
 
 def test_add():

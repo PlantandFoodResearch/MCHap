@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from haplohelper.assemble.likelihood import *
+from haplokit.assemble.likelihood import *
 
 
 def reference_likelihood(reads, genotype):

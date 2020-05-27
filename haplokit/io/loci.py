@@ -5,7 +5,7 @@ import pysam
 from dataclasses import dataclass
 from Bio import bgzf
 
-from haplohelper.encoding import allelic
+from haplokit.encoding import allelic
 
 
 @dataclass(frozen=True, order=True)
