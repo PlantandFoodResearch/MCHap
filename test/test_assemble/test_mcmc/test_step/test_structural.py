@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from haplohelper.assemble.mcmc.step import structural
+from haplokit.assemble.mcmc.step import structural
 
 
 @pytest.mark.parametrize('breaks,n', [

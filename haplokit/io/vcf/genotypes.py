@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from functools import reduce
 from itertools import combinations_with_replacement
 
-from haplohelper import mset
-from haplohelper.io import format_haplotypes
+from haplokit import mset
+from haplokit.io import format_haplotypes
 
 
 def _allele_sort(alleles):

@@ -1,5 +1,5 @@
-HaploHelper
-===========
+HaploKit
+========
 
-Local haplotype manipulation and assembly
+Micro-haplotype assembly and manipulation
  

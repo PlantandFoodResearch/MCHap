@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from haplohelper.encoding import allelic, probabilistic
+from haplokit.encoding import allelic, probabilistic
 
 
 def test_is_gap():

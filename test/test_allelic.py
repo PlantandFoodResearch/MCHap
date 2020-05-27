@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from haplohelper.encoding import allelic
+from haplokit.encoding import allelic
 
 def test_from_strings():
     strings = ['0000', '0101', '1121', '01-1']

@@ -3,7 +3,7 @@
 import numpy as np
 import numba
 
-from haplohelper.assemble.util import random_choice as _random_choice
+from haplokit.assemble.util import random_choice as _random_choice
 
 
 def call_alleles(array, p=0.95, dtype=np.int8):
