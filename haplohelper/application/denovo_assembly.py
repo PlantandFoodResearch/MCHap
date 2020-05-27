@@ -302,7 +302,10 @@ class program(object):
                     haplotype_vcf_sample_data[sample]['PPM'] = probability
 
                     # most complete genotype of this phenotype (may have nulls)
-                    call = delayed(vcf.call_phenotype)(genotype_dist, genotype_probs)
+                    call = delayed(vcf.call_phenotype)(
+                        genotype_dist, genotype_probs, 
+                        self.probability_filter_threshold
+                    )
                     genotype = call[0]
                     
                 else:
