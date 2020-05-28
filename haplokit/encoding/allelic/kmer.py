@@ -5,8 +5,25 @@ from . import sequence
 
 
 def iter_kmers(array, k=3):
-    """Return a generator of aligned kmers given a array 
-    of binary or onehot encoded sequences.
+    """Generate a sequence of kmer vectors.
+
+    Parameters
+    ----------
+    array : ndarray, int
+        Array of integers encoding alleles.
+    k : int, optional
+        Size of kmers.
+
+    Yields
+    ------
+    kmer : ndarray, int, shape (1, )
+        Integer encoded alleles of kmer sequence.
+    
+    Notes
+    -----
+    Kmer vectors are padded with gap values (`-1`) to
+    maintain the sam allele positions as the source sequence.
+
     """
     n_base = array.shape[-1]
     n_windows = n_base - (k - 1)
@@ -23,11 +40,29 @@ def iter_kmers(array, k=3):
                 yield kmer
 
 
-def kmer_counts(array, k=3, order=None):
-    """Return a tuple of unique aligned kmers and counts 
-    given a array of binary or onehot encoded sequences.
+def kmer_counts(array, k=3):
+    """Generate an array of kmer vectors with counts of each kmers occurance.
+
+    Parameters
+    ----------
+    array : ndarray, int
+        Array of integers encoding alleles.
+    k : int, optional
+        Size of kmers.
+
+    Returns
+    -------
+    kmers : ndarray, int
+        Integer encoded alleles of kmer sequences.
+    counts : ndarray, int
+        Counts of each kmer.
+    
+    Notes
+    -----
+    Kmer vectors are padded with gap values (`-1`) to
+    maintain the sam allele positions as the source sequence.
+
     """
-    assert order in {'ascending', 'descending', None}
     kmer = None  # handle case of no kmers
     kmers_dict = {}
     counts_dict = {}
@@ -51,19 +86,25 @@ def kmer_counts(array, k=3, order=None):
         kmers[i]=kmer
         counts[i]=counts_dict[string]
 
-    if order is None:
-        return kmers, counts
-
-    idx = np.argsort(counts)
-    if order == 'descending':
-        idx = np.flip(idx, axis=0)
-
-    return kmers[idx], counts[idx]
+    return kmers, counts
 
 
 def kmer_positions(kmers, end=False):
-    """Return the local alignment positions of bases
-    for each kmer in an array of kmers.
+    """Identify base positions of each kmer.
+
+    Parameters
+    ----------
+    kmers : ndarray, int
+        Integer encoded alleles of kmer sequences.
+    end : str, optional
+        Optionally report only the 'start' or 'stop' position
+        of each kmer.
+
+    Returns
+    -------
+    positions : ndarray, int
+        positions of each base within each kmer.
+    
     """
     assert end in {False, 'start', 'stop'}
     is_coding = ~sequence.is_gap(kmers)
@@ -80,7 +121,21 @@ def kmer_positions(kmers, end=False):
 
 
 def kmer_frequency(kmers, counts):
-    """Frequency of each kmer among kmers that share its position.
+    """Calculate the frequency of each kmer among kmers that 
+    overlap it's positional interval.
+
+    Parameters
+    ----------
+    kmers : ndarray, int
+        Integer encoded alleles of kmer sequences.
+    counts : ndarray, int
+        Counts of each kmer.
+    
+    Returns
+    -------
+    frequencies : ndarray, float
+        Local frequency of each kmer.
+
     """
     is_coding = ~sequence.is_gap(kmers)
     # detect k

@@ -2,7 +2,26 @@ import numpy as np
 
 
 def as_allelic(array, alleles=None, dtype=np.int8):
+    """Convert an array of allele characters into an array of integers.
 
+    Parameters
+    ----------
+    array : ndarray, str
+        Array of allele characters.
+    alleles : array_like, array_like, str, optional
+        Characters used to represent each allele at each position.
+    
+    Returns
+    -------
+    integers : ndarray, int
+        An array of integer encoded alleles.
+
+    Notes
+    -----
+    Symbols that are not specified as alleles will be 
+    encoded as gaps (`-1`).
+
+    """
     if not isinstance(array, np.ndarray):
         array = np.array(array, copy=False)
     
