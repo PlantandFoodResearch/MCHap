@@ -11,6 +11,30 @@ from haplokit.encoding import allelic
 def gamete_probabilities(genotypes,
                          probabilities,
                          order=None):
+    """Calculate unique gametes and their associated probabilities
+    given a distribution of genotypes and probabilities for an
+    individual.
+
+    Parameters
+    ----------
+    genotypes : ndarray, int, shape (n_genotypes, ploidy, n_positions)
+        The possible genotypes of an individual of known ploidy at a 
+        locus covering n_positions variable positions.
+    probabilities : ndarray, float, shape (n_genotypes, )
+        Probabilities (summing to 1) of each genotype.
+    order : str, optional
+        Specify if the gametes should be returned in 'ascending' or 
+        'descending' order of probabilities.
+
+    Returns
+    -------
+    gametes : ndarray, int, shape (n_gametes, ploidy//2, n_positions)
+        The possible gametes produced by the individual.
+    gamete_probabilities : ndarray, float, shape (n_gametes, )
+        Probabilities (summing to 1) of each gamete.
+
+    """
+
     assert order in {None, 'ascending', 'descending'}
 
     n_gens, ploidy, n_base = genotypes.shape
@@ -59,6 +83,35 @@ def cross_probabilities(maternal_gametes,
                         paternal_gametes,
                         paternal_probabilities,
                         order=None):
+    """Calculate unique genotypes and their associated probabilities
+    given distributions of maternal and paternal gametes.
+
+    Parameters
+    ----------
+    maternal_gametes : ndarray, int, shape (n_gametes, ploidy//2, n_positions)
+        The possible maternal gametes contributing to an individual 
+        at a locus covering n_positions variable positions.
+    maternal_probabilities : ndarray, float, shape (n_gametes, )
+        Probabilities (summing to 1) of each maternal gamete.
+    paternal_gametes : ndarray, int, shape (n_gametes, ploidy//2, n_positions)
+        The possible paternal gametes contributing to an individual 
+        at a locus covering n_positions variable positions.
+    paternal_probabilities : ndarray, float, shape (n_gametes, )
+        Probabilities (summing to 1) of each paternal gamete.
+    order : str, optional
+        Specify if the genotypes should be returned in 'ascending' or 
+        'descending' order of probabilities.
+
+    Returns
+    -------
+    genotypes : ndarray, int, shape (n_genotypes, ploidy, n_positions)
+        The possible genotypes of an individual of known ploidy at a 
+        locus covering n_positions variable positions.
+    probabilities : ndarray, float, shape (n_genotypes, )
+        Probabilities (summing to 1) of each genotype.
+
+    """
+
     assert order in {None, 'ascending', 'descending'}
 
     # get dimensions
