@@ -12,15 +12,18 @@ def log_likelihood(reads, genotype):
 
     Parameters
     ----------
-    reads : array_like, float, shape (n_reads, n_base, n_nucl)
-        Observed reads encoded as an array of probabilistic matrices.
-    genotype : array_like, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
+    reads : ndarray, float, shape (n_reads, n_base, n_nucl)
+        Observed reads encoded as an array of 
+        probabilistic matrices.
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded 
+        as simple integers from 0 to n_nucl.
 
     Returns
     -------
     llk : float
         Log-likelihood of the observed reads given the genotype.
+    
     """
     
     ploidy, n_base = genotype.shape
@@ -58,19 +61,25 @@ def log_likelihood_structural_change(reads, genotype, haplotype_indices, interva
 
     Parameters
     ----------
-    reads : array_like, float, shape (n_reads, n_base, n_nucl)
-        Observed reads encoded as an array of probabilistic matrices.
-    genotype : array_like, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    haplotype_indices : array_like, int, shape (ploidy)
-        Indicies of haplotypes to use within the changed interval.
-    interval : tuple, int
-        Interval of base-positions to swap (defaults to all base positions).
+    reads : ndarray, float, shape (n_reads, n_base, n_nucl)
+        Observed reads encoded as an array of 
+        probabilistic matrices.
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as 
+        simple integers from 0 to n_nucl.
+    haplotype_indices : ndarray, int, shape (ploidy)
+        Indicies of haplotypes to use within the 
+        changed interval.
+    interval : tuple, int, shape (2, ), optional
+        Interval of base-positions to swap (defaults to 
+        all base positions).
 
     Returns
     -------
     llk : float
-        Log-likelihood of the observed reads given the genotype.
+        Log-likelihood of the observed reads given the proposed 
+        structural change to the genotype.
+    
     """
     ploidy, n_base = genotype.shape
     n_reads = len(reads)
