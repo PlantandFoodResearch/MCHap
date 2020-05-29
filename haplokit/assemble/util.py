@@ -7,6 +7,7 @@ _FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=n
 
 @numba.njit
 def interval_as_range(interval, max_range):
+    # TODO: inline this into the callers and remove
     if interval is None:
         return range(max_range)
     else:
@@ -22,14 +23,13 @@ def add_log_prob(x, y):
 
     Parameters
     ----------
-    x : float
-        A log-transformed probability.
-    y : float
-        A log-transformed probability.
+    x, y : float
+        Log-transformed probabilities.
 
     Returns
     -------
-    z : The log-transformed sum of the un-transformed `x` and `y`.
+    z : float
+        The log-transformed sum of the un-transformed `x` and `y`.
 
     """
     if x > y:
@@ -40,6 +40,19 @@ def add_log_prob(x, y):
 
 @numba.njit
 def sum_log_probs(array):
+    """Sum of values in log space.
+
+    Parameters
+    ----------
+    array : ndarray, float, shape (n_values, )
+        Log-transformed values.
+
+    Returns
+    -------
+    z : float
+        The log-transformed sum of the un-transformed values.
+
+    """
     acumulate = array[0]
     for i in range(1, len(array)):
         acumulate = add_log_prob(acumulate, array[i])
@@ -48,6 +61,20 @@ def sum_log_probs(array):
 
 @numba.njit
 def log_likelihoods_as_conditionals(llks):
+    """Returns conditional probabilities of
+    an array of log-transformed likelihoods.
+
+    Parameters
+    ----------
+    llks : ndarray, float, shape (n_values, )
+        Log-transformed likelihoods.
+
+    Returns
+    -------
+    conditionals : ndarray, float, shape (n_values, )
+        Normalised conditional probabilities.
+
+    """
     # calculated denominator in log space
     log_denominator = sum_log_probs(llks)
 
@@ -65,8 +92,8 @@ def random_choice(probabilities):
 
     Parameters
     ----------
-    probabilities : array_like, float
-        An array of probabilities that sum to one.
+    probabilities : ndarray, float, shape (n_values, )
+        1D vector of probabilities that sum to one.
 
     Returns
     -------
@@ -83,8 +110,8 @@ def greedy_choice(probabilities):
 
     Parameters
     ----------
-    probabilities : array_like, float
-        An array of probabilities that sum to one.
+    probabilities : ndarray, float, shape (n_values, )
+        1D vector of probabilities that sum to one.
 
     Returns
     -------
@@ -101,15 +128,16 @@ def array_equal(x, y, interval=None):
 
     Parameters
     ----------
-    x : array_like, int
-        A one-dimentional array of integers.
-    y : array_like, int
-        A one-dimentional array of integers with the same length as `x`.
+    x, y : ndarray, int
+        1D vectors of integers.
+    interval : tuple, int shape (2, ), optional
+        A pair of integers defining a half open interval.
 
     Returns
     -------
     equality : bool
-        True if `x` and `y` are equal, else False.
+        True if `x` and `y` are equal (within an interval 
+        if specified).
 
     """
     r = interval_as_range(interval, len(x))
@@ -127,10 +155,11 @@ def get_dosage(dosage, genotype, interval=None):
     
     Parameters
     ----------
-    dosage : array_like, int, shape (ploidy)
+    dosage : ndarray, int, shape (ploidy)
         Array to update with dosage of each haplotype.
-    genotype : array_like, int, shape (ploidy, n_base)
-        Initial state of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Initial state of haplotypes with base positions encoded as 
+        simple integers.
 
     Returns
     -------
@@ -139,8 +168,10 @@ def get_dosage(dosage, genotype, interval=None):
     Notes
     -----
     The `dosage` variable is updated in place.
-    The `dosage` array should always sum to the number of haplotypes in the `genotype`.
-    A value of `0` in the `dosage` array indicates that that haplotype is a duplicate of another.
+    The `dosage` array should always sum to the number of haplotypes 
+    in the `genotype`.
+    A value of `0` in the `dosage` array indicates that that haplotype 
+    is a duplicate of another.
 
     """
     # start with assumption that all are unique
@@ -170,9 +201,10 @@ def set_dosage(genotype, dosage):
 
     Parameters
     ----------
-    genotype : array_like, int, shape (ploidy, n_base)
-        Initial state of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    dosage : array_like, int, shape (ploidy)
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Initial state of haplotypes with alleles at each base 
+        positions encoded as integers.
+    dosage : ndarray, int, shape (ploidy)
         Array with dose of each haplotype.
 
     Returns
@@ -182,7 +214,8 @@ def set_dosage(genotype, dosage):
     Notes
     -----
     The `dosage` variable is updated in place.
-    The `dosage` array should always sum to the number of haplotypes in the `genotype`.
+    The `dosage` array should always sum to the number of 
+    haplotypes in the `genotype`.
 
     """    
     dosage = dosage.copy()
@@ -207,6 +240,19 @@ def set_dosage(genotype, dosage):
 
 @numba.njit
 def factorial_20(x):
+    """Returns the factorial of integers in the range [0, 20] (inclusive)
+    
+    Parameters
+    ----------
+    x : int
+        An integer
+
+    Returns
+    -------
+    x_fac : int
+        Factorial of x
+
+    """
     if x in range(0, 21):
         return _FACTORIAL_LOOK_UP[x]
     else:
@@ -215,11 +261,20 @@ def factorial_20(x):
 
 @numba.njit
 def count_equivalent_permutations(dosage):
-    """Counts the total number of equivilent genotype perterbation based on the dosage.
+    """Counts the total number of equivilent genotype perterbations
+    based on the genotypes dosage.
 
-    A genotype is an unsorted set of haplotypes hence the genotype `{A, B}` is equivielnt
-    to the genotype `{B, A}`.
-    A fully homozygous genotype e.g. `{A, A}` has only one possible perterbation.
+    Parameters
+    ----------
+    dosage : ndarray, int
+        1D vector of counts of each unique haplotype in a genotype.
+
+    Notes
+    -----
+    A genotype is an unsorted multi-set of haplotypes hence rearanging the
+    order of haplotypes in a (heterozygous) genotype can result in equivilent 
+    permutations
+
     """
     ploidy = np.sum(dosage)
     numerator = factorial_20(ploidy)
