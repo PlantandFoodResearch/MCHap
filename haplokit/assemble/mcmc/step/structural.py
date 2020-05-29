@@ -9,6 +9,30 @@ from haplokit.assemble.likelihood import log_likelihood_structural_change
 
 @numba.njit
 def random_breaks(breaks, n):
+    """Return a set of randomly selected non-overlapping
+    intervals which cover a sequence of length n.
+
+    Parameters
+    ----------
+    breaks : int
+        Number of breaks between intervals (i.e. number of
+        intervals - 1).
+    n : int
+        The combined length of intervals
+    
+    Returns
+    -------
+    intervals : ndarray, int shape(breaks + 1, 2)
+        Ordered set of half open intervals with combined 
+        length of n.
+
+    Notes
+    -----
+    Intervals must be greater than length zero and be 
+    imediately adjacent to one another with no gaps or
+    overlaps.
+
+    """
     
     if breaks >= n:
         raise ValueError('breaks must be smaller then n')
@@ -37,16 +61,20 @@ def random_breaks(breaks, n):
 
 @numba.njit
 def structural_change(genotype, haplotype_indices, interval=None):
-    """Mutate genotype by re-arranging haplotypes within a given interval.
+    """Mutate genotype by re-arranging haplotypes 
+    within a given interval.
 
     Parameters
     ----------
-    genotype : array_like, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    haplotype_indices : array_like, int, shape (ploidy)
-        Indicies of haplotypes to use within the changed interval.
-    interval : tuple, int
-        Interval of base-positions to swap (defaults to all base positions).
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as 
+        simple integers from 0 to n_allele.
+    haplotype_indices : ndarray, int, shape (ploidy)
+        Indicies of haplotypes to update alleles from.
+    interval : tuple, int, optional
+        If set then base-positions copies/swaps between
+        haplotype is constrained to the specified 
+        half open interval (defaults = None).
     
     Returns
     -------
@@ -54,7 +82,7 @@ def structural_change(genotype, haplotype_indices, interval=None):
 
     Notes
     -----
-    Variables `genotype` is updated in place.
+    Variable `genotype` is updated in place.
 
     """
     
@@ -81,8 +109,9 @@ def recombination_step_n_options(labels):
     
     Parameters
     ----------
-    labels : array_like, int, shape (n_haps, 2)
-        Labels for haplotype sections (excluding duplicated haplotypes).
+    labels : ndarray, int, shape (ploidy, 2)
+        Labels for haplotype segments within and outside
+        of some arbitrary range.
 
     Returns
     -------
@@ -91,12 +120,18 @@ def recombination_step_n_options(labels):
 
     Notes
     -----
-    Duplicate copies of haplotypes must be excluded from the labels array.
+    Duplicate copies of haplotypes must be excluded 
+    from the labels array.
+
+    See also
+    --------
+    haplotype_segment_labels
 
     """
     ploidy = len(labels)
 
-    # the dosage is used as a simple way to skip compleately duplicated haplotypes
+    # the dosage is used as a simple way to skip 
+    # compleately duplicated haplotypes
     dosage = np.empty(ploidy, np.int8)
     util.get_dosage(dosage, labels)
 
@@ -124,13 +159,19 @@ def recombination_step_options(labels):
 
     Parameters
     ----------
-    labels : array_like, int, shape (ploidy, 2)
-        Labels for haplotype sections.
+    labels : ndarray, int, shape (ploidy, 2)
+        Labels for haplotype segments within and outside
+        of some arbitrary range.
 
     Returns
     -------
-    options : array_like, int, shape (n_options, ploidy)
-        Possible recombinations between pairs of unique haplotypes based on the dosage.
+    options : ndarray, int, shape (n_options, ploidy)
+        Possible recombinations between pairs of unique 
+        haplotypes based on the dosage.
+
+    See also
+    --------
+    haplotype_segment_labels
 
     """
     ploidy = len(labels)
@@ -171,19 +212,28 @@ def recombination_step_options(labels):
 
 @numba.njit
 def dosage_step_n_options(labels, allow_deletions=False):
-    """Calculate the number of alternative dosages within one steps distance.
-    Dosages must include at least one copy of each unique haplotype.
-
+    """Calculate the number of alternative dosages within 
+    one steps distance.
+    
     Parameters
     ----------
-    labels : array_like, int, shape (ploidy, 2)
-        Array of dosages.
+    labels : ndarray, int, shape (ploidy, 2)
+        Labels for haplotype segments within and outside
+        of some arbitrary range.
 
     Returns
     -------
     n : int
-        The number of dosages within one step of the current dosage (excluding the current dosage).
+        The number of dosages within one step of the 
+        current dosage (excluding the current dosage).
  
+    Notes
+    -----
+    Dosages must include at least one copy of each unique haplotype.
+
+    See also
+    --------
+    haplotype_segment_labels
 
     """
     ploidy = len(labels)
@@ -229,19 +279,31 @@ def dosage_step_n_options(labels, allow_deletions=False):
 
 @numba.njit
 def dosage_step_options(labels, allow_deletions=False):
-    """Calculate the number of alternative dosages within one steps distance.
-    Dosages must include at least one copy of each unique haplotype.
+    """Calculate the number of alternative dosages within 
+    one steps distance.
+    Dosages must include at least one copy of each unique 
+    haplotype.
 
     Parameters
     ----------
-    labels : array_like, int, shape (ploidy, 2)
-        Array of dosages.
+    labels : ndarray, int, shape (ploidy, 2)
+        Labels for haplotype segments within and outside
+        of some arbitrary range.
+    allow_deletions : bool, optional
+        Set to False to dis-allow dosage changes 
+        that remove part or all of the only 
+        copy of a haplotype from the genotype
+        (default = True).
 
     Returns
     -------
     n : int
-        The number of dosages within one step of the current dosage (excluding the current dosage).
- 
+        The number of dosages within one step of the current 
+        dosage (excluding the current dosage).
+
+    See also
+    --------
+    haplotype_segment_labels
 
     """
     ploidy = len(labels)
@@ -294,6 +356,30 @@ def dosage_step_options(labels, allow_deletions=False):
 
 @numba.njit
 def _label_haplotypes(labels, genotype, interval=None):
+    """Label each haplotype in a genotype with
+    the index of its first occurance.
+
+    Parameters
+    ----------
+    labels : ndarray, int, shape(ploidy, )
+        An array to be updated with the haplotype labels
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as 
+        simple integers from 0 to n_allele.
+    interval : tuple, int, optional
+        If set then haplotypes are labeled using only those
+        alleles withint the specified half open interval
+        (defaults = None).
+
+    Notes
+    -----
+    Variable `labels` is updated in place.
+
+    See also
+    --------
+    haplotype_segment_labels
+
+    """
 
     ploidy, n_base = genotype.shape
     labels[:] = 0
@@ -320,6 +406,26 @@ def _label_haplotypes(labels, genotype, interval=None):
 
 @numba.njit
 def _interval_inverse_mask(interval, n):
+    """Return a boolean vector of True values outside 
+    of the specified interval.
+
+    Parameters
+    ----------
+    interval : tuple, int
+        Half open interval.
+    n : int
+        Length ot the vector
+
+    Returns:
+    --------
+    mask : ndarray, bool, shape (n, )
+        Vector of boolean values.
+
+    See also
+    --------
+    haplotype_segment_labels
+
+    """
     if interval is None:
         mask = np.zeros(n, np.bool8)
     else:
@@ -335,9 +441,29 @@ def haplotype_segment_labels(genotype, interval=None):
     the second column contains labels for the remander of the 
     haplotypes.
 
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as 
+        simple integers from 0 to n_allele.
+    interval : tuple, int, optional
+        If set then the first label of each haplotype will
+        corospond to the positions within the interval and
+        the second label will corospond to the positions
+        outside of the interval (defaults = None).
+
+    Returns
+    -------
+    labels : ndarray, int, shape (ploidy, 2)
+        Labels for haplotype segments within and outside
+        of the defined interval.
+
+    Notes
+    -----
     If no interval is speciefied then the first column will contain
     labels for the full haplotypes and the second column will 
-    contain zeros
+    contain zeros.
+
     """
     ploidy, n_base = genotype.shape
 
@@ -358,6 +484,47 @@ def interval_step(
         allow_dosage_swaps=True,
         allow_deletions=False
     ):
+    """A structural sub-step of an MCMC simulation constrained to 
+    a single interval contating a sub-set of positions of a genotype.
+
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, n_base)
+        The current genotype state in an MCMC simulation consisting
+        of a set of haplotypes with base positions encoded as 
+        integers from 0 to n_allele.
+    reads : ndarray, float, shape (n_reads, n_positions, max_allele)
+        Probabilistically encoded variable positions of NGS reads.
+    llk : float
+        The log-likelihood of the current genotype state in the MCMC
+        simulation.
+    interval : tuple, int, optional
+        The interval constraining the domain of this sub-step.
+    allow_recombinations : bool, optional
+        Set to False to dis-allow structural steps involving
+        the recombination of part of a pair of haplotypes
+        (default = True).
+    allow_dosage_swaps : bool, optional
+        Set to False to dis-allow structural steps involving
+        dosage changes between parts of a pair of haplotypes
+        (default = True).
+    allow_deletions : bool, optional
+        Set to False to dis-allow structural steps involving
+        dosage changes that remove part or all of the only 
+        copy of a haplotype from the genotype
+        (default = True).
+
+    Returns
+    -------
+    llk : float
+        The log-likelihood of the genotype state after the step 
+        has been made.
+
+    Notes
+    -----
+    The `genotype` variable is updated in place.
+
+    """
 
     ploidy, _ = genotype.shape
 
@@ -427,6 +594,52 @@ def compound_step(
         allow_deletions=False,
         randomise=True
     ):
+    """A structural step of an MCMC simulation consisting of
+    multiple sub-steps each of which are  constrained to a single 
+    interval contating a sub-set of positions of a genotype.
+
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, n_base)
+        The current genotype state in an MCMC simulation consisting
+        of a set of haplotypes with base positions encoded as 
+        integers from 0 to n_allele.
+    reads : ndarray, float, shape (n_reads, n_positions, max_allele)
+        Probabilistically encoded variable positions of NGS reads.
+    llk : float
+        The log-likelihood of the current genotype state in the MCMC
+        simulation.
+    intervals : ndarray, int, shape (n_intervals, 2)
+        The interval constraining each sub-step within this step.
+    allow_recombinations : bool, optional
+        Set to False to dis-allow structural steps involving
+        the recombination of part of a pair of haplotypes
+        (default = True).
+    allow_dosage_swaps : bool, optional
+        Set to False to dis-allow structural steps involving
+        dosage changes between parts of a pair of haplotypes
+        (default = True).
+    allow_deletions : bool, optional
+        Set to False to dis-allow structural steps involving
+        dosage changes that remove part or all of the only 
+        copy of a haplotype from the genotype
+        (default = True).
+    randomise : bool, optional
+        If True then the order of substeps (as defined by the 
+        order of intervals) will be randomly permuted
+        (default = True).
+
+    Returns
+    -------
+    llk : float
+        The log-likelihood of the genotype state after the step 
+        has been made.
+
+    Notes
+    -----
+    The `genotype` variable is updated in place.
+
+    """
     
     n_intervals = len(intervals)
 

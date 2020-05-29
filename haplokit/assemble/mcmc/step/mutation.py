@@ -9,27 +9,33 @@ from haplokit.assemble.likelihood import log_likelihood
 
 @numba.njit
 def base_step(genotype, reads, llk, h, j, mask=None):
-    """Mutation Gibbs sampler step for the jth base position of the hth haplotype.
+    """Mutation Gibbs sampler step for the jth base position 
+    of the hth haplotype.
 
     Parameters
     ----------
-    genotype : array_like, int, shape (ploidy, n_base)
-        Initial state of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    reads : array_like, float, shape (n_reads, n_base, n_nucl)
-        Observed reads encoded as an array of probabilistic matrices.
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Initial state of haplotypes with base positions encoded 
+        as simple integers from 0 to n_nucl.
+    reads : ndarray, float, shape (n_reads, n_base, n_nucl)
+        Observed reads encoded as an array of probabilistic 
+        matrices.
     llk : float
-        Log-likelihood of the initial haplotype state given the observed reads.
+        Log-likelihood of the initial haplotype state given 
+        the observed reads.
     h : int
         Index of the haplotype to be mutated.
     j : int
         Index of the base position to be mutated
-    mask : array_like, bool, shape (n_nucl, )
-        Optionally indicate some alleles to skip e.g. alleles which are known to have 0 probability.
+    mask : ndarray, bool, shape (n_nucl, )
+        Optionally indicate some alleles to skip e.g. alleles 
+        which are known to have 0 probability.
     
     Returns
     -------
     llk : float
-        New log-likelihood of observed reads given the updated genotype.
+        New log-likelihood of observed reads given 
+        the updated genotype.
 
     Notes
     -----
@@ -73,18 +79,22 @@ def base_step(genotype, reads, llk, h, j, mask=None):
 
 @numba.njit
 def genotype_compound_step(genotype, reads, llk, mask=None):
-    """Mutation compound Gibbs sampler step for all base positions of all haplotypes in a genotype.
+    """Mutation compound Gibbs sampler step for all base positions 
+    of all haplotypes in a genotype.
 
     Parameters
     ----------
-    genotype : array_like, int, shape (ploidy, n_base)
-        Initial state of haplotypes with base positions encoded as simple integers from 0 to n_nucl.
-    reads : array_like, float, shape (n_reads, n_base, n_nucl)
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Initial state of haplotypes with base positions encoded as 
+        simple integers from 0 to n_nucl.
+    reads : ndarray, float, shape (n_reads, n_base, n_nucl)
         Observed reads encoded as an array of probabilistic matrices.
     llk : float
-        Log-likelihood of the initial haplotype state given the observed reads.
-    mask : array_like, bool, shape (n_base, n_nucl)
-        Optionally indicate some alleles to skip e.g. alleles which are known to have 0 probability.
+        Log-likelihood of the initial haplotype state given the 
+        observed reads.
+    mask : ndarray, bool, shape (n_base, n_nucl)
+        Optionally indicate some alleles to skip e.g. alleles which 
+        are known to have 0 probability.
     
     Returns
     -------
