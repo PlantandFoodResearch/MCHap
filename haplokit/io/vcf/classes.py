@@ -2,6 +2,8 @@ import numpy as np
 from dataclasses import dataclass
 from Bio import bgzf
 
+from haplokit.io.vcf.util import vcfstr
+
 
 @dataclass(frozen=True)
 class VCFHeader(object):
@@ -52,24 +54,6 @@ class VCFHeader(object):
 
     def __str__(self):
         return '\n'.join(self.lines())
-
-        
-
-def vcfstr(obj):
-    if isinstance(obj, str):
-        if obj:
-            return obj
-        else:
-            return '.'
-    elif hasattr(obj, '__iter__'):
-        if len(obj) == 0:
-            return '.'
-        else:
-            return ','.join(map(vcfstr, obj))
-    elif obj is None:
-        return '.'
-    else:
-        return str(obj)
 
 
 @dataclass

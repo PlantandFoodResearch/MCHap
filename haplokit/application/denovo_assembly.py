@@ -300,7 +300,7 @@ class program(object):
 
                     # probability of this phenotype
                     probability = delayed(np.sum)(genotype_probs)
-                    haplotype_vcf_sample_data[sample]['PPM'] = probability
+                    haplotype_vcf_sample_data[sample]['PPM'] = delayed(vcf.util.vcfround)(probability, self.precision)
 
                     # most complete genotype of this phenotype (may have nulls)
                     call = delayed(vcf.call_phenotype)(
@@ -314,7 +314,7 @@ class program(object):
                     mode = posterior.mode()
                     genotype = mode[0]
                     probability = mode[1]
-                    haplotype_vcf_sample_data[sample]['GPM'] = probability
+                    haplotype_vcf_sample_data[sample]['GPM'] = delayed(vcf.util.vcfround)(probability, self.precision)
                 
                 # depth 
                 depth = delayed(symbolic.depth)(read_symbols)
@@ -381,8 +381,8 @@ class program(object):
                     tup = labeler.label_phenotype_posterior(genotypes, probs, expected_dosage=True)
                     ordered_probs = tup[1]
                     expected_dosage = tup[2]
-                    haplotype_vcf_sample_data[sample]['MPGP'] = ordered_probs
-                    haplotype_vcf_sample_data[sample]['MPED'] = expected_dosage
+                    haplotype_vcf_sample_data[sample]['MPGP'] = delayed(vcf.util.vcfround)(ordered_probs, self.precision)
+                    haplotype_vcf_sample_data[sample]['MPED'] = delayed(vcf.util.vcfround)(expected_dosage, self.precision)
             
             # append to haplotype vcf
             vcf_template.append(
