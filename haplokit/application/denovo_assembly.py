@@ -236,7 +236,8 @@ class program(object):
         if self.call_phenotypes:
             format_fields += (
                 vcf.formatfields.PPM, 
-                vcf.formatfields.MPGP
+                vcf.formatfields.MPGP,
+                vcf.formatfields.MPED,
             )
         else:
             format_fields += (vcf.formatfields.GPM, )
@@ -291,7 +292,7 @@ class program(object):
                 # posterior mode
                 if self.call_phenotypes:
                     # posterior mode phenotype
-                    mode = posterior.mode_phenotype(genotypes=True)
+                    mode = posterior.mode_phenotype()
                     #genotype = mode[0]  # this is a phenotype as a genotype array
                     #probability = mode[1]
                     genotype_dist = mode[0]  # observed genotypes of this phenotype
@@ -299,7 +300,7 @@ class program(object):
 
                     # probability of this phenotype
                     probability = delayed(np.sum)(genotype_probs)
-                    haplotype_vcf_sample_data[sample]['PPM'] = probability
+                    haplotype_vcf_sample_data[sample]['PPM'] = delayed(vcf.util.vcfround)(probability, self.precision)
 
                     # most complete genotype of this phenotype (may have nulls)
                     call = delayed(vcf.call_phenotype)(
@@ -313,7 +314,7 @@ class program(object):
                     mode = posterior.mode()
                     genotype = mode[0]
                     probability = mode[1]
-                    haplotype_vcf_sample_data[sample]['GPM'] = probability
+                    haplotype_vcf_sample_data[sample]['GPM'] = delayed(vcf.util.vcfround)(probability, self.precision)
                 
                 # depth 
                 depth = delayed(symbolic.depth)(read_symbols)
@@ -377,10 +378,11 @@ class program(object):
                     dist = sample_genotype_dists[sample]
                     genotypes = dist[0]
                     probs = dist[1]
-                    pair = labeler.label_phenotype_posterior(genotypes, probs)
-                    ordered_probs = pair[1]
-                    haplotype_vcf_sample_data[sample]['MPGP'] = ordered_probs
-
+                    tup = labeler.label_phenotype_posterior(genotypes, probs, expected_dosage=True)
+                    ordered_probs = tup[1]
+                    expected_dosage = tup[2]
+                    haplotype_vcf_sample_data[sample]['MPGP'] = delayed(vcf.util.vcfround)(ordered_probs, self.precision)
+                    haplotype_vcf_sample_data[sample]['MPED'] = delayed(vcf.util.vcfround)(expected_dosage, self.precision)
             
             # append to haplotype vcf
             vcf_template.append(

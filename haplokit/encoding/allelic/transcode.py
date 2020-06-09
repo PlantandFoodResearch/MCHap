@@ -56,7 +56,37 @@ def as_probabilistic(array,
                      p=1.0, 
                      gaps=True, 
                      dtype=np.float):
+    """Converts an array integer encoded alleles to an 
+    array of probabilistic row vectors.
 
+    Parameters
+    ----------
+    array : ndarray, int
+        Array of integers encoding alleles
+    n_alleles : array_like, int
+        Number of alleles to encode in each row vector.
+    p : array_like, float, optional
+        Probability associated with each allele call in the input array.
+    gaps : bool, optional
+        If `False` then gaps in the input array are treated as unknown
+        values in the probabilistic array, i.e. equal probability of 
+        each allele.
+    dtype : dtype
+        Specify the dtype of the returned probabilistic array.
+
+    Returns
+    -------
+    probabilistic_array : ndarray, float, shape(n_positions, max_allele)
+        Array of vectors encoding allele probabilities.
+
+    Notes
+    -----
+    If n_alleles is variable then the vectors encoding fewer alleles
+    will be padded with `0` values.
+    If gaps are included they will be represented as a vector of `nan`
+    values which will also be padded with `0` values if as required.
+    
+    """
     vector_size = np.max(n_alleles)
 
     n_alleles = _tile_to_shape(n_alleles, array.shape)
@@ -80,6 +110,25 @@ def as_probabilistic(array,
 
     
 def vector_from_string(string, gaps='-', length=None, dtype=np.int8):
+    """Convert a string to an array of integer encoded alleles.
+
+    Parameters
+    ----------
+    string : str
+        String of alleles
+    gaps : str, optional
+        String of symbols to be interpreted as gaps in the sequence.
+    length : int, optional
+        Truncate or extend sequence to a set length by padding with gap values.
+    dtype : dtype, optional
+        Specify dtype of returned array.
+    
+    Returns
+    -------
+    array : ndarray, int
+        Array of alleles encoded as integers.
+
+    """
     if length is None:
         length = len(string)
 
@@ -96,6 +145,25 @@ def vector_from_string(string, gaps='-', length=None, dtype=np.int8):
 
 
 def from_strings(data, gaps='-', length=None, dtype=np.int8):
+    """Convert a series of strings to an array of integer encoded alleles.
+
+    Parameters
+    ----------
+    data : array_like, str
+        Sequence of strings of alleles.
+    gaps : str, optional
+        String of symbols to be interpreted as gaps in the sequence.
+    length : int, optional
+        Truncate or extend sequence to a set length by padding with gap values.
+    dtype : dtype, optional
+        Specify dtype of returned array.
+    
+    Returns
+    -------
+    array : ndarray, int
+        Array of alleles encoded as integers.
+
+    """
     if isinstance(data, str):
         return vector_from_string(data, gaps=gaps, length=length, dtype=dtype)
     
@@ -130,6 +198,23 @@ def from_strings(data, gaps='-', length=None, dtype=np.int8):
 
 
 def vector_as_string(vector, gap='-', alleles=None):
+    """Convert a vector of integer encoded alleles to a string.
+
+    Parameters
+    ----------
+    vector : ndarray, int, (n_pos, )
+        1D array of integers.
+    gap : str, optional
+        Character used to represent gap values.
+    alleles : array_like, array_like, str, optional
+        Characters used to represent each allele at each position.
+    
+    Returns
+    -------
+    string : str
+        String of allele characters
+
+    """
     if alleles is None:
         return ''.join(str(a) if a >= 0 else gap for a in vector)
     else:
@@ -137,6 +222,23 @@ def vector_as_string(vector, gap='-', alleles=None):
 
 
 def as_strings(array, gap='-', alleles=None):
+    """Convert an array of integer encoded alleles into one or more strings.
+
+    Parameters
+    ----------
+    array : ndarray, int
+        array of integers.
+    gap : str, optional
+        Character used to represent gap values.
+    alleles : array_like, array_like, str, optional
+        Characters used to represent each allele at each position.
+    
+    Returns
+    -------
+    strings : ndarray, str
+        Strings of allele characters
+
+    """
     if not isinstance(array, np.ndarray):
         array = np.array(array, copy=False)
     if array.ndim == 1:
@@ -157,6 +259,23 @@ def as_strings(array, gap='-', alleles=None):
 
 
 def vector_as_characters(vector, gap='-', alleles=None):
+    """Convert an array of integer encoded alleles into an array of characters.
+
+    Parameters
+    ----------
+    vector : ndarray, int, (n_pos, )
+        1D array of integers.
+    gap : str, optional
+        Character used to represent gap values.
+    alleles : array_like, array_like, str, optional
+        Characters used to represent each allele at each position.
+    
+    Returns
+    -------
+    Characters : ndarray, str, (n_pos, )
+        1D array of allele characters.
+
+    """
     if alleles is None:
         return np.fromiter(
             (str(a) if a >= 0 else gap for a in vector), 
@@ -171,6 +290,23 @@ def vector_as_characters(vector, gap='-', alleles=None):
 
     
 def as_characters(array, gap='-', alleles=None):
+    """Convert an array of integer encoded alleles into an array of characters.
+
+    Parameters
+    ----------
+    array : ndarray, int
+        An array of integers.
+    gap : str, optional
+        Character used to represent gap values.
+    alleles : array_like, array_like, str, optional
+        Characters used to represent each allele at each position.
+    
+    Returns
+    -------
+    characters : ndarray, str
+        Array of allele characters.
+
+    """
 
     if not isinstance(array, np.ndarray):
         array = np.array(array, copy=False)

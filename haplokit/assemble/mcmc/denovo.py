@@ -27,6 +27,13 @@ def _denovo_gibbs_sampler(
         allow_dosage_swaps,
         allow_deletions
     ):
+    """Jitted worker function for method `fit` of class `DenovoMCMC`.
+
+    See Also
+    --------
+    DenovoMCMC
+
+    """
     _, n_base = genotype.shape
     
     llk = log_likelihood(reads, genotype)
@@ -96,6 +103,20 @@ def _point_beta_probabilities(n_base, a=1, b=1):
 
 
 def _read_mean_dist(reads):
+    """Calculate the element-wise means of a collection of 
+    probabilistically encoded reads.
+
+    Parameters
+    ----------
+    reads : ndarray, float, shape (n_reads, n_positions, max_allele)
+        Probabilistically encoded variable positions of NGS reads.
+
+    Returns
+    -------
+    mean_read : ndarray, float, shape (n_positions, max_allele)
+        The mean probabilities of input reads.
+    
+    """
     # work around to avoid nan values caused by gaps
     dist = reads.copy()
     dist[np.isnan(dist)] = 1
@@ -105,8 +126,20 @@ def _read_mean_dist(reads):
 
 
 def _homozygosity_probabilities(reads, ploidy):
-    """Returns posterior probabilities of each base position being homozygous for each alllele.
-    THe posterior probability is calculated for each base position independently of other base positions.
+    """Calculate the posterior probability that an individual
+    is homozygous for each allele at each position.
+
+    Parameters
+    ----------
+    reads : ndarray, float, shape (n_reads, n_positions, max_allele)
+        Probabilistically encoded variable positions of NGS reads.
+    ploidy : int
+        Ploidy oth the individual in question.
+
+    Notes
+    -----
+    The probabilities calculated this way are independent
+    of alleles at other positions.
     """
     # probability of homozygousity for each allele at each base position
     probs = np.zeros(reads.shape[-2:], dtype=reads.dtype)
@@ -172,8 +205,77 @@ class DenovoMCMC(Assembler):
     allow_recombinations: bool = True
     allow_dosage_swaps: bool = True
     allow_deletions: bool = True
+    """De novo haplotype assembly using Markov chain Monte Carlo
+    for probabilistically encoded variable positions of NGS reads.
+
+    Attributes
+    ----------
+    ploidy : int
+        Ploidy of organisim at the assembled locus.
+    steps : int, optional
+        Number of steps to run in the MCMC simulation
+        (default = 1000).
+    ratio : float, optional
+        Ratio of mutation steps to structural steps to use
+        in the MCMC simulation (default = 0.75).
+    alpha, beta : float, optional
+        Parameters defining a Beta distribution to sample
+        the number of random intervals to generate at each
+        structural step in the MCMC simulation 
+        (defaults = 1.0, 3.0).
+    n_intervals : int, optional
+        If set structural steps in the MCMC will always use
+        this number of intevals ignoring the alpha and beta
+        parameters (default = None).
+    fix_homozygous : float, optional
+        Individual variant positions that have a posterior
+        probability of being homozygous that is greater than
+        this value will be fixed as non-variable positions
+        during the MCMC simulation. This can greatly improve
+        performance when there are multiple homozygous 
+        alleles (default = 0.999).
+    allow_recombinations : bool, optional
+        Set to False to dis-allow structural steps involving
+        the recombination of part of a pair of haplotypes
+        (default = True).
+    allow_dosage_swaps : bool, optional
+        Set to False to dis-allow structural steps involving
+        dosage changes between parts of a pair of haplotypes
+        (default = True).
+    allow_deletions : bool, optional
+        Set to False to dis-allow structural steps involving
+        dosage changes that remove part or all of the only 
+        copy of a haplotype from the genotype
+        (default = True).
+
+    """
 
     def fit(self, reads, initial=None):
+        """Fit the parametized model to a set of probabilistically 
+        encoded variable positions of NGS reads.
+
+        Parameters
+        ----------
+        reads : ndarray, float, shape (n_reads, n_positions, max_allele)
+            Probabilistically encoded variable positions of NGS reads.
+        initial : ndarray, int, shape (ploidy, n_positions, max_allele), optional
+            Set the initial genotype state of the MCMC simulation
+            (default = None).
+
+        Returns
+        -------
+        trace : GenotypeTrace
+            An instance of GenotypeTrace containing the genotype state
+            and log-likelihood at each step in the MCMC simulation.
+        
+        Notes
+        -----
+        If the initial genotype state is not set by the user
+        then it is automatically set by sampling <ploidy> random 
+        haplotypes from the mean allele probabilities 
+        among all reads.
+
+        """
 
         # identify base positions that are overwhelmingly likely
         # to be homozygous

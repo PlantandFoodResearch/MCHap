@@ -140,7 +140,7 @@ class HaplotypeAlleleLabeler(object):
         
         return Genotype(alleles)
 
-    def label_phenotype_posterior(self, array, probs, unobserved=True):
+    def label_phenotype_posterior(self, array, probs, unobserved=True, expected_dosage=False):
         """Create a VCF genotype from one or more genotype arrays
         that share the same alleles but with different dosage.
         """
@@ -149,7 +149,12 @@ class HaplotypeAlleleLabeler(object):
 
         if np.all(array < 0):
             # null alleles
-            return [Genotype(tuple(-1 for _ in range(ploidy)))], [None]
+            genotypes = [Genotype(tuple(-1 for _ in range(ploidy)))]
+            probs = [None]
+            if not expected_dosage:
+                return genotypes, probs
+            else:
+                return genotypes, probs, [None]
 
         # label observed genotypes
         observed = [self.label(gen) for gen in array]
@@ -186,7 +191,21 @@ class HaplotypeAlleleLabeler(object):
         genotypes = [genotypes[i] for i in idx]
         probs = [probs[i] for i in idx]
 
-        return genotypes, probs
+        if not expected_dosage:
+            return genotypes, probs
+
+        # normalised probs
+        normalised = np.array(probs) / np.sum(probs)
+
+        # dosage weighted by prob of each genotype
+        dosage_exp = np.zeros(len(alleles), dtype=np.float)
+        for gen, p in zip(genotypes, normalised):
+            counts = Counter(gen.alleles)
+            for i, a in enumerate(alleles):
+                dosage_exp[i] += counts[a] * p
+
+        return genotypes, probs, list(dosage_exp)
+
 
     def ref_array(self):
         """Returns reference allele array.
