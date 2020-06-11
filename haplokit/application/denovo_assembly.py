@@ -4,7 +4,8 @@ from dask import delayed
 import numpy as np
 from dataclasses import dataclass
 
-
+from haplokit.assemble.mcmc.denovo import DenovoMCMC
+from haplokit.encoding import symbolic
 from haplokit.io import \
     LociFile, \
     extract_sample_ids, \
@@ -12,12 +13,9 @@ from haplokit.io import \
     encode_read_alleles, \
     encode_read_distributions, \
     qual_of_prob, \
-    format_haplotypes
-
-from haplokit.assemble.mcmc.denovo import DenovoMCMC
-
-from haplokit.io import vcf
-from haplokit.encoding import symbolic
+    format_haplotypes, \
+    vcf, \
+    PFEIFFER_ERROR
 
 
 @dataclass
@@ -28,6 +26,7 @@ class program(object):
     call_best_genotype: bool = False
     call_filtered: bool = False
     read_group_field: str = 'SM'
+    read_error_rate: float = PFEIFFER_ERROR
     mcmc_steps: int = 1000
     mcmc_burn: int = 500
     mcmc_ratio: float = 0.75
@@ -99,6 +98,14 @@ class program(object):
             type=str,
             default=['SM'],
             help='Read group field to use as sample id (default = "SM").'
+        )
+
+        parser.add_argument(
+            '--error-rate',
+            nargs=1,
+            type=float,
+            default=[PFEIFFER_ERROR],
+            help='Expected base-call error rate of sequences (default = {}).'.format(PFEIFFER_ERROR)
         )
 
         parser.add_argument(
@@ -176,6 +183,7 @@ class program(object):
             call_best_genotype=args.call_best_genotype,
             call_filtered=args.call_filtered,
             read_group_field=read_group_field,
+            read_error_rate=args.error_rate[0],
             mcmc_steps=args.mcmc_steps[0],
             mcmc_burn=args.mcmc_burn[0],
             #mcmc_ratio,
@@ -192,8 +200,7 @@ class program(object):
             n_cores=args.cores[0],
         )
     
-
-    def run(self):
+    def header(self):
 
         # io
         samples = list(self.sample_bam.keys())
@@ -247,7 +254,12 @@ class program(object):
             samples=tuple(samples),
         )
 
-        vcf_template = vcf.VCF(vcf_header, [])
+        return vcf_header
+
+    def template(self):
+
+        vcf_template = vcf.VCF(self.header(), [])
+        samples = vcf_template.header.samples
 
         # assembly
         for locus in self.loci:
@@ -270,7 +282,13 @@ class program(object):
                 read_symbols=read_variants[0]
                 read_quals=read_variants[1]
                 read_calls = delayed(encode_read_alleles)(locus, read_symbols)
-                reads = delayed(encode_read_distributions)(locus, read_calls, read_quals, gaps=True)
+                reads = delayed(encode_read_distributions)(
+                    locus, 
+                    read_calls, 
+                    read_quals, 
+                    error_rate=self.read_error_rate, 
+                    gaps=True,
+                )
                 trace = delayed(DenovoMCMC.parameterize)(
                     ploidy=self.sample_ploidy[sample], 
                     steps=self.mcmc_steps, 
@@ -397,6 +415,12 @@ class program(object):
                 ), 
                 format=haplotype_vcf_sample_data,
             )
+
+        return vcf_template
+
+    def run(self):
+
+        vcf_template = self.template()
 
         if self.n_cores == 1:
             compute_kwargs =  dict(scheduler="threads")
