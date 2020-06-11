@@ -192,8 +192,7 @@ class program(object):
             n_cores=args.cores[0],
         )
     
-
-    def run(self):
+    def template(self):
 
         # io
         samples = list(self.sample_bam.keys())
@@ -248,6 +247,13 @@ class program(object):
         )
 
         vcf_template = vcf.VCF(vcf_header, [])
+
+        return vcf_template
+
+    def build(self):
+
+        vcf_template = self.template()
+        samples = vcf_template.header.samples
 
         # assembly
         for locus in self.loci:
@@ -397,6 +403,12 @@ class program(object):
                 ), 
                 format=haplotype_vcf_sample_data,
             )
+
+        return vcf_template
+
+    def run(self):
+
+        vcf_template = self.build()
 
         if self.n_cores == 1:
             compute_kwargs =  dict(scheduler="threads")
