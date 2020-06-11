@@ -21,6 +21,7 @@ class FormatField(object):
 # FORMAT fields
 GT = FormatField(id='GT', number=1, type='String', descr='Genotype')
 GQ = FormatField(id='GQ', number=1, type='Integer', descr='Genotype quality')
+PQ = FormatField(id='PQ', number=1, type='Integer', descr='Phenotype quality')
 DP = FormatField(id='DP', number=1, type='Integer', descr='Read depth')
 PS = FormatField(id='PS', number=1, type='Integer', descr='Phase set')
 FT = FormatField(id='FT', number=1, type='String', descr='Filter indicating if this genotype was called')

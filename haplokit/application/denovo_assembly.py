@@ -25,7 +25,7 @@ class program(object):
     loci: list
     sample_bam: dict
     sample_ploidy: dict
-    call_phenotypes: bool = False
+    call_best_genotype: bool = False
     call_filtered: bool = False
     read_group_field: str = 'SM'
     mcmc_steps: int = 1000
@@ -77,12 +77,12 @@ class program(object):
             help='Loci file containing intervals and SNPs.',
         )
 
-        parser.set_defaults(call_phenotypes=False)
+        parser.set_defaults(call_best_genotype=False)
         parser.add_argument(
-            '--phenotypes',
-            dest='call_phenotypes',
+            '--best-genotype',
+            dest='call_best_genotype',
             action='store_true',
-            help='Call phenotypes in place of genotypes.'
+            help='Allways call the best supported compleate genotype within the called phenotype.'
         )
 
         parser.set_defaults(call_filtered=False)
@@ -173,7 +173,7 @@ class program(object):
             loci,
             sample_bam,
             sample_ploidy,
-            call_phenotypes=args.call_phenotypes,
+            call_best_genotype=args.call_best_genotype,
             call_filtered=args.call_filtered,
             read_group_field=read_group_field,
             mcmc_steps=args.mcmc_steps[0],
@@ -229,8 +229,10 @@ class program(object):
         format_fields=(
             vcf.formatfields.GT,
             vcf.formatfields.GQ,
+            vcf.formatfields.PQ,
             vcf.formatfields.DP,
             vcf.formatfields.FT,
+            vcf.formatfields.GPM,
             vcf.formatfields.PPM, 
             vcf.formatfields.MPGP,
             vcf.formatfields.MPED,
@@ -287,28 +289,42 @@ class program(object):
                 genotype_dist = mode[0]  # observed genotypes of this phenotype
                 genotype_probs = mode[1]  # probs of observed genotypes
 
-                # probability of this phenotype
-                probability = delayed(np.sum)(genotype_probs)
-                haplotype_vcf_sample_data[sample]['PPM'] = delayed(vcf.util.vcfround)(probability, self.precision)
+                # posterior probability of mode phenotype
+                phenotype_probability = delayed(np.sum)(genotype_probs)
+                haplotype_vcf_sample_data[sample]['PPM'] = delayed(vcf.util.vcfround)(phenotype_probability, self.precision)
 
-                # most complete genotype of this phenotype (may have nulls)
-                call = delayed(vcf.call_phenotype)(
-                    genotype_dist, genotype_probs, 
-                    self.probability_filter_threshold
-                )
-                genotype = call[0]
+                if self.call_best_genotype:
+                    # call genotype with the highest probability within the mode phenotype
+                    call_idx = delayed(np.argmax)(genotype_probs)
+                    genotype = genotype_dist[call_idx]
+                    genotype_probability = genotype_probs[call_idx]
+
+                else:
+                    # most complete genotype of this phenotype given probability threshold (may have nulls)
+                    call = delayed(vcf.call_phenotype)(
+                        genotype_dist, genotype_probs, 
+                        self.probability_filter_threshold
+                    )
+                    genotype = call[0]
+                    genotype_probability = call[1]
+
+                # posterior probability of called genotype
+                haplotype_vcf_sample_data[sample]['GPM'] = delayed(vcf.util.vcfround)(genotype_probability, self.precision)
                 
                 # depth 
                 depth = delayed(symbolic.depth)(read_symbols)
-                haplotype_vcf_sample_data[sample]['DP'] = delayed(str)(delayed(int)(delayed(np.mean)(depth)))
+                haplotype_vcf_sample_data[sample]['DP'] = delayed(int)(delayed(np.mean)(depth))
 
                 # genotype quality
-                haplotype_vcf_sample_data[sample]['GQ'] = delayed(str)(delayed(qual_of_prob)(probability))
+                haplotype_vcf_sample_data[sample]['GQ'] = delayed(vcf.util.if_not_none)(qual_of_prob, genotype_probability)
+
+                # phenotype quality
+                haplotype_vcf_sample_data[sample]['PQ'] = delayed(qual_of_prob)(phenotype_probability)
 
                 # filters
                 filter_results = delayed(vcf.filters.FilterCallSet.new)(
                     delayed(vcf.filters.prob_filter)(
-                        probability,
+                        phenotype_probability,
                         threshold=self.probability_filter_threshold,
                     ),
                     delayed(vcf.filters.depth_haplotype_filter)(
