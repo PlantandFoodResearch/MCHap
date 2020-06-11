@@ -200,7 +200,7 @@ class program(object):
             n_cores=args.cores[0],
         )
     
-    def template(self):
+    def header(self):
 
         # io
         samples = list(self.sample_bam.keys())
@@ -254,13 +254,11 @@ class program(object):
             samples=tuple(samples),
         )
 
-        vcf_template = vcf.VCF(vcf_header, [])
+        return vcf_header
 
-        return vcf_template
+    def template(self):
 
-    def build(self):
-
-        vcf_template = self.template()
+        vcf_template = vcf.VCF(self.header(), [])
         samples = vcf_template.header.samples
 
         # assembly
@@ -422,7 +420,7 @@ class program(object):
 
     def run(self):
 
-        vcf_template = self.build()
+        vcf_template = self.template()
 
         if self.n_cores == 1:
             compute_kwargs =  dict(scheduler="threads")
