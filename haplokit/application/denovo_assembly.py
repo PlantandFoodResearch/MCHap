@@ -25,7 +25,7 @@ class program(object):
     loci: list
     sample_bam: dict
     sample_ploidy: dict
-    call_phenotypes: bool = False
+    call_best_genotype: bool = False
     call_filtered: bool = False
     read_group_field: str = 'SM'
     mcmc_steps: int = 1000
@@ -77,12 +77,12 @@ class program(object):
             help='Loci file containing intervals and SNPs.',
         )
 
-        parser.set_defaults(call_phenotypes=False)
+        parser.set_defaults(call_best_genotype=False)
         parser.add_argument(
-            '--phenotypes',
-            dest='call_phenotypes',
+            '--best-genotype',
+            dest='call_best_genotype',
             action='store_true',
-            help='Call phenotypes in place of genotypes.'
+            help='Allways call the best supported compleate genotype within the called phenotype.'
         )
 
         parser.set_defaults(call_filtered=False)
@@ -173,7 +173,7 @@ class program(object):
             loci,
             sample_bam,
             sample_ploidy,
-            call_phenotypes=args.call_phenotypes,
+            call_best_genotype=args.call_best_genotype,
             call_filtered=args.call_filtered,
             read_group_field=read_group_field,
             mcmc_steps=args.mcmc_steps[0],
@@ -229,18 +229,14 @@ class program(object):
         format_fields=(
             vcf.formatfields.GT,
             vcf.formatfields.GQ,
+            vcf.formatfields.PQ,
             vcf.formatfields.DP,
             vcf.formatfields.FT,
+            vcf.formatfields.GPM,
+            vcf.formatfields.PPM, 
+            vcf.formatfields.MPGP,
+            vcf.formatfields.MPED,
         )
-
-        if self.call_phenotypes:
-            format_fields += (
-                vcf.formatfields.PPM, 
-                vcf.formatfields.MPGP,
-                vcf.formatfields.MPED,
-            )
-        else:
-            format_fields += (vcf.formatfields.GPM, )
 
         vcf_header = vcf.VCFHeader(
             meta=meta_fields,
@@ -259,12 +255,11 @@ class program(object):
             # format data for sample columns in haplotype vcf
             haplotype_vcf_sample_data = {sample: {} for sample in samples}
             
-            # need genotypes arrays to lable haplotype alts
+            # store called genotype of each phenotype (may have nulls)
             sample_genotype_arrays = {}
 
-            # if using phenotypes then store genotype dist
-            if self.call_phenotypes:
-                sample_genotype_dists = {}
+            # store genotype distribution within each phenotype
+            sample_genotype_dists = {}
 
             # samples must be in same order as in header
             for sample in samples:
@@ -289,44 +284,47 @@ class program(object):
                 # posterior dist
                 posterior = trace.burn(self.mcmc_burn).posterior()
 
-                # posterior mode
-                if self.call_phenotypes:
-                    # posterior mode phenotype
-                    mode = posterior.mode_phenotype()
-                    #genotype = mode[0]  # this is a phenotype as a genotype array
-                    #probability = mode[1]
-                    genotype_dist = mode[0]  # observed genotypes of this phenotype
-                    genotype_probs = mode[1]  # probs of observed genotypes
+                # posterior mode phenotype
+                mode = posterior.mode_phenotype()
+                genotype_dist = mode[0]  # observed genotypes of this phenotype
+                genotype_probs = mode[1]  # probs of observed genotypes
 
-                    # probability of this phenotype
-                    probability = delayed(np.sum)(genotype_probs)
-                    haplotype_vcf_sample_data[sample]['PPM'] = delayed(vcf.util.vcfround)(probability, self.precision)
+                # posterior probability of mode phenotype
+                phenotype_probability = delayed(np.sum)(genotype_probs)
+                haplotype_vcf_sample_data[sample]['PPM'] = delayed(vcf.util.vcfround)(phenotype_probability, self.precision)
 
-                    # most complete genotype of this phenotype (may have nulls)
+                if self.call_best_genotype:
+                    # call genotype with the highest probability within the mode phenotype
+                    call_idx = delayed(np.argmax)(genotype_probs)
+                    genotype = genotype_dist[call_idx]
+                    genotype_probability = genotype_probs[call_idx]
+
+                else:
+                    # most complete genotype of this phenotype given probability threshold (may have nulls)
                     call = delayed(vcf.call_phenotype)(
                         genotype_dist, genotype_probs, 
                         self.probability_filter_threshold
                     )
                     genotype = call[0]
-                    
-                else:
-                    # posterior mode genotype
-                    mode = posterior.mode()
-                    genotype = mode[0]
-                    probability = mode[1]
-                    haplotype_vcf_sample_data[sample]['GPM'] = delayed(vcf.util.vcfround)(probability, self.precision)
+                    genotype_probability = call[1]
+
+                # posterior probability of called genotype
+                haplotype_vcf_sample_data[sample]['GPM'] = delayed(vcf.util.vcfround)(genotype_probability, self.precision)
                 
                 # depth 
                 depth = delayed(symbolic.depth)(read_symbols)
-                haplotype_vcf_sample_data[sample]['DP'] = delayed(str)(delayed(int)(delayed(np.mean)(depth)))
+                haplotype_vcf_sample_data[sample]['DP'] = delayed(int)(delayed(np.mean)(depth))
 
                 # genotype quality
-                haplotype_vcf_sample_data[sample]['GQ'] = delayed(str)(delayed(qual_of_prob)(probability))
+                haplotype_vcf_sample_data[sample]['GQ'] = delayed(vcf.util.if_not_none)(qual_of_prob, genotype_probability)
+
+                # phenotype quality
+                haplotype_vcf_sample_data[sample]['PQ'] = delayed(qual_of_prob)(phenotype_probability)
 
                 # filters
                 filter_results = delayed(vcf.filters.FilterCallSet.new)(
                     delayed(vcf.filters.prob_filter)(
-                        probability,
+                        phenotype_probability,
                         threshold=self.probability_filter_threshold,
                     ),
                     delayed(vcf.filters.depth_haplotype_filter)(
@@ -347,19 +345,17 @@ class program(object):
                     # store genotype/phenotype 
                     sample_genotype_arrays[sample] = genotype
 
-                    if self.call_phenotypes:
-                        # store observed genotypes of mode phenotype
-                        sample_genotype_dists[sample] = (genotype_dist, genotype_probs)
+                    # store observed genotypes of mode phenotype
+                    sample_genotype_dists[sample] = (genotype_dist, genotype_probs)
 
                 else:
                     # filter genotype/phenotype and store
                     genotype_filtered = delayed(vcf.filters.null_filtered_array)(genotype, filter_results.failed)
                     sample_genotype_arrays[sample] = genotype_filtered
 
-                    if self.call_phenotypes:
-                        # store observed genotypes of mode phenotype
-                        genotype_dist_filtered = delayed(vcf.filters.null_filtered_array)(genotype_dist, filter_results.failed)
-                        sample_genotype_dists[sample] = (genotype_dist_filtered, genotype_probs)
+                    # store observed genotypes of mode phenotype
+                    genotype_dist_filtered = delayed(vcf.filters.null_filtered_array)(genotype_dist, filter_results.failed)
+                    sample_genotype_dists[sample] = (genotype_dist_filtered, genotype_probs)
             
             # label haplotypes for haplotype vcf
             observed_genotypes = list(sample_genotype_arrays.values())
@@ -374,15 +370,14 @@ class program(object):
                 haplotype_vcf_sample_data[sample]['GT'] = labeler.label(genotype)
 
                 # use labeler to sort gentype probs within phenotype
-                if self.call_phenotypes:
-                    dist = sample_genotype_dists[sample]
-                    genotypes = dist[0]
-                    probs = dist[1]
-                    tup = labeler.label_phenotype_posterior(genotypes, probs, expected_dosage=True)
-                    ordered_probs = tup[1]
-                    expected_dosage = tup[2]
-                    haplotype_vcf_sample_data[sample]['MPGP'] = delayed(vcf.util.vcfround)(ordered_probs, self.precision)
-                    haplotype_vcf_sample_data[sample]['MPED'] = delayed(vcf.util.vcfround)(expected_dosage, self.precision)
+                dist = sample_genotype_dists[sample]
+                genotypes = dist[0]
+                probs = dist[1]
+                tup = labeler.label_phenotype_posterior(genotypes, probs, expected_dosage=True)
+                ordered_probs = tup[1]
+                expected_dosage = tup[2]
+                haplotype_vcf_sample_data[sample]['MPGP'] = delayed(vcf.util.vcfround)(ordered_probs, self.precision)
+                haplotype_vcf_sample_data[sample]['MPED'] = delayed(vcf.util.vcfround)(expected_dosage, self.precision)
             
             # append to haplotype vcf
             vcf_template.append(

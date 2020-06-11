@@ -24,3 +24,9 @@ def vcfround(obj, decimals):
         return np.round(obj, decimals)
     else:
         return obj
+
+def if_not_none(func, option, *args, **kwargs):
+    if option is None:
+        return None
+    else:
+        return func(option, *args, **kwargs)
