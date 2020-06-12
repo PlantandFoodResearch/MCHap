@@ -91,6 +91,15 @@ class program(object):
             help='Indexed fasta file containing reference genome.',
         )
 
+        parser.add_argument(
+            '--region',
+            type=str,
+            nargs=1,
+            default=[None],
+            help=('Specify a contig region for haplotype assembly '
+            'e.g. "contig:start-stop" (Default = None).'),
+        )
+
         parser.set_defaults(call_best_genotype=False)
         parser.add_argument(
             '--best-genotype',
@@ -185,6 +194,7 @@ class program(object):
             args.bed[0],
             args.vcf[0],
             args.ref[0],
+            region=args.region[0],
         ))
 
         read_group_field = args.read_group_field[0]
