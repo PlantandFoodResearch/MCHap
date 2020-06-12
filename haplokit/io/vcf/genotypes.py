@@ -5,7 +5,6 @@ from functools import reduce
 from itertools import combinations_with_replacement
 
 from haplokit import mset
-from haplokit.io import format_haplotypes
 
 
 def _allele_sort(alleles):

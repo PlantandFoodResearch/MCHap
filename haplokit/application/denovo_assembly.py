@@ -13,7 +13,6 @@ from haplokit.io import \
     encode_read_alleles, \
     encode_read_distributions, \
     qual_of_prob, \
-    format_haplotypes, \
     vcf, \
     PFEIFFER_ERROR
 
@@ -399,7 +398,7 @@ class program(object):
             observed_genotypes = list(sample_genotype_arrays.values())
             labeler = delayed(vcf.HaplotypeAlleleLabeler.from_obs)(observed_genotypes)
             ref_seq = locus.sequence
-            alt_seqs = delayed(format_haplotypes)(locus, labeler.alt_array())
+            alt_seqs = delayed(locus.format_haplotypes)(labeler.alt_array())
             allele_counts = labeler.count_obs(observed_genotypes)
 
             # add genotypes to sample data

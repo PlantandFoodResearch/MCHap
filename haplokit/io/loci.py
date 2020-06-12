@@ -58,49 +58,35 @@ class Locus:
         data = self.as_dict()
         data.update(kwargs)
         return type(self)(**data)
+
+    def _template_sequence(self):
+        chars = list(self.sequence)
+        ref_alleles = (tup[0] for tup in self.alleles)
+        for pos, string in zip(self.positions, ref_alleles):
+            idx = pos - self.start
+            for offset, char in enumerate(string):
+                if chars[idx+offset] != char:
+                    message = 'Reference allele does not match sequence at position {}:{}'
+                    raise ValueError(message.format(self.contig, pos + offset))
+                
+                # remove chars
+                chars[idx+offset] = ''
+                
+            # add template position
+            chars[idx] = '{}'
         
+        # join and return
+        return ''.join(chars)
 
-def contig_value(contig):
-    chars = ''
-    digits = ''
-    for i in contig:
-        if i.isdigit():
-            digits += i
-        else:
-            chars += i
-    return chars, int(digits)
+    def format_haplotypes(self, array, gap='-'):
+        """Format integer encoded alleles as a haplotype string"""
+        variants = allelic.as_characters(array, gap=gap, alleles=self.alleles)
+        template = self._template_sequence()
+        return [template.format(*hap) for hap in variants]
 
-
-def _template_sequence(locus):
-    chars = list(locus.sequence)
-    ref_alleles = (tup[0] for tup in locus.alleles)
-    for pos, string in zip(locus.positions, ref_alleles):
-        idx = pos - locus.start
-        for offset, char in enumerate(string):
-            if chars[idx+offset] != char:
-                message = 'Reference allele does not match sequence at position {}:{}'
-                raise ValueError(message.format(locus.contig, pos + offset))
-            
-            # remove chars
-            chars[idx+offset] = ''
-            
-        # add template position
-        chars[idx] = '{}'
-    
-    # join and return
-    return ''.join(chars)
-
-
-def format_haplotypes(locus, array, gap='-'):
-    """Format integer encoded alleles as a haplotype string"""
-    variants = allelic.as_characters(array, gap=gap, alleles=locus.alleles)
-    template = _template_sequence(locus)
-    return [template.format(*hap) for hap in variants]
-
-
-def format_variants(locus, array, gap='-'):
-    """Format integer encoded alleles as a haplotype string"""
-    return allelic.as_characters(array, gap=gap, alleles=locus.alleles)
+    def format_variants(self, array, gap='-'):
+        """Format integer encoded alleles as a haplotype string"""
+        return allelic.as_characters(array, gap=gap, alleles=self.alleles)
 
 
 def _set_loci_sequence(loci, fasta_file):
