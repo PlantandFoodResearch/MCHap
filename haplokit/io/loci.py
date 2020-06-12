@@ -89,48 +89,13 @@ class Locus:
         return allelic.as_characters(array, gap=gap, alleles=self.alleles)
 
 
-def _set_loci_sequence(loci, fasta_file):
-    for locus in loci:
-        sequence = fasta_file.fetch(locus.contig, locus.start, locus.stop).upper()
-        locus = locus.set(sequence=sequence)
-        yield locus
-
-
-def _set_loci_variants(loci, variant_file):
-    for locus in loci:
-        variants = []
-
-        for var in variant_file.fetch(locus.contig, locus.start, locus.stop):
-            if var.stop - var.start == 1:
-                # SNP
-                variants.append(
-                    Variant(
-                        contig=var.contig,
-                        start=var.start,
-                        stop=var.stop,
-                        name=var.id if var.id else '.',
-                        category='SNP',
-                        alleles=(var.ref, ) + var.alts,
-                    )
-                )
-            else:
-                # not a SNP
-                pass
-
-        variants=tuple(variants)
-        locus = locus.set(variants=variants)
-        yield locus
-
-
 class Bed4File(pysam.Tabixfile):
     
     def fetch(self, *args, **kwargs):
         
-        names = set()
-        
         lines = super().fetch(*args, **kwargs)
         
-        for line_number, line in enumerate(lines):
+        for line in lines:
             
             if line[0] == '#':
                 pass
@@ -145,12 +110,7 @@ class Bed4File(pysam.Tabixfile):
                     # assume bed 4 so next column in name
                     name = line[3].strip()
                 else:
-                    name = '{}:{}-{}'.format(contig, start, stop)
-
-                if name in names:
-                    raise ValueError('Loci with duplicate name found on line {}'.format(line_number))
-                else:
-                    names.add(name)
+                    name = None
 
                 locus = Locus(
                     contig=contig,
@@ -165,25 +125,51 @@ class Bed4File(pysam.Tabixfile):
                 yield locus
 
 
+def _set_locus_sequence(locus, fasta_file):
+    sequence = fasta_file.fetch(locus.contig, locus.start, locus.stop).upper()
+    locus = locus.set(sequence=sequence)
+    return locus
+
+
+def _set_locus_variants(locus, variant_file):
+    variants = []
+
+    for var in variant_file.fetch(locus.contig, locus.start, locus.stop):
+        if var.stop - var.start == 1:
+            # SNP
+            variants.append(
+                Variant(
+                    contig=var.contig,
+                    start=var.start,
+                    stop=var.stop,
+                    name=var.id if var.id else '.',
+                    category='SNP',
+                    alleles=(var.ref, ) + var.alts,
+                )
+            )
+        else:
+            # not a SNP
+            pass
+
+    variants=tuple(variants)
+    locus = locus.set(variants=variants)
+    return locus
+
+
 def read_loci(bed, vcf, fasta, region=(), drop_non_variable=True):
     bed_file = Bed4File(bed)
     vcf_file = pysam.VariantFile(vcf)
     ref_file = pysam.FastaFile(fasta)
 
-    loci = _set_loci_sequence(
-        _set_loci_variants(
-            bed_file.fetch(*region),
-            vcf_file,
-        ),
-        ref_file,
-    )
+    loci = bed_file.fetch(*region)
+    for locus in loci:
+        locus = _set_locus_variants(locus, vcf_file)
 
-    if drop_non_variable:
-        for locus in loci:
-            if len(locus.variants) > 0:
-                yield locus
-    else:
-        yield from loci
+        if drop_non_variable and len(locus.variants) == 0:
+            pass
+
+        else:
+            yield _set_locus_sequence(locus, ref_file)
 
     bed_file.close()
     vcf_file.close()
