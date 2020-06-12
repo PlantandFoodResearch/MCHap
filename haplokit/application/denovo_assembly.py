@@ -7,13 +7,12 @@ from dataclasses import dataclass
 from haplokit.assemble.mcmc.denovo import DenovoMCMC
 from haplokit.encoding import symbolic
 from haplokit.io import \
-    LociFile, \
+    read_loci, \
     extract_sample_ids, \
     extract_read_variants, \
     encode_read_alleles, \
     encode_read_distributions, \
     qual_of_prob, \
-    format_haplotypes, \
     vcf, \
     PFEIFFER_ERROR
 
@@ -69,11 +68,36 @@ class program(object):
         )
 
         parser.add_argument(
-            '--loci',
+            '--bed',
             type=str,
             nargs=1,
             default=[None],
-            help='Loci file containing intervals and SNPs.',
+            help='Tabix indexed 4 column Bed file containing (named) genomic intervals.',
+        )
+
+        parser.add_argument(
+            '--vcf',
+            type=str,
+            nargs=1,
+            default=[None],
+            help='Tabix indexed VCF file containing SNP variants.',
+        )
+
+        parser.add_argument(
+            '--ref',
+            type=str,
+            nargs=1,
+            default=[None],
+            help='Indexed fasta file containing reference genome.',
+        )
+
+        parser.add_argument(
+            '--region',
+            type=str,
+            nargs=1,
+            default=[None],
+            help=('Specify a contig region for haplotype assembly '
+            'e.g. "contig:start-stop" (Default = None).'),
         )
 
         parser.set_defaults(call_best_genotype=False)
@@ -166,7 +190,12 @@ class program(object):
 
         args = parser.parse_args(command[1:])
 
-        loci = list(LociFile(args.loci[0]).fetch())
+        loci = list(read_loci(
+            args.bed[0],
+            args.vcf[0],
+            args.ref[0],
+            region=args.region[0],
+        ))
 
         read_group_field = args.read_group_field[0]
         bams = args.bam
@@ -379,7 +408,7 @@ class program(object):
             observed_genotypes = list(sample_genotype_arrays.values())
             labeler = delayed(vcf.HaplotypeAlleleLabeler.from_obs)(observed_genotypes)
             ref_seq = locus.sequence
-            alt_seqs = delayed(format_haplotypes)(locus, labeler.alt_array())
+            alt_seqs = delayed(locus.format_haplotypes)(labeler.alt_array())
             allele_counts = labeler.count_obs(observed_genotypes)
 
             # add genotypes to sample data
