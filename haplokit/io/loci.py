@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+import gzip
 import pysam
 from dataclasses import dataclass
 
@@ -86,39 +87,53 @@ class Locus:
         return allelic.as_characters(array, gap=gap, alleles=self.alleles)
 
 
-class Bed4File(pysam.Tabixfile):
-    
-    def fetch(self, *args, **kwargs):
-        
-        lines = super().fetch(*args, **kwargs)
-        
-        for line in lines:
-            
-            if line[0] == '#':
-                pass
-            
+def _parse_bed4_line(line):
+    line = line.split()
+    contig = line[0].strip()
+    start = int(line[1].strip())
+    stop = int(line[2].strip())
+    if len(line) > 3:
+        # assume bed 4 so next column in name
+        name = line[3].strip()
+    else:
+        name = None
+
+    return Locus(
+        contig=contig,
+        start=start,
+        stop=stop,
+        name=name,
+        sequence=None,
+        variants=None
+    )
+
+
+def read_bed4(bed, region=None):
+
+    if region:
+        # must be gzipped and tabix indexed
+        if isinstance(region, str):
+            region = (region, )
+        with pysam.TabixFile(bed) as tbx:
+            for line in tbx.fetch(*region):
+                yield _parse_bed4_line(line)
+
+    else:
+        # check if gzipped
+        with open(bed, 'rb') as f:
+            token = f.read(3)
+            f.seek(0)
+            if token == b'\x1f\x8b\x08':
+                # is gzipped
+                f =  gzip.GzipFile(fileobj=f)
             else:
-                line = line.split()
-
-                contig = line[0].strip()
-                start = int(line[1].strip())
-                stop = int(line[2].strip())
-                if len(line) > 3:
-                    # assume bed 4 so next column in name
-                    name = line[3].strip()
+                # not gzipped so assume plain text
+                pass
+            for line in f:
+                if line.startswith(b'#'):
+                    pass
                 else:
-                    name = None
-
-                locus = Locus(
-                    contig=contig,
-                    start=start,
-                    stop=stop,
-                    name=name,
-                    sequence=None,
-                    variants=None
-                )
-
-                yield locus
+                    yield _parse_bed4_line(line.decode())
 
 
 def _set_locus_sequence(locus, fasta_file):
@@ -151,13 +166,11 @@ def _set_locus_variants(locus, variant_file):
     return locus
 
 
-def read_loci(bed, vcf, fasta, region=(), drop_non_variable=True):
-    bed_file = Bed4File(bed)
+def read_loci(bed, vcf, fasta, region=None, drop_non_variable=True):
     vcf_file = pysam.VariantFile(vcf)
     ref_file = pysam.FastaFile(fasta)
 
-    loci = bed_file.fetch(*region)
-    for locus in loci:
+    for locus in read_bed4(bed, region=region):
         locus = _set_locus_variants(locus, vcf_file)
 
         if drop_non_variable and len(locus.variants) == 0:
@@ -166,6 +179,5 @@ def read_loci(bed, vcf, fasta, region=(), drop_non_variable=True):
         else:
             yield _set_locus_sequence(locus, ref_file)
 
-    bed_file.close()
     vcf_file.close()
     ref_file.close()
