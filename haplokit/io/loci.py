@@ -8,12 +8,11 @@ from haplokit.encoding import allelic
 
 
 @dataclass(frozen=True, order=True)
-class Variant:
+class SNP:
     contig: str
     start: int
     stop: int
     name: str
-    category: str
     alleles: tuple
 
 
@@ -24,7 +23,6 @@ class Locus:
     start: int
     stop: int
     name: str
-    category: str
     sequence: str
     variants: tuple
 
@@ -49,7 +47,6 @@ class Locus:
             start=self.start,
             stop=self.stop,
             name=self.name,
-            category=self.category,
             sequence=self.sequence,
             variants=self.variants,
         )
@@ -117,7 +114,6 @@ class Bed4File(pysam.Tabixfile):
                     start=start,
                     stop=stop,
                     name=name,
-                    category='interval',
                     sequence=None,
                     variants=None
                 )
@@ -138,12 +134,11 @@ def _set_locus_variants(locus, variant_file):
         if var.stop - var.start == 1:
             # SNP
             variants.append(
-                Variant(
+                SNP(
                     contig=var.contig,
                     start=var.start,
                     stop=var.stop,
                     name=var.id if var.id else '.',
-                    category='SNP',
                     alleles=(var.ref, ) + var.alts,
                 )
             )
