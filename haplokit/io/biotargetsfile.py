@@ -1,5 +1,7 @@
 import re
+import warnings
 import numpy as np
+import networkx as nx
 from dataclasses import dataclass
 
 
@@ -126,6 +128,41 @@ class BioTargetsFile(object):
         
     def __str__(self):
         return '\n'.join(self.iter_lines())
+
+    def pedigree_digraph(self, data=None, warn=True, edge_labels=True):
+        if data is None:
+            data = []
+        
+        column = {node.column for node in self.header.pedigree}
+        assert len(column) == 1
+        column = column.pop()
+        
+        # add columns as nodes
+        graph = nx.DiGraph()
+        for row in self.array:
+            node = row[column]
+            if node:
+                d = {col: row[col] for col in data}
+                graph.add_node(node, **d)
+        
+        # add pedigree edges
+        message = 'Pedigree node "{}" not found in column "{}".'
+        for obj in self.header.pedigree:
+            child = obj.node
+            if warn and (child not in graph):
+                warnings.warn(message.format(child, column))
+            for edge in obj.edges:
+                relation = edge.edge
+                parent = edge.node
+                if warn and (parent not in graph):
+                    warnings.warn(message.format(parent, column))
+                
+                if edge_labels:
+                    graph.add_edge(parent, child, label=relation)
+                else:
+                    graph.add_edge(parent, child)
+
+        return graph
     
 
 def read_biotargets(path):
