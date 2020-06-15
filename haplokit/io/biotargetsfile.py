@@ -60,7 +60,7 @@ class PedigreeHeader(object):
     edges: tuple # (PedigreeEdge, )
         
     def __str__(self):
-        edges = ','.join([str(edge for edge in self.edges)])
+        edges = ','.join([str(edge) for edge in self.edges])
         return '## PEDIGREE=<{column}={node},{edges}>'.format(
             column=self.column,
             node=self.node,
