@@ -1,6 +1,5 @@
 import re
 import warnings
-import numpy as np
 import networkx as nx
 from dataclasses import dataclass
 
@@ -87,9 +86,9 @@ class PedigreeEdge(object):
 
 
 TYPE_DISPATCH = {
-    'integer': np.int,
-    'float': np.float,
-    'string': np.object,
+    'integer': int,
+    'float': float,
+    'string': str,
 }
 
 @dataclass(frozen=True)
@@ -100,7 +99,10 @@ class BioTargetsHeader(object):
         
     def column_names(self):
         return [col.id for col in self.columns]
-        
+
+    def column_types(self):
+        return [TYPE_DISPATCH[col.type.lower()] for col in self.columns]
+            
     def iter_lines(self):
         for line in self.meta:
             yield str(line)
@@ -112,19 +114,29 @@ class BioTargetsHeader(object):
         
     def __str__(self):
         return '\n'.join(self.iter_lines())
-    
-    def dtype(self):
-        return np.dtype([(col.id, TYPE_DISPATCH[col.type.lower()]) for col in self.columns])
-        
+
+    def pedigree_column(self):
+        column = {node.column for node in self.pedigree}
+        assert len(column) == 1
+        column = column.pop()
+        return column
+
+
 @dataclass
 class BioTargetsFile(object):
     header: BioTargetsHeader
-    array: np.ndarray
+    data: list
         
-    def iter_lines(self):
-        yield from self.header.iter_lines()
-        for row in self.array:
-            yield '\t'.join(map(str, row))
+    def iter_lines(self, header=True):
+        if header:
+            yield from self.header.iter_lines()
+        for row in self.data:
+            yield '\t'.join(('' if field is None else str(field) for field in row))
+
+    def iter_dicts(self):
+        columns = self.header.column_names()
+        for tup in self.data:
+            yield dict(zip(columns, tup))
         
     def __str__(self):
         return '\n'.join(self.iter_lines())
@@ -133,14 +145,12 @@ class BioTargetsFile(object):
         if data is None:
             data = []
         
-        column = {node.column for node in self.header.pedigree}
-        assert len(column) == 1
-        column = column.pop()
+        ped_column = self.header.pedigree_column()
         
         # add columns as nodes
         graph = nx.DiGraph()
-        for row in self.array:
-            node = row[column]
+        for row in self.iter_dicts():
+            node = row[ped_column]
             if node:
                 d = {col: row[col] for col in data}
                 graph.add_node(node, **d)
@@ -150,12 +160,12 @@ class BioTargetsFile(object):
         for obj in self.header.pedigree:
             child = obj.node
             if warn and (child not in graph):
-                warnings.warn(message.format(child, column))
+                warnings.warn(message.format(child, ped_column))
             for edge in obj.edges:
                 relation = edge.edge
                 parent = edge.node
                 if warn and (parent not in graph):
-                    warnings.warn(message.format(parent, column))
+                    warnings.warn(message.format(parent, ped_column))
                 
                 if edge_labels:
                     graph.add_edge(parent, child, label=relation)
@@ -185,7 +195,7 @@ def read_biotargets(path):
         else:
             break
 
-    col_names = lines[i].strip().split()
+    col_names = lines[i].strip().split('\t')
     i += 1
     
     header = BioTargetsHeader(
@@ -194,6 +204,11 @@ def read_biotargets(path):
         pedigree=tuple(pedigree)
     )
     
-    array = np.array([tuple(row.strip().split()) for row in lines[i:]], dtype=header.dtype())
-    
-    return BioTargetsFile(header, array)
+    col_types = header.column_types()
+    data = []
+
+    for row in lines[i:]:
+        strings = row.strip().split('\t')
+        data.append(tuple(t(s) if s else None for t, s in zip(col_types, strings)))
+
+    return BioTargetsFile(header, data)
