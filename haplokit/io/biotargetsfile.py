@@ -146,6 +146,10 @@ class BioTargetsFile(object):
             data = []
         
         ped_column = self.header.pedigree_column()
+        ped_col_header = [col for col in self.header.columns if col.id==ped_column]
+        assert len(ped_col_header) == 1
+        ped_col_header=ped_col_header[0]
+        ped_col_type = TYPE_DISPATCH[ped_col_header.type.lower()]
         
         # add columns as nodes
         graph = nx.DiGraph()
@@ -158,12 +162,12 @@ class BioTargetsFile(object):
         # add pedigree edges
         message = 'Pedigree node "{}" not found in column "{}".'
         for obj in self.header.pedigree:
-            child = obj.node
+            child = ped_col_type(obj.node)
             if warn and (child not in graph):
                 warnings.warn(message.format(child, ped_column))
             for edge in obj.edges:
                 relation = edge.edge
-                parent = edge.node
+                parent = ped_col_type(edge.node)
                 if warn and (parent not in graph):
                     warnings.warn(message.format(parent, ped_column))
                 
@@ -212,3 +216,4 @@ def read_biotargets(path):
         data.append(tuple(t(s) if s else None for t, s in zip(col_types, strings)))
 
     return BioTargetsFile(header, data)
+
