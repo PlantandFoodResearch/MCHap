@@ -52,19 +52,8 @@ def _genotype_string(array, symbol=True):
     return head + body + tail
 
 
-def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2):
-    """
+def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2, label='label'):
     
-    Parameters
-    ----------
-    graph : DiGraph
-        Networkx DiGraph of pedigree structure.
-    variant_record : VariantRecord
-        A Pysam VariantRecord object.
-    sample_map : dict, optional
-        Optional map of sample names to pedigree item names.
-
-    """
     # map alleles to lists of chars
     haps = (variant.ref, ) + variant.alts
     positions = variant.info['VP']
@@ -72,7 +61,7 @@ def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2):
     for i, hap in enumerate(haps):
         alleles[i] = [hap[pos] for pos in positions]
     # add null allele
-    alleles[None] = ['-' for _ in positions]
+    alleles[None] = ['-' for _ in positions]    
     
     # map of pedigree item to sample to haplotype chars
     ped_sample_arrays = {}
@@ -104,23 +93,28 @@ def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2):
     gvg.attr(nodesep='1')
     gvg.attr(ranksep='1')
     
+    # get labels from graph (default to node name)
+    labels = {}
+    for node, data in graph.nodes(data=True):
+        labels[node] = data.get(label, node)
+    
     # create subgraph of nodes for each sample
     for node, samples in ped_sample_arrays.items():
         cluster = 'cluster_{}'.format(node)
         with gvg.subgraph(name=cluster) as sg:
-            sg.attr(label='{}'.format(node))
+            sg.attr(label=str(labels[node]))
             sg.attr(style='filled', color='lightgrey')
             sg.node_attr.update(style='filled', color='grey')
             for i, (sample, array) in enumerate(samples.items()):
                 name = '{}_{}'.format(node, i)
                 genotype = _genotype_string(array)
                 sg.node(name, genotype)
-    
+
     # copy edges from initial graph
     for parent, child in graph.edges():
         gvg.edge(
-            '{}_0'.format(parent), 
-            '{}_0'.format(child), 
+            '{}_{}'.format(parent, len(ped_sample_arrays[parent])//2), 
+            '{}_{}'.format(child, len(ped_sample_arrays[child])//2), 
             ltail='cluster_{}'.format(parent), 
             lhead='cluster_{}'.format(child), 
         )
