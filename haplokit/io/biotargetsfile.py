@@ -217,3 +217,35 @@ def read_biotargets(path):
 
     return BioTargetsFile(header, data)
 
+
+def _rows_from_digraph(graph, pedigree_column, *args):
+    columns = [(col, TYPE_DISPATCH[type_.lower()]) for col, type_, _ in args]
+    for idx, data in graph.nodes(data=True):
+        data[pedigree_column] = idx
+        row = tuple(None if data[col] is None else type_(data[col]) for col, type_ in columns)
+        yield row
+
+
+def from_digraph(graph, pedigree_column, *args):
+    pedigree = dict()
+    for parent, child, data in graph.edges(data=True):
+        label = data.get('label', 'Parent')
+        if child in pedigree:
+            pedigree[child].add(PedigreeEdge(edge=label, node=parent))
+        else:
+            pedigree[child] = {PedigreeEdge(edge=label, node=parent)}
+    
+    for child, edges in pedigree.items():
+        pedigree[child] = PedigreeHeader(pedigree_column, child, tuple(edges))
+
+    pedigree = tuple(pedigree.values())
+    columns = tuple(ColumnHeader(*col) for col in args)
+    data = list(_rows_from_digraph(graph, pedigree_column, *args))
+    
+    header = BioTargetsHeader(
+        meta=(),
+        columns=columns,
+        pedigree=pedigree,
+    )
+ 
+    return BioTargetsFile(header, data)
