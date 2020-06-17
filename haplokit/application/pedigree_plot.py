@@ -24,66 +24,6 @@ def ancestors(graph, *args, stop=None):
             yield from ancestors(graph, *preds, stop=stop)
 
 
-def insert_sample_haplotypes(graph, variant, sample_map=None, default_ploidy=2):
-    """
-    
-    Parameters
-    ----------
-    graph : DiGraph
-        Networkx DiGraph of pedigree structure.
-    variant_record : VariantRecord
-        A Pysam VariantRecord object.
-    sample_map : dict, optional
-        Optional map of sample names to pedigree item names.
-
-    """
-    # map alleles to lists of chars
-    haps = (variant.ref, ) + variant.alts
-    positions = variant.info['VP']
-    alleles = {}
-    for i, hap in enumerate(haps):
-        alleles[i] = [hap[pos] for pos in positions]
-    # add null allele
-    alleles[None] = ['-' for _ in positions]
-
-    # keep track of visited nodes
-    nodes = set()
-
-    # blank out samples dict
-    for ped_item in graph.nodes():
-        nodes.add(ped_item)
-        graph.node[ped_item]['SAMPLES'] = dict()
-    
-    # insert sample alleles into graph
-    for sample, record in variant.samples.items():
-        if sample_map:
-            ped_item = sample_map[sample]
-        else:
-            ped_item = sample
-            
-        array = [alleles[a] for a in record['GT']]
-        
-        if ped_item not in graph:
-            warnings.warn('Node "{}" not found in pedigree and will be skipped')
-        else:
-            graph.node[ped_item]['SAMPLES'] = {sample: array}
-            if ped_item in nodes:
-                nodes.remove(ped_item)
-
-    # add a default null sample to items without samples
-    for ped_item in nodes:
-        if len(graph.node[ped_item]['SAMPLES']) == 0:
-            ploidy = graph.node[ped_item].get('ploidy')
-            if not isinstance(ploidy, int):
-                ploidy = default_ploidy
-            array = [alleles[None] for _ in range(ploidy)]
-            graph.node[ped_item]['SAMPLES']['None'] = array
-        else:
-            assert False
-        
-
-
-
 _BASE_COLORS = {
     'A': '#e00000',  #  Red
     'C': '#00c000',  #  Green
@@ -112,18 +52,61 @@ def _genotype_string(array, symbol=True):
     return head + body + tail
 
 
-def as_graphviz(ped):
+def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2):
+    """
+    
+    Parameters
+    ----------
+    graph : DiGraph
+        Networkx DiGraph of pedigree structure.
+    variant_record : VariantRecord
+        A Pysam VariantRecord object.
+    sample_map : dict, optional
+        Optional map of sample names to pedigree item names.
 
+    """
+    # map alleles to lists of chars
+    haps = (variant.ref, ) + variant.alts
+    positions = variant.info['VP']
+    alleles = {}
+    for i, hap in enumerate(haps):
+        alleles[i] = [hap[pos] for pos in positions]
+    # add null allele
+    alleles[None] = ['-' for _ in positions]
+    
+    # map of pedigree item to sample to haplotype chars
+    ped_sample_arrays = {}
+    for sample, record in variant.samples.items():
+        array = [alleles[a] for a in record['GT']]
+        if sample_map:
+            ped_item = sample_map[sample]
+        else:
+            ped_item = sample
+        if ped_item not in ped_sample_arrays:
+            ped_sample_arrays[ped_item] = {}
+        ped_sample_arrays[ped_item][sample] = array
+    
+    # add null haps for pedigree items without sampels
+    for ped_item, data in graph.nodes(data=True):
+        # get ploidy if present
+        if ped_item not in ped_sample_arrays:
+            ploidy = data.get('ploidy')
+            if not isinstance(ploidy, int):
+                # fall back to default ploidy
+                ploidy = default_ploidy
+            # create array of null haplotypes
+            array = [alleles[None] for _ in range(ploidy)]
+            ped_sample_arrays[ped_item]={'None': array}
+    
+    # create graphviz
     gvg = gv.Digraph('G', node_attr={'shape': 'plaintext'})
     gvg.attr(compound='true')
     gvg.attr(nodesep='1')
     gvg.attr(ranksep='1')
-
-    for node, data in ped.nodes(data=True):
-
+    
+    # create subgraph of nodes for each sample
+    for node, samples in ped_sample_arrays.items():
         cluster = 'cluster_{}'.format(node)
-        samples = data['SAMPLES'].copy()
-
         with gvg.subgraph(name=cluster) as sg:
             sg.attr(label='{}'.format(node))
             sg.attr(style='filled', color='lightgrey')
@@ -132,15 +115,13 @@ def as_graphviz(ped):
                 name = '{}_{}'.format(node, i)
                 genotype = _genotype_string(array)
                 sg.node(name, genotype)
-
-    for parent, child in ped.edges():
-
+    
+    # copy edges from initial graph
+    for parent, child in graph.edges():
         gvg.edge(
             '{}_0'.format(parent), 
             '{}_0'.format(child), 
             ltail='cluster_{}'.format(parent), 
             lhead='cluster_{}'.format(child), 
         )
-        
     return gvg
-
