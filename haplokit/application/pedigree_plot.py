@@ -52,7 +52,7 @@ def _genotype_string(array, symbol=True):
     return head + body + tail
 
 
-def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2, label='label'):
+def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2, label='label', transpose=False):
     
     # map alleles to lists of chars
     haps = (variant.ref, ) + variant.alts
@@ -66,7 +66,9 @@ def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2, lab
     # map of pedigree item to sample to haplotype chars
     ped_sample_arrays = {}
     for sample, record in variant.samples.items():
-        array = [alleles[a] for a in record['GT']]
+        array = np.array([alleles[a] for a in record['GT']])
+        if transpose:
+            array = array.transpose()
         if sample_map:
             ped_item = sample_map[sample]
         else:
@@ -84,7 +86,9 @@ def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2, lab
                 # fall back to default ploidy
                 ploidy = default_ploidy
             # create array of null haplotypes
-            array = [alleles[None] for _ in range(ploidy)]
+            array = np.array([alleles[None] for _ in range(ploidy)])
+            if transpose:
+                array = array.transpose()
             ped_sample_arrays[ped_item]={'None': array}
     
     # create graphviz
