@@ -15,6 +15,7 @@ from haplokit.io import \
     qual_of_prob, \
     vcf, \
     PFEIFFER_ERROR
+from haplokit.io.biotargetsfile import read_biotargets
 
 
 @dataclass
@@ -51,6 +52,14 @@ class program(object):
         parser = argparse.ArgumentParser(
             'De novo haplotype assembly'
         )
+        parser.add_argument(
+            '--btf',
+            type=str,
+            nargs=1,
+            default=[],
+            help='Biotargets file with sample ids, bam paths and ploidy.',
+        )
+
         parser.add_argument(
             '--bam',
             type=str,
@@ -197,13 +206,28 @@ class program(object):
             region=args.region[0],
         ))
 
-        read_group_field = args.read_group_field[0]
-        bams = args.bam
-        sample_bam = extract_sample_ids(bams, id=read_group_field)
-
-        ploidy = args.ploidy[0]
-        samples = list(sample_bam.keys())
-        sample_ploidy = {sample: ploidy for sample in samples}
+        # sample bam paths and ploidy
+        if args.btf:
+            # read from bio-targets file
+            btf = read_biotargets(args.btf[0])
+            id_column = btf.header.column_names()[0]
+            sample_bam = {}
+            sample_ploidy = {}
+            for d in btf.iter_dicts():
+                sample = d[id_column]
+                sample_bam[sample] = d['bam']
+                sample_ploidy[sample] = d['ploidy']
+        else:
+            # check bams for samples
+            bams = args.bam
+            sample_bam = extract_sample_ids(
+                bams, 
+                id=args.read_group_field[0]
+            )
+            # use specified ploidy for all samples
+            ploidy = args.ploidy[0]
+            samples = list(sample_bam.keys())
+            sample_ploidy = {sample: ploidy for sample in samples}
 
         return cls(
             loci,
@@ -211,7 +235,7 @@ class program(object):
             sample_ploidy,
             call_best_genotype=args.call_best_genotype,
             call_filtered=args.call_filtered,
-            read_group_field=read_group_field,
+            read_group_field=args.read_group_field[0],
             read_error_rate=args.error_rate[0],
             mcmc_steps=args.mcmc_steps[0],
             mcmc_burn=args.mcmc_burn[0],
