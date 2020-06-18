@@ -52,7 +52,18 @@ def _genotype_string(array, symbol=True):
     return head + body + tail
 
 
-def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2, label='label', transpose=False):
+def as_haplotype_graphviz(
+        graph, 
+        variant, 
+        sample_map=None, 
+        default_ploidy=2, 
+        label='label', 
+        transpose=False, 
+        sample_names=False,
+        nodesep=1,
+        ranksep=1,
+        rankdir='TB'
+    ):
     
     # map alleles to lists of chars
     haps = (variant.ref, ) + variant.alts
@@ -94,8 +105,9 @@ def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2, lab
     # create graphviz
     gvg = gv.Digraph('G', node_attr={'shape': 'plaintext'})
     gvg.attr(compound='true')
-    gvg.attr(nodesep='1')
-    gvg.attr(ranksep='1')
+    gvg.attr(nodesep=str(nodesep))
+    gvg.attr(ranksep=str(ranksep))
+    gvg.attr(rankdir=rankdir)
     
     # get labels from graph (default to node name)
     labels = {}
@@ -112,7 +124,15 @@ def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2, lab
             for i, (sample, array) in enumerate(samples.items()):
                 name = '{}_{}'.format(node, i)
                 genotype = _genotype_string(array)
-                sg.node(name, genotype)
+                if sample_names:
+                    sub_cluster = '{}_{}'.format(cluster, sample)
+                    with sg.subgraph(name=sub_cluster) as ssg:
+                        ssg.attr(label=str(sample))
+                        ssg.attr(style='filled', color='grey')
+                        ssg.node_attr.update(style='filled', color='grey')
+                        ssg.node(name, genotype)
+                else:
+                    sg.node(name, genotype)
 
     # copy edges from initial graph
     for parent, child in graph.edges():
@@ -122,4 +142,5 @@ def as_haplotype_graphviz(graph, variant, sample_map=None, default_ploidy=2, lab
             ltail='cluster_{}'.format(parent), 
             lhead='cluster_{}'.format(child), 
         )
+  
     return gvg
