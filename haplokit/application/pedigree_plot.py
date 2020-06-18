@@ -55,6 +55,7 @@ def _genotype_string(array, symbol=True):
 def as_haplotype_graphviz(
         graph, 
         variant, 
+        simplify=False,
         sample_map=None, 
         default_ploidy=2, 
         label='label', 
@@ -68,6 +69,9 @@ def as_haplotype_graphviz(
     # map alleles to lists of chars
     haps = (variant.ref, ) + variant.alts
     positions = variant.info['VP']
+    if simplify:
+        counts = [(pos, len({h[pos] for h in haps})) for pos in positions]
+        positions = [pos for pos, count in counts if count > 1]
     alleles = {}
     for i, hap in enumerate(haps):
         alleles[i] = [hap[pos] for pos in positions]
