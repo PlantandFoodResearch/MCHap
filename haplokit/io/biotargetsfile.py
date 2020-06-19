@@ -143,7 +143,7 @@ class BioTargetsFile(object):
 
     def pedigree_digraph(self, data=None, warn=True, edge_labels=True):
         if data is None:
-            data = []
+            data = self.header.column_names()
         
         ped_column = self.header.pedigree_column()
         ped_col_header = [col for col in self.header.columns if col.id==ped_column]
@@ -212,8 +212,8 @@ def read_biotargets(path):
     data = []
 
     for row in lines[i:]:
-        strings = row.strip().split('\t')
-        data.append(tuple(t(s) if s else None for t, s in zip(col_types, strings)))
+        strings = row.split('\t')
+        data.append(tuple(t(s.strip()) if s else None for t, s in zip(col_types, strings)))
 
     return BioTargetsFile(header, data)
 

@@ -1,4 +1,5 @@
 import os
+import argparse
 import numpy as np
 import networkx as nx
 import graphviz as gv
@@ -56,8 +57,9 @@ def _genotype_string(array, symbol=True):
 
 @dataclass
 class program(object):
+    vcf: str
     digraph: nx.DiGraph
-    variants: list
+    region: str = None
     sample_map: dict = None
     default_ploidy: int = 2
     label: str = 'label'
@@ -72,39 +74,203 @@ class program(object):
     output_path: str = None
 
     @classmethod
-    def cli(cls):
-        pass
+    def cli(cls, command):
+        """Program initialisation from cli command
+        
+        e.g. `program.cli(sys.argv)`
+        """
+        parser = argparse.ArgumentParser(
+            'Plot sample hapotypes within a pedigree'
+        )
+        parser.add_argument(
+            '--vcf',
+            type=str,
+            nargs=1,
+            default=[],
+            help='VCF file of haplotypes.',
+        )
+
+        parser.add_argument(
+            '--region',
+            type=str,
+            nargs=1,
+            default=[None],
+            help='Graph haplotypes in specified region.',
+        )
+
+        parser.add_argument(
+            '--ped',
+            type=str,
+            nargs=1,
+            default=[],
+            help='Biotargets file with pedigree fields.',
+        )
+
+        parser.add_argument(
+            '--sample-pedigree-map',
+            type=str,
+            nargs=1,
+            default=[None],
+            help='Biotargets file mapping sample ids (first column) to pedigree items.',
+        )
+
+        parser.add_argument(
+            '--default-ploidy',
+            type=int,
+            nargs=1,
+            default=[2],
+            help='Default ploidy value to use for pedigree items not in the VCF.',
+        )
+
+        parser.add_argument(
+            '--label-column',
+            type=str,
+            nargs=1,
+            default=['label'],
+            help='Column name to use as pedigree item labels.',
+        )
+
+        parser.set_defaults(simplify_haplotypes=False)
+        parser.add_argument(
+            '--simplify-haplotypes',
+            dest='simplify_haplotypes',
+            action='store_true',
+            help='Remove SNPs that do not vary across haplotypes.'
+        )
+
+        parser.set_defaults(transpose_haplotypes=False)
+        parser.add_argument(
+            '--transpose-haplotypes',
+            dest='transpose_haplotypes',
+            action='store_true',
+            help='Transpose haplotypes into a vertical orientation.'
+        )
+
+        parser.set_defaults(show_sample_names=False)
+        parser.add_argument(
+            '--show-sample-names',
+            dest='show_sample_names',
+            action='store_true',
+            help='Show names of individual samples in the output graphic.'
+        )
+
+        parser.set_defaults(use_variant_names=False)
+        parser.add_argument(
+            '--use-variant-names',
+            dest='use_variant_names',
+            action='store_true',
+            help='Use variant names (if present) for output file names.'
+        )
+
+        parser.add_argument(
+            '--nodesep',
+            type=int,
+            nargs=1,
+            default=[1],
+            help='Graphviz paramter for space seperating nodes.',
+        )
+
+        parser.add_argument(
+            '--ranksep',
+            type=int,
+            nargs=1,
+            default=[1],
+            help='Graphviz paramter for space seperating ranks.',
+        )
+
+        parser.add_argument(
+            '--rankdir',
+            type=str,
+            nargs=1,
+            default=['TB'],
+            help='Graphviz paramter for direction of graph.',
+        )
+
+        parser.add_argument(
+            '--format',
+            type=str,
+            nargs=1,
+            default=['pdf'],
+            help='Output format (default = "pdf").',
+        )
+
+        parser.add_argument(
+            '-o', '--output',
+            type=str,
+            nargs=1,
+            help='Output directory.',
+        )
+
+        args = parser.parse_args(command[1:])
+
+        btf_ped = read_biotargets(args.ped[0])
+        digraph = btf_ped.pedigree_digraph()
+
+        if btf_ped and args.sample_pedigree_map[0]:
+            btf_map = read_biotargets(args.sample_pedigree_map[0])
+            sample_col = btf_map.header.column_names()[0]
+            pedigree_col = btf_ped.header.pedigree_column()
+            sample_map = {
+                d[sample_col]: d[pedigree_col] 
+                for d in btf_map.iter_dicts()
+            }
+        else:
+            sample_map = None
+
+        return cls(
+            vcf=args.vcf[0],
+            digraph=digraph,
+            region=args.region[0],
+            sample_map=sample_map,
+            default_ploidy=args.default_ploidy[0],
+            label=args.label_column[0],
+            simplify_haplotypes=args.simplify_haplotypes,
+            transpose_haplotypes=args.transpose_haplotypes,
+            show_sample_names=args.show_sample_names,
+            variant_names=args.use_variant_names,
+            nodesep=args.nodesep[0],
+            ranksep=args.ranksep[0],
+            rankdir=args.rankdir[0],
+            output_format=args.format[0],
+            output_path=args.output[0],
+        )
 
     def iter_graphs(self):
-        for variant in self.variants:
-            if self.variant_names and variant.id:
-                name = variant.id
+        with pysam.VariantFile(self.vcf) as vcf:
+            if self.region:
+                variants = vcf.fetch(self.region)
             else:
-                name = '{}_{}'.format(
-                    variant.chrom,
-                    variant.pos
-                )
-                if variant.stop:
+                variants = vcf.fetch()
+
+            for variant in variants:
+                if self.variant_names and variant.id:
+                    name = variant.id
+                else:
                     name = '{}_{}'.format(
-                        name,
-                        variant.stop,
+                        variant.chrom,
+                        variant.pos
                     )
+                    if variant.stop:
+                        name = '{}_{}'.format(
+                            name,
+                            variant.stop,
+                        )
 
-            graph = graph_variant(
-                digraph=self.digraph, 
-                variant=variant, 
-                sample_map=self.sample_map, 
-                default_ploidy=self.default_ploidy, 
-                label=self.label, 
-                simplify_haplotypes=self.simplify_haplotypes,
-                transpose_haplotypes=self.transpose_haplotypes, 
-                show_sample_names=self.show_sample_names,
-                nodesep=self.nodesep,
-                ranksep=self.ranksep,
-                rankdir=self.rankdir,
-            )
+                graph = graph_variant(
+                    digraph=self.digraph, 
+                    variant=variant, 
+                    sample_map=self.sample_map, 
+                    default_ploidy=self.default_ploidy, 
+                    label=self.label, 
+                    simplify_haplotypes=self.simplify_haplotypes,
+                    transpose_haplotypes=self.transpose_haplotypes, 
+                    show_sample_names=self.show_sample_names,
+                    nodesep=self.nodesep,
+                    ranksep=self.ranksep,
+                    rankdir=self.rankdir,
+                )
 
-            yield name, graph
+                yield name, graph
 
     def run(self):
         if not os.path.isdir(self.output_path):
@@ -112,6 +278,7 @@ class program(object):
         for name, graph in self.iter_graphs():
             path = self.output_path + '/' + name + '.gv'
             graph.render(path, format=self.output_format, cleanup=True)
+        return True
 
 
 def graph_variant(
@@ -129,7 +296,9 @@ def graph_variant(
     ):
     
     # map alleles to lists of chars
-    haps = (variant.ref, ) + variant.alts
+    haps = (variant.ref, )
+    if variant.alts:
+        haps += variant.alts
     positions = variant.info['VP']
     if simplify_haplotypes:
         counts = [(pos, len({h[pos] for h in haps})) for pos in positions]
