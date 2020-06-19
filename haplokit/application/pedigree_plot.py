@@ -33,12 +33,13 @@ _BASE_COLORS = {
     'G': '#5050ff',  #  Blue
     'T': '#e6e600',  #  Yellow
     'N': 'black',
-    'Z': 'grey',
-    '-': 'grey',
-    '.': 'grey'
+    'Z': 'lightgrey',
+    '-': 'lightgrey',
+    '.': 'lightgrey',
+    ' ': 'lightgrey',
 }
 
-_BASE_TEMPLATE = '<TD bgcolor="{color}"> {char} </TD>'
+_BASE_TEMPLATE = '<TD bgcolor="{color}">{char}</TD>'
 
 
 def _haplotype_string(vector, symbol=True):   
@@ -67,6 +68,8 @@ class program(object):
     transpose_haplotypes: bool = False
     show_sample_names: bool = False
     variant_names: bool = False
+    label_font: str = "Times-Roman"
+    haplotype_font: str = "Mono"
     nodesep: int = 1
     ranksep: int = 1
     rankdir: str = 'TB'
@@ -163,6 +166,22 @@ class program(object):
         )
 
         parser.add_argument(
+            '--label-font',
+            type=str,
+            nargs=1,
+            default=["Times-Roman"],
+            help='Font for pedigree and sample labels.',
+        )
+
+        parser.add_argument(
+            '--haplotype-font',
+            type=str,
+            nargs=1,
+            default=["Mono"],
+            help='Font for haplotype characters.',
+        )
+
+        parser.add_argument(
             '--nodesep',
             type=int,
             nargs=1,
@@ -228,6 +247,8 @@ class program(object):
             transpose_haplotypes=args.transpose_haplotypes,
             show_sample_names=args.show_sample_names,
             variant_names=args.use_variant_names,
+            label_font=args.label_font[0],
+            haplotype_font=args.haplotype_font[0],
             nodesep=args.nodesep[0],
             ranksep=args.ranksep[0],
             rankdir=args.rankdir[0],
@@ -290,6 +311,8 @@ def graph_variant(
         simplify_haplotypes=False,
         transpose_haplotypes=False, 
         show_sample_names=False,
+        label_font="Times-Roman",
+        haplotype_font="Mono",
         nodesep=1,
         ranksep=1,
         rankdir='TB'
@@ -365,9 +388,9 @@ def graph_variant(
                         ssg.attr(label=str(sample))
                         ssg.attr(style='filled', color='grey')
                         ssg.node_attr.update(style='filled', color='grey')
-                        ssg.node(name, genotype)
+                        ssg.node(name, genotype, fontname=haplotype_font)
                 else:
-                    sg.node(name, genotype)
+                    sg.node(name, genotype, fontname=haplotype_font)
 
     # copy edges from initial graph
     for parent, child in digraph.edges():
