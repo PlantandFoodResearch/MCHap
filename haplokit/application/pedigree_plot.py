@@ -27,6 +27,13 @@ def ancestors(graph, *args, stop=None):
             yield from ancestors(graph, *preds, stop=stop)
 
 
+_FILTER_COLORS = {
+    True: 'orange',
+    False: 'grey',
+    None: 'grey',
+}
+
+
 _BASE_COLORS = {
     'A': '#e00000',  #  Red
     'C': '#00c000',  #  Green
@@ -334,6 +341,7 @@ def graph_variant(
     
     # map of pedigree item to sample to haplotype chars
     ped_sample_arrays = {}
+    ped_sample_filtered = {}
     for sample, record in variant.samples.items():
         array = np.array([alleles[a] for a in record['GT']])
         if transpose_haplotypes:
@@ -345,6 +353,16 @@ def graph_variant(
         if ped_item not in ped_sample_arrays:
             ped_sample_arrays[ped_item] = {}
         ped_sample_arrays[ped_item][sample] = array
+        filt = record.get('FT')
+        if filt is None:
+            pass
+        elif filt == 'PASS':
+            filt = False
+        else:
+            filt = True
+        if ped_item not in ped_sample_filtered:
+            ped_sample_filtered[ped_item] = {}
+        ped_sample_filtered[ped_item][sample] = filt
     
     # add null haps for pedigree items without sampels
     for ped_item, data in digraph.nodes(data=True):
@@ -359,6 +377,7 @@ def graph_variant(
             if transpose_haplotypes:
                 array = array.transpose()
             ped_sample_arrays[ped_item]={'None': array}
+            ped_sample_filtered[ped_item]={'None': None}
     
     # create graphviz
     gvg = gv.Digraph('G', node_attr={'shape': 'plaintext'})
@@ -382,15 +401,16 @@ def graph_variant(
             for i, (sample, array) in enumerate(samples.items()):
                 name = '{}_{}'.format(node, i)
                 genotype = _genotype_string(array)
+                node_color = _FILTER_COLORS[ped_sample_filtered[node][sample]]
                 if show_sample_names:
-                    sub_cluster = '{}_{}'.format(cluster, sample)
+                    sub_cluster = '{}_{}'.format(cluster, sample)                    
                     with sg.subgraph(name=sub_cluster) as ssg:
                         ssg.attr(label=str(sample))
-                        ssg.attr(style='filled', color='grey')
-                        ssg.node_attr.update(style='filled', color='grey')
-                        ssg.node(name, genotype, fontname=haplotype_font)
+                        ssg.attr(style='filled', color=node_color)
+                        ssg.node_attr.update(style='filled', color=node_color)
+                        ssg.node(name, genotype, fontname=haplotype_font, color=node_color)
                 else:
-                    sg.node(name, genotype, fontname=haplotype_font)
+                    sg.node(name, genotype, fontname=haplotype_font, color=node_color)
 
     # copy edges from initial graph
     for parent, child in digraph.edges():
