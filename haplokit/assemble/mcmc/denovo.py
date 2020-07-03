@@ -68,8 +68,10 @@ def _denovo_gibbs_sampler(
                 intervals=intervals,
                 allow_recombinations=allow_recombinations,
                 allow_dosage_swaps=allow_dosage_swaps,
-                allow_deletions=allow_deletions
             )
+
+            # followed by mutation step
+            llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask)
         
         genotype_trace[i] = genotype.copy() # TODO: is this copy needed?
         llk_trace[i] = llk
