@@ -34,7 +34,6 @@ class program(object):
     mcmc_fix_homozygous: float = 0.999
     mcmc_allow_recombinations: bool = True
     mcmc_allow_dosage_swaps: bool = True
-    mcmc_allow_deletions: bool = True
     depth_filter_threshold: float = 5.0
     probability_filter_threshold: float = 0.95
     kmer_filter_k: int = 3
@@ -221,7 +220,6 @@ class program(object):
             #mcmc_fix_homozygous,
             #mcmc_allow_recombinations,
             #mcmc_allow_dosage_swaps,
-            #mcmc_allow_deletions,
             depth_filter_threshold=args.filter_depth[0],
             probability_filter_threshold=args.filter_probability[0],
             kmer_filter_k=args.filter_kmer_k[0],
@@ -325,7 +323,6 @@ class program(object):
                     fix_homozygous=self.mcmc_fix_homozygous,
                     allow_recombinations=self.mcmc_allow_recombinations,
                     allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
-                    allow_deletions=self.mcmc_allow_deletions,
                 ).fit(reads)
 
                 # posterior dist

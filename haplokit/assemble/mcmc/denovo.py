@@ -15,6 +15,171 @@ from haplokit.assemble import util, complexity
 from haplokit.assemble.classes import Assembler, GenotypeTrace
 
 
+@dataclass
+class DenovoMCMC(Assembler):
+
+    ploidy: int
+    steps: int = 1000
+    ratio: float = 1.0
+    alpha: float = 1.0
+    beta: float = 3.0
+    n_intervals: int = None
+    fix_homozygous: float = 0.999
+    allow_recombinations: bool = True
+    allow_dosage_swaps: bool = True
+    """De novo haplotype assembly using Markov chain Monte Carlo
+    for probabilistically encoded variable positions of NGS reads.
+
+    Attributes
+    ----------
+    ploidy : int
+        Ploidy of organisim at the assembled locus.
+    steps : int, optional
+        Number of steps to run in the MCMC simulation
+        (default = 1000).
+    ratio : float, optional
+        Proportion of steps to include structural sub-steps
+        in the MCMC simulation (default = 1.0).
+    alpha, beta : float, optional
+        Parameters defining a Beta distribution to sample
+        the number of random intervals to generate at each
+        structural step in the MCMC simulation 
+        (defaults = 1.0, 3.0).
+    n_intervals : int, optional
+        If set structural steps in the MCMC will always use
+        this number of intevals ignoring the alpha and beta
+        parameters (default = None).
+    fix_homozygous : float, optional
+        Individual variant positions that have a posterior
+        probability of being homozygous that is greater than
+        this value will be fixed as non-variable positions
+        during the MCMC simulation. This can greatly improve
+        performance when there are multiple homozygous 
+        alleles (default = 0.999).
+    allow_recombinations : bool, optional
+        Set to False to dis-allow structural steps involving
+        the recombination of part of a pair of haplotypes
+        (default = True).
+    allow_dosage_swaps : bool, optional
+        Set to False to dis-allow structural steps involving
+        dosage changes between parts of a pair of haplotypes
+        (default = True).
+
+    """
+
+    def fit(self, reads, initial=None):
+        """Fit the parametized model to a set of probabilistically 
+        encoded variable positions of NGS reads.
+
+        Parameters
+        ----------
+        reads : ndarray, float, shape (n_reads, n_positions, max_allele)
+            Probabilistically encoded variable positions of NGS reads.
+        initial : ndarray, int, shape (ploidy, n_positions, max_allele), optional
+            Set the initial genotype state of the MCMC simulation
+            (default = None).
+
+        Returns
+        -------
+        trace : GenotypeTrace
+            An instance of GenotypeTrace containing the genotype state
+            and log-likelihood at each step in the MCMC simulation.
+        
+        Notes
+        -----
+        If the initial genotype state is not set by the user
+        then it is automatically set by sampling <ploidy> random 
+        haplotypes from the mean allele probabilities 
+        among all reads.
+
+        """
+
+        # identify base positions that are overwhelmingly likely
+        # to be homozygous
+        # these can be 'fixed' to reduce computational complexity
+        hom_probs = _homozygosity_probabilities(reads, self.ploidy)
+        fixed = hom_probs >= self.fix_homozygous
+        homozygous = np.any(fixed, axis=-1)
+        heterozygous = ~homozygous
+
+        # subset of read positions which have not been identified 
+        # as homozygous
+        reads_het = reads[:, heterozygous]
+
+        # counts of total number of bases and number of het bases
+        _, n_base, _ = reads.shape
+        _, n_het_base, _ = reads_het.shape
+
+        # if all bases are fixed homozygous we don't need to sample anything
+        if n_het_base == 0:
+            # create a haplotype of the fixed alleles
+            idx, vals = np.where(fixed)
+            haplotype = np.zeros(n_base, dtype=np.int8)
+            haplotype[idx] = vals
+            # tile for each haplotype in each "step"
+            genotypes = np.tile(haplotype, (self.steps, self.ploidy, 1))
+            # set likelihoods to nan
+            llks = np.empty(self.steps, dtype=np.float)
+            llks[:] = np.nan
+            return GenotypeTrace(genotypes, llks)
+
+        # set the initial genotype
+        if initial is None:
+            # for each haplotype, take a random sample of mean of reads
+            var_dist = _read_mean_dist(reads_het)
+            genotype = np.empty((self.ploidy, n_het_base), dtype=np.int8)
+            for i in range(self.ploidy):
+                genotype[i] = probabilistic.sample_alleles(var_dist)
+        else:
+            # use the provided array
+            assert initial.shape == (self.ploidy, n_het_base)
+            genotype = initial.copy()
+
+        # distribution to draw number of break points from for structural steps
+        if self.n_intervals is None:
+            # random number of intervals based on beta distribution
+            break_dist = _point_beta_probabilities(n_het_base, self.alpha, self.beta)
+        else:
+            # this is a hack to fix number of intervals to a constant
+            break_dist = np.zeros(self.n_intervals, dtype=np.float64)
+            break_dist[-1] = 1  # 100% probability of n_intervals -1 break points
+
+        # Automatically mask out alleles for which all reads have a probability of 0
+        # A probability of 0 indicates that the allele is invalid (zero padding)
+        # Masking alleles stops that allele being assessed in the
+        # mcmc and hence reduces paramater space and compute time.
+        mask = np.all(reads_het == 0, axis=-3)
+
+        # run the sampler on the heterozygous positions
+        genotypes, llks = _denovo_gibbs_sampler(
+            genotype, 
+            reads_het, 
+            mask=mask,
+            ratio=self.ratio, 
+            steps=self.steps, 
+            break_dist=break_dist,
+            allow_recombinations=self.allow_recombinations,
+            allow_dosage_swaps=self.allow_dosage_swaps,
+        )
+
+        # return the genotype trace and llks
+        if n_het_base == n_base:
+            # no fixed homozygous alleles to add back in
+            return GenotypeTrace(genotypes, llks)
+
+        else:
+            # add back in the fixed alleles that where removed
+            # create a template of the fized alleles
+            idx, vals = np.where(fixed)
+            template = np.zeros(n_base, dtype=genotypes.dtype)
+            template[idx] = vals
+            # tile for each haplotype in each step
+            template = np.tile(template, (self.steps, self.ploidy, 1))
+            # add in the heterozygous alleles from the real trace
+            template[:, :, heterozygous] = genotypes
+            return GenotypeTrace(template, llks)
+
+
 @numba.njit
 def _denovo_gibbs_sampler(
         genotype, 
@@ -25,7 +190,6 @@ def _denovo_gibbs_sampler(
         break_dist,
         allow_recombinations,
         allow_dosage_swaps,
-        allow_deletions
     ):
     """Jitted worker function for method `fit` of class `DenovoMCMC`.
 
@@ -44,15 +208,14 @@ def _denovo_gibbs_sampler(
         if np.isnan(llk):
             raise ValueError('Encountered log likelihood of nan')
         
-        # chance of mutation step
-        choice = ratio > np.random.random()
+        choice = ratio < np.random.random()
         
         if choice:
-            # mutation step
+            # mutation step only
             llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask)
         
         else:
-            # structural step
+            # structural step followed by mutation step
             
             # choose number of break points
             n_breaks = util.random_choice(break_dist)
@@ -60,7 +223,7 @@ def _denovo_gibbs_sampler(
             # break into intervals
             intervals = structural.random_breaks(n_breaks, n_base)
             
-            # compound step
+            # compound structural step
             llk = structural.compound_step(
                 genotype=genotype, 
                 reads=reads, 
@@ -68,8 +231,10 @@ def _denovo_gibbs_sampler(
                 intervals=intervals,
                 allow_recombinations=allow_recombinations,
                 allow_dosage_swaps=allow_dosage_swaps,
-                allow_deletions=allow_deletions
             )
+
+            # followed by mutation step
+            llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask)
         
         genotype_trace[i] = genotype.copy() # TODO: is this copy needed?
         llk_trace[i] = llk
@@ -189,176 +354,3 @@ def _homozygosity_probabilities(reads, ploidy):
         probs[i, 0:n_alleles] = util.log_likelihoods_as_conditionals(llks)[homozygous_genotypes]
         
     return probs
-
-
-
-@dataclass
-class DenovoMCMC(Assembler):
-
-    ploidy: int
-    steps: int = 1000
-    ratio: int = 0.75
-    alpha: float = 1.0
-    beta: float = 3.0
-    n_intervals: int = None
-    fix_homozygous: float = 0.999
-    allow_recombinations: bool = True
-    allow_dosage_swaps: bool = True
-    allow_deletions: bool = True
-    """De novo haplotype assembly using Markov chain Monte Carlo
-    for probabilistically encoded variable positions of NGS reads.
-
-    Attributes
-    ----------
-    ploidy : int
-        Ploidy of organisim at the assembled locus.
-    steps : int, optional
-        Number of steps to run in the MCMC simulation
-        (default = 1000).
-    ratio : float, optional
-        Ratio of mutation steps to structural steps to use
-        in the MCMC simulation (default = 0.75).
-    alpha, beta : float, optional
-        Parameters defining a Beta distribution to sample
-        the number of random intervals to generate at each
-        structural step in the MCMC simulation 
-        (defaults = 1.0, 3.0).
-    n_intervals : int, optional
-        If set structural steps in the MCMC will always use
-        this number of intevals ignoring the alpha and beta
-        parameters (default = None).
-    fix_homozygous : float, optional
-        Individual variant positions that have a posterior
-        probability of being homozygous that is greater than
-        this value will be fixed as non-variable positions
-        during the MCMC simulation. This can greatly improve
-        performance when there are multiple homozygous 
-        alleles (default = 0.999).
-    allow_recombinations : bool, optional
-        Set to False to dis-allow structural steps involving
-        the recombination of part of a pair of haplotypes
-        (default = True).
-    allow_dosage_swaps : bool, optional
-        Set to False to dis-allow structural steps involving
-        dosage changes between parts of a pair of haplotypes
-        (default = True).
-    allow_deletions : bool, optional
-        Set to False to dis-allow structural steps involving
-        dosage changes that remove part or all of the only 
-        copy of a haplotype from the genotype
-        (default = True).
-
-    """
-
-    def fit(self, reads, initial=None):
-        """Fit the parametized model to a set of probabilistically 
-        encoded variable positions of NGS reads.
-
-        Parameters
-        ----------
-        reads : ndarray, float, shape (n_reads, n_positions, max_allele)
-            Probabilistically encoded variable positions of NGS reads.
-        initial : ndarray, int, shape (ploidy, n_positions, max_allele), optional
-            Set the initial genotype state of the MCMC simulation
-            (default = None).
-
-        Returns
-        -------
-        trace : GenotypeTrace
-            An instance of GenotypeTrace containing the genotype state
-            and log-likelihood at each step in the MCMC simulation.
-        
-        Notes
-        -----
-        If the initial genotype state is not set by the user
-        then it is automatically set by sampling <ploidy> random 
-        haplotypes from the mean allele probabilities 
-        among all reads.
-
-        """
-
-        # identify base positions that are overwhelmingly likely
-        # to be homozygous
-        # these can be 'fixed' to reduce computational complexity
-        hom_probs = _homozygosity_probabilities(reads, self.ploidy)
-        fixed = hom_probs >= self.fix_homozygous
-        homozygous = np.any(fixed, axis=-1)
-        heterozygous = ~homozygous
-
-        # subset of read positions which have not been identified 
-        # as homozygous
-        reads_het = reads[:, heterozygous]
-
-        # counts of total number of bases and number of het bases
-        _, n_base, _ = reads.shape
-        _, n_het_base, _ = reads_het.shape
-
-        # if all bases are fixed homozygous we don't need to sample anything
-        if n_het_base == 0:
-            # create a haplotype of the fixed alleles
-            idx, vals = np.where(fixed)
-            haplotype = np.zeros(n_base, dtype=np.int8)
-            haplotype[idx] = vals
-            # tile for each haplotype in each "step"
-            genotypes = np.tile(haplotype, (self.steps, self.ploidy, 1))
-            # set likelihoods to nan
-            llks = np.empty(self.steps, dtype=np.float)
-            llks[:] = np.nan
-            return GenotypeTrace(genotypes, llks)
-
-        # set the initial genotype
-        if initial is None:
-            # for each haplotype, take a random sample of mean of reads
-            var_dist = _read_mean_dist(reads_het)
-            genotype = np.empty((self.ploidy, n_het_base), dtype=np.int8)
-            for i in range(self.ploidy):
-                genotype[i] = probabilistic.sample_alleles(var_dist)
-        else:
-            # use the provided array
-            assert initial.shape == (self.ploidy, n_het_base)
-            genotype = initial.copy()
-
-        # distribution to draw number of break points from for structural steps
-        if self.n_intervals is None:
-            # random number of intervals based on beta distribution
-            break_dist = _point_beta_probabilities(n_het_base, self.alpha, self.beta)
-        else:
-            # this is a hack to fix number of intervals to a constant
-            break_dist = np.zeros(self.n_intervals, dtype=np.float64)
-            break_dist[-1] = 1  # 100% probability of n_intervals -1 break points
-
-        # Automatically mask out alleles for which all reads have a probability of 0
-        # A probability of 0 indicates that the allele is invalid (zero padding)
-        # Masking alleles stops that allele being assessed in the
-        # mcmc and hence reduces paramater space and compute time.
-        mask = np.all(reads_het == 0, axis=-3)
-
-        # run the sampler on the heterozygous positions
-        genotypes, llks = _denovo_gibbs_sampler(
-            genotype, 
-            reads_het, 
-            mask=mask,
-            ratio=self.ratio, 
-            steps=self.steps, 
-            break_dist=break_dist,
-            allow_recombinations=self.allow_recombinations,
-            allow_dosage_swaps=self.allow_dosage_swaps,
-            allow_deletions=self.allow_deletions
-        )
-
-        # return the genotype trace and llks
-        if n_het_base == n_base:
-            # no fixed homozygous alleles to add back in
-            return GenotypeTrace(genotypes, llks)
-
-        else:
-            # add back in the fixed alleles that where removed
-            # create a template of the fized alleles
-            idx, vals = np.where(fixed)
-            template = np.zeros(n_base, dtype=genotypes.dtype)
-            template[idx] = vals
-            # tile for each haplotype in each step
-            template = np.tile(template, (self.steps, self.ploidy, 1))
-            # add in the heterozygous alleles from the real trace
-            template[:, :, heterozygous] = genotypes
-            return GenotypeTrace(template, llks)
