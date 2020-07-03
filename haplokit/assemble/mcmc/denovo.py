@@ -43,15 +43,14 @@ def _denovo_gibbs_sampler(
         if np.isnan(llk):
             raise ValueError('Encountered log likelihood of nan')
         
-        # chance of mutation step
-        choice = ratio > np.random.random()
+        choice = ratio < np.random.random()
         
         if choice:
-            # mutation step
+            # mutation step only
             llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask)
         
         else:
-            # structural step
+            # structural step followed by mutation step
             
             # choose number of break points
             n_breaks = util.random_choice(break_dist)
@@ -59,7 +58,7 @@ def _denovo_gibbs_sampler(
             # break into intervals
             intervals = structural.random_breaks(n_breaks, n_base)
             
-            # compound step
+            # compound structural step
             llk = structural.compound_step(
                 genotype=genotype, 
                 reads=reads, 
@@ -198,7 +197,7 @@ class DenovoMCMC(Assembler):
 
     ploidy: int
     steps: int = 1000
-    ratio: int = 0.75
+    ratio: float = 1.0
     alpha: float = 1.0
     beta: float = 3.0
     n_intervals: int = None
@@ -216,8 +215,8 @@ class DenovoMCMC(Assembler):
         Number of steps to run in the MCMC simulation
         (default = 1000).
     ratio : float, optional
-        Ratio of mutation steps to structural steps to use
-        in the MCMC simulation (default = 0.75).
+        Proportion of steps to include structural sub-steps
+        in the MCMC simulation (default = 1.0).
     alpha, beta : float, optional
         Parameters defining a Beta distribution to sample
         the number of random intervals to generate at each
