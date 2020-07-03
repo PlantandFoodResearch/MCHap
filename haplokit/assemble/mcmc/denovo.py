@@ -25,7 +25,6 @@ def _denovo_gibbs_sampler(
         break_dist,
         allow_recombinations,
         allow_dosage_swaps,
-        allow_deletions
     ):
     """Jitted worker function for method `fit` of class `DenovoMCMC`.
 
@@ -206,7 +205,6 @@ class DenovoMCMC(Assembler):
     fix_homozygous: float = 0.999
     allow_recombinations: bool = True
     allow_dosage_swaps: bool = True
-    allow_deletions: bool = True
     """De novo haplotype assembly using Markov chain Monte Carlo
     for probabilistically encoded variable positions of NGS reads.
 
@@ -243,11 +241,6 @@ class DenovoMCMC(Assembler):
     allow_dosage_swaps : bool, optional
         Set to False to dis-allow structural steps involving
         dosage changes between parts of a pair of haplotypes
-        (default = True).
-    allow_deletions : bool, optional
-        Set to False to dis-allow structural steps involving
-        dosage changes that remove part or all of the only 
-        copy of a haplotype from the genotype
         (default = True).
 
     """
@@ -345,7 +338,6 @@ class DenovoMCMC(Assembler):
             break_dist=break_dist,
             allow_recombinations=self.allow_recombinations,
             allow_dosage_swaps=self.allow_dosage_swaps,
-            allow_deletions=self.allow_deletions
         )
 
         # return the genotype trace and llks
