@@ -482,7 +482,6 @@ def interval_step(
         interval=None, 
         allow_recombinations=True,
         allow_dosage_swaps=True,
-        allow_deletions=False
     ):
     """A structural sub-step of an MCMC simulation constrained to 
     a single interval contating a sub-set of positions of a genotype.
@@ -508,11 +507,6 @@ def interval_step(
         Set to False to dis-allow structural steps involving
         dosage changes between parts of a pair of haplotypes
         (default = True).
-    allow_deletions : bool, optional
-        Set to False to dis-allow structural steps involving
-        dosage changes that remove part or all of the only 
-        copy of a haplotype from the genotype
-        (default = True).
 
     Returns
     -------
@@ -525,62 +519,92 @@ def interval_step(
     The `genotype` variable is updated in place.
 
     """
-
-    ploidy, _ = genotype.shape
-
+    # labels for interval/non-interval components of current genotype
     labels = haplotype_segment_labels(genotype, interval)
 
     # calculate number of potential steps from current state
-    if allow_recombinations:
-        n_recombine = recombination_step_n_options(labels)
+    if allow_recombinations and allow_dosage_swaps:
+        steps = np.append(
+            recombination_step_options(labels),
+            dosage_step_options(labels),
+            axis=0,
+        )
+    elif allow_recombinations:
+        steps = recombination_step_options(labels)
+    elif allow_dosage_swaps:
+        steps = dosage_step_options(labels)
     else:
-        n_recombine = 0
-    if allow_dosage_swaps:
-        n_dosage = dosage_step_n_options(labels, allow_deletions)
-    else:
-        n_dosage = 0
-    n_steps = n_recombine + n_dosage
+        raise ValueError('Must allow recombination and/or dosage steps.')
 
-    # not stepping is also an option
+    # number of neighbouring genotypes
+    n_steps = len(steps)
+
+    # non-transition is also an option
     n_options = n_steps + 1
 
-    # array of step options
-    steps = np.empty((n_steps, ploidy), np.int8)
-    if allow_recombinations:
-        steps[0:n_recombine] = recombination_step_options(labels)
-    if allow_dosage_swaps:
-        steps[n_recombine:] = dosage_step_options(labels, allow_deletions)
+    # labels for interval/non-interval components of neighbouring genotypes
+    neighbour_labels = labels.copy()
 
-    # log liklihood for each new option and the current state
+    # Log of ratios of proposal probabilities of transitioning to and from
+    # each neighbouring genotype (required to balance proposal distribution)
+    log_proposal_ratios = np.empty(n_options)
+    for neighbour in range(n_steps):
+
+        # probability of proposing a transition to neighbour
+        to_neighbour_prob = 1 / n_options
+
+        # alter within interval labels to match neighbours genotype 
+        neighbour_labels[:,0] = labels[:,0][steps[neighbour]]
+
+        # probability of proposing a transition back from neighbour
+        neighbour_n_options = 1  # non-transition
+        if allow_recombinations:
+            neighbour_n_options += recombination_step_n_options(neighbour_labels)
+        if allow_dosage_swaps:
+            neighbour_n_options += dosage_step_n_options(neighbour_labels)
+        from_neighbour_prob = 1 / neighbour_n_options
+
+        # store log of ratio of probs
+        ratio = from_neighbour_prob / to_neighbour_prob
+        log_proposal_ratios[neighbour] = np.log(ratio)
+
+    # final option is to keep the current genotype 
+    log_proposal_ratios[-1] = np.log(1.0)
+
+    # log liklihood for each neighbouring genotype and the current
     llks = np.empty(n_options)
     
-    # iterate through new options and calculate log-likelihood
-    for opt in range(n_steps):
-        llks[opt] = log_likelihood_structural_change(
+    # iterate through neighbouring genotypes and calculate log-likelihood
+    for neighbour in range(n_steps):
+        llks[neighbour] = log_likelihood_structural_change(
             reads, 
             genotype, 
-            steps[opt],
+            steps[neighbour],
             interval
         )
 
-    # final option is to keep the initial genotype (no recombination)
+    # final option is to keep the current genotype 
     llks[-1] = llk
 
-    # calculate conditional probs
-    conditionals = util.log_likelihoods_as_conditionals(llks)
+    # acceptance distribution ratios of each transition option
+    log_accept = (llks - llk) + (log_proposal_ratios)
 
-    # choose new dosage based on conditional probabilities
+    # calculate conditional probs of acceptance for all transitions
+    conditionals = util.log_likelihoods_as_conditionals(log_accept)
+
+    # choose new genotype based on conditional probabilities
     choice = util.random_choice(conditionals)
        
     if choice == (n_options - 1):
-        # the choice is to keep the current state
+        # the choice is to keep the current genotype
         pass
     else:
         # update the genotype state
         structural_change(genotype, steps[choice], interval)
+        llk = llks[choice]
 
-    # return llk of new state
-    return llks[choice]
+    # return llk of new genotype
+    return llk
 
 
 @numba.njit
@@ -591,7 +615,6 @@ def compound_step(
         intervals,  
         allow_recombinations=True,
         allow_dosage_swaps=True,
-        allow_deletions=False,
         randomise=True
     ):
     """A structural step of an MCMC simulation consisting of
@@ -618,11 +641,6 @@ def compound_step(
     allow_dosage_swaps : bool, optional
         Set to False to dis-allow structural steps involving
         dosage changes between parts of a pair of haplotypes
-        (default = True).
-    allow_deletions : bool, optional
-        Set to False to dis-allow structural steps involving
-        dosage changes that remove part or all of the only 
-        copy of a haplotype from the genotype
         (default = True).
     randomise : bool, optional
         If True then the order of substeps (as defined by the 
@@ -655,6 +673,5 @@ def compound_step(
             interval=intervals[i], 
             allow_recombinations=allow_recombinations,
             allow_dosage_swaps=allow_dosage_swaps,
-            allow_deletions=allow_deletions
         )
     return llk
