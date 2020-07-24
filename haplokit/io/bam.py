@@ -164,7 +164,7 @@ def add_nan_read_if_empty(locus, symbols, quals):
     assert np.size(symbols) == np.size(quals)
     if np.size(symbols) == 0:
         symbols = np.array(['-'] * len(locus.variants))
-        quals = np.array(['!'] * len(locus.variants))
+        quals = np.zeros(len(locus.variants))
     return symbols, quals
 
 
