@@ -156,14 +156,19 @@ def extract_read_variants(
     return data
 
 
-def encode_read_alleles(locus, symbols):
+def add_nan_read_if_empty(locus, symbols, quals):
+    # This is a hack to let static computation graphs compleate 
+    # when there are no reads for a sample
+    # by specifying a single read of gaps only, the posterior
+    # should approximate the prior
+    assert np.size(symbols) == np.size(quals)
     if np.size(symbols) == 0:
-        # This is a hack to let static computation graphs compleate 
-        # when there are no reads for a sample
-        # by specifying a single read of gaps only, the posterior
-        # should approximate the prior
         symbols = np.array(['-'] * len(locus.variants))
+        quals = np.array(['!'] * len(locus.variants))
+    return symbols, quals
 
+
+def encode_read_alleles(locus, symbols):
     return _as_allelic(symbols, alleles=locus.alleles)
 
 
