@@ -163,8 +163,8 @@ def add_nan_read_if_empty(locus, symbols, quals):
     # should approximate the prior
     assert np.size(symbols) == np.size(quals)
     if np.size(symbols) == 0:
-        symbols = np.array(['-'] * len(locus.variants))
-        quals = np.zeros(len(locus.variants))
+        symbols = np.array([['-'] * len(locus.variants) ])
+        quals = np.zeros((1, len(locus.variants)), dtype=np.int8)
     return symbols, quals
 
 
