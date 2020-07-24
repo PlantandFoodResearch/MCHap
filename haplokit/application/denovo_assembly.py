@@ -10,6 +10,7 @@ from haplokit.io import \
     read_loci, \
     extract_sample_ids, \
     extract_read_variants, \
+    add_nan_read_if_empty, \
     encode_read_alleles, \
     encode_read_distributions, \
     qual_of_prob, \
@@ -305,7 +306,8 @@ class program(object):
                 path = self.sample_bam[sample]
                 
                 # assemble
-                read_variants = delayed(extract_read_variants)(locus, path, samples=sample, id='SM')[sample]
+                read_variants_unsafe = delayed(extract_read_variants)(locus, path, samples=sample, id='SM')[sample]
+                read_variants = delayed(add_nan_read_if_empty)(locus, read_variants_unsafe[0], read_variants_unsafe[1])
                 read_symbols=read_variants[0]
                 read_quals=read_variants[1]
                 read_calls = delayed(encode_read_alleles)(locus, read_symbols)
