@@ -86,6 +86,11 @@ def kmer_representation(variants, haplotype_calls, k=3):
     read_kmers, read_kmer_counts = allelic.kmer_counts(variants, k=k)
     hap_kmers, _ = allelic.kmer_counts(haplotype_calls, k=k)
     
+    # handle case of no read kmers (i.e. from nan reads)
+    if np.prod(read_kmers.shape) == 0:
+        _, n_pos = hap_kmers.shape
+        return np.ones(n_pos)
+
     # index of kmers not found in haplotypes
     idx = mset.count(hap_kmers, read_kmers).astype(np.bool) == False
     
