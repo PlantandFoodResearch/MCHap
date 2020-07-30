@@ -15,7 +15,10 @@ setup(
     author_email='tim.millar@plantandfood.co.nz',
     description='Local haplotype manipulation and assembly',
     long_description=read_file('README.rst'),
-    scripts=['applications/haplokit-denovo.py'],
+    scripts=[
+        'applications/haplokit-denovo.py',
+        'applications/haplokit-haplograph.py',
+    ],
     packages=[
         'haplokit',
         'haplokit/application',
