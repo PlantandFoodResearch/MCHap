@@ -7,8 +7,7 @@ from haplokit.application.denovo_assembly import program
 
 def main():
     prog = program.cli(sys.argv)
-    vcf = prog.run()
-    for line in vcf.lines():
+    for line in prog.compute_lines():
         print(line)
 
 

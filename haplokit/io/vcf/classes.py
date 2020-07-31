@@ -53,9 +53,6 @@ class VCFHeader(object):
     def __str__(self):
         return '\n'.join(self.lines())
 
-    def new_record(self, *args, **kwargs):
-        return VCFRecord(self, *args, **kwargs)
-
 
 @dataclass(frozen=True)
 class VCFRecord(object):
@@ -105,7 +102,7 @@ class VCF(object):
     records: list
         
     def append(self, *args, **kwargs):
-        record = self.header.new_record(*args, **kwargs)
+        record = VCFRecord(self.header, *args, **kwargs)
         self.records.append(record)
         
     def lines(self, header=True, records=True):
