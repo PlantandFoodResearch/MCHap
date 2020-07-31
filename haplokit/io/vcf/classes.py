@@ -1,6 +1,5 @@
 import numpy as np 
 from dataclasses import dataclass
-from Bio import bgzf
 
 from haplokit.io.vcf.util import vcfstr
 
@@ -32,7 +31,6 @@ class VCFHeader(object):
         else:
             return cols
             
-    
     def lines(self):
 
         for obj in self.meta:
@@ -55,92 +53,68 @@ class VCFHeader(object):
     def __str__(self):
         return '\n'.join(self.lines())
 
+    def new_record(self, *args, **kwargs):
+        return VCFRecord(self, *args, **kwargs)
+
+
+@dataclass(frozen=True)
+class VCFRecord(object):
+    header: VCFHeader
+    chrom: str = None 
+    pos: int = None 
+    id: str = None 
+    ref: str = None 
+    alt: tuple = None 
+    qual: int = None 
+    filter: str = None 
+    info: dict = None # key: value
+    format: dict = None # sample: key: value
+
+    def __str__(self):
+
+        # order info based on header
+        info = dict() if self.info is None else self.info
+        ikeys = [f.id for f in self.header.info_fields]
+        info = ';'.join(['{}={}'.format(str(k), vcfstr(info.get(k))) for k in ikeys])
+
+        # order sample data based on header
+        format_ = dict() if self.format is None else self.format
+        samples = self.header.samples
+        fkeys = [f.id for f in self.header.format_fields]
+        samples = '\t'.join([':'.join([vcfstr(format_.get(s, {}).get(k)) for k in fkeys]) for s in samples])
+        format = ':'.join(fkeys)
+
+        line = [
+            vcfstr(self.chrom),
+            vcfstr(self.pos),
+            vcfstr(self.id),
+            vcfstr(self.ref),
+            vcfstr(self.alt),
+            vcfstr(self.qual),
+            vcfstr(self.filter),
+            info,
+            format,
+            samples,
+        ]
+        return '\t'.join(line)
+
 
 @dataclass
 class VCF(object):
     header: VCFHeader
-    data: list
+    records: list
         
-    def append(self, chrom=None, pos=None, id=None, ref=None, alt=None, qual=None, filter=None, info=None, format=None):
+    def append(self, *args, **kwargs):
+        record = self.header.new_record(*args, **kwargs)
+        self.records.append(record)
         
-        info = dict() if info is None else info
-        info_keys = (f.id for f in self.header.info_fields)
-        info_ = tuple((k, info.get(k)) for k in info_keys)
-        
-        format = dict() if format is None else format
-        sample_dicts = ((s, format.get(s, {})) for s in self.header.samples)
-        format_keys = tuple(f.id for f in self.header.format_fields)
-        format_ = tuple((s, tuple((k, d.get(k)) for k in format_keys)) for s, d in sample_dicts)
-        
-        self.data.append((chrom, pos, id, ref, alt, qual, filter, info_, format_))
-        
-    def data_lines(self):
-        
-        sample_order = tuple(self.header.samples)
-        info_keys = tuple(f.id for f in self.header.info_fields)
-        format_keys = tuple(f.id for f in self.header.format_fields)
-        
-        for tup in self.data:
-            
-            assert len(tup) == 9
-            line = list(map(vcfstr, tup[0:7]))
-            
-            info = tup[7]
-            format_=tup[8]
-            
-            # ensure info data in correct order
-            assert info_keys == tuple(k for k, _ in info)
-            
-            # info string 
-            line.append(';'.join(('{}={}'.format(k, vcfstr(v)) for k, v in info)))
-            
-            # format string
-            line.append(':'.join(format_keys))
-            
-            # ensure samples in correct order
-            assert sample_order == tuple(s for s, _ in format_)
-            
-            # iter through sample specific format data
-            for _, sample_data in format_:
-            
-                # ensure format data in correct order
-                assert format_keys == tuple(k for k, _ in sample_data)
-                
-                # sample format string
-                line.append(':'.join((vcfstr(v) for _, v in sample_data)))
-                
-            yield '\t'.join(line)
-
-
-    def lines(self):
-
-        yield from self.header.lines()
-        yield from self.data_lines()
-
-
-    def view(self, n=5, header=False):
-
-        lines = self.data_lines()
-        if n:
-            string = '\n'.join(line for line, _ in zip(lines, range(n)))
-        else:
-            string = '\n'.join(lines)
+    def lines(self, header=True, records=True):
 
         if header:
-            string = str(self.header) + '\n' + string
+            yield from self.header.lines()
+        if records:
+            for record in self.records:
+                yield str(record)
 
-        return string
-
-    
     def __str__(self):
-        return self.view(n=False, header=True)
-
-
-    def write(self, path, bgzip=False):
-
-        open_ = bgzf.open if bgzip else open
-
-        with open_(path, 'w') as f:
-            for line in self.lines():
-                f.write(line + '\n')
-            
+        return '\n'.join(self.lines())
