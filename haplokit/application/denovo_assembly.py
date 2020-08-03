@@ -1,8 +1,10 @@
+import sys
 import argparse
 import numpy as np
 from dataclasses import dataclass
 import pysam
 from itertools import islice
+import multiprocessing as mp
 
 from haplokit.assemble.mcmc.denovo import DenovoMCMC
 from haplokit.encoding import symbolic
@@ -204,14 +206,6 @@ class program(object):
             help=('Number of cpu cores to use (default = 1).')
         )
 
-        parser.add_argument(
-            '--chunk-size',
-            type=int,
-            nargs=1,
-            default=[10],
-            help=('Number bed intervals to compute at one time (default = 10).')
-        )
-
         args = parser.parse_args(command[1:])
 
         # sample bam paths and ploidy
@@ -261,7 +255,6 @@ class program(object):
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
             n_cores=args.cores[0],
-            chunk_size=args.chunk_size[0],
         )
 
     def loci(self):
@@ -490,6 +483,19 @@ class program(object):
 
         return record
 
+    def _worker(self, header, locus, queue):
+        line = str(self._compute_graph(header, locus))
+        queue.put(line)
+        return line
+
+    def _writer(self, queue):
+        while True:
+            line = queue.get()
+            if line == 'KILL':
+                break
+            sys.stdout.write(line + '\n')
+            sys.stdout.flush()
+
     def run(self):
 
         header = self.header()
@@ -497,19 +503,30 @@ class program(object):
         return vcf.VCF(header, records)
 
 
-    def iter_lines(self):
+    def write_lines(self):
 
         header = self.header()
-        yield from header.lines()
 
-        loci = self.loci()
+        for line in header.lines():
+            sys.stdout.write(line + '\n')
+        sys.stdout.flush()
 
-        running = True
-        while running:
-            # take next N loci
-            chunk = list(islice(loci, self.chunk_size))
-            if chunk == []:
-                break
-            records = [self._compute_graph(header, locus) for locus in chunk]
-            for record in records:
-                yield str(record)
+        manager = mp.Manager()
+        queue = manager.Queue()
+        pool = mp.Pool(self.n_cores)
+
+        # start writer process
+        writer = pool.apply_async(self._writer, (queue,))
+
+        jobs = []
+        for locus in self.loci():
+            job = pool.apply_async(self._worker, (header, locus, queue))
+            jobs.append(job)
+
+        for job in jobs:
+            job.get()
+
+        queue.put('KILL')
+        pool.close()
+        pool.join()
+

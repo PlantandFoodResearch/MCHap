@@ -7,8 +7,7 @@ from haplokit.application.denovo_assembly import program
 
 def main():
     prog = program.cli(sys.argv)
-    for line in prog.compute_lines():
-        print(line)
+    prog.write_lines()
 
 
 if __name__ == "__main__":
