@@ -17,14 +17,6 @@ def vcfstr(obj):
         return str(obj)
 
 
-def vcfround(obj, decimals):
-    if hasattr(obj, '__iter__'):
-        return [vcfround(o, decimals) for o in obj]
-    elif isinstance(obj, float):
-        return np.round(obj, decimals)
-    else:
-        return obj
-
 def if_not_none(func, option, *args, **kwargs):
     if option is None:
         return None

@@ -146,6 +146,10 @@ def depth_filter_header(threshold=5.0):
 
 
 def depth_variant_filter(depths, threshold=5.0, gap='-'):
+    n_pos = depths.shape[-1]
+    if np.prod(depths.shape) == 0:
+        # can't apply depth filter across 0 variants
+        return [_NULL_CODE for _ in range(n_pos)]
     fails = depths < threshold
     code = _DEPTH_CODE.format(threshold=threshold)
     return [code if fail else _PASS_CODE for fail in fails]
@@ -153,6 +157,9 @@ def depth_variant_filter(depths, threshold=5.0, gap='-'):
 
 def depth_haplotype_filter(depths, threshold=5.0, gap='-'):
     code = _DEPTH_CODE.format(threshold=threshold)
+    if np.prod(depths.shape) == 0:
+        # can't apply depth filter across 0 variants
+        return FilterCall(code, None, applied=False)
     fail = np.mean(depths) < threshold
     return FilterCall(code, fail)
 

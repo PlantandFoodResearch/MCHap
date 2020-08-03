@@ -162,7 +162,8 @@ def add_nan_read_if_empty(locus, symbols, quals):
     # by specifying a single read of gaps only, the posterior
     # should approximate the prior
     assert np.size(symbols) == np.size(quals)
-    if np.size(symbols) == 0:
+    n_reads = symbols.shape[0]
+    if np.size(n_reads) == 0:
         symbols = np.array([['-'] * len(locus.variants) ])
         quals = np.zeros((1, len(locus.variants)), dtype=np.int16)
     return symbols, quals

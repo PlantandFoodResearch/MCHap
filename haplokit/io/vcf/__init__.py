@@ -5,4 +5,4 @@ from haplokit.io.vcf import filters
 from haplokit.io.vcf import util
 from .classes import *
 from .genotypes import Genotype, HaplotypeAlleleLabeler, call_phenotype
-from .contigs import ContigHeader, contig_headers
+from .contigs import ContigHeader

@@ -87,7 +87,7 @@ def as_probabilistic(array,
     values which will also be padded with `0` values if as required.
     
     """
-    vector_size = np.max(n_alleles)
+    vector_size = int(np.max(n_alleles, initial=0))
 
     n_alleles = _tile_to_shape(n_alleles, array.shape)
     p = _tile_to_shape(p, array.shape)

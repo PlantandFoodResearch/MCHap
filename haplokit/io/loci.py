@@ -57,6 +57,14 @@ class Locus:
         data.update(kwargs)
         return type(self)(**data)
 
+    def set_sequence(self, fasta):
+        with pysam.FastaFile(fasta) as f:
+            return _set_locus_sequence(self, f)
+
+    def set_variants(self, vcf):
+        with pysam.VariantFile(vcf) as f:
+            return _set_locus_variants(self, f)
+
     def _template_sequence(self):
         chars = list(self.sequence)
         ref_alleles = (tup[0] for tup in self.alleles)
