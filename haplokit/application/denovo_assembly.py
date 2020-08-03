@@ -206,6 +206,14 @@ class program(object):
             help=('Number of cpu cores to use (default = 1).')
         )
 
+        parser.add_argument(
+            '--chunk-size',
+            type=int,
+            nargs=1,
+            default=[10],
+            help=('Number bed intervals to compute at one time (default = 10).')
+        )
+
         args = parser.parse_args(command[1:])
 
         # sample bam paths and ploidy
@@ -255,6 +263,7 @@ class program(object):
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
             n_cores=args.cores[0],
+            chunk_size=args.chunk_size[0],
         )
 
     def loci(self):
