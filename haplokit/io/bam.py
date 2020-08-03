@@ -149,8 +149,13 @@ def extract_read_variants(
         # return a dict of matrices
         for id, reads in data.items():
             tuples = list(reads.values())
-            chars = np.array([tup[0] for tup in tuples])
-            quals = np.array([tup[1] for tup in tuples])
+            if len(tuples) == 0:
+                n_pos = len(locus.positions)
+                chars = np.empty((0, n_pos), dtype='U1')
+                quals = np.empty((0, n_pos), dtype=np.int16)
+            else:
+                chars = np.array([tup[0] for tup in tuples])
+                quals = np.array([tup[1] for tup in tuples])
             data[id] = (chars, quals)
 
     return data

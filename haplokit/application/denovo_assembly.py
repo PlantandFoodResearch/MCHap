@@ -4,6 +4,7 @@ from dask import delayed
 import numpy as np
 from dataclasses import dataclass
 import pysam
+from itertools import islice
 
 from haplokit.assemble.mcmc.denovo import DenovoMCMC
 from haplokit.encoding import symbolic
@@ -49,6 +50,7 @@ class program(object):
     kmer_filter_theshold: float = 0.95
     n_cores: int = 1
     precision: int = 3
+    chunk_size: int = 10
 
     @classmethod
     def cli(cls, command):
@@ -257,7 +259,8 @@ class program(object):
 
     def loci(self):
         bed = read_bed4(self.bed, region=self.region)
-        return [delayed(b).set_sequence(self.ref).set_variants(self.vcf) for b in bed]
+        for b in bed:
+            yield delayed(b).set_sequence(self.ref).set_variants(self.vcf)
 
     def header(self):
 
@@ -498,7 +501,7 @@ class program(object):
         vcf_result = dask.compute(vcf_template, **compute_kwargs)[0] 
         return vcf_result
 
-    def compute_lines(self, header=True, records=True):
+    def compute_lines(self):
         if self.n_cores == 1:
             compute_kwargs =  dict(scheduler="threads")
         else:
@@ -507,7 +510,15 @@ class program(object):
         header = self.header()
         yield from header.lines()
 
-        for locus in self.loci():
-            graph = self._compute_graph(header, locus)
-            record = dask.compute(graph, **compute_kwargs)[0] 
-            yield str(record)
+        loci = self.loci()
+
+        running = True
+        while running:
+            # take next N loci
+            chunk = list(islice(loci, self.chunk_size))
+            if chunk == []:
+                break
+            graph = [self._compute_graph(header, locus) for locus in chunk]
+            records = dask.compute(graph, **compute_kwargs)[0] 
+            for record in records:
+                yield str(record)
