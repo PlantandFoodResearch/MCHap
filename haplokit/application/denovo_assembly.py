@@ -1,6 +1,4 @@
 import argparse
-import dask
-from dask import delayed
 import numpy as np
 from dataclasses import dataclass
 import pysam
@@ -269,7 +267,7 @@ class program(object):
     def loci(self):
         bed = read_bed4(self.bed, region=self.region)
         for b in bed:
-            yield delayed(b).set_sequence(self.ref).set_variants(self.vcf)
+            yield b.set_sequence(self.ref).set_variants(self.vcf)
 
     def header(self):
 
@@ -351,19 +349,19 @@ class program(object):
             path = self.sample_bam[sample]
             
             # assemble
-            read_variants_unsafe = delayed(extract_read_variants)(locus, path, samples=sample, id='SM')[sample]
-            read_variants = delayed(add_nan_read_if_empty)(locus, read_variants_unsafe[0], read_variants_unsafe[1])
+            read_variants_unsafe = extract_read_variants(locus, path, samples=sample, id='SM')[sample]
+            read_variants = add_nan_read_if_empty(locus, read_variants_unsafe[0], read_variants_unsafe[1])
             read_symbols=read_variants[0]
             read_quals=read_variants[1]
-            read_calls = delayed(encode_read_alleles)(locus, read_symbols)
-            reads = delayed(encode_read_distributions)(
+            read_calls = encode_read_alleles(locus, read_symbols)
+            reads = encode_read_distributions(
                 locus, 
                 read_calls, 
                 read_quals, 
                 error_rate=self.read_error_rate, 
                 gaps=True,
             )
-            trace = delayed(DenovoMCMC.parameterize)(
+            trace = DenovoMCMC.parameterize(
                 ploidy=self.sample_ploidy[sample], 
                 steps=self.mcmc_steps, 
                 ratio=self.mcmc_ratio,
@@ -381,18 +379,18 @@ class program(object):
             genotype_probs = mode[1]  # probs of observed genotypes
 
             # posterior probability of mode phenotype
-            phenotype_probability = delayed(np.sum)(genotype_probs)
-            haplotype_vcf_sample_data[sample]['PPM'] = delayed(vcf.formatfields.probabilities)(phenotype_probability, self.precision)
+            phenotype_probability = np.sum(genotype_probs)
+            haplotype_vcf_sample_data[sample]['PPM'] = vcf.formatfields.probabilities(phenotype_probability, self.precision)
 
             if self.call_best_genotype:
                 # call genotype with the highest probability within the mode phenotype
-                call_idx = delayed(np.argmax)(genotype_probs)
+                call_idx = np.argmax(genotype_probs)
                 genotype = genotype_dist[call_idx]
                 genotype_probability = genotype_probs[call_idx]
 
             else:
                 # most complete genotype of this phenotype given probability threshold (may have nulls)
-                call = delayed(vcf.call_phenotype)(
+                call = vcf.call_phenotype(
                     genotype_dist, genotype_probs, 
                     self.probability_filter_threshold
                 )
@@ -400,29 +398,29 @@ class program(object):
                 genotype_probability = call[1]
 
             # posterior probability of called genotype
-            haplotype_vcf_sample_data[sample]['GPM'] = delayed(vcf.formatfields.probabilities)(genotype_probability, self.precision)
+            haplotype_vcf_sample_data[sample]['GPM'] = vcf.formatfields.probabilities(genotype_probability, self.precision)
             
             # depth 
-            depth = delayed(symbolic.depth)(read_symbols)  # also used in filter
-            haplotype_vcf_sample_data[sample]['DP'] = delayed(vcf.formatfields.haplotype_depth)(depth)
+            depth = symbolic.depth(read_symbols)  # also used in filter
+            haplotype_vcf_sample_data[sample]['DP'] = vcf.formatfields.haplotype_depth(depth)
 
             # genotype quality
-            haplotype_vcf_sample_data[sample]['GQ'] = delayed(vcf.formatfields.quality)(genotype_probability) 
+            haplotype_vcf_sample_data[sample]['GQ'] = vcf.formatfields.quality(genotype_probability) 
 
             # phenotype quality
-            haplotype_vcf_sample_data[sample]['PQ'] = delayed(vcf.formatfields.quality)(phenotype_probability)
+            haplotype_vcf_sample_data[sample]['PQ'] = vcf.formatfields.quality(phenotype_probability)
 
             # filters
-            filter_results = delayed(vcf.filters.FilterCallSet.new)(
-                delayed(vcf.filters.prob_filter)(
+            filter_results = vcf.filters.FilterCallSet.new(
+                vcf.filters.prob_filter(
                     phenotype_probability,
                     threshold=self.probability_filter_threshold,
                 ),
-                delayed(vcf.filters.depth_haplotype_filter)(
+                vcf.filters.depth_haplotype_filter(
                     depth, 
                     threshold=self.depth_filter_threshold,
                 ),
-                delayed(vcf.filters.kmer_haplotype_filter)(
+                vcf.filters.kmer_haplotype_filter(
                     read_calls, 
                     genotype,
                     k=self.kmer_filter_k,
@@ -441,18 +439,18 @@ class program(object):
 
             else:
                 # filter genotype/phenotype and store
-                genotype_filtered = delayed(vcf.filters.null_filtered_array)(genotype, filter_results.failed)
+                genotype_filtered = vcf.filters.null_filtered_array(genotype, filter_results.failed)
                 sample_genotype_arrays[sample] = genotype_filtered
 
                 # store observed genotypes of mode phenotype
-                genotype_dist_filtered = delayed(vcf.filters.null_filtered_array)(genotype_dist, filter_results.failed)
+                genotype_dist_filtered = vcf.filters.null_filtered_array(genotype_dist, filter_results.failed)
                 sample_genotype_dists[sample] = (genotype_dist_filtered, genotype_probs)
         
         # label haplotypes for haplotype vcf
         observed_genotypes = list(sample_genotype_arrays.values())
-        labeler = delayed(vcf.HaplotypeAlleleLabeler.from_obs)(observed_genotypes)
+        labeler = vcf.HaplotypeAlleleLabeler.from_obs(observed_genotypes)
         ref_seq = locus.sequence
-        alt_seqs = delayed(locus.format_haplotypes)(labeler.alt_array())
+        alt_seqs = locus.format_haplotypes(labeler.alt_array())
         allele_counts = labeler.count_obs(observed_genotypes)
 
         # add genotypes to sample data
@@ -467,12 +465,12 @@ class program(object):
             tup = labeler.label_phenotype_posterior(genotypes, probs, expected_dosage=True)
             ordered_probs = tup[1]
             expected_dosage = tup[2]
-            haplotype_vcf_sample_data[sample]['MPGP'] = delayed(vcf.formatfields.probabilities)(ordered_probs, self.precision)
-            haplotype_vcf_sample_data[sample]['MPED'] = delayed(vcf.formatfields.probabilities)(expected_dosage, self.precision)
+            haplotype_vcf_sample_data[sample]['MPGP'] = vcf.formatfields.probabilities(ordered_probs, self.precision)
+            haplotype_vcf_sample_data[sample]['MPED'] = vcf.formatfields.probabilities(expected_dosage, self.precision)
         
         # construct vcf record
         record = vcf.VCFRecord(
-            delayed(header),
+            header,
             chrom=locus.contig, 
             pos=locus.start, 
             id=locus.name, 
@@ -482,39 +480,24 @@ class program(object):
             filter=None, 
             info=dict(
                 END=locus.stop,
-                VP=delayed(vcf.vcfstr)(delayed(np.subtract)(locus.positions, locus.start)),
+                VP=vcf.vcfstr(np.subtract(locus.positions, locus.start)),
                 NS=len(header.samples),
                 AC=allele_counts[1:],  # exclude reference count
-                AN=delayed(np.sum)(delayed(np.greater)(allele_counts, 0)),
+                AN=np.sum(np.greater(allele_counts, 0)),
             ), 
             format=haplotype_vcf_sample_data,
         )
 
         return record
 
-    def template(self):
+    def run(self):
 
         header = self.header()
         records = [self._compute_graph(header, locus) for locus in self.loci()]
         return vcf.VCF(header, records)
 
-    def compute(self):
 
-        vcf_template = self.template()
-
-        if self.n_cores == 1:
-            compute_kwargs =  dict(scheduler="threads")
-        else:
-            compute_kwargs =  dict(scheduler="processes", num_workers=self.n_cores)
-
-        vcf_result = dask.compute(vcf_template, **compute_kwargs)[0] 
-        return vcf_result
-
-    def compute_lines(self):
-        if self.n_cores == 1:
-            compute_kwargs =  dict(scheduler="threads")
-        else:
-            compute_kwargs =  dict(scheduler="processes", num_workers=self.n_cores)
+    def iter_lines(self):
 
         header = self.header()
         yield from header.lines()
@@ -527,7 +510,6 @@ class program(object):
             chunk = list(islice(loci, self.chunk_size))
             if chunk == []:
                 break
-            graph = [self._compute_graph(header, locus) for locus in chunk]
-            records = dask.compute(graph, **compute_kwargs)[0] 
+            records = [self._compute_graph(header, locus) for locus in chunk]
             for record in records:
                 yield str(record)
