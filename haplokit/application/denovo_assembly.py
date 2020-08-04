@@ -481,6 +481,13 @@ class program(object):
 
         return record
 
+    def run(self):
+        header = self.header()
+        pool = mp.Pool(self.n_cores)
+        jobs = ((header, locus) for locus in self.loci())
+        records = pool.starmap(self._compute_graph, jobs)
+        return vcf.VCF(header, records)
+
     def _worker(self, header, locus, queue):
         line = str(self._compute_graph(header, locus))
         queue.put(line)
@@ -493,13 +500,6 @@ class program(object):
                 break
             sys.stdout.write(line + '\n')
             sys.stdout.flush()
-
-    def run(self):
-
-        header = self.header()
-        records = [self._compute_graph(header, locus) for locus in self.loci()]
-        return vcf.VCF(header, records)
-
 
     def run_stdout(self):
 
