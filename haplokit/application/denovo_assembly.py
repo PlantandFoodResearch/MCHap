@@ -356,9 +356,7 @@ class program(object):
             # assemble
             read_variants_unsafe = extract_read_variants(locus, path, samples=sample, id='SM')[sample]
             read_count = read_variants_unsafe[0].shape[0]
-            read_variants = add_nan_read_if_empty(locus, read_variants_unsafe[0], read_variants_unsafe[1])
-            read_symbols=read_variants[0]
-            read_quals=read_variants[1]
+            read_symbols, read_quals = add_nan_read_if_empty(locus, *read_variants_unsafe)
             read_calls = encode_read_alleles(locus, read_symbols)
             reads = encode_read_distributions(
                 locus, 
@@ -376,13 +374,8 @@ class program(object):
                 allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
             ).fit(reads)
 
-            # posterior dist
-            posterior = trace.burn(self.mcmc_burn).posterior()
-
-            # posterior mode phenotype
-            mode = posterior.mode_phenotype()
-            genotype_dist = mode[0]  # observed genotypes of this phenotype
-            genotype_probs = mode[1]  # probs of observed genotypes
+            # genotypes within posterior mode phenotype
+            genotype_dist, genotype_probs = trace.burn(self.mcmc_burn).posterior().mode_phenotype()
 
             # posterior probability of mode phenotype
             phenotype_probability = np.sum(genotype_probs)
