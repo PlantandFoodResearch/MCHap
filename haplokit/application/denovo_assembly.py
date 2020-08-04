@@ -338,7 +338,7 @@ class program(object):
 
         return vcf_header
 
-    def _compute_graph(self, header, locus):
+    def _assemble_locus(self, header, locus):
 
         # format data for sample columns in haplotype vcf
         sample_data = {sample: {} for sample in header.samples}
@@ -347,18 +347,21 @@ class program(object):
         for sample in header.samples:
             path = self.sample_bam[sample]
             
-            # assemble
-            read_variants_unsafe = extract_read_variants(locus, path, samples=sample, id='SM')[sample]
-            read_count = read_variants_unsafe[0].shape[0]
-            read_symbols, read_quals = add_nan_read_if_empty(locus, *read_variants_unsafe)
-            read_calls = encode_read_alleles(locus, read_symbols)
-            reads = encode_read_distributions(
+            # read data
+            read_chars, read_quals = extract_read_variants(locus, path, samples=sample, id='SM')[sample]
+            read_count = read_chars.shape[0]
+            read_depth = symbolic.depth(read_chars)
+            read_chars, read_quals = add_nan_read_if_empty(locus, read_chars, read_quals)
+            read_calls = encode_read_alleles(locus, read_chars)
+            read_dists = encode_read_distributions(
                 locus, 
                 read_calls, 
                 read_quals, 
                 error_rate=self.read_error_rate, 
                 gaps=True,
             )
+
+            # assemble
             trace = DenovoMCMC.parameterize(
                 ploidy=self.sample_ploidy[sample], 
                 steps=self.mcmc_steps, 
@@ -366,67 +369,44 @@ class program(object):
                 fix_homozygous=self.mcmc_fix_homozygous,
                 allow_recombinations=self.mcmc_allow_recombinations,
                 allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
-            ).fit(reads)
+            ).fit(read_dists)
 
             # posterior mode phenotype is a collection of genotypes
             phenotype = trace.burn(self.mcmc_burn).posterior().mode_phenotype()
 
-            # posterior probability of mode phenotype
-            sample_data[sample]['PPM'] = vcf.formatfields.probabilities(phenotype[1].sum(), self.precision)
-
+            # call genotype (array(ploidy, vars), probs)
             if self.call_best_genotype:
                 genotype = vcf.call_best_genotype(*phenotype)
             else:
                 genotype = vcf.call_phenotype(*phenotype, self.probability_filter_threshold)
 
-            # posterior probability of called genotype
-            sample_data[sample]['GPM'] = vcf.formatfields.probabilities(genotype[1], self.precision)
-            
-            # number of reads within haplotyp interval
-            sample_data[sample]['RC'] = read_count
-
-            # depth 
-            depth = symbolic.depth(read_symbols)  # also used in filter
-            sample_data[sample]['DP'] = vcf.formatfields.haplotype_depth(depth)
-
-            # genotype quality
-            sample_data[sample]['GQ'] = vcf.formatfields.quality(genotype[1]) 
-
-            # phenotype quality
-            sample_data[sample]['PQ'] = vcf.formatfields.quality(phenotype[1].sum())
-
             # filters
-            filter_results = vcf.filters.FilterCallSet.new(
-                vcf.filters.prob_filter(
-                    phenotype[1].sum(),
-                    threshold=self.probability_filter_threshold,
-                ),
-                vcf.filters.depth_haplotype_filter(
-                    depth, 
-                    threshold=self.depth_filter_threshold,
-                ),
-                vcf.filters.read_count_filter(
-                    read_count,
-                    threshold=self.read_count_filter_threshold,
-                ),
-                vcf.filters.kmer_haplotype_filter(
-                    read_calls, 
-                    genotype[0],
-                    k=self.kmer_filter_k,
-                    threshold=self.kmer_filter_theshold,
-                ),
-            )
-            sample_data[sample]['FT'] = filter_results
+            filterset = vcf.filters.FilterCallSet((
+                vcf.filters.prob_filter(phenotype[1].sum(), threshold=self.probability_filter_threshold),
+                vcf.filters.depth_haplotype_filter(read_depth, threshold=self.depth_filter_threshold),
+                vcf.filters.read_count_filter(read_count, threshold=self.read_count_filter_threshold),
+                vcf.filters.kmer_haplotype_filter(read_calls, genotype[0], k=self.kmer_filter_k, threshold=self.kmer_filter_theshold),
+            ))
+
+            # format fields
+            sample_data[sample].update({
+                'GPM': vcf.formatfields.probabilities(genotype[1], self.precision),
+                'PPM': vcf.formatfields.probabilities(phenotype[1].sum(), self.precision),
+                'RC': read_count,
+                'DP': vcf.formatfields.haplotype_depth(read_depth),
+                'GQ': vcf.formatfields.quality(genotype[1]),
+                'PQ': vcf.formatfields.quality(phenotype[1].sum()),
+                'FT': filterset
+            })
 
             # Null out the genotype and phenotype arrays
-            if (not self.call_filtered) and filter_results.failed:
+            if (not self.call_filtered) and filterset.failed:
                 genotype[0][:] = -1
                 phenotype[0][:] = -1
 
             # store sample genotypes/phenotypes for labeling
             sample_data[sample]['genotype'] = genotype
             sample_data[sample]['phenotype'] = phenotype
-
         
         # label haplotypes for haplotype vcf
         observed_genotypes = [sample_data[sample]['genotype'][0] for sample in header.samples]
@@ -456,7 +436,7 @@ class program(object):
             sample_data[sample]['MPED'] = vcf.formatfields.probabilities(dosage, self.precision)
         
         # construct vcf record
-        record = vcf.VCFRecord(
+        return vcf.VCFRecord(
             header,
             chrom=locus.contig, 
             pos=locus.start, 
@@ -468,17 +448,16 @@ class program(object):
             info=info_data, 
             format=sample_data,
         )
-        return record
 
     def run(self):
         header = self.header()
         pool = mp.Pool(self.n_cores)
         jobs = ((header, locus) for locus in self.loci())
-        records = pool.starmap(self._compute_graph, jobs)
+        records = pool.starmap(self._assemble_locus, jobs)
         return vcf.VCF(header, records)
 
     def _worker(self, header, locus, queue):
-        line = str(self._compute_graph(header, locus))
+        line = str(self._assemble_locus(header, locus))
         queue.put(line)
         return line
 
@@ -516,4 +495,3 @@ class program(object):
         queue.put('KILL')
         pool.close()
         pool.join()
-

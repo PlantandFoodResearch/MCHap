@@ -57,10 +57,6 @@ class FilterCallSet(object):
             else:
                 return 'PASS'
 
-    @classmethod
-    def new(cls, *args):
-        return cls(tuple(args))
-
     @property
     def failed(self):
         for call in self.calls:
