@@ -8,8 +8,9 @@ from haplokit.encoding import allelic, symbolic
 _PASS_CODE = 'PASS'
 _NULL_CODE = '.'
 _KMER_CODE = 'k{k}<{threshold}'
-_DEPTH_CODE = 'd<{threshold}'
-_PROB_CODE = 'p<{threshold}'
+_DEPTH_CODE = 'dp<{threshold}'
+_READCOUNT_CODE = 'rc<{threshold}'
+_PROB_CODE = 'pp<{threshold}'
 _FILTER_HEADER = '##FILTER=<ID={code},Description="{desc}">\n'
 
 
@@ -164,15 +165,27 @@ def depth_haplotype_filter(depths, threshold=5.0, gap='-'):
     return FilterCall(code, fail)
 
 
+def read_count_filter_header(threshold=5):
+    code = _READCOUNT_CODE.format(threshold=threshold)
+    descr = 'Sample has read (pair) count of less than {} in haplotype interval.'.format(threshold)
+    return FilterHeader(code, descr)
+
+
+def read_count_filter(count, threshold=5):
+    fails = count < threshold
+    code = _READCOUNT_CODE.format(threshold=threshold)
+    return FilterCall(code, fails)
+
+
 def prob_filter_header(threshold=0.95):
-    descr = 'Samples genotype posterior probability < {}.'.format(threshold)
-    code = 'p<{}'.format(threshold)
+    descr = 'Samples phenotype posterior probability < {}.'.format(threshold)
+    code = _PROB_CODE.format(threshold=threshold)
     return FilterHeader(code, descr)
 
 
 def prob_filter(p, threshold=0.95):
     fails = p < threshold
-    code = 'p<{}'.format(threshold)
+    code = _PROB_CODE.format(threshold=threshold)
     if np.shape(p) == ():
         # scalar
         return FilterCall(code, fails)

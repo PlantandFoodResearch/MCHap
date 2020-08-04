@@ -45,6 +45,7 @@ class program(object):
     mcmc_allow_recombinations: bool = True
     mcmc_allow_dosage_swaps: bool = True
     depth_filter_threshold: float = 5.0
+    read_count_filter_threshold: int = 5
     probability_filter_threshold: float = 0.95
     kmer_filter_k: int = 3
     kmer_filter_theshold: float = 0.95
@@ -175,6 +176,14 @@ class program(object):
         )
 
         parser.add_argument(
+            '--filter-read-count',
+            type=float,
+            nargs=1,
+            default=[5.0],
+            help=('Minimum number of read (pairs) within interval required to include an assembly result (default = 5).')
+        )
+
+        parser.add_argument(
             '--filter-probability',
             type=float,
             nargs=1,
@@ -251,6 +260,7 @@ class program(object):
             #mcmc_allow_recombinations,
             #mcmc_allow_dosage_swaps,
             depth_filter_threshold=args.filter_depth[0],
+            read_count_filter_threshold=args.filter_read_count[0],
             probability_filter_threshold=args.filter_probability[0],
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
@@ -288,6 +298,9 @@ class program(object):
             vcf.filters.depth_filter_header(
                 threshold=self.depth_filter_threshold,
             ),
+            vcf.filters.read_count_filter_header(
+                threshold=self.read_count_filter_threshold,
+            ),
             vcf.filters.prob_filter_header(
                 threshold=self.probability_filter_threshold,
             ),
@@ -306,6 +319,7 @@ class program(object):
             vcf.formatfields.GQ,
             vcf.formatfields.PQ,
             vcf.formatfields.DP,
+            vcf.formatfields.RC,
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PPM, 
@@ -341,6 +355,7 @@ class program(object):
             
             # assemble
             read_variants_unsafe = extract_read_variants(locus, path, samples=sample, id='SM')[sample]
+            read_count = read_variants_unsafe[0].shape[0]
             read_variants = add_nan_read_if_empty(locus, read_variants_unsafe[0], read_variants_unsafe[1])
             read_symbols=read_variants[0]
             read_quals=read_variants[1]
@@ -391,6 +406,9 @@ class program(object):
             # posterior probability of called genotype
             haplotype_vcf_sample_data[sample]['GPM'] = vcf.formatfields.probabilities(genotype_probability, self.precision)
             
+            # number of reads within haplotyp interval
+            haplotype_vcf_sample_data[sample]['RC'] = read_count
+
             # depth 
             depth = symbolic.depth(read_symbols)  # also used in filter
             haplotype_vcf_sample_data[sample]['DP'] = vcf.formatfields.haplotype_depth(depth)
@@ -410,6 +428,10 @@ class program(object):
                 vcf.filters.depth_haplotype_filter(
                     depth, 
                     threshold=self.depth_filter_threshold,
+                ),
+                vcf.filters.read_count_filter(
+                    read_count,
+                    threshold=self.read_count_filter_threshold,
                 ),
                 vcf.filters.kmer_haplotype_filter(
                     read_calls, 
