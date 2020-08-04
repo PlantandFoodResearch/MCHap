@@ -267,12 +267,10 @@ class program(object):
         # io
         samples = list(self.sample_bam.keys())
 
-        contigs = {target.contig for target in read_bed4(self.bed)}
         with pysam.Fastafile(self.ref) as fasta:
-            contigs =tuple(
-                vcf.ContigHeader(c, l) for c, l in 
-                zip(fasta.references, fasta.lengths) 
-                if c in contigs
+            contigs = tuple(
+                vcf.ContigHeader(c, l)
+                for c, l in zip(fasta.references, fasta.lengths)
             )
 
         # define vcf template
