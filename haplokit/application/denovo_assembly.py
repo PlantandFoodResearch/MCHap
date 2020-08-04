@@ -501,7 +501,7 @@ class program(object):
         return vcf.VCF(header, records)
 
 
-    def write_lines(self):
+    def run_stdout(self):
 
         header = self.header()
 
