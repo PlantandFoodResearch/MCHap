@@ -16,6 +16,14 @@ def _allele_sort(alleles):
     return tuple(calls + nulls)
 
 
+def call_best_genotype(genotypes, probabilities):
+    """Returns the genotype with highest probability.
+    """
+    assert len(genotypes) == len(probabilities)
+    idx = np.argmax(probabilities)
+    return genotypes[idx], probabilities[idx]
+
+
 def call_phenotype(genotypes, probabilities, threshold=0.95):
     """Identifies the most complete set of alleles that 
     exceeds a probability threshold.

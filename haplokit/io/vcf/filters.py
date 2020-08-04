@@ -69,16 +69,6 @@ class FilterCallSet(object):
         return False
 
 
-def null_filtered_array(array, filtered):
-    """If filtered is True an array of null alleles is returned.
-    """
-
-    if filtered:
-        return np.zeros(array.shape, dtype=array.dtype) - 1
-    else:
-        return array
-
-
 def kmer_representation(variants, haplotype_calls, k=3):
     """ Calculates position-wise frequency of read_calls kmers which 
     are also present in haplotype_calls.

@@ -342,12 +342,6 @@ class program(object):
 
         # format data for sample columns in haplotype vcf
         sample_data = {sample: {} for sample in header.samples}
-        
-        # store called genotype of each phenotype (may have nulls)
-        sample_genotype_arrays = {}
-
-        # store genotype distribution within each phenotype
-        sample_genotype_dists = {}
 
         # samples must be in same order as in header
         for sample in header.samples:
@@ -374,30 +368,19 @@ class program(object):
                 allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
             ).fit(reads)
 
-            # genotypes within posterior mode phenotype
-            genotype_dist, genotype_probs = trace.burn(self.mcmc_burn).posterior().mode_phenotype()
+            # posterior mode phenotype is a collection of genotypes
+            phenotype = trace.burn(self.mcmc_burn).posterior().mode_phenotype()
 
             # posterior probability of mode phenotype
-            phenotype_probability = np.sum(genotype_probs)
-            sample_data[sample]['PPM'] = vcf.formatfields.probabilities(phenotype_probability, self.precision)
+            sample_data[sample]['PPM'] = vcf.formatfields.probabilities(phenotype[1].sum(), self.precision)
 
             if self.call_best_genotype:
-                # call genotype with the highest probability within the mode phenotype
-                call_idx = np.argmax(genotype_probs)
-                genotype = genotype_dist[call_idx]
-                genotype_probability = genotype_probs[call_idx]
-
+                genotype = vcf.call_best_genotype(*phenotype)
             else:
-                # most complete genotype of this phenotype given probability threshold (may have nulls)
-                call = vcf.call_phenotype(
-                    genotype_dist, genotype_probs, 
-                    self.probability_filter_threshold
-                )
-                genotype = call[0]
-                genotype_probability = call[1]
+                genotype = vcf.call_phenotype(*phenotype, self.probability_filter_threshold)
 
             # posterior probability of called genotype
-            sample_data[sample]['GPM'] = vcf.formatfields.probabilities(genotype_probability, self.precision)
+            sample_data[sample]['GPM'] = vcf.formatfields.probabilities(genotype[1], self.precision)
             
             # number of reads within haplotyp interval
             sample_data[sample]['RC'] = read_count
@@ -407,15 +390,15 @@ class program(object):
             sample_data[sample]['DP'] = vcf.formatfields.haplotype_depth(depth)
 
             # genotype quality
-            sample_data[sample]['GQ'] = vcf.formatfields.quality(genotype_probability) 
+            sample_data[sample]['GQ'] = vcf.formatfields.quality(genotype[1]) 
 
             # phenotype quality
-            sample_data[sample]['PQ'] = vcf.formatfields.quality(phenotype_probability)
+            sample_data[sample]['PQ'] = vcf.formatfields.quality(phenotype[1].sum())
 
             # filters
             filter_results = vcf.filters.FilterCallSet.new(
                 vcf.filters.prob_filter(
-                    phenotype_probability,
+                    phenotype[1].sum(),
                     threshold=self.probability_filter_threshold,
                 ),
                 vcf.filters.depth_haplotype_filter(
@@ -428,32 +411,25 @@ class program(object):
                 ),
                 vcf.filters.kmer_haplotype_filter(
                     read_calls, 
-                    genotype,
+                    genotype[0],
                     k=self.kmer_filter_k,
                     threshold=self.kmer_filter_theshold,
                 ),
             )
             sample_data[sample]['FT'] = filter_results
 
+            # Null out the genotype and phenotype arrays
+            if (not self.call_filtered) and filter_results.failed:
+                genotype[0][:] = -1
+                phenotype[0][:] = -1
+
             # store sample genotypes/phenotypes for labeling
-            if self.call_filtered:
-                # store genotype/phenotype 
-                sample_genotype_arrays[sample] = genotype
+            sample_data[sample]['genotype'] = genotype
+            sample_data[sample]['phenotype'] = phenotype
 
-                # store observed genotypes of mode phenotype
-                sample_genotype_dists[sample] = (genotype_dist, genotype_probs)
-
-            else:
-                # filter genotype/phenotype and store
-                genotype_filtered = vcf.filters.null_filtered_array(genotype, filter_results.failed)
-                sample_genotype_arrays[sample] = genotype_filtered
-
-                # store observed genotypes of mode phenotype
-                genotype_dist_filtered = vcf.filters.null_filtered_array(genotype_dist, filter_results.failed)
-                sample_genotype_dists[sample] = (genotype_dist_filtered, genotype_probs)
         
         # label haplotypes for haplotype vcf
-        observed_genotypes = list(sample_genotype_arrays.values())
+        observed_genotypes = [sample_data[sample]['genotype'][0] for sample in header.samples]
         labeler = vcf.HaplotypeAlleleLabeler.from_obs(observed_genotypes)
         ref_seq = locus.sequence
         alt_seqs = locus.format_haplotypes(labeler.alt_array())
@@ -470,18 +446,14 @@ class program(object):
 
         # add genotypes to sample data
         for sample in header.samples:
-            genotype = sample_genotype_arrays[sample]
-            sample_data[sample]['GT'] = labeler.label(genotype)
+            genotype = sample_data[sample]['genotype']
+            sample_data[sample]['GT'] = labeler.label(genotype[0])
 
             # use labeler to sort gentype probs within phenotype
-            dist = sample_genotype_dists[sample]
-            genotypes = dist[0]
-            probs = dist[1]
-            tup = labeler.label_phenotype_posterior(genotypes, probs, expected_dosage=True)
-            ordered_probs = tup[1]
-            expected_dosage = tup[2]
-            sample_data[sample]['MPGP'] = vcf.formatfields.probabilities(ordered_probs, self.precision)
-            sample_data[sample]['MPED'] = vcf.formatfields.probabilities(expected_dosage, self.precision)
+            phenotype = sample_data[sample]['phenotype']
+            _, probs, dosage = labeler.label_phenotype_posterior(*phenotype, expected_dosage=True)
+            sample_data[sample]['MPGP'] = vcf.formatfields.probabilities(probs, self.precision)
+            sample_data[sample]['MPED'] = vcf.formatfields.probabilities(dosage, self.precision)
         
         # construct vcf record
         record = vcf.VCFRecord(
