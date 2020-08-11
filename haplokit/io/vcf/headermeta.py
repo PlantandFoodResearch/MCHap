@@ -18,7 +18,12 @@ def fileformat(version):
 def filedate(date=None):
     if date is None:
         date = _date.today()
-    date = '{}{}{}'.format(date.year, date.month, date.day)
+        year = str(date.year)
+        month = str(date.month)
+        day = str(date.day)
+        month = '0' + month if len(month) == 1 else month
+        day = '0' + day if len(day) == 1 else day
+    date = '{}{}{}'.format(year, month, day)
     return MetaHeader('fileDate', date)
 
 
