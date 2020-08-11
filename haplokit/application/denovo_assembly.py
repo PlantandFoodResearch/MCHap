@@ -415,11 +415,18 @@ class program(object):
         alt_seqs = locus.format_haplotypes(labeler.alt_array())
         allele_counts = labeler.count_obs(observed_genotypes)
 
+        # count called samples
+        n_called_samples = len(header.samples)
+        if not self.call_filtered:
+            for sample in header.samples:
+                if sample_data[sample]['FT'].failed:
+                    n_called_samples -= 1
+
         # data for info column of VCF
         info_data = dict(
             END=locus.stop,
             VP=vcf.vcfstr(np.subtract(locus.positions, locus.start)),
-            NS=len(header.samples),
+            NS=n_called_samples,
             AC=allele_counts[1:],  # exclude reference count
             AN=np.sum(np.greater(allele_counts, 0)),
         )
