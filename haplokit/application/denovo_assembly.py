@@ -317,7 +317,7 @@ class program(object):
         format_fields=(
             vcf.formatfields.GT,
             vcf.formatfields.GQ,
-            vcf.formatfields.PQ,
+            vcf.formatfields.PHQ,
             vcf.formatfields.DP,
             vcf.formatfields.RC,
             vcf.formatfields.FT,
@@ -395,7 +395,7 @@ class program(object):
                 'RC': read_count,
                 'DP': vcf.formatfields.haplotype_depth(read_depth),
                 'GQ': vcf.formatfields.quality(genotype[1]),
-                'PQ': vcf.formatfields.quality(phenotype[1].sum()),
+                'PHQ': vcf.formatfields.quality(phenotype[1].sum()),
                 'FT': filterset
             })
 
