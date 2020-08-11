@@ -154,19 +154,19 @@ def _set_locus_variants(locus, variant_file):
     variants = []
 
     for var in variant_file.fetch(locus.contig, locus.start, locus.stop):
-        if var.stop - var.start == 1:
-            # SNP
+        alleles = (var.ref, ) + var.alts
+        if (var.stop - var.start == 1) and all(len(a) == 1 for a in alleles):
+            # is a SNP
             variants.append(
                 SNP(
                     contig=var.contig,
                     start=var.start,
                     stop=var.stop,
                     name=var.id if var.id else '.',
-                    alleles=(var.ref, ) + var.alts,
+                    alleles=alleles,
                 )
             )
         else:
-            # not a SNP
             pass
 
     variants=tuple(variants)
