@@ -8,6 +8,7 @@ import warnings
 from dataclasses import dataclass
 
 from haplokit.io.biotargetsfile import read_biotargets
+from haplokit.io.vcf.genotypes import Genotype
 
 
 def ancestors(graph, *args, stop=None):
@@ -69,6 +70,7 @@ class program(object):
     digraph: nx.DiGraph
     region: str = None
     sample_map: dict = None
+    style: str = 'haplotype'
     default_ploidy: int = 2
     label: str = 'label'
     simplify_haplotypes: bool = False
@@ -92,6 +94,15 @@ class program(object):
         parser = argparse.ArgumentParser(
             'Plot sample hapotypes within a pedigree'
         )
+
+        parser.set_defaults(plot_gt=False)
+        parser.add_argument(
+            '--GT',
+            dest='plot_gt',
+            action='store_true',
+            help='Plot GT field instead of haplotypes.'
+        )
+
         parser.add_argument(
             '--vcf',
             type=str,
@@ -243,11 +254,17 @@ class program(object):
         else:
             sample_map = None
 
+        if args.plot_gt:
+            style = 'genotype'
+        else:
+            style = 'haplotype'
+
         return cls(
             vcf=args.vcf[0],
             digraph=digraph,
             region=args.region[0],
             sample_map=sample_map,
+            style=style,
             default_ploidy=args.default_ploidy[0],
             label=args.label_column[0],
             simplify_haplotypes=args.simplify_haplotypes,
@@ -283,20 +300,31 @@ class program(object):
                             name,
                             variant.stop,
                         )
-
-                graph = graph_variant(
-                    digraph=self.digraph, 
-                    variant=variant, 
-                    sample_map=self.sample_map, 
-                    default_ploidy=self.default_ploidy, 
-                    label=self.label, 
-                    simplify_haplotypes=self.simplify_haplotypes,
-                    transpose_haplotypes=self.transpose_haplotypes, 
-                    show_sample_names=self.show_sample_names,
-                    nodesep=self.nodesep,
-                    ranksep=self.ranksep,
-                    rankdir=self.rankdir,
-                )
+                if self.style == 'genotype':
+                    graph = variant_genotype_graph(
+                        digraph=self.digraph, 
+                        variant=variant,
+                        sample_map=self.sample_map,
+                        label=self.label,
+                        show_sample_names=self.show_sample_names,
+                        nodesep=self.nodesep,
+                        ranksep=self.ranksep,
+                        rankdir=self.rankdir,
+                    )
+                else:
+                    graph = variant_haplotype_graph(
+                        digraph=self.digraph, 
+                        variant=variant, 
+                        sample_map=self.sample_map, 
+                        default_ploidy=self.default_ploidy, 
+                        label=self.label, 
+                        simplify_haplotypes=self.simplify_haplotypes,
+                        transpose_haplotypes=self.transpose_haplotypes, 
+                        show_sample_names=self.show_sample_names,
+                        nodesep=self.nodesep,
+                        ranksep=self.ranksep,
+                        rankdir=self.rankdir,
+                    )
 
                 yield name, graph
 
@@ -309,7 +337,94 @@ class program(object):
         return True
 
 
-def graph_variant(
+def variant_genotype_graph(
+        digraph, 
+        variant,
+        sample_map=None,
+        label='label', 
+        show_sample_names=False,
+        label_font="Times-Roman",
+        genotype_font="Mono",
+        nodesep=1,
+        ranksep=1,
+        rankdir='TB'
+    ):
+    # map of pedigree item to sample to genotype
+    ped_sample_genotypes = {}
+    ped_sample_filtered = {}
+    for sample, record in variant.samples.items():
+        tup = tuple(-1 if a is None else a for a in record['GT'])
+        genotype = str(Genotype(tup, record.phased))
+        if sample_map:
+            ped_item = sample_map[sample]
+        else:
+            ped_item = sample
+        if ped_item not in ped_sample_genotypes:
+            ped_sample_genotypes[ped_item] = {}
+        ped_sample_genotypes[ped_item][sample] = genotype
+        filt = record.get('FT')
+        if filt is None:
+            pass
+        elif filt == 'PASS':
+            filt = False
+        else:
+            filt = True
+        if ped_item not in ped_sample_filtered:
+            ped_sample_filtered[ped_item] = {}
+        ped_sample_filtered[ped_item][sample] = filt
+
+    # add null genotype for pedigree items without sampels
+    for ped_item, data in digraph.nodes(data=True):
+        # get ploidy if present
+        if ped_item not in ped_sample_genotypes:
+            ped_sample_genotypes[ped_item]={'None': '.'}
+            ped_sample_filtered[ped_item]={'None': None}
+
+    # create graphviz
+    gvg = gv.Digraph('G', node_attr={'shape': 'plaintext'})
+    gvg.attr(compound='true')
+    gvg.attr(nodesep=str(nodesep))
+    gvg.attr(ranksep=str(ranksep))
+    gvg.attr(rankdir=rankdir)
+    
+    # get labels from graph (default to node name)
+    labels = {}
+    for node, data in digraph.nodes(data=True):
+        labels[node] = data.get(label, node)
+
+    # create subgraph of nodes for each sample
+    for node, samples in ped_sample_genotypes.items():
+        cluster = 'cluster_{}'.format(node)
+        with gvg.subgraph(name=cluster) as sg:
+            sg.attr(label=str(labels[node]))
+            sg.attr(style='filled', color='lightgrey')
+            sg.node_attr.update(style='filled', color='grey')
+            for i, (sample, genotype) in enumerate(samples.items()):
+                name = '{}_{}'.format(node, i)
+                node_color = _FILTER_COLORS[ped_sample_filtered[node][sample]]
+                if show_sample_names:
+                    sub_cluster = '{}_{}'.format(cluster, sample)                    
+                    with sg.subgraph(name=sub_cluster) as ssg:
+                        ssg.attr(label=str(sample))
+                        ssg.attr(style='filled', color=node_color)
+                        ssg.node_attr.update(style='filled', color=node_color)
+                        ssg.node(name, genotype, fontname=genotype_font, color=node_color)
+                else:
+                    sg.node(name, genotype, fontname=genotype_font, color=node_color)
+
+    # copy edges from initial graph
+    for parent, child in digraph.edges():
+        gvg.edge(
+            '{}_{}'.format(parent, len(ped_sample_genotypes[parent])//2), 
+            '{}_{}'.format(child, len(ped_sample_genotypes[child])//2), 
+            ltail='cluster_{}'.format(parent), 
+            lhead='cluster_{}'.format(child), 
+        )
+  
+    return gvg
+
+
+def variant_haplotype_graph(
         digraph, 
         variant, 
         sample_map=None, 
