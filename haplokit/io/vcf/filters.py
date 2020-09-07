@@ -8,8 +8,9 @@ from haplokit.encoding import allelic, symbolic
 _PASS_CODE = 'PASS'
 _NULL_CODE = '.'
 _KMER_CODE = 'k{k}<{threshold}'
-_DEPTH_CODE = 'd<{threshold}'
-_PROB_CODE = 'p<{threshold}'
+_DEPTH_CODE = 'dp<{threshold}'
+_READCOUNT_CODE = 'rc<{threshold}'
+_PROB_CODE = 'pp<{threshold}'
 _FILTER_HEADER = '##FILTER=<ID={code},Description="{desc}">\n'
 
 
@@ -56,26 +57,12 @@ class FilterCallSet(object):
             else:
                 return 'PASS'
 
-    @classmethod
-    def new(cls, *args):
-        return cls(tuple(args))
-
     @property
     def failed(self):
         for call in self.calls:
             if call.applied and call.failed:
                 return True
         return False
-
-
-def null_filtered_array(array, filtered):
-    """If filtered is True an array of null alleles is returned.
-    """
-
-    if filtered:
-        return np.zeros(array.shape, dtype=array.dtype) - 1
-    else:
-        return array
 
 
 def kmer_representation(variants, haplotype_calls, k=3):
@@ -146,6 +133,10 @@ def depth_filter_header(threshold=5.0):
 
 
 def depth_variant_filter(depths, threshold=5.0, gap='-'):
+    n_pos = depths.shape[-1]
+    if np.prod(depths.shape) == 0:
+        # can't apply depth filter across 0 variants
+        return [_NULL_CODE for _ in range(n_pos)]
     fails = depths < threshold
     code = _DEPTH_CODE.format(threshold=threshold)
     return [code if fail else _PASS_CODE for fail in fails]
@@ -153,19 +144,34 @@ def depth_variant_filter(depths, threshold=5.0, gap='-'):
 
 def depth_haplotype_filter(depths, threshold=5.0, gap='-'):
     code = _DEPTH_CODE.format(threshold=threshold)
+    if np.prod(depths.shape) == 0:
+        # can't apply depth filter across 0 variants
+        return FilterCall(code, None, applied=False)
     fail = np.mean(depths) < threshold
     return FilterCall(code, fail)
 
 
+def read_count_filter_header(threshold=5):
+    code = _READCOUNT_CODE.format(threshold=threshold)
+    descr = 'Sample has read (pair) count of less than {} in haplotype interval.'.format(threshold)
+    return FilterHeader(code, descr)
+
+
+def read_count_filter(count, threshold=5):
+    fails = count < threshold
+    code = _READCOUNT_CODE.format(threshold=threshold)
+    return FilterCall(code, fails)
+
+
 def prob_filter_header(threshold=0.95):
-    descr = 'Samples genotype posterior probability < {}.'.format(threshold)
-    code = 'p<{}'.format(threshold)
+    descr = 'Samples phenotype posterior probability < {}.'.format(threshold)
+    code = _PROB_CODE.format(threshold=threshold)
     return FilterHeader(code, descr)
 
 
 def prob_filter(p, threshold=0.95):
     fails = p < threshold
-    code = 'p<{}'.format(threshold)
+    code = _PROB_CODE.format(threshold=threshold)
     if np.shape(p) == ():
         # scalar
         return FilterCall(code, fails)

@@ -57,6 +57,14 @@ class Locus:
         data.update(kwargs)
         return type(self)(**data)
 
+    def set_sequence(self, fasta):
+        with pysam.FastaFile(fasta) as f:
+            return _set_locus_sequence(self, f)
+
+    def set_variants(self, vcf):
+        with pysam.VariantFile(vcf) as f:
+            return _set_locus_variants(self, f)
+
     def _template_sequence(self):
         chars = list(self.sequence)
         ref_alleles = (tup[0] for tup in self.alleles)
@@ -142,23 +150,56 @@ def _set_locus_sequence(locus, fasta_file):
     return locus
 
 
+def _merge_snps(x, y):
+    match = [
+        x.contig == y.contig,
+        x.name == y.name,
+        x.start == y.start,
+        x.stop == y.stop,
+        x.alleles[0] == y.alleles[0]
+    ]
+
+    if not all(match):
+        x_str = '{}: {}:{}'.format(x.name, x.contig, x.start)
+        y_str = '{}: {}:{}'.format(y.name, y.contig, y.start)
+        message = 'Cannot merge SNPs "{}" and "{}"'.format(x_str, y_str)
+        raise ValueError(message)
+
+    alleles = x.alleles
+    alleles += tuple(a for a in y.alleles if a not in alleles)
+
+    return SNP(
+        contig=x.contig,
+        start=x.start,
+        stop=x.stop,
+        name=x.name,
+        alleles=alleles,
+    )
+
+
 def _set_locus_variants(locus, variant_file):
     variants = []
+    positions = set()
 
     for var in variant_file.fetch(locus.contig, locus.start, locus.stop):
-        if var.stop - var.start == 1:
-            # SNP
-            variants.append(
-                SNP(
-                    contig=var.contig,
-                    start=var.start,
-                    stop=var.stop,
-                    name=var.id if var.id else '.',
-                    alleles=(var.ref, ) + var.alts,
-                )
+        alleles = (var.ref, ) + var.alts
+
+        if (var.stop - var.start == 1) and all(len(a) == 1 for a in alleles):
+            # is a SNP
+            snp = SNP(
+                contig=var.contig,
+                start=var.start,
+                stop=var.stop,
+                name=var.id if var.id else '.',
+                alleles=alleles,
             )
+            if snp.start in positions:
+                # attempt to merge duplicates
+                variants = [_merge_snps(s, snp) if s.start == snp.start else s for s in variants]
+            else:
+                variants.append(snp)
+                positions.add(snp.start)
         else:
-            # not a SNP
             pass
 
     variants=tuple(variants)

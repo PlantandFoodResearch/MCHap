@@ -108,7 +108,7 @@ def extract_read_variants(
                     # default is array of gaps with qual of 0
                     chars = np.empty(n_positions, dtype='U1')
                     chars[:] = '-'
-                    quals = np.zeros(n_positions, dtype=np.int8)
+                    quals = np.zeros(n_positions, dtype=np.int16)
                     sample_data[read.qname] = [chars, quals]
                     
                 else:
@@ -149,8 +149,13 @@ def extract_read_variants(
         # return a dict of matrices
         for id, reads in data.items():
             tuples = list(reads.values())
-            chars = np.array([tup[0] for tup in tuples])
-            quals = np.array([tup[1] for tup in tuples])
+            if len(tuples) == 0:
+                n_pos = len(locus.positions)
+                chars = np.empty((0, n_pos), dtype='U1')
+                quals = np.empty((0, n_pos), dtype=np.int16)
+            else:
+                chars = np.array([tup[0] for tup in tuples])
+                quals = np.array([tup[1] for tup in tuples])
             data[id] = (chars, quals)
 
     return data
@@ -162,9 +167,10 @@ def add_nan_read_if_empty(locus, symbols, quals):
     # by specifying a single read of gaps only, the posterior
     # should approximate the prior
     assert np.size(symbols) == np.size(quals)
-    if np.size(symbols) == 0:
-        symbols = np.array([['-'] * len(locus.variants) ])
-        quals = np.zeros((1, len(locus.variants)), dtype=np.int8)
+    n_reads = symbols.shape[0]
+    if n_reads == 0:
+        symbols = np.array([['-'] * len(locus.variants) ], dtype=symbols.dtype)
+        quals = np.zeros((1, len(locus.variants)), dtype=quals.dtype)
     return symbols, quals
 
 

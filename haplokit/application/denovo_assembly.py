@@ -1,13 +1,16 @@
+import sys
 import argparse
-import dask
-from dask import delayed
 import numpy as np
 from dataclasses import dataclass
+import pysam
+from itertools import islice
+import multiprocessing as mp
 
 from haplokit.assemble.mcmc.denovo import DenovoMCMC
 from haplokit.encoding import symbolic
 from haplokit.io import \
     read_loci, \
+    read_bed4, \
     extract_sample_ids, \
     extract_read_variants, \
     add_nan_read_if_empty, \
@@ -18,12 +21,17 @@ from haplokit.io import \
     PFEIFFER_ERROR
 from haplokit.io.biotargetsfile import read_biotargets
 
+import warnings
+warnings.simplefilter('error', RuntimeWarning)
 
 @dataclass
 class program(object):
-    loci: list
+    bed: str
+    vcf: str
+    ref: str
     sample_bam: dict
     sample_ploidy: dict
+    region: str = None
     call_best_genotype: bool = False
     call_filtered: bool = False
     read_group_field: str = 'SM'
@@ -37,11 +45,13 @@ class program(object):
     mcmc_allow_recombinations: bool = True
     mcmc_allow_dosage_swaps: bool = True
     depth_filter_threshold: float = 5.0
+    read_count_filter_threshold: int = 5
     probability_filter_threshold: float = 0.95
     kmer_filter_k: int = 3
     kmer_filter_theshold: float = 0.95
     n_cores: int = 1
     precision: int = 3
+    chunk_size: int = 10
 
     @classmethod
     def cli(cls, command):
@@ -166,6 +176,14 @@ class program(object):
         )
 
         parser.add_argument(
+            '--filter-read-count',
+            type=float,
+            nargs=1,
+            default=[5.0],
+            help=('Minimum number of read (pairs) within interval required to include an assembly result (default = 5).')
+        )
+
+        parser.add_argument(
             '--filter-probability',
             type=float,
             nargs=1,
@@ -199,13 +217,6 @@ class program(object):
 
         args = parser.parse_args(command[1:])
 
-        loci = list(read_loci(
-            args.bed[0],
-            args.vcf[0],
-            args.ref[0],
-            region=args.region[0],
-        ))
-
         # sample bam paths and ploidy
         if args.btf:
             # read from bio-targets file
@@ -230,9 +241,12 @@ class program(object):
             sample_ploidy = {sample: ploidy for sample in samples}
 
         return cls(
-            loci,
+            args.bed[0],
+            args.vcf[0],
+            args.ref[0],
             sample_bam,
             sample_ploidy,
+            region=args.region[0],
             call_best_genotype=args.call_best_genotype,
             call_filtered=args.call_filtered,
             read_group_field=args.read_group_field[0],
@@ -246,16 +260,28 @@ class program(object):
             #mcmc_allow_recombinations,
             #mcmc_allow_dosage_swaps,
             depth_filter_threshold=args.filter_depth[0],
+            read_count_filter_threshold=args.filter_read_count[0],
             probability_filter_threshold=args.filter_probability[0],
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
             n_cores=args.cores[0],
         )
-    
+
+    def loci(self):
+        bed = read_bed4(self.bed, region=self.region)
+        for b in bed:
+            yield b.set_sequence(self.ref).set_variants(self.vcf)
+
     def header(self):
 
         # io
         samples = list(self.sample_bam.keys())
+
+        with pysam.Fastafile(self.ref) as fasta:
+            contigs = tuple(
+                vcf.ContigHeader(c, l)
+                for c, l in zip(fasta.references, fasta.lengths)
+            )
 
         # define vcf template
         meta_fields=(
@@ -271,6 +297,9 @@ class program(object):
             ),
             vcf.filters.depth_filter_header(
                 threshold=self.depth_filter_threshold,
+            ),
+            vcf.filters.read_count_filter_header(
+                threshold=self.read_count_filter_threshold,
             ),
             vcf.filters.prob_filter_header(
                 threshold=self.probability_filter_threshold,
@@ -288,8 +317,9 @@ class program(object):
         format_fields=(
             vcf.formatfields.GT,
             vcf.formatfields.GQ,
-            vcf.formatfields.PQ,
+            vcf.formatfields.PHQ,
             vcf.formatfields.DP,
+            vcf.formatfields.RC,
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PPM, 
@@ -299,7 +329,7 @@ class program(object):
 
         vcf_header = vcf.VCFHeader(
             meta=meta_fields,
-            contigs=vcf.contig_headers(self.loci),
+            contigs=contigs,
             filters=filters,
             info_fields=info_fields,
             format_fields=format_fields,
@@ -308,176 +338,167 @@ class program(object):
 
         return vcf_header
 
-    def template(self):
+    def _assemble_locus(self, header, locus):
 
-        vcf_template = vcf.VCF(self.header(), [])
-        samples = vcf_template.header.samples
+        # format data for sample columns in haplotype vcf
+        sample_data = {sample: {} for sample in header.samples}
 
-        # assembly
-        for locus in self.loci:
-
-            # format data for sample columns in haplotype vcf
-            haplotype_vcf_sample_data = {sample: {} for sample in samples}
+        # samples must be in same order as in header
+        for sample in header.samples:
+            path = self.sample_bam[sample]
             
-            # store called genotype of each phenotype (may have nulls)
-            sample_genotype_arrays = {}
-
-            # store genotype distribution within each phenotype
-            sample_genotype_dists = {}
-
-            # samples must be in same order as in header
-            for sample in samples:
-                path = self.sample_bam[sample]
-                
-                # assemble
-                read_variants_unsafe = delayed(extract_read_variants)(locus, path, samples=sample, id='SM')[sample]
-                read_variants = delayed(add_nan_read_if_empty)(locus, read_variants_unsafe[0], read_variants_unsafe[1])
-                read_symbols=read_variants[0]
-                read_quals=read_variants[1]
-                read_calls = delayed(encode_read_alleles)(locus, read_symbols)
-                reads = delayed(encode_read_distributions)(
-                    locus, 
-                    read_calls, 
-                    read_quals, 
-                    error_rate=self.read_error_rate, 
-                    gaps=True,
-                )
-                trace = delayed(DenovoMCMC.parameterize)(
-                    ploidy=self.sample_ploidy[sample], 
-                    steps=self.mcmc_steps, 
-                    ratio=self.mcmc_ratio,
-                    fix_homozygous=self.mcmc_fix_homozygous,
-                    allow_recombinations=self.mcmc_allow_recombinations,
-                    allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
-                ).fit(reads)
-
-                # posterior dist
-                posterior = trace.burn(self.mcmc_burn).posterior()
-
-                # posterior mode phenotype
-                mode = posterior.mode_phenotype()
-                genotype_dist = mode[0]  # observed genotypes of this phenotype
-                genotype_probs = mode[1]  # probs of observed genotypes
-
-                # posterior probability of mode phenotype
-                phenotype_probability = delayed(np.sum)(genotype_probs)
-                haplotype_vcf_sample_data[sample]['PPM'] = delayed(vcf.util.vcfround)(phenotype_probability, self.precision)
-
-                if self.call_best_genotype:
-                    # call genotype with the highest probability within the mode phenotype
-                    call_idx = delayed(np.argmax)(genotype_probs)
-                    genotype = genotype_dist[call_idx]
-                    genotype_probability = genotype_probs[call_idx]
-
-                else:
-                    # most complete genotype of this phenotype given probability threshold (may have nulls)
-                    call = delayed(vcf.call_phenotype)(
-                        genotype_dist, genotype_probs, 
-                        self.probability_filter_threshold
-                    )
-                    genotype = call[0]
-                    genotype_probability = call[1]
-
-                # posterior probability of called genotype
-                haplotype_vcf_sample_data[sample]['GPM'] = delayed(vcf.util.vcfround)(genotype_probability, self.precision)
-                
-                # depth 
-                depth = delayed(symbolic.depth)(read_symbols)
-                haplotype_vcf_sample_data[sample]['DP'] = delayed(int)(delayed(np.mean)(depth))
-
-                # genotype quality
-                haplotype_vcf_sample_data[sample]['GQ'] = delayed(vcf.util.if_not_none)(qual_of_prob, genotype_probability)
-
-                # phenotype quality
-                haplotype_vcf_sample_data[sample]['PQ'] = delayed(qual_of_prob)(phenotype_probability)
-
-                # filters
-                filter_results = delayed(vcf.filters.FilterCallSet.new)(
-                    delayed(vcf.filters.prob_filter)(
-                        phenotype_probability,
-                        threshold=self.probability_filter_threshold,
-                    ),
-                    delayed(vcf.filters.depth_haplotype_filter)(
-                        depth, 
-                        threshold=self.depth_filter_threshold,
-                    ),
-                    delayed(vcf.filters.kmer_haplotype_filter)(
-                        read_calls, 
-                        genotype,
-                        k=self.kmer_filter_k,
-                        threshold=self.kmer_filter_theshold,
-                    ),
-                )
-                haplotype_vcf_sample_data[sample]['FT'] = filter_results
-
-                # store sample genotypes/phenotypes for labeling
-                if self.call_filtered:
-                    # store genotype/phenotype 
-                    sample_genotype_arrays[sample] = genotype
-
-                    # store observed genotypes of mode phenotype
-                    sample_genotype_dists[sample] = (genotype_dist, genotype_probs)
-
-                else:
-                    # filter genotype/phenotype and store
-                    genotype_filtered = delayed(vcf.filters.null_filtered_array)(genotype, filter_results.failed)
-                    sample_genotype_arrays[sample] = genotype_filtered
-
-                    # store observed genotypes of mode phenotype
-                    genotype_dist_filtered = delayed(vcf.filters.null_filtered_array)(genotype_dist, filter_results.failed)
-                    sample_genotype_dists[sample] = (genotype_dist_filtered, genotype_probs)
-            
-            # label haplotypes for haplotype vcf
-            observed_genotypes = list(sample_genotype_arrays.values())
-            labeler = delayed(vcf.HaplotypeAlleleLabeler.from_obs)(observed_genotypes)
-            ref_seq = locus.sequence
-            alt_seqs = delayed(locus.format_haplotypes)(labeler.alt_array())
-            allele_counts = labeler.count_obs(observed_genotypes)
-
-            # add genotypes to sample data
-            for sample in samples:
-                genotype = sample_genotype_arrays[sample]
-                haplotype_vcf_sample_data[sample]['GT'] = labeler.label(genotype)
-
-                # use labeler to sort gentype probs within phenotype
-                dist = sample_genotype_dists[sample]
-                genotypes = dist[0]
-                probs = dist[1]
-                tup = labeler.label_phenotype_posterior(genotypes, probs, expected_dosage=True)
-                ordered_probs = tup[1]
-                expected_dosage = tup[2]
-                haplotype_vcf_sample_data[sample]['MPGP'] = delayed(vcf.util.vcfround)(ordered_probs, self.precision)
-                haplotype_vcf_sample_data[sample]['MPED'] = delayed(vcf.util.vcfround)(expected_dosage, self.precision)
-            
-            # append to haplotype vcf
-            vcf_template.append(
-                chrom=locus.contig, 
-                pos=locus.start, 
-                id=locus.name, 
-                ref=ref_seq, 
-                alt=alt_seqs, 
-                qual=None, 
-                filter=None, 
-                info=dict(
-                    END=locus.stop,
-                    VP=','.join(str(pos - locus.start) for pos in locus.positions),
-                    NS=len(samples),
-                    AC=allele_counts[1:],  # exclude reference count
-                    AN=delayed(np.sum)(delayed(np.greater)(allele_counts, 0)),
-                ), 
-                format=haplotype_vcf_sample_data,
+            # read data
+            read_chars, read_quals = extract_read_variants(locus, path, samples=sample, id='SM')[sample]
+            read_count = read_chars.shape[0]
+            read_depth = symbolic.depth(read_chars)
+            read_chars, read_quals = add_nan_read_if_empty(locus, read_chars, read_quals)
+            read_calls = encode_read_alleles(locus, read_chars)
+            read_dists = encode_read_distributions(
+                locus, 
+                read_calls, 
+                read_quals, 
+                error_rate=self.read_error_rate, 
+                gaps=True,
             )
 
-        return vcf_template
+            # assemble
+            trace = DenovoMCMC.parameterize(
+                ploidy=self.sample_ploidy[sample], 
+                steps=self.mcmc_steps, 
+                ratio=self.mcmc_ratio,
+                fix_homozygous=self.mcmc_fix_homozygous,
+                allow_recombinations=self.mcmc_allow_recombinations,
+                allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
+            ).fit(read_dists)
+
+            # posterior mode phenotype is a collection of genotypes
+            phenotype = trace.burn(self.mcmc_burn).posterior().mode_phenotype()
+
+            # call genotype (array(ploidy, vars), probs)
+            if self.call_best_genotype:
+                genotype = vcf.call_best_genotype(*phenotype)
+            else:
+                genotype = vcf.call_phenotype(*phenotype, self.probability_filter_threshold)
+
+            # filters
+            filterset = vcf.filters.FilterCallSet((
+                vcf.filters.prob_filter(phenotype[1].sum(), threshold=self.probability_filter_threshold),
+                vcf.filters.depth_haplotype_filter(read_depth, threshold=self.depth_filter_threshold),
+                vcf.filters.read_count_filter(read_count, threshold=self.read_count_filter_threshold),
+                vcf.filters.kmer_haplotype_filter(read_calls, genotype[0], k=self.kmer_filter_k, threshold=self.kmer_filter_theshold),
+            ))
+
+            # format fields
+            sample_data[sample].update({
+                'GPM': vcf.formatfields.probabilities(genotype[1], self.precision),
+                'PPM': vcf.formatfields.probabilities(phenotype[1].sum(), self.precision),
+                'RC': read_count,
+                'DP': vcf.formatfields.haplotype_depth(read_depth),
+                'GQ': vcf.formatfields.quality(genotype[1]),
+                'PHQ': vcf.formatfields.quality(phenotype[1].sum()),
+                'FT': filterset
+            })
+
+            # Null out the genotype and phenotype arrays
+            if (not self.call_filtered) and filterset.failed:
+                genotype[0][:] = -1
+                phenotype[0][:] = -1
+
+            # store sample genotypes/phenotypes for labeling
+            sample_data[sample]['genotype'] = genotype
+            sample_data[sample]['phenotype'] = phenotype
+        
+        # label haplotypes for haplotype vcf
+        observed_genotypes = [sample_data[sample]['genotype'][0] for sample in header.samples]
+        labeler = vcf.HaplotypeAlleleLabeler.from_obs(observed_genotypes)
+        ref_seq = locus.sequence
+        alt_seqs = locus.format_haplotypes(labeler.alt_array())
+        allele_counts = labeler.count_obs(observed_genotypes)
+
+        # count called samples
+        n_called_samples = len(header.samples)
+        if not self.call_filtered:
+            for sample in header.samples:
+                if sample_data[sample]['FT'].failed:
+                    n_called_samples -= 1
+
+        # data for info column of VCF
+        info_data = dict(
+            END=locus.stop,
+            VP=vcf.vcfstr(np.subtract(locus.positions, locus.start)),
+            NS=n_called_samples,
+            AC=allele_counts[1:],  # exclude reference count
+            AN=np.sum(np.greater(allele_counts, 0)),
+        )
+
+        # add genotypes to sample data
+        for sample in header.samples:
+            genotype = sample_data[sample]['genotype']
+            sample_data[sample]['GT'] = labeler.label(genotype[0])
+
+            # use labeler to sort gentype probs within phenotype
+            phenotype = sample_data[sample]['phenotype']
+            _, probs, dosage = labeler.label_phenotype_posterior(*phenotype, expected_dosage=True)
+            sample_data[sample]['MPGP'] = vcf.formatfields.probabilities(probs, self.precision)
+            sample_data[sample]['MPED'] = vcf.formatfields.probabilities(dosage, self.precision)
+        
+        # construct vcf record
+        return vcf.VCFRecord(
+            header,
+            chrom=locus.contig, 
+            pos=locus.start, 
+            id=locus.name, 
+            ref=ref_seq, 
+            alt=alt_seqs, 
+            qual=None, 
+            filter=None, 
+            info=info_data, 
+            format=sample_data,
+        )
 
     def run(self):
+        header = self.header()
+        pool = mp.Pool(self.n_cores)
+        jobs = ((header, locus) for locus in self.loci())
+        records = pool.starmap(self._assemble_locus, jobs)
+        return vcf.VCF(header, records)
 
-        vcf_template = self.template()
+    def _worker(self, header, locus, queue):
+        line = str(self._assemble_locus(header, locus))
+        queue.put(line)
+        return line
 
-        if self.n_cores == 1:
-            compute_kwargs =  dict(scheduler="threads")
-        else:
-            compute_kwargs =  dict(scheduler="processes", num_workers=self.n_cores)
+    def _writer(self, queue):
+        while True:
+            line = queue.get()
+            if line == 'KILL':
+                break
+            sys.stdout.write(line + '\n')
+            sys.stdout.flush()
 
-        vcf_result = dask.compute(vcf_template, **compute_kwargs)[0] 
-        return vcf_result
+    def run_stdout(self):
+
+        header = self.header()
+
+        for line in header.lines():
+            sys.stdout.write(line + '\n')
+        sys.stdout.flush()
+
+        manager = mp.Manager()
+        queue = manager.Queue()
+        pool = mp.Pool(self.n_cores)
+
+        # start writer process
+        writer = pool.apply_async(self._writer, (queue,))
+
+        jobs = []
+        for locus in self.loci():
+            job = pool.apply_async(self._worker, (header, locus, queue))
+            jobs.append(job)
+
+        for job in jobs:
+            job.get()
+
+        queue.put('KILL')
+        pool.close()
+        pool.join()
