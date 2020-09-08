@@ -283,10 +283,18 @@ def _read_mean_dist(reads):
     
     """
     # work around to avoid nan values caused by gaps
-    dist = reads.copy()
-    dist[np.isnan(dist)] = 1
-    dist /= np.expand_dims(dist.sum(axis=-1), -1)
-    dist = np.mean(dist, axis=-3)
+    reads = reads.copy()
+    n_reads = len(reads)
+    gaps = np.isnan(reads).all(axis=0)
+
+    # replace gaps with 1
+    reads[np.tile(gaps, (n_reads, 1, 1))] = 1
+    dist = np.nanmean(reads, axis=0)
+
+    # fill gaps
+    n_alleles = np.sum(~np.all(reads == 0, axis=0), axis=1, keepdims=True)
+    fill = 1 / np.tile(n_alleles, (1, reads.shape[-1]))
+    dist[gaps] = fill[gaps]
     return dist
 
 
