@@ -282,3 +282,10 @@ def count_equivalent_permutations(dosage):
     for i in range(len(dosage)):
         denominator *= factorial_20(dosage[i])
     return numerator // denominator
+
+
+@numba.njit
+def seed_numba(seed):
+    """Set numba random seed
+    """
+    np.random.seed(seed)
