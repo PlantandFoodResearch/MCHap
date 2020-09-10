@@ -1,5 +1,6 @@
 import pytest
 import pathlib
+import numpy as np
 
 from haplokit.io import loci
 
@@ -182,3 +183,93 @@ def test_Locus__set_variants__duplicate():
 
     actual = locus.set_variants(vcf)
     assert expect == actual
+
+
+def test_Locus__attributes():
+
+    variants = (
+        loci.SNP('CHR2', 14, 15, '.', alleles=('A', 'T')),
+        loci.SNP('CHR2', 19, 20, '.', alleles=('A', 'C', 'G', 'T')),
+    )
+    locus = loci.Locus(
+        contig='CHR2', 
+        start=10, 
+        stop=30, 
+        name='CHR2_10_30', 
+        sequence='A' * 20, 
+        variants=variants
+    )
+
+    assert locus.positions == [14, 19]
+    assert locus.alleles == [('A', 'T'), ('A', 'C', 'G', 'T')]
+    assert locus.range == range(10, 30)
+    assert locus.count_alleles() == [2, 4]
+
+
+def test_Locus__format_haplotypes():
+
+    variants = (
+        loci.SNP('CHR1', 6, 7, '.', alleles=('A', 'C')),
+        loci.SNP('CHR1', 15, 16, '.', alleles=('A', 'G')),
+        loci.SNP('CHR1', 22, 23, '.', alleles=('A', 'C', 'T')),
+    )
+    locus = loci.Locus(
+        contig='CHR1', 
+        start=5, 
+        stop=25, 
+        name='CHR1_05_25', 
+        sequence='A' * 20, 
+        variants=variants
+    )
+
+    haplotypes = np.array([
+        [0, 0, 0],
+        [0, 0, 0],
+        [1, 1, 1],
+        [0, 1, 2],
+    ], dtype = np.int8)
+
+    expect = np.array([
+        'AAAAAAAAAAAAAAAAAAAA',
+        'AAAAAAAAAAAAAAAAAAAA',
+        'ACAAAAAAAAGAAAAAACAA',
+        'AAAAAAAAAAGAAAAAATAA',
+    ])
+
+    actual = locus.format_haplotypes(haplotypes)
+    np.testing.assert_array_equal(expect, actual)
+
+
+def test_Locus__format_variants():
+
+    variants = (
+        loci.SNP('CHR1', 6, 7, '.', alleles=('A', 'C')),
+        loci.SNP('CHR1', 15, 16, '.', alleles=('A', 'G')),
+        loci.SNP('CHR1', 22, 23, '.', alleles=('A', 'C', 'T')),
+    )
+    locus = loci.Locus(
+        contig='CHR1', 
+        start=5, 
+        stop=25, 
+        name='CHR1_05_25', 
+        sequence='A' * 20, 
+        variants=variants
+    )
+
+    haplotypes = np.array([
+        [0, 0, 0],
+        [0, 0, 0],
+        [1, 1, 1],
+        [0, 1, 2],
+    ], dtype = np.int8)
+
+    expect = np.array([
+        ['A', 'A', 'A'],
+        ['A', 'A', 'A'],
+        ['C', 'G', 'C'],
+        ['A', 'G', 'T'],
+    ])
+
+    actual = locus.format_variants(haplotypes)
+    np.testing.assert_array_equal(expect, actual)
+
