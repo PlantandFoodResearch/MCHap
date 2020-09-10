@@ -9,7 +9,19 @@ PFEIFFER_ERROR = .0024
 
 
 def qual_of_char(char):
-    return ord(char) - 33
+    if isinstance(char, str):
+        qual = ord(char) - 33
+        return qual
+    elif isinstance(char, np.ndarray):
+        if char.dtype == np.dtype('<U1'):
+            qual = char.copy()
+            qual.dtype = np.int32
+            qual -= 33
+            return qual
+        else:
+            raise ValueError('Array must have dtype "<U1"')
+    else:
+        raise ValueError('Input must be character or array of characters')
 
 
 def prob_of_qual(qual):
