@@ -6,9 +6,9 @@ from haplokit.io import loci
 
 
 def test_read_bed4__plain_vs_zipped():
-    directiory = pathlib.Path(__file__).parent.absolute()
-    plain = str(directiory / 'data/simple.bed')
-    zipped = str(directiory / 'data/simple.bed.gz')
+    directory = pathlib.Path(__file__).parent.absolute()
+    plain = str(directory / 'data/simple.bed')
+    zipped = str(directory / 'data/simple.bed.gz')
 
     expect = [
         loci.Locus(
@@ -45,8 +45,8 @@ def test_read_bed4__plain_vs_zipped():
 
 
 def test_read_bed4__region():
-    directiory = pathlib.Path(__file__).parent.absolute()
-    zipped = str(directiory / 'data/simple.bed.gz')
+    directory = pathlib.Path(__file__).parent.absolute()
+    zipped = str(directory / 'data/simple.bed.gz')
 
     intervals = [
         loci.Locus(
