@@ -9,7 +9,6 @@ import multiprocessing as mp
 from haplokit.assemble.mcmc.denovo import DenovoMCMC
 from haplokit.encoding import symbolic
 from haplokit.io import \
-    read_loci, \
     read_bed4, \
     extract_sample_ids, \
     extract_read_variants, \
