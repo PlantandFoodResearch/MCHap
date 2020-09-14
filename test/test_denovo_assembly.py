@@ -118,3 +118,63 @@ def test_Program__header():
     columns_actual = header.columns()
     assert columns_expect == columns_actual
 
+
+def test_Program__run():
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / 'test_io/data'
+
+    BED = str(path / 'simple.bed.gz')
+    VCF = str(path / 'simple.vcf.gz')
+    REF = str(path / 'simple.fasta')
+    BAMS = [
+        str(path / 'simple.sample1.deep.bam'),
+        str(path / 'simple.sample2.deep.bam'),
+        str(path / 'simple.sample3.deep.bam')
+    ]
+
+    command = [
+        'haplokit-denovo',
+        '--bam', BAMS[0], BAMS[1], BAMS[2],
+        '--ploidy', '4',
+        '--bed', BED,
+        '--vcf', VCF,
+        '--ref', REF,
+        '--mcmc-steps', '500',
+        '--mcmc-burn', '100',
+        '--seed', '11',
+    ]
+
+    samples = ('SAMPLE1', 'SAMPLE2', 'SAMPLE3')
+    prog = program.cli(command)
+    out = prog.run()
+    assert out.header.samples == samples
+
+    records = out.records
+    record = records[0]
+    assert record.chrom == 'CHR1'
+    assert record.pos == 5
+    assert record.id == 'CHR1_05_25'
+    assert record.ref == 'A' * 20
+    assert record.alt == ['AAAAAAAAAAGAAAAAATAA', 'ACAAAAAAAAGAAAAAACAA']
+
+    info = record.info
+    assert info['END'] == 25
+    assert info['VP'] == '1,10,17'
+    assert info['NS'] == 3
+    assert tuple(info['AC']) == (3, 2)
+    assert info['AN'] == 3
+
+    format = record.format
+    assert set(format.keys()) == set(samples)
+
+    sample = format['SAMPLE1']
+    assert sample['GPM'] == 1.0
+    assert sample['PPM'] == 1.0
+    assert sample['RC'] == 200
+    assert sample['DP'] == 133
+    assert sample['GQ'] == 60
+    assert sample['PHQ'] == 60
+    assert str(sample['GT']) == '0/0/1/2'
+    assert sample['MPGP'] == [1.0, 0.0, 0.0]
+    assert sample['MPED'] == [2.0, 1.0, 1.0]
+    assert str(sample['FT']) == 'PASS'
