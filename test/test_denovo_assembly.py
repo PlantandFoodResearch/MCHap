@@ -100,6 +100,7 @@ def test_Program__header():
     assert contigs_actual == contigs_expect
 
     filters_expect = [
+        r'##FILTER=<ID=PASS,Description="All filters passed">',
         r'##FILTER=<ID=k3<0.95,Description="Less than 95.0 % of samples read-variant 3-mers ">',
         r'##FILTER=<ID=dp<5.0,Description="Sample has mean read depth less than 5.0.">',
         r'##FILTER=<ID=rc<5.0,Description="Sample has read (pair) count of less than 5.0 in haplotype interval.">',

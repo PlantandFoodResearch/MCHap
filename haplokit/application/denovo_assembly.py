@@ -304,6 +304,10 @@ class program(object):
         )
 
         filters=(
+            vcf.filters.FilterHeader(
+                id='PASS',
+                descr='All filters passed'
+            ),
             vcf.filters.kmer_filter_header(
                 k=self.kmer_filter_k,
                 threshold=self.kmer_filter_theshold,
