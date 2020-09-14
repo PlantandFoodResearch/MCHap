@@ -100,11 +100,11 @@ def test_Program__header():
     assert contigs_actual == contigs_expect
 
     filters_expect = [
-        r'##FILTER=<ID=PASS,Description="All filters passed">',
-        r'##FILTER=<ID=k3<0.95,Description="Less than 95.0 % of samples read-variant 3-mers ">',
-        r'##FILTER=<ID=dp<5.0,Description="Sample has mean read depth less than 5.0.">',
-        r'##FILTER=<ID=rc<5.0,Description="Sample has read (pair) count of less than 5.0 in haplotype interval.">',
-        r'##FILTER=<ID=pp<0.95,Description="Samples phenotype posterior probability < 0.95.">',
+        '##FILTER=<ID=PASS,Description="All filters passed">',
+        '##FILTER=<ID=3m95,Description="Less than 0.95 of read-variant 3-mers represented in haplotypes">',
+        '##FILTER=<ID=dp5,Description="Sample has mean read depth less than 5.0">',
+        '##FILTER=<ID=rc5,Description="Sample has read (pair) count of less than 5.0">',
+        '##FILTER=<ID=pp95,Description="Samples phenotype posterior probability less than 0.95">',
     ]
     filters_actual = [str(i) for i in header.filters]
     assert filters_actual == filters_expect

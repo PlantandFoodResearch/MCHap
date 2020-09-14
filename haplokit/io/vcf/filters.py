@@ -5,19 +5,8 @@ from haplokit import mset
 from haplokit.encoding import allelic, symbolic
 
 
-_PASS_CODE = 'PASS'
-_NULL_CODE = '.'
-_KMER_CODE = 'k{k}<{threshold}'
-_DEPTH_CODE = 'dp<{threshold}'
-_READCOUNT_CODE = 'rc<{threshold}'
-_PROB_CODE = 'pp<{threshold}'
-_FILTER_HEADER = '##FILTER=<ID={code},Description="{desc}">\n'
-
-
 @dataclass(frozen=True)
-class FilterHeader(object):
-    id: str
-    descr: str
+class SampleFilter(object):
 
     def __str__(self):
         template = '##FILTER=<ID={id},Description="{descr}">'
@@ -25,6 +14,28 @@ class FilterHeader(object):
             id=self.id,
             descr=self.descr
         )
+
+    def __call__(self):
+        raise NotImplementedError
+
+    @property
+    def id(self):
+        raise NotImplementedError
+
+    @property
+    def descr(self):
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class SamplePassFilter(SampleFilter):
+    @property
+    def id(self):
+        return 'PASS'
+
+    @property
+    def descr(self):
+        return 'All filters passed'
 
 
 @dataclass(frozen=True)
@@ -65,7 +76,7 @@ class FilterCallSet(object):
         return False
 
 
-def kmer_representation(variants, haplotype_calls, k=3):
+def _kmer_representation(variants, haplotype_calls, k=3):
     """ Calculates position-wise frequency of read_calls kmers which 
     are also present in haplotype_calls.
     """
@@ -94,87 +105,84 @@ def kmer_representation(variants, haplotype_calls, k=3):
     return result
 
 
-def kmer_filter_header(k=3, threshold=0.95):
-    code = _KMER_CODE.format(k=k, threshold=threshold)
-    descr = 'Less than {} % of samples read-variant {}-mers '.format(threshold * 100, k)
-    return FilterHeader(code, descr)
+@dataclass(frozen=True)
+class SampleKmerFilter(SampleFilter):
+    k: int = 3
+    threshold: float = 0.95
+        
+    @property
+    def id(self):
+        return '{}m{}'.format(self.k, int(self.threshold * 100))
+    
+    @property
+    def descr(self):
+        template = 'Less than {} of read-variant {}-mers represented in haplotypes'
+        return template.format(self.threshold, self.k)
+    
+    def __call__(self, variants, genotype):
+        n_pos = variants.shape[-1]
+        if n_pos < self.k:
+            # can't apply kmer filter
+            return FilterCall(self.id, None, applied=False)
+
+        freqs = _kmer_representation(variants, genotype, k=self.k)
+        fail = np.any(freqs < self.threshold)
+
+        return FilterCall(self.id, fail)
 
 
-def kmer_variant_filter(variants, genotype, k=3, threshold=0.95):
-    n_pos = variants.shape[-1]
-    if n_pos < k:
-        # can't apply kmer filter
-        return [_NULL_CODE for _ in range(n_pos)]
-
-    freqs = kmer_representation(variants, genotype, k=k)
-    fails = freqs < threshold
-    code = _KMER_CODE.format(k=k, threshold=threshold)
-    return [code if fail else _PASS_CODE for fail in fails]
-
-
-def kmer_haplotype_filter(variants, genotype, k=3, threshold=0.95):
-    code = _KMER_CODE.format(k=k, threshold=threshold)
-
-    n_pos = variants.shape[-1]
-    if n_pos < k:
-        # can't apply kmer filter
-        return FilterCall(code, None, applied=False)
-
-    freqs = kmer_representation(variants, genotype, k=k)
-    fail = np.any(freqs < threshold)
-
-    return FilterCall(code, fail)
+@dataclass(frozen=True)
+class SampleDepthFilter(SampleFilter):
+    threshold: float = 5.0
+        
+    @property
+    def id(self):
+        return 'dp{}'.format(int(self.threshold))
+    
+    @property
+    def descr(self):
+        template = 'Sample has mean read depth less than {}'
+        return template.format(self.threshold)
+    
+    def __call__(self, depths, gap='-'):
+        if np.prod(depths.shape) == 0:
+            # can't apply depth filter across 0 variants
+            return FilterCall(self.id, None, applied=False)
+        fail = np.mean(depths) < self.threshold
+        return FilterCall(self.id, fail)
 
 
-def depth_filter_header(threshold=5.0):
-    code = _DEPTH_CODE.format(threshold=threshold)
-    descr = 'Sample has mean read depth less than {}.'.format(threshold)
-    return FilterHeader(code, descr)
+@dataclass(frozen=True)
+class SampleReadCountFilter(SampleFilter):
+    threshold: int = 5
+        
+    @property
+    def id(self):
+        return 'rc{}'.format(int(self.threshold))
+    
+    @property
+    def descr(self):
+        template = 'Sample has read (pair) count of less than {}'
+        return template.format(self.threshold)
+    
+    def __call__(self, count):
+        fails = count < self.threshold
+        return FilterCall(self.id, fails)
 
 
-def depth_variant_filter(depths, threshold=5.0, gap='-'):
-    n_pos = depths.shape[-1]
-    if np.prod(depths.shape) == 0:
-        # can't apply depth filter across 0 variants
-        return [_NULL_CODE for _ in range(n_pos)]
-    fails = depths < threshold
-    code = _DEPTH_CODE.format(threshold=threshold)
-    return [code if fail else _PASS_CODE for fail in fails]
-
-
-def depth_haplotype_filter(depths, threshold=5.0, gap='-'):
-    code = _DEPTH_CODE.format(threshold=threshold)
-    if np.prod(depths.shape) == 0:
-        # can't apply depth filter across 0 variants
-        return FilterCall(code, None, applied=False)
-    fail = np.mean(depths) < threshold
-    return FilterCall(code, fail)
-
-
-def read_count_filter_header(threshold=5):
-    code = _READCOUNT_CODE.format(threshold=threshold)
-    descr = 'Sample has read (pair) count of less than {} in haplotype interval.'.format(threshold)
-    return FilterHeader(code, descr)
-
-
-def read_count_filter(count, threshold=5):
-    fails = count < threshold
-    code = _READCOUNT_CODE.format(threshold=threshold)
-    return FilterCall(code, fails)
-
-
-def prob_filter_header(threshold=0.95):
-    descr = 'Samples phenotype posterior probability < {}.'.format(threshold)
-    code = _PROB_CODE.format(threshold=threshold)
-    return FilterHeader(code, descr)
-
-
-def prob_filter(p, threshold=0.95):
-    fails = p < threshold
-    code = _PROB_CODE.format(threshold=threshold)
-    if np.shape(p) == ():
-        # scalar
-        return FilterCall(code, fails)
-    else:
-        # iterable
-        return [code if fail else _PASS_CODE for fail in fails]
+@dataclass(frozen=True)
+class SamplePhenotypeProbabilityFilter(SampleFilter):
+    threshold: float = 0.95
+        
+    @property
+    def id(self):
+        return 'pp{}'.format(int(self.threshold * 100))
+    
+    @property
+    def descr(self):
+        template = 'Samples phenotype posterior probability less than {}'
+        return template.format(self.threshold)
+    
+    def __call__(self, p):
+        fails = p < self.threshold
+        return FilterCall(self.id, fails)

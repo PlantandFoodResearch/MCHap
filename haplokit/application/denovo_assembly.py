@@ -304,23 +304,11 @@ class program(object):
         )
 
         filters=(
-            vcf.filters.FilterHeader(
-                id='PASS',
-                descr='All filters passed'
-            ),
-            vcf.filters.kmer_filter_header(
-                k=self.kmer_filter_k,
-                threshold=self.kmer_filter_theshold,
-            ),
-            vcf.filters.depth_filter_header(
-                threshold=self.depth_filter_threshold,
-            ),
-            vcf.filters.read_count_filter_header(
-                threshold=self.read_count_filter_threshold,
-            ),
-            vcf.filters.prob_filter_header(
-                threshold=self.probability_filter_threshold,
-            ),
+            vcf.filters.SamplePassFilter(),
+            vcf.filters.SampleKmerFilter(self.kmer_filter_k, self.kmer_filter_theshold),
+            vcf.filters.SampleDepthFilter(self.depth_filter_threshold),
+            vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold),
+            vcf.filters.SamplePhenotypeProbabilityFilter(self.probability_filter_threshold),
         )
 
         info_fields=(
@@ -356,6 +344,12 @@ class program(object):
         return vcf_header
 
     def _assemble_locus(self, header, locus):
+
+        # contruct sample filters
+        kmer_filter = vcf.filters.SampleKmerFilter(self.kmer_filter_k, self.kmer_filter_theshold)
+        depth_filter = vcf.filters.SampleDepthFilter(self.depth_filter_threshold)
+        count_filter = vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold)
+        prob_filter = vcf.filters.SamplePhenotypeProbabilityFilter(self.probability_filter_threshold)
 
         # format data for sample columns in haplotype vcf
         sample_data = {sample: {} for sample in header.samples}
@@ -398,12 +392,12 @@ class program(object):
             else:
                 genotype = vcf.call_phenotype(*phenotype, self.probability_filter_threshold)
 
-            # filters
+            # apply filters
             filterset = vcf.filters.FilterCallSet((
-                vcf.filters.prob_filter(phenotype[1].sum(), threshold=self.probability_filter_threshold),
-                vcf.filters.depth_haplotype_filter(read_depth, threshold=self.depth_filter_threshold),
-                vcf.filters.read_count_filter(read_count, threshold=self.read_count_filter_threshold),
-                vcf.filters.kmer_haplotype_filter(read_calls, genotype[0], k=self.kmer_filter_k, threshold=self.kmer_filter_theshold),
+                prob_filter(phenotype[1].sum()),
+                depth_filter(read_depth),
+                count_filter(read_count),
+                kmer_filter(read_calls, genotype[0]),
             ))
 
             # format fields
