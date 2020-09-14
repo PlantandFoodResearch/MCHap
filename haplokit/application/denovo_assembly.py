@@ -345,11 +345,11 @@ class program(object):
 
     def _assemble_locus(self, header, locus):
 
-        # contruct sample filters
-        kmer_filter = vcf.filters.SampleKmerFilter(self.kmer_filter_k, self.kmer_filter_theshold)
-        depth_filter = vcf.filters.SampleDepthFilter(self.depth_filter_threshold)
-        count_filter = vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold)
-        prob_filter = vcf.filters.SamplePhenotypeProbabilityFilter(self.probability_filter_threshold)
+        # label sample filters
+        kmer_filter = header.filters[1]
+        depth_filter = header.filters[2]
+        count_filter = header.filters[3]
+        prob_filter = header.filters[4]
 
         # format data for sample columns in haplotype vcf
         sample_data = {sample: {} for sample in header.samples}
