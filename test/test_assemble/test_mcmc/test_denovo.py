@@ -254,6 +254,39 @@ def test_DenovoMCMC__tetraploid():
         assert posterior.probabilities[0] < 0.30
 
 
+def test_DenovoMCMC__seed():
+
+    haplotypes = np.array([
+        [0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 1, 1, 1],
+        [0, 1, 0, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1],
+    ])
+    ploidy, n_base = haplotypes.shape
+    n_steps = 1000
+    n_burn = 500
+    model = denovo.DenovoMCMC(ploidy=ploidy, steps=n_steps)
+    # medium read depth
+    reads = simulate_reads(
+        haplotypes, 
+        n_reads=16, 
+        uniform_sample=True,
+        errors=False, 
+        qual=(60, 60),
+    )
+
+    model_1 = denovo.DenovoMCMC(ploidy=ploidy, steps=n_steps, random_seed=42)
+    model_2 = denovo.DenovoMCMC(ploidy=ploidy, steps=n_steps, random_seed=33)
+    model_3 = denovo.DenovoMCMC(ploidy=ploidy, steps=n_steps, random_seed=42)
+
+    trace_1 = model_1.fit(reads)
+    trace_2 = model_2.fit(reads)
+    trace_3 = model_3.fit(reads)
+
+    assert np.any((trace_1.genotypes != trace_2.genotypes))
+    np.testing.assert_array_equal(trace_1.genotypes, trace_3.genotypes)
+
+
 def test_DenovoMCMC__fuzz():
     for _ in range(10):
         ploidy = np.random.randint(2, 5)

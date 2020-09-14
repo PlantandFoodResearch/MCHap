@@ -27,6 +27,7 @@ class DenovoMCMC(Assembler):
     fix_homozygous: float = 0.999
     allow_recombinations: bool = True
     allow_dosage_swaps: bool = True
+    random_seed: int = None
     """De novo haplotype assembly using Markov chain Monte Carlo
     for probabilistically encoded variable positions of NGS reads.
 
@@ -64,6 +65,9 @@ class DenovoMCMC(Assembler):
         Set to False to dis-allow structural steps involving
         dosage changes between parts of a pair of haplotypes
         (default = True).
+    random_seed: int, optional
+        Seed the random seed for numpy and numba RNG
+        (default = None).
 
     """
 
@@ -93,6 +97,10 @@ class DenovoMCMC(Assembler):
         among all reads.
 
         """
+        # seet random seed if specified
+        if self.random_seed is not None:
+            np.random.seed(self.random_seed)
+            util.seed_numba(self.random_seed)
 
         # identify base positions that are overwhelmingly likely
         # to be homozygous

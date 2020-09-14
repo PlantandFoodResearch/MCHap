@@ -50,7 +50,8 @@ class program(object):
     kmer_filter_theshold: float = 0.95
     n_cores: int = 1
     precision: int = 3
-    chunk_size: int = 10
+    random_seed: int = 42
+    cli_command: str=None
 
     @classmethod
     def cli(cls, command):
@@ -207,6 +208,14 @@ class program(object):
         )
 
         parser.add_argument(
+            '--seed',
+            type=int,
+            nargs=1,
+            default=[42],
+            help=('Random seed for MCMC (default = 42).')
+        )
+
+        parser.add_argument(
             '--cores',
             type=int,
             nargs=1,
@@ -264,6 +273,8 @@ class program(object):
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
             n_cores=args.cores[0],
+            cli_command=command,
+            random_seed=args.seed[0]
         )
 
     def loci(self):
@@ -286,7 +297,10 @@ class program(object):
         meta_fields=(
             vcf.headermeta.fileformat('v4.3'),
             vcf.headermeta.filedate(),
+            vcf.headermeta.source(),
             vcf.headermeta.phasing('None'),
+            vcf.headermeta.commandline(self.cli_command),
+            vcf.headermeta.randomseed(self.random_seed),
         )
 
         filters=(
@@ -368,6 +382,7 @@ class program(object):
                 fix_homozygous=self.mcmc_fix_homozygous,
                 allow_recombinations=self.mcmc_allow_recombinations,
                 allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
+                random_seed=self.random_seed,
             ).fit(read_dists)
 
             # posterior mode phenotype is a collection of genotypes
