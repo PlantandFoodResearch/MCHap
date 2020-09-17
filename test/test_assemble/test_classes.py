@@ -69,15 +69,22 @@ def test_GenotypeTrace():
 
     counts = np.array([60, 20, 15, 5])
 
-    genotype_trace = mset.repeat(genotypes, counts)
-    genotype_trace = genotype_trace[np.random.permutation(len(genotype_trace))]
-    llks = np.zeros(len(genotype_trace))
+    single_chain = mset.repeat(genotypes, counts)
 
-    trace = classes.GenotypeTrace(genotype_trace, llks)
+    n_chains = 2
+    n_steps = len(single_chain)
+    
+    genotype_trace = np.tile(single_chain, (n_chains, 1, 1, 1))
+    for i in range(n_chains):
+        genotype_trace[i] = genotype_trace[i][np.random.permutation(n_steps)]
+
+    llks = np.zeros((n_chains, n_steps))
+
+    trace = classes.GenotypeMultiTrace(genotype_trace, llks)
 
     burnt = trace.burn(10)
-    assert burnt.genotypes.shape == (90, 4, 3)
-    assert burnt.llks.shape == (90, )
+    assert burnt.genotypes.shape == (2, 90, 4, 3)
+    assert burnt.llks.shape == (2, 90)
 
     # posterior sorted from most to least probable
     posterior = trace.posterior()

@@ -125,15 +125,15 @@ class PosteriorGenotypeDistribution(object):
 
 
 @dataclass
-class GenotypeTrace(object):
-    """Generic class for single chained MCMC haplotype assembler trace.
+class GenotypeMultiTrace(object):
+    """Generic class for multi-chain MCMC haplotype assembler trace.
 
     Attributes
     ----------
-    genotypes : ndarray, int, shape (n_steps, ploidy, n_positions)
+    genotypes : ndarray, int, shape (n_chains, n_steps, ploidy, n_positions)
         The genotype recorded at each step of a Markov chain Monte Carlo 
         simulation for a locus covering n_positions variable positions.
-    llks : ndarray, float, shape (n_steps, )
+    llks : ndarray, float, shape (n_chains, n_steps)
         The log-likelihood calculated for the genotype at each step of
         the Markov chain Monte Carlo simulation.
 
@@ -149,23 +149,26 @@ class GenotypeTrace(object):
             self.genotypes=self.genotypes.copy()
             self.llks=self.llks.copy()
         
-            assert np.ndim(self.genotypes) == 3
-            assert np.ndim(self.llks) == 1
-            assert len(self.genotypes) == len(self.llks)
+            assert np.ndim(self.genotypes) == 4
+            assert np.ndim(self.llks) == 2
+            assert self.genotypes.shape[0:2] == self.llks.shape
 
             # sort genotypes
-            for i in range(len(self.genotypes)):
-                self.genotypes[i] = allelic.sort(self.genotypes[i])
+            n_chains, n_steps = self.genotypes.shape[0:2]
+            for c in range(n_chains):
+                for i in range(n_steps):
+                    self.genotypes[c, i] = allelic.sort(self.genotypes[c, i])
 
 
     def burn(self, n):
         """Returns a new GenotypeTrace object without the first 
-        `n` observations.
+        `n` observations of each chain.
 
         Parameters
         ----------
         n : int
-            Number of steps to remove from the start of the trace.
+            Number of steps to remove from the start of each 
+            chain in the trace.
 
         Returns
         -------
@@ -180,8 +183,8 @@ class GenotypeTrace(object):
             None, 
             None,
         )
-        new.genotypes = self.genotypes[n:]
-        new.llks = self.llks[n:]
+        new.genotypes = self.genotypes[:, n:]
+        new.llks = self.llks[:, n:]
         return new
 
     def posterior(self):
@@ -193,7 +196,11 @@ class GenotypeTrace(object):
             A distribution over unique genotypes recorded in the trace.
 
         """
-        states, counts = mset.unique_counts(self.genotypes)
+        # merge chains
+        n_chain, n_step, ploidy, n_base = self.genotypes.shape
+        genotypes = self.genotypes.reshape(n_chain * n_step, ploidy, n_base)
+
+        states, counts = mset.unique_counts(genotypes)
         probs = counts / np.sum(counts)
 
         idx = np.flip(np.argsort(probs))
