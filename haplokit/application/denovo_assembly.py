@@ -459,7 +459,7 @@ class program(object):
         # data for info column of VCF
         info_data = dict(
             END=locus.stop,
-            VP=vcf.vcfstr(np.subtract(locus.positions, locus.start)),
+            VP=vcf.vcfstr(np.subtract(locus.positions, locus.start) + 1),
             NS=n_called_samples,
             AC=allele_counts[1:],  # exclude reference count
             AN=np.sum(np.greater(allele_counts, 0)),
