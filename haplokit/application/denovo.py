@@ -243,7 +243,10 @@ class program(object):
             help=('Number of cpu cores to use (default = 1).')
         )
 
-        args = parser.parse_args(command[1:])
+        if len(command) < 3:
+            parser.print_help()
+            sys.exit(1)
+        args = parser.parse_args(command[2:])
 
         # sample bam paths and ploidy
         if args.btf:

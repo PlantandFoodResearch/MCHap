@@ -2,7 +2,7 @@ import pathlib
 
 from haplokit.version import __version__
 from haplokit.io.vcf.headermeta import filedate
-from haplokit.application.denovo_assembly import program
+from haplokit.application.denovo import program
 
 
 def test_Program__cli():
@@ -21,7 +21,8 @@ def test_Program__cli():
     ]
 
     command = [
-        'haplokit-denovo',
+        'haplokit',
+        'denovo',
         '--bam', BAMS[0], BAMS[1], BAMS[2],
         '--ploidy', '4',
         '--bed', BED,
@@ -66,7 +67,8 @@ def test_Program__header():
     ]
 
     command = [
-        'haplokit-denovo',
+        'haplokit',
+        'denovo',
         '--bam', BAMS[0], BAMS[1], BAMS[2],
         '--ploidy', '4',
         '--bed', BED,
@@ -134,7 +136,8 @@ def test_Program__run():
     ]
 
     command = [
-        'haplokit-denovo',
+        'haplokit',
+        'denovo',
         '--bam', BAMS[0], BAMS[1], BAMS[2],
         '--ploidy', '4',
         '--bed', BED,

@@ -18,10 +18,7 @@ setup(
     author_email='tim.millar@plantandfood.co.nz',
     description='Polyploid micro-haplotype assembly',
     long_description=read_file('README.rst'),
-    scripts=[
-        'applications/haplokit-denovo.py',
-        'applications/haplokit-haplograph.py',
-    ],
+    entry_points={"console_scripts": ["haplokit=haplokit.application.cli:main"]},
     packages=[
         'haplokit',
         'haplokit/application',
