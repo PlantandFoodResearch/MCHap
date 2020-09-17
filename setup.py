@@ -3,22 +3,22 @@
 import os
 from setuptools import setup
 
-
 def read_file(file_name):
-    return os.path.join(os.path.dirname(__file__), file_name)
+    path = os.path.join(os.path.dirname(__file__), file_name)
+    with open(path) as f:
+        lines = f.readlines()
+    return '\n'.join(lines)
 
+VERSION = read_file('haplokit/version.py').split("'")[1]
 
 setup(
     name='haplokit',
-    version='0.0.1',
+    version=VERSION,
     author='Tim Millar',
     author_email='tim.millar@plantandfood.co.nz',
-    description='Local haplotype manipulation and assembly',
+    description='Polyploid micro-haplotype assembly',
     long_description=read_file('README.rst'),
-    scripts=[
-        'applications/haplokit-denovo.py',
-        'applications/haplokit-haplograph.py',
-    ],
+    entry_points={"console_scripts": ["haplokit=haplokit.application.cli:main"]},
     packages=[
         'haplokit',
         'haplokit/application',
@@ -32,9 +32,15 @@ setup(
         'haplokit/io',
         'haplokit/io/vcf',
     ],
-    keywords=['biology', 'bioinformatics'],
-    classifiers=['Development Status :: 1 - Planning',
-                'Intended Audience :: Science/Research',
-                'Programming Language :: Python :: 3.5',
-                'Topic :: Scientific/Engineering']
+    python_requires='>3.7.0',
+    keywords=['biology', 'bioinformatics', 'genetics', 'genomics'],
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Environment :: Console',
+        'Intended Audience :: Science/Research',
+        'Natural Language :: English',
+        'Operating System :: POSIX :: Linux',
+        'Programming Language :: Python :: 3.7',
+        'Topic :: Scientific/Engineering :: Bio-Informatics',
+    ]
     )

@@ -9,7 +9,6 @@ import multiprocessing as mp
 from haplokit.assemble.mcmc.denovo import DenovoMCMC
 from haplokit.encoding import symbolic
 from haplokit.io import \
-    read_loci, \
     read_bed4, \
     extract_sample_ids, \
     extract_read_variants, \
@@ -36,6 +35,7 @@ class program(object):
     call_filtered: bool = False
     read_group_field: str = 'SM'
     read_error_rate: float = PFEIFFER_ERROR
+    mcmc_chains: int = 2
     mcmc_steps: int = 1000
     mcmc_burn: int = 500
     mcmc_ratio: float = 0.75
@@ -51,7 +51,8 @@ class program(object):
     kmer_filter_theshold: float = 0.95
     n_cores: int = 1
     precision: int = 3
-    chunk_size: int = 10
+    random_seed: int = 42
+    cli_command: str=None
 
     @classmethod
     def cli(cls, command):
@@ -152,6 +153,14 @@ class program(object):
         )
 
         parser.add_argument(
+            '--mcmc-chains',
+            type=int,
+            nargs=1,
+            default=[2],
+            help='Number of independent MCMC chains per assembly (default = 2).'
+        )
+
+        parser.add_argument(
             '--mcmc-steps',
             type=int,
             nargs=1,
@@ -165,6 +174,25 @@ class program(object):
             nargs=1,
             default=[500],
             help='Number of initial steps to discard from MCMC trace (default = 500).'
+        )
+
+        parser.add_argument(
+            '--mcmc-fix-homozygous',
+            type=float,
+            nargs=1,
+            default=[0.999],
+            help=(
+                'Fix alleles that are homozygous with a probability greater '
+                'than or equal to the specified value (default = 0.999).'
+            )
+        )
+
+        parser.add_argument(
+            '--mcmc-seed',
+            type=int,
+            nargs=1,
+            default=[42],
+            help=('Random seed for MCMC (default = 42).')
         )
 
         parser.add_argument(
@@ -215,7 +243,10 @@ class program(object):
             help=('Number of cpu cores to use (default = 1).')
         )
 
-        args = parser.parse_args(command[1:])
+        if len(command) < 3:
+            parser.print_help()
+            sys.exit(1)
+        args = parser.parse_args(command[2:])
 
         # sample bam paths and ploidy
         if args.btf:
@@ -251,12 +282,13 @@ class program(object):
             call_filtered=args.call_filtered,
             read_group_field=args.read_group_field[0],
             read_error_rate=args.error_rate[0],
+            mcmc_chains=args.mcmc_chains[0],
             mcmc_steps=args.mcmc_steps[0],
             mcmc_burn=args.mcmc_burn[0],
             #mcmc_ratio,
             #mcmc_alpha,
             #mcmc_beta,
-            #mcmc_fix_homozygous,
+            mcmc_fix_homozygous=args.mcmc_fix_homozygous[0],
             #mcmc_allow_recombinations,
             #mcmc_allow_dosage_swaps,
             depth_filter_threshold=args.filter_depth[0],
@@ -265,6 +297,8 @@ class program(object):
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
             n_cores=args.cores[0],
+            cli_command=command,
+            random_seed=args.mcmc_seed[0]
         )
 
     def loci(self):
@@ -287,23 +321,18 @@ class program(object):
         meta_fields=(
             vcf.headermeta.fileformat('v4.3'),
             vcf.headermeta.filedate(),
+            vcf.headermeta.source(),
             vcf.headermeta.phasing('None'),
+            vcf.headermeta.commandline(self.cli_command),
+            vcf.headermeta.randomseed(self.random_seed),
         )
 
         filters=(
-            vcf.filters.kmer_filter_header(
-                k=self.kmer_filter_k,
-                threshold=self.kmer_filter_theshold,
-            ),
-            vcf.filters.depth_filter_header(
-                threshold=self.depth_filter_threshold,
-            ),
-            vcf.filters.read_count_filter_header(
-                threshold=self.read_count_filter_threshold,
-            ),
-            vcf.filters.prob_filter_header(
-                threshold=self.probability_filter_threshold,
-            ),
+            vcf.filters.SamplePassFilter(),
+            vcf.filters.SampleKmerFilter(self.kmer_filter_k, self.kmer_filter_theshold),
+            vcf.filters.SampleDepthFilter(self.depth_filter_threshold),
+            vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold),
+            vcf.filters.SamplePhenotypeProbabilityFilter(self.probability_filter_threshold),
         )
 
         info_fields=(
@@ -311,7 +340,7 @@ class program(object):
             vcf.infofields.AC,
             vcf.infofields.NS,
             vcf.infofields.END,
-            vcf.infofields.VP,
+            vcf.infofields.SNVPOS,
         )
 
         format_fields=(
@@ -340,6 +369,12 @@ class program(object):
 
     def _assemble_locus(self, header, locus):
 
+        # label sample filters
+        kmer_filter = header.filters[1]
+        depth_filter = header.filters[2]
+        count_filter = header.filters[3]
+        prob_filter = header.filters[4]
+
         # format data for sample columns in haplotype vcf
         sample_data = {sample: {} for sample in header.samples}
 
@@ -363,12 +398,14 @@ class program(object):
 
             # assemble
             trace = DenovoMCMC.parameterize(
-                ploidy=self.sample_ploidy[sample], 
-                steps=self.mcmc_steps, 
+                ploidy=self.sample_ploidy[sample],
+                steps=self.mcmc_steps,
+                chains=self.mcmc_chains,
                 ratio=self.mcmc_ratio,
                 fix_homozygous=self.mcmc_fix_homozygous,
                 allow_recombinations=self.mcmc_allow_recombinations,
                 allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
+                random_seed=self.random_seed,
             ).fit(read_dists)
 
             # posterior mode phenotype is a collection of genotypes
@@ -380,12 +417,12 @@ class program(object):
             else:
                 genotype = vcf.call_phenotype(*phenotype, self.probability_filter_threshold)
 
-            # filters
+            # apply filters
             filterset = vcf.filters.FilterCallSet((
-                vcf.filters.prob_filter(phenotype[1].sum(), threshold=self.probability_filter_threshold),
-                vcf.filters.depth_haplotype_filter(read_depth, threshold=self.depth_filter_threshold),
-                vcf.filters.read_count_filter(read_count, threshold=self.read_count_filter_threshold),
-                vcf.filters.kmer_haplotype_filter(read_calls, genotype[0], k=self.kmer_filter_k, threshold=self.kmer_filter_theshold),
+                prob_filter(phenotype[1].sum()),
+                depth_filter(read_depth),
+                count_filter(read_count),
+                kmer_filter(read_calls, genotype[0]),
             ))
 
             # format fields
@@ -423,13 +460,13 @@ class program(object):
                     n_called_samples -= 1
 
         # data for info column of VCF
-        info_data = dict(
-            END=locus.stop,
-            VP=vcf.vcfstr(np.subtract(locus.positions, locus.start)),
-            NS=n_called_samples,
-            AC=allele_counts[1:],  # exclude reference count
-            AN=np.sum(np.greater(allele_counts, 0)),
-        )
+        info_data = {
+            'END': locus.stop,
+            'SNVPOS': vcf.vcfstr(np.subtract(locus.positions, locus.start) + 1),
+            'NS': n_called_samples,
+            'AC': allele_counts[1:],  # exclude reference count
+            'AN': np.sum(np.greater(allele_counts, 0)),
+        }
 
         # add genotypes to sample data
         for sample in header.samples:

@@ -1,6 +1,10 @@
 import numpy as np
 import pytest
 
+from haplokit.testing import simulate_reads
+from haplokit.encoding import allelic
+from haplokit.assemble.util import seed_numba, log_likelihoods_as_conditionals
+from haplokit.assemble.likelihood import log_likelihood
 from haplokit.assemble.mcmc.step import structural
 
 
@@ -257,3 +261,95 @@ def test_dosage_step_options(labels, allow_deletions, answer):
 
     assert len(query) == n_options
     np.testing.assert_array_equal(query, answer)
+
+
+def test_interval_step():
+    np.random.seed(42)
+    seed_numba(42)
+
+    # true haplotypes
+    haplotypes = np.array([
+        [0, 0, 0, 0],
+        [0, 0, 1, 1],
+        [1, 1, 0, 0],
+        [1, 1, 1, 1],
+    ])
+
+    reads = simulate_reads(
+        haplotypes,
+        n_reads=4,
+        uniform_sample=True,
+        errors=False,
+        error_rate=0.1,
+        qual=(60, 60),
+    )
+
+    # initial genotype
+    genotype = np.array([
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+    ])
+
+    # interval includes first 2 bases
+    interval = (0, 2)
+
+    # all unique re-arrangements
+    options = np.array([
+        [[0, 0, 0, 0],  # no change
+         [0, 0, 0, 0],
+         [1, 1, 1, 1],
+         [1, 1, 1, 1]],
+        [[0, 0, 0, 0],  # dosage
+         [0, 0, 0, 0],
+         [0, 0, 1, 1],
+         [1, 1, 1, 1]],
+        [[0, 0, 0, 0],  # dosage
+         [1, 1, 0, 0],
+         [1, 1, 1, 1],
+         [1, 1, 1, 1]],
+        [[0, 0, 0, 0],  # recombine
+         [0, 0, 1, 1],
+         [1, 1, 0, 0],
+         [1, 1, 1, 1]],
+    ])
+
+    # calculate and order by llk
+    llks = np.empty(len(options), dtype=np.float64)
+    for i, option in enumerate(options):
+        llks[i] = log_likelihood(reads, option)
+    options = options[np.argsort(llks)]
+
+    # count choices of each option
+    counts = {}
+    for option in options:
+        counts[option.tostring()] = 0
+    for _ in range(100):
+        choice = genotype.copy()
+        llk = log_likelihood(reads, choice)
+        structural.interval_step(
+            choice, 
+            reads, 
+            llk, 
+            interval=interval, 
+            allow_recombinations=True,
+            allow_dosage_swaps=True,
+        )
+        choice = allelic.sort(choice)
+        assert choice.tostring() in counts
+        counts[choice.tostring()] += 1
+    totals = np.zeros(len(options), dtype=np.int)
+    for i, option in enumerate(options):
+        totals[i] = counts[option.tostring()]
+    
+    probs = totals / totals.sum()
+    
+    # check posterior probs in same order as
+    # likelihoods and that values are reasonable
+    assert probs[3] > 0.75
+    assert np.logical_and((0.15 > probs[1:3]), (probs[1:3] > 0.05)).all()
+    assert 0.5 > probs[0] 
+
+    #TODO independent calculation of posterior probabilities
+    

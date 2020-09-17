@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import numpy as np
 import networkx as nx
@@ -238,7 +239,10 @@ class program(object):
             help='Output directory.',
         )
 
-        args = parser.parse_args(command[1:])
+        if len(command) < 3:
+            parser.print_help()
+            sys.exit(1)
+        args = parser.parse_args(command[2:])
 
         btf_ped = read_biotargets(args.ped[0])
         digraph = btf_ped.pedigree_digraph()

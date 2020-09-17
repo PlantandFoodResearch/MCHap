@@ -15,10 +15,3 @@ def vcfstr(obj):
         return '.'
     else:
         return str(obj)
-
-
-def if_not_none(func, option, *args, **kwargs):
-    if option is None:
-        return None
-    else:
-        return func(option, *args, **kwargs)

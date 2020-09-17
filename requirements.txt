@@ -1,0 +1,6 @@
+dataclasses
+gzip
+numpy
+scipy
+numba
+pysam

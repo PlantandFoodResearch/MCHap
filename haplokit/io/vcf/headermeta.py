@@ -1,6 +1,8 @@
 from datetime import date as _date
 from dataclasses import dataclass
 
+from haplokit import version
+
 
 @dataclass(frozen=True)
 class MetaHeader(object):
@@ -27,8 +29,20 @@ def filedate(date=None):
     return MetaHeader('fileDate', date)
 
 
-def source(source):
+def source(source=None):
+    if source is None:
+        source = 'Haplokit v{}'.format(version.__version__)
     return MetaHeader('source', source)
+
+
+def commandline(command):
+    if not isinstance(command, str):
+        command='"{}"'.format(' '.join(command))
+    return MetaHeader('commandline', command)
+
+
+def randomseed(seed):
+    return MetaHeader('randomseed', str(seed))
 
 
 def reference(path):

@@ -56,9 +56,6 @@ def call_phenotype(genotypes, probabilities, threshold=0.95):
         p += probabilities.pop(idx)
         selected.append(genotypes.pop(idx))
 
-    # if p < threshold return None
-    p = None if p < threshold else p
-    
     # intercept of selected genotypes
     alleles = reduce(mset.intercept, selected)
     

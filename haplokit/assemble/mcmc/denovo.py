@@ -12,7 +12,7 @@ from haplokit.encoding import probabilistic
 from haplokit.assemble.mcmc.step import mutation, structural
 from haplokit.assemble.likelihood import log_likelihood
 from haplokit.assemble import util, complexity
-from haplokit.assemble.classes import Assembler, GenotypeTrace
+from haplokit.assemble.classes import Assembler, GenotypeMultiTrace
 
 
 @dataclass
@@ -20,6 +20,7 @@ class DenovoMCMC(Assembler):
 
     ploidy: int
     steps: int = 1000
+    chains: int = 2
     ratio: float = 1.0
     alpha: float = 1.0
     beta: float = 3.0
@@ -27,6 +28,7 @@ class DenovoMCMC(Assembler):
     fix_homozygous: float = 0.999
     allow_recombinations: bool = True
     allow_dosage_swaps: bool = True
+    random_seed: int = None
     """De novo haplotype assembly using Markov chain Monte Carlo
     for probabilistically encoded variable positions of NGS reads.
 
@@ -35,8 +37,11 @@ class DenovoMCMC(Assembler):
     ploidy : int
         Ploidy of organisim at the assembled locus.
     steps : int, optional
-        Number of steps to run in the MCMC simulation
+        Number of steps to run in each MCMC simulation
         (default = 1000).
+    chains : int, optional
+        Number of independent MCMC simulations to run
+        (default = 2).
     ratio : float, optional
         Proportion of steps to include structural sub-steps
         in the MCMC simulation (default = 1.0).
@@ -64,6 +69,9 @@ class DenovoMCMC(Assembler):
         Set to False to dis-allow structural steps involving
         dosage changes between parts of a pair of haplotypes
         (default = True).
+    random_seed: int, optional
+        Seed the random seed for numpy and numba RNG
+        (default = None).
 
     """
 
@@ -75,15 +83,15 @@ class DenovoMCMC(Assembler):
         ----------
         reads : ndarray, float, shape (n_reads, n_positions, max_allele)
             Probabilistically encoded variable positions of NGS reads.
-        initial : ndarray, int, shape (ploidy, n_positions, max_allele), optional
-            Set the initial genotype state of the MCMC simulation
+        initial : ndarray, int, shape (n_chains, ploidy, n_positions, max_allele), optional
+            Set the initial genotype state of each MCMC simulation
             (default = None).
 
         Returns
         -------
-        trace : GenotypeTrace
-            An instance of GenotypeTrace containing the genotype state
-            and log-likelihood at each step in the MCMC simulation.
+        trace : GenotypeMultiTrace
+            An instance of GenotypeMultiTrace containing the genotype state
+            and log-likelihood at each step in each of the MCMC simulations.
         
         Notes
         -----
@@ -93,7 +101,32 @@ class DenovoMCMC(Assembler):
         among all reads.
 
         """
+        # seet random seed once for all chains
+        if self.random_seed is not None:
+            np.random.seed(self.random_seed)
+            util.seed_numba(self.random_seed)
 
+        if initial is None:
+            initial = [None for _ in range(self.chains)]
+
+        # run simulations sequentially
+        genotypes = []
+        llks = []
+        for chain in range(self.chains):
+            g, l = self._mcmc(reads, initial=initial[chain])
+            genotypes.append(g)
+            llks.append(l)
+
+        # combine traces into multi-trace
+        return GenotypeMultiTrace(
+            np.array(genotypes),
+            np.array(llks),
+        )
+
+
+    def _mcmc(self, reads, initial=None):
+        """Run a single MCMC simulation.
+        """
         # identify base positions that are overwhelmingly likely
         # to be homozygous
         # these can be 'fixed' to reduce computational complexity
@@ -121,7 +154,7 @@ class DenovoMCMC(Assembler):
             # set likelihoods to nan
             llks = np.empty(self.steps, dtype=np.float)
             llks[:] = np.nan
-            return GenotypeTrace(genotypes, llks)
+            return genotypes, llks
 
         # set the initial genotype
         if initial is None:
@@ -165,7 +198,7 @@ class DenovoMCMC(Assembler):
         # return the genotype trace and llks
         if n_het_base == n_base:
             # no fixed homozygous alleles to add back in
-            return GenotypeTrace(genotypes, llks)
+            return genotypes, llks
 
         else:
             # add back in the fixed alleles that where removed
@@ -177,7 +210,7 @@ class DenovoMCMC(Assembler):
             template = np.tile(template, (self.steps, self.ploidy, 1))
             # add in the heterozygous alleles from the real trace
             template[:, :, heterozygous] = genotypes
-            return GenotypeTrace(template, llks)
+            return template, llks
 
 
 @numba.njit
@@ -283,10 +316,18 @@ def _read_mean_dist(reads):
     
     """
     # work around to avoid nan values caused by gaps
-    dist = reads.copy()
-    dist[np.isnan(dist)] = 1
-    dist /= np.expand_dims(dist.sum(axis=-1), -1)
-    dist = np.mean(dist, axis=-3)
+    reads = reads.copy()
+    n_reads = len(reads)
+    gaps = np.isnan(reads).all(axis=0)
+
+    # replace gaps with 1
+    reads[np.tile(gaps, (n_reads, 1, 1))] = 1
+    dist = np.nanmean(reads, axis=0)
+
+    # fill gaps
+    n_alleles = np.sum(~np.all(reads == 0, axis=0), axis=1, keepdims=True)
+    fill = 1 / np.tile(n_alleles, (1, reads.shape[-1]))
+    dist[gaps] = fill[gaps]
     return dist
 
 

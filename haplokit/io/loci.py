@@ -205,20 +205,3 @@ def _set_locus_variants(locus, variant_file):
     variants=tuple(variants)
     locus = locus.set(variants=variants)
     return locus
-
-
-def read_loci(bed, vcf, fasta, region=None, drop_non_variable=True):
-    vcf_file = pysam.VariantFile(vcf)
-    ref_file = pysam.FastaFile(fasta)
-
-    for locus in read_bed4(bed, region=region):
-        locus = _set_locus_variants(locus, vcf_file)
-
-        if drop_non_variable and len(locus.variants) == 0:
-            pass
-
-        else:
-            yield _set_locus_sequence(locus, ref_file)
-
-    vcf_file.close()
-    ref_file.close()
