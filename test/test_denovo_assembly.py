@@ -160,7 +160,7 @@ def test_Program__run():
 
     info = record.info
     assert info['END'] == 25
-    assert info['VP'] == '2,11,18'
+    assert info['SNVPOS'] == '2,11,18'
     assert info['NS'] == 3
     assert tuple(info['AC']) == (3, 2)
     assert info['AN'] == 3

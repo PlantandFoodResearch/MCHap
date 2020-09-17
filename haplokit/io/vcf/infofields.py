@@ -26,4 +26,4 @@ AN = InfoField(id='AN', number=1, type='Integer', descr='Total number of alleles
 AF = InfoField(id='AF', number='A', type='Float', descr='Allele Frequency')
 AA = InfoField(id='AA', number=1, type='String', descr='Ancestral allele')
 END = InfoField(id='END', number=1, type='Integer', descr='End position on CHROM')
-VP = InfoField(id='VP', number='.', type='Integer', descr='Relative positions of SNPs within haplotypes')
+SNVPOS = InfoField(id='SNVPOS', number='.', type='Integer', descr='Relative (1-based) positions of SNVs within haplotypes')
