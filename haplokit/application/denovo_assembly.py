@@ -35,6 +35,7 @@ class program(object):
     call_filtered: bool = False
     read_group_field: str = 'SM'
     read_error_rate: float = PFEIFFER_ERROR
+    mcmc_chains: int = 2
     mcmc_steps: int = 1000
     mcmc_burn: int = 500
     mcmc_ratio: float = 0.75
@@ -152,6 +153,14 @@ class program(object):
         )
 
         parser.add_argument(
+            '--mcmc-chains',
+            type=int,
+            nargs=1,
+            default=[2],
+            help='Number of independent MCMC chains per assembly (default = 2).'
+        )
+
+        parser.add_argument(
             '--mcmc-steps',
             type=int,
             nargs=1,
@@ -259,6 +268,7 @@ class program(object):
             call_filtered=args.call_filtered,
             read_group_field=args.read_group_field[0],
             read_error_rate=args.error_rate[0],
+            mcmc_chains=args.mcmc_chains[0],
             mcmc_steps=args.mcmc_steps[0],
             mcmc_burn=args.mcmc_burn[0],
             #mcmc_ratio,
@@ -374,8 +384,9 @@ class program(object):
 
             # assemble
             trace = DenovoMCMC.parameterize(
-                ploidy=self.sample_ploidy[sample], 
-                steps=self.mcmc_steps, 
+                ploidy=self.sample_ploidy[sample],
+                steps=self.mcmc_steps,
+                chains=self.mcmc_chains,
                 ratio=self.mcmc_ratio,
                 fix_homozygous=self.mcmc_fix_homozygous,
                 allow_recombinations=self.mcmc_allow_recombinations,
