@@ -29,7 +29,7 @@ def test_Program__cli():
         '--ref', REF,
         '--mcmc-steps', '500',
         '--mcmc-burn', '100',
-        '--seed', '11',
+        '--mcmc-seed', '11',
         '--cores', '5',
     ]
 
@@ -74,7 +74,7 @@ def test_Program__header():
         '--ref', REF,
         '--mcmc-steps', '500',
         '--mcmc-burn', '100',
-        '--seed', '11',
+        '--mcmc-seed', '11',
     ]
 
     prog = program.cli(command)
@@ -142,7 +142,7 @@ def test_Program__run():
         '--ref', REF,
         '--mcmc-steps', '500',
         '--mcmc-burn', '100',
-        '--seed', '11',
+        '--mcmc-seed', '11',
     ]
 
     samples = ('SAMPLE1', 'SAMPLE2', 'SAMPLE3')

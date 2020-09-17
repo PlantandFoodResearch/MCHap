@@ -177,6 +177,25 @@ class program(object):
         )
 
         parser.add_argument(
+            '--mcmc-fix-homozygous',
+            type=float,
+            nargs=1,
+            default=[0.999],
+            help=(
+                'Fix alleles that are homozygous with a probability greater '
+                'than or equal to the specified value (default = 0.999).'
+            )
+        )
+
+        parser.add_argument(
+            '--mcmc-seed',
+            type=int,
+            nargs=1,
+            default=[42],
+            help=('Random seed for MCMC (default = 42).')
+        )
+
+        parser.add_argument(
             '--filter-depth',
             type=float,
             nargs=1,
@@ -214,14 +233,6 @@ class program(object):
             nargs=1,
             default=[0.95],
             help=('Minimum kmer representation required at each position in assembly results (default = 0.95).')
-        )
-
-        parser.add_argument(
-            '--seed',
-            type=int,
-            nargs=1,
-            default=[42],
-            help=('Random seed for MCMC (default = 42).')
         )
 
         parser.add_argument(
@@ -274,7 +285,7 @@ class program(object):
             #mcmc_ratio,
             #mcmc_alpha,
             #mcmc_beta,
-            #mcmc_fix_homozygous,
+            mcmc_fix_homozygous=args.mcmc_fix_homozygous[0],
             #mcmc_allow_recombinations,
             #mcmc_allow_dosage_swaps,
             depth_filter_threshold=args.filter_depth[0],
@@ -284,7 +295,7 @@ class program(object):
             kmer_filter_theshold=args.filter_kmer[0],
             n_cores=args.cores[0],
             cli_command=command,
-            random_seed=args.seed[0]
+            random_seed=args.mcmc_seed[0]
         )
 
     def loci(self):
