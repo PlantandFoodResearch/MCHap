@@ -8,8 +8,8 @@ import pysam
 import warnings
 from dataclasses import dataclass
 
-from haplokit.io.biotargetsfile import read_biotargets
-from haplokit.io.vcf.genotypes import Genotype
+from mchap.io.biotargetsfile import read_biotargets
+from mchap.io.vcf.genotypes import Genotype
 
 
 def ancestors(graph, *args, stop=None):

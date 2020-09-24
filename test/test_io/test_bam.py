@@ -1,8 +1,8 @@
 import numpy as np
 import pathlib
 
-from haplokit.io import loci
-from haplokit.io import bam
+from mchap.io import loci
+from mchap.io import bam
 
 
 def test_extract_sample_ids():

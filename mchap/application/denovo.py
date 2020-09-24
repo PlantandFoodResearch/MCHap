@@ -6,9 +6,9 @@ import pysam
 from itertools import islice
 import multiprocessing as mp
 
-from haplokit.assemble.mcmc.denovo import DenovoMCMC
-from haplokit.encoding import symbolic
-from haplokit.io import \
+from mchap.assemble.mcmc.denovo import DenovoMCMC
+from mchap.encoding import symbolic
+from mchap.io import \
     read_bed4, \
     extract_sample_ids, \
     extract_read_variants, \
@@ -18,7 +18,7 @@ from haplokit.io import \
     qual_of_prob, \
     vcf, \
     PFEIFFER_ERROR
-from haplokit.io.biotargetsfile import read_biotargets
+from mchap.io.biotargetsfile import read_biotargets
 
 import warnings
 warnings.simplefilter('error', RuntimeWarning)

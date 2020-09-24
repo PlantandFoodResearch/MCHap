@@ -3,8 +3,8 @@
 import numpy as np
 import numba
 
-from haplokit.assemble import util
-from haplokit.assemble.likelihood import log_likelihood_structural_change
+from mchap.assemble import util
+from mchap.assemble.likelihood import log_likelihood_structural_change
 
 
 @numba.njit

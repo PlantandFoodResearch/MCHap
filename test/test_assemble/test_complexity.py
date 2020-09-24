@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from itertools import combinations_with_replacement
 
-from haplokit.assemble import complexity
+from mchap.assemble import complexity
 
 
 def test_count_unique_haplotypes():

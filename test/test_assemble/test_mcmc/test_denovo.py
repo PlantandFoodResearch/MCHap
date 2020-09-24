@@ -2,9 +2,9 @@ import numpy as np
 import numba
 import pytest
 
-from haplokit.assemble.mcmc import denovo
-from haplokit.assemble.util import seed_numba
-from haplokit.testing import simulate_reads
+from mchap.assemble.mcmc import denovo
+from mchap.assemble.util import seed_numba
+from mchap.testing import simulate_reads
 
 
 def test_point_beta_probabilities():

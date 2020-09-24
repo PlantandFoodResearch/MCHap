@@ -5,7 +5,7 @@ import gzip
 import pysam
 from dataclasses import dataclass
 
-from haplokit.encoding import allelic
+from mchap.encoding import allelic
 
 
 @dataclass(frozen=True, order=True)

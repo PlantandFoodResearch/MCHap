@@ -4,9 +4,9 @@ import os
 import pysam
 import numpy as np
 
-from haplokit.io import util
-from haplokit.encoding.allelic import as_probabilistic as _as_probabilistic
-from haplokit.encoding.symbolic import as_allelic as _as_allelic
+from mchap.io import util
+from mchap.encoding.allelic import as_probabilistic as _as_probabilistic
+from mchap.encoding.symbolic import as_allelic as _as_allelic
 
 
 def extract_sample_ids(bam_paths, id='ID'):

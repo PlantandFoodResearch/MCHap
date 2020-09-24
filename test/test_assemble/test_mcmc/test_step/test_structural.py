@@ -1,11 +1,11 @@
 import numpy as np
 import pytest
 
-from haplokit.testing import simulate_reads
-from haplokit.encoding import allelic
-from haplokit.assemble.util import seed_numba, log_likelihoods_as_conditionals
-from haplokit.assemble.likelihood import log_likelihood
-from haplokit.assemble.mcmc.step import structural
+from mchap.testing import simulate_reads
+from mchap.encoding import allelic
+from mchap.assemble.util import seed_numba, log_likelihoods_as_conditionals
+from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble.mcmc.step import structural
 
 
 @pytest.mark.parametrize('breaks,n', [

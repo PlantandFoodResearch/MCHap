@@ -3,7 +3,7 @@
 import numpy as np
 import numba
 
-from haplokit.assemble import util
+from mchap.assemble import util
 
 
 @numba.njit

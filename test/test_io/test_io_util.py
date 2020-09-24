@@ -1,6 +1,6 @@
 import numpy as np
 
-from haplokit.io import util
+from mchap.io import util
 
 
 def test_qual_of_char():

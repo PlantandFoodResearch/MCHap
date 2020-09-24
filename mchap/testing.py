@@ -1,9 +1,9 @@
 import numpy as np
 
-from haplokit.encoding.allelic import as_probabilistic
-from haplokit.encoding.probabilistic import sample_alleles
-from haplokit.io.util import prob_of_qual, PFEIFFER_ERROR
-from haplokit.assemble.util import random_choice
+from mchap.encoding.allelic import as_probabilistic
+from mchap.encoding.probabilistic import sample_alleles
+from mchap.io.util import prob_of_qual, PFEIFFER_ERROR
+from mchap.assemble.util import random_choice
 
 def simulate_reads(
         haplotypes, 

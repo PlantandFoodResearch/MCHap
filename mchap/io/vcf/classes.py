@@ -1,7 +1,7 @@
 import numpy as np 
 from dataclasses import dataclass
 
-from haplokit.io.vcf.util import vcfstr
+from mchap.io.vcf.util import vcfstr
 
 
 @dataclass(frozen=True)

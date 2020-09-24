@@ -1,8 +1,8 @@
 import pytest
 import numpy as np
 
-from haplokit import mset
-from haplokit.assemble import inheritence
+from mchap import mset
+from mchap.assemble import inheritence
 
 def test_gamete_probabilities__hom():
 

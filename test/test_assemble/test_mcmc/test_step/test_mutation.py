@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
-from haplokit.assemble.mcmc.step import mutation
-from haplokit.assemble.likelihood import log_likelihood
-from haplokit.assemble.util import log_likelihoods_as_conditionals
-from haplokit.assemble.util import seed_numba
+from mchap.assemble.mcmc.step import mutation
+from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble.util import log_likelihoods_as_conditionals
+from mchap.assemble.util import seed_numba
 
 def test_base_step():
 

@@ -1,7 +1,7 @@
 import numpy as np
 from dataclasses import dataclass
 
-from haplokit.io.util import qual_of_prob
+from mchap.io.util import qual_of_prob
 
 
 @dataclass(frozen=True)

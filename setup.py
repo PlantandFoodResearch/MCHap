@@ -9,28 +9,28 @@ def read_file(file_name):
         lines = f.readlines()
     return '\n'.join(lines)
 
-VERSION = read_file('haplokit/version.py').split("'")[1]
+VERSION = read_file('mchap/version.py').split("'")[1]
 
 setup(
-    name='haplokit',
+    name='mchap',
     version=VERSION,
     author='Tim Millar',
     author_email='tim.millar@plantandfood.co.nz',
     description='Polyploid micro-haplotype assembly',
     long_description=read_file('README.rst'),
-    entry_points={"console_scripts": ["haplokit=haplokit.application.cli:main"]},
+    entry_points={"console_scripts": ["mchap=mchap.application.cli:main"]},
     packages=[
-        'haplokit',
-        'haplokit/application',
-        'haplokit/assemble',
-        'haplokit/assemble/mcmc',
-        'haplokit/assemble/mcmc/step',
-        'haplokit/encoding',
-        'haplokit/encoding/allelic',
-        'haplokit/encoding/probabilistic',
-        'haplokit/encoding/symbolic',
-        'haplokit/io',
-        'haplokit/io/vcf',
+        'mchap',
+        'mchap/application',
+        'mchap/assemble',
+        'mchap/assemble/mcmc',
+        'mchap/assemble/mcmc/step',
+        'mchap/encoding',
+        'mchap/encoding/allelic',
+        'mchap/encoding/probabilistic',
+        'mchap/encoding/symbolic',
+        'mchap/io',
+        'mchap/io/vcf',
     ],
     python_requires='>3.7.0',
     keywords=['biology', 'bioinformatics', 'genetics', 'genomics'],

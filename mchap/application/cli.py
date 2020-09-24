@@ -1,8 +1,8 @@
 import sys
 import argparse
 
-from haplokit.application import denovo
-from haplokit.application import pedigraph
+from mchap.application import denovo
+from mchap.application import pedigraph
 
 def main():
     parser = argparse.ArgumentParser(
