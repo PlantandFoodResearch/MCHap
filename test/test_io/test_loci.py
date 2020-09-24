@@ -2,7 +2,7 @@ import pytest
 import pathlib
 import numpy as np
 
-from haplokit.io import loci
+from mchap.io import loci
 
 
 def test_read_bed4__plain_vs_zipped():

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import reduce
 from itertools import combinations_with_replacement
 
-from haplokit import mset
+from mchap import mset
 
 
 def _allele_sort(alleles):

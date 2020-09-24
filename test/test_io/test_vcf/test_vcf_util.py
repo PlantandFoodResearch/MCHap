@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from haplokit.io.vcf import util
+from mchap.io.vcf import util
 
 @pytest.mark.parametrize('obj,expect', [
     pytest.param(None, '.', id='None'),

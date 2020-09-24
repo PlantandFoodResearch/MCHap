@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from haplokit.io.vcf import filters
+from mchap.io.vcf import filters
 
 @pytest.mark.parametrize('obj,expect', [
     pytest.param(filters.FilterCall('pp95', failed=False, applied=True), 'PASS', id='pass'),

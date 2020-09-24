@@ -3,9 +3,9 @@
 import numpy as np 
 import numba
 
-from haplokit.assemble import util
-from haplokit.assemble import complexity
-from haplokit.assemble.likelihood import log_likelihood
+from mchap.assemble import util
+from mchap.assemble import complexity
+from mchap.assemble.likelihood import log_likelihood
 
 
 # TODO: avoid haplotype-int convertions

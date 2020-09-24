@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from haplokit.io.vcf import genotypes
+from mchap.io.vcf import genotypes
 
 
 @pytest.mark.parametrize('alleles,phased,expect', [

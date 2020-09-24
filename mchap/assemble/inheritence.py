@@ -4,8 +4,8 @@ import numpy as np
 from itertools import combinations as _combinations
 from collections import Counter as _Counter
 
-from haplokit import mset
-from haplokit.encoding import allelic
+from mchap import mset
+from mchap.encoding import allelic
 
 
 def gamete_probabilities(genotypes,

@@ -1,8 +1,8 @@
 import pytest
 import numpy as np
 
-from haplokit import mset
-from haplokit.assemble import classes
+from mchap import mset
+from mchap.assemble import classes
 
 
 def test_PosteriorGenotypeDistribution():

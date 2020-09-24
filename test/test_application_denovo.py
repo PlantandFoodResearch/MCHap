@@ -1,8 +1,8 @@
 import pathlib
 
-from haplokit.version import __version__
-from haplokit.io.vcf.headermeta import filedate
-from haplokit.application.denovo import program
+from mchap.version import __version__
+from mchap.io.vcf.headermeta import filedate
+from mchap.application.denovo import program
 
 
 def test_Program__cli():
@@ -21,7 +21,7 @@ def test_Program__cli():
     ]
 
     command = [
-        'haplokit',
+        'mchap',
         'denovo',
         '--bam', BAMS[0], BAMS[1], BAMS[2],
         '--ploidy', '4',
@@ -67,7 +67,7 @@ def test_Program__header():
     ]
 
     command = [
-        'haplokit',
+        'mchap',
         'denovo',
         '--bam', BAMS[0], BAMS[1], BAMS[2],
         '--ploidy', '4',
@@ -85,7 +85,7 @@ def test_Program__header():
     meta_expect = [
         '##fileformat=VCFv4.3',
         str(filedate()),
-        '##source=Haplokit v{}'.format(__version__),
+        '##source=mchap v{}'.format(__version__),
         '##phasing=None',
         '##commandline="{}"'.format(' '.join(command)),
         '##randomseed=11',
@@ -136,7 +136,7 @@ def test_Program__run():
     ]
 
     command = [
-        'haplokit',
+        'mchap',
         'denovo',
         '--bam', BAMS[0], BAMS[1], BAMS[2],
         '--ploidy', '4',

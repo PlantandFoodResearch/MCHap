@@ -1,7 +1,7 @@
 from datetime import date as _date
 from dataclasses import dataclass
 
-from haplokit import version
+from mchap import version
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ def filedate(date=None):
 
 def source(source=None):
     if source is None:
-        source = 'Haplokit v{}'.format(version.__version__)
+        source = 'mchap v{}'.format(version.__version__)
     return MetaHeader('source', source)
 
 

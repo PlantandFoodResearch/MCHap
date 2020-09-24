@@ -6,13 +6,13 @@ from scipy import stats as _stats
 from itertools import combinations_with_replacement as _combinations_with_replacement
 from dataclasses import dataclass
 
-from haplokit import mset
-from haplokit.encoding import allelic
-from haplokit.encoding import probabilistic
-from haplokit.assemble.mcmc.step import mutation, structural
-from haplokit.assemble.likelihood import log_likelihood
-from haplokit.assemble import util, complexity
-from haplokit.assemble.classes import Assembler, GenotypeMultiTrace
+from mchap import mset
+from mchap.encoding import allelic
+from mchap.encoding import probabilistic
+from mchap.assemble.mcmc.step import mutation, structural
+from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble import util, complexity
+from mchap.assemble.classes import Assembler, GenotypeMultiTrace
 
 
 @dataclass

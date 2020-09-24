@@ -2,7 +2,7 @@ import tempfile
 import shutil
 import pysam
 
-from haplokit.io import vcf
+from mchap.io import vcf
 
 
 def test_vcf_io():
