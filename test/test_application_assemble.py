@@ -2,7 +2,7 @@ import pathlib
 
 from mchap.version import __version__
 from mchap.io.vcf.headermeta import filedate
-from mchap.application.denovo import program
+from mchap.application.assemble import program
 
 
 def test_Program__cli():
