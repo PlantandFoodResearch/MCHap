@@ -61,7 +61,36 @@ class program(object):
         e.g. `program.cli(sys.argv)`
         """
         parser = argparse.ArgumentParser(
-            'De novo haplotype assembly'
+            'MCMC haplotype assembly'
+        )
+
+        parser.add_argument(
+            '--targets',
+            type=str,
+            nargs=1,
+            default=[None],
+            help=('Bed file containing genomic intervals for haplotype assembly. '
+            'First three columns (contig, start, stop) are manditory. '
+            'If present, the fourth column (id) will be used as the variant id in '
+            'the output.'),
+        )
+
+        parser.add_argument(
+            '--variants',
+            type=str,
+            nargs=1,
+            default=[None],
+            help=('Tabix indexed VCF file containing SNP variants to be used in '
+            'assembly. Assembled halotypes will only contain the reference and '
+            'alternate alleles specified within this file.'),
+        )
+
+        parser.add_argument(
+            '--reference',
+            type=str,
+            nargs=1,
+            default=[None],
+            help='Indexed fasta file containing the reference genome.',
         )
 
         parser.add_argument(
@@ -69,7 +98,9 @@ class program(object):
             type=str,
             nargs='*',
             default=[],
-            help='A list of 0 or more bam files.',
+            help=('A list of 0 or more bam files. '
+            'Haplotypes will be assembled for all samples found within all '
+            'listed bam files unless the --sample-list parameter is used.'),
         )
 
         parser.add_argument(
@@ -77,7 +108,9 @@ class program(object):
             type=str,
             nargs=1,
             default=[None],
-            help='A file containing a list of bam file paths (one per line).',
+            help=('A file containing a list of bam file paths (one per line). '
+            'This can optionally be used inplace of or combined with the --bam '
+            'parameter.'),
         )
 
         parser.add_argument(
@@ -85,7 +118,9 @@ class program(object):
             type=int,
             nargs=1,
             default=[2],
-            help='Default ploidy for all samples (default = 2).',
+            help=('Default ploidy for all samples (default = 2). '
+            'This value is used for all samples which are not specified using '
+            'the --sample-ploidy parameter'),
         )
 
         parser.add_argument(
@@ -99,30 +134,6 @@ class program(object):
                 'default value. Each line should contain a sample identifier '
                 'followed by a tab and then an integer ploidy value.'
             ),
-        )
-
-        parser.add_argument(
-            '--bed',
-            type=str,
-            nargs=1,
-            default=[None],
-            help='Tabix indexed 4 column Bed file containing (named) genomic intervals.',
-        )
-
-        parser.add_argument(
-            '--vcf',
-            type=str,
-            nargs=1,
-            default=[None],
-            help='Tabix indexed VCF file containing SNP variants.',
-        )
-
-        parser.add_argument(
-            '--ref',
-            type=str,
-            nargs=1,
-            default=[None],
-            help='Indexed fasta file containing the reference genome.',
         )
 
         parser.add_argument(
@@ -151,14 +162,6 @@ class program(object):
             dest='call_filtered',
             action='store_true',
             help='Include genotypes of filtered samples.'
-        )
-
-        parser.add_argument(
-            '--read-group-field',
-            nargs=1,
-            type=str,
-            default=['SM'],
-            help='Read group field to use as sample id (default = "SM").'
         )
 
         parser.add_argument(
@@ -253,6 +256,14 @@ class program(object):
         )
 
         parser.add_argument(
+            '--read-group-field',
+            nargs=1,
+            type=str,
+            default=['SM'],
+            help='Read group field to use as sample id (default = "SM").'
+        )
+
+        parser.add_argument(
             '--cores',
             type=int,
             nargs=1,
@@ -299,9 +310,9 @@ class program(object):
                 sample_ploidy[sample] = args.ploidy[0]
 
         return cls(
-            args.bed[0],
-            args.vcf[0],
-            args.ref[0],
+            args.targets[0],
+            args.variants[0],
+            args.reference[0],
             bams,
             samples,
             sample_ploidy,
