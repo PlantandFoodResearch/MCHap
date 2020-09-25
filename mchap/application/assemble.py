@@ -31,7 +31,6 @@ class program(object):
     bams: list
     samples: list
     sample_ploidy: dict
-    region: str = None
     call_best_genotype: bool = False
     call_filtered: bool = False
     read_group_field: str = 'SM'
@@ -136,15 +135,6 @@ class program(object):
                 'This file also specifies the sample order in the output. '
                 'If not specified then all samples in the input bamfiles will '
                 'be haplotyped.'),
-        )
-
-        parser.add_argument(
-            '--region',
-            type=str,
-            nargs=1,
-            default=[None],
-            help=('Specify a contig region for haplotype assembly '
-            'e.g. "contig:start-stop" (Default = None).'),
         )
 
         parser.set_defaults(call_best_genotype=False)
@@ -315,7 +305,6 @@ class program(object):
             bams,
             samples,
             sample_ploidy,
-            region=args.region[0],
             call_best_genotype=args.call_best_genotype,
             call_filtered=args.call_filtered,
             read_group_field=args.read_group_field[0],
@@ -340,7 +329,7 @@ class program(object):
         )
 
     def loci(self):
-        bed = read_bed4(self.bed, region=self.region)
+        bed = read_bed4(self.bed)
         for b in bed:
             yield b.set_sequence(self.ref).set_variants(self.vcf)
 
