@@ -435,7 +435,6 @@ class program(object):
                     read_calls, 
                     read_quals, 
                     error_rate=self.read_error_rate, 
-                    gaps=True,
                 )
 
                 # assemble

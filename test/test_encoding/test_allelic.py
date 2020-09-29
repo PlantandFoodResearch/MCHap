@@ -41,23 +41,16 @@ def test_as_probabilistic():
     n_alleles = [2,2,3,2]
     p = 0.7
 
+    tri_call = 0.7 / 0.9
+    tri_alt = 0.1 / 0.9
     answer = np.array([
-        [[0.7, 0.3, 0.0], [0.7, 0.3, 0.0], [0.7, 0.15, 0.15], [0.7, 0.3, 0.0]],
-        [[0.7, 0.3, 0.0], [0.3, 0.7, 0.0], [0.7, 0.15, 0.15], [0.3, 0.7, 0.0]],
-        [[0.3, 0.7, 0.0], [0.3, 0.7, 0.0], [0.15, 0.15, 0.7], [0.3, 0.7, 0.0]],
-        [[0.7, 0.3, 0.0], [np.nan, np.nan, 0.0], [np.nan, np.nan, np.nan], [0.3, 0.7, 0.0]],
+        [[0.875, 0.125, 0.0], [0.875, 0.125, 0.0], [tri_call, tri_alt, tri_alt], [0.875, 0.125, 0.0]],
+        [[0.875, 0.125, 0.0], [0.125, 0.875, 0.0], [tri_call, tri_alt, tri_alt], [0.125, 0.875, 0.0]],
+        [[0.125, 0.875, 0.0], [0.125, 0.875, 0.0], [tri_alt, tri_alt, tri_call], [0.125, 0.875, 0.0]],
+        [[0.875, 0.125, 0.0], [np.nan, np.nan, 0.0], [np.nan, np.nan, np.nan], [0.125, 0.875, 0.0]],
     ])
 
     query = allelic.as_probabilistic(array, n_alleles=n_alleles, p=p)
-
-    np.testing.assert_almost_equal(query, answer)
-
-    # now try without gaps
-
-    answer[3][1] = np.array([0.5, 0.5, 0.0])
-    answer[3][2] = np.array([1/3, 1/3, 1/3])
-
-    query = allelic.as_probabilistic(array, n_alleles=n_alleles, p=p, gaps=False)
 
     np.testing.assert_almost_equal(query, answer)
 

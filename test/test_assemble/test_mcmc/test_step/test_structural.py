@@ -280,7 +280,7 @@ def test_interval_step():
         n_reads=4,
         uniform_sample=True,
         errors=False,
-        error_rate=0.1,
+        error_rate=0.2,
         qual=(60, 60),
     )
 
@@ -325,7 +325,7 @@ def test_interval_step():
     counts = {}
     for option in options:
         counts[option.tostring()] = 0
-    for _ in range(100):
+    for _ in range(1000):
         choice = genotype.copy()
         llk = log_likelihood(reads, choice)
         structural.interval_step(
@@ -347,9 +347,10 @@ def test_interval_step():
     
     # check posterior probs in same order as
     # likelihoods and that values are reasonable
-    assert probs[3] > 0.75
-    assert np.logical_and((0.15 > probs[1:3]), (probs[1:3] > 0.05)).all()
-    assert 0.5 > probs[0] 
+    assert probs[0] < 0.01
+    assert 0.01 < probs[1] < 0.1
+    assert 0.01 < probs[2] < 0.1
+    assert 0.8 < probs[3]
 
     #TODO independent calculation of posterior probabilities
     

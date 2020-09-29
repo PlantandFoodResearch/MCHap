@@ -178,7 +178,7 @@ def encode_read_alleles(locus, symbols):
     return _as_allelic(symbols, alleles=locus.alleles)
 
 
-def encode_read_distributions(locus, calls, quals, error_rate=util.PFEIFFER_ERROR, gaps=True):
+def encode_read_distributions(locus, calls, quals, error_rate=0.0):
 
     # convert error_rate to prob of correct call
     probs = np.ones((calls.shape), dtype=np.float) * (1 - error_rate)
@@ -187,5 +187,5 @@ def encode_read_distributions(locus, calls, quals, error_rate=util.PFEIFFER_ERRO
     probs *= util.prob_of_qual(quals)
     
     n_alleles = locus.count_alleles()
-    encoded = _as_probabilistic(calls, n_alleles, probs, gaps=gaps)
+    encoded = _as_probabilistic(calls, n_alleles, probs)
     return encoded
