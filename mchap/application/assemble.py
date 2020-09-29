@@ -44,6 +44,7 @@ class program(object):
     mcmc_fix_homozygous: float = 0.999
     mcmc_allow_recombinations: bool = True
     mcmc_allow_dosage_swaps: bool = True
+    mcmc_full_length_dosage_swap: bool = True
     depth_filter_threshold: float = 5.0
     read_count_filter_threshold: int = 5
     probability_filter_threshold: float = 0.95

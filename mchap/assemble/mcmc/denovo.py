@@ -28,6 +28,7 @@ class DenovoMCMC(Assembler):
     fix_homozygous: float = 0.999
     allow_recombinations: bool = True
     allow_dosage_swaps: bool = True
+    full_length_dosage_swap: bool = True
     random_seed: int = None
     """De novo haplotype assembly using Markov chain Monte Carlo
     for probabilistically encoded variable positions of NGS reads.
@@ -69,6 +70,10 @@ class DenovoMCMC(Assembler):
         Set to False to dis-allow structural steps involving
         dosage changes between parts of a pair of haplotypes
         (default = True).
+    full_length_dosage_swap : bool, optional
+        Include an additional full length dosage swap step
+        within each step to ensure mixing between dosage
+        levels (default = True).
     random_seed: int, optional
         Seed the random seed for numpy and numba RNG
         (default = None).
@@ -101,7 +106,7 @@ class DenovoMCMC(Assembler):
         among all reads.
 
         """
-        # seet random seed once for all chains
+        # set random seed once for all chains
         if self.random_seed is not None:
             np.random.seed(self.random_seed)
             util.seed_numba(self.random_seed)
@@ -193,6 +198,7 @@ class DenovoMCMC(Assembler):
             break_dist=break_dist,
             allow_recombinations=self.allow_recombinations,
             allow_dosage_swaps=self.allow_dosage_swaps,
+            full_length_dosage_swap=self.full_length_dosage_swap,
         )
 
         # return the genotype trace and llks
@@ -223,6 +229,7 @@ def _denovo_gibbs_sampler(
         break_dist,
         allow_recombinations,
         allow_dosage_swaps,
+        full_length_dosage_swap,
     ):
     """Jitted worker function for method `fit` of class `DenovoMCMC`.
 
@@ -268,6 +275,17 @@ def _denovo_gibbs_sampler(
 
             # followed by mutation step
             llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask)
+        
+        if full_length_dosage_swap:
+            # final full length dosage swap
+            llk = structural.compound_step(
+                genotype=genotype, 
+                reads=reads, 
+                llk=llk, 
+                intervals=np.array([[0, n_base]]),
+                allow_recombinations=False,
+                allow_dosage_swaps=True,
+            )
         
         genotype_trace[i] = genotype.copy() # TODO: is this copy needed?
         llk_trace[i] = llk
