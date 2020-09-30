@@ -116,8 +116,8 @@ class SampleKmerFilter(SampleFilter):
     
     @property
     def descr(self):
-        template = 'Less than {} of read-variant {}-mers represented in haplotypes'
-        return template.format(self.threshold, self.k)
+        template = 'Less than {} percent of read-variant {}-mers represented in haplotypes'
+        return template.format(self.threshold * 100, self.k)
     
     def __call__(self, variants, genotype):
         n_pos = variants.shape[-1]

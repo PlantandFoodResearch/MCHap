@@ -1,62 +1,15 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import numba
 
 
-@numba.njit
-def _as_probabilistic(array, new, n_alleles, probs, vector_size, gaps):
-
-    for i in range(len(array)):
-        a = array[i]  # allele index
-        n = n_alleles[i]
-        p = probs[i]
-
-        # deal with gap
-        if a == -1: # this is a gap
-            if gaps:
-                val = np.nan
-            else:
-                val = 1.0 / n
-            for j in range(n):
-                new[i, j] = val
-            
-            # always pad distribution with 0, even a gap
-            for j in range(n, vector_size):
-                new[i, j] = 0.0 # pad
-        
-        # deal with regular allele
-        else:
-            # TODO: find better way to do this?
-            # not nesesarily a flat distribution over non-called alleles
-            inv = (1.0 - p) / (n - 1) 
-            for j in range(n):
-                if j == a:
-                    # called allele
-                    new[i, j] = p
-                else:
-                    # non-called allele
-                    new[i, j] = inv
-
-            # pad
-            for j in range(n, vector_size):
-                new[i, j] = 0.0 
-
-
-def _tile_to_shape(x, shape):
-    ndims = np.ndim(x)
-    diff = len(shape) - ndims
-    assert np.shape(x) == shape[diff:]
-    template = shape[:diff] + tuple(1 for _ in range(ndims))
-    return np.tile(x, template)
-
-
-def as_probabilistic(array, 
-                     n_alleles, 
-                     p=1.0, 
-                     gaps=True, 
-                     dtype=np.float):
-    """Converts an array integer encoded alleles to an 
+def as_probabilistic(
+    array, 
+    n_alleles=4, 
+    p=1.0, 
+    error_factor=3, 
+    dtype=np.float):
+    """Converts an array of integer encoded alleles to an 
     array of probabilistic row vectors.
 
     Parameters
@@ -64,13 +17,12 @@ def as_probabilistic(array,
     array : ndarray, int
         Array of integers encoding alleles
     n_alleles : array_like, int
-        Number of alleles to encode in each row vector.
+        Constrain number of alleles encoded at each position.
     p : array_like, float, optional
-        Probability associated with each allele call in the input array.
-    gaps : bool, optional
-        If `False` then gaps in the input array are treated as unknown
-        values in the probabilistic array, i.e. equal probability of 
-        each allele.
+        Probability that allele call is correct.
+    error_factor:
+        Factor to divide error rate by for probability of each
+        alt alleles, for a SNP this should be 3 (default = 3).
     dtype : dtype
         Specify the dtype of the returned probabilistic array.
 
@@ -81,32 +33,49 @@ def as_probabilistic(array,
 
     Notes
     -----
-    If n_alleles is variable then the vectors encoding fewer alleles
-    will be padded with `0` values.
-    If gaps are included they will be represented as a vector of `nan`
-    values which will also be padded with `0` values if as required.
-    
+    In the case of an incorrect call it is assumed that each of the 
+    non-called alleles are equally likely to be called.
+    In this case the error rate (1 - p) is divided by the error_factor
+    (the number of possible non-called alleles) to get the probability of 
+    each of the non-called alleles.
+    If an position is constrained to have fewer than the possible number 
+    of alternate alleles (e.g. a bi-allelic contstraint) using the
+    n_alleles argument then the probability of the alternate alleles 
+    is calculated for all possible alleles before removing the 
+    non-allowed alleles an re-normalizing the remaining probabilities.
+    This can result in the called allele having a probability of greater
+    than p.    
     """
-    vector_size = int(np.max(n_alleles, initial=0))
+    # check inputs
+    array = np.array(array, copy=False)
+    n_alleles = np.array(n_alleles, copy=False)
+    error_factor = np.array(error_factor, copy=False)
+    p = np.array(p, copy=False)
+    
+    # special case for zero-length reads
+    if array.shape[-1] == 0:
+        return np.empty(array.shape + (0,), dtype=dtype)
+    
+    alleles = np.arange(np.max(n_alleles))
 
-    n_alleles = _tile_to_shape(n_alleles, array.shape)
-    p = _tile_to_shape(p, array.shape)
-
-    n_base = np.prod(array.shape)
-    new = np.empty((n_base, vector_size), dtype=dtype)
-
-    _as_probabilistic(
-        array.ravel(),
-        new,
-        n_alleles.ravel(),
-        p.ravel(),
-        vector_size,
-        gaps
-    )
-
-    shape = array.shape + (vector_size, )
-
-    return new.reshape(shape)
+    # onehot encoding of alleles
+    onehot = array[..., None] == alleles
+    
+    # basic probs
+    new = ((1 - p) / error_factor)[..., None] * ~onehot
+    calls = p[..., None] * onehot
+    new[onehot] = calls[onehot]
+    
+    # zero out non-alleles
+    new[..., n_alleles[..., None] <= alleles] = 0
+    
+    # normalize 
+    new /= np.nansum(new, axis=-1, keepdims=True)
+    
+    # nan fill gaps and re-zero
+    new[array < 0] = np.nan
+    new[..., n_alleles[..., None] <= alleles] = 0
+    return new
 
     
 def vector_from_string(string, gaps='-', length=None, dtype=np.int8):

@@ -1,12 +1,14 @@
 import pathlib
+import tempfile
+import shutil
 
 from mchap.version import __version__
 from mchap.io.vcf.headermeta import filedate
-from mchap.application.denovo import program
+from mchap.application.assemble import program
 
 
 def test_Program__cli():
-    samples = ('SAMPLE1', 'SAMPLE2', 'SAMPLE3')
+    samples = ['SAMPLE1', 'SAMPLE2', 'SAMPLE3']
 
     path = pathlib.Path(__file__).parent.absolute()
     path = path / 'test_io/data'
@@ -25,9 +27,9 @@ def test_Program__cli():
         'denovo',
         '--bam', BAMS[0], BAMS[1], BAMS[2],
         '--ploidy', '4',
-        '--bed', BED,
-        '--vcf', VCF,
-        '--ref', REF,
+        '--targets', BED,
+        '--variants', VCF,
+        '--reference', REF,
         '--mcmc-steps', '500',
         '--mcmc-burn', '100',
         '--mcmc-seed', '11',
@@ -42,14 +44,79 @@ def test_Program__cli():
     assert prog.n_cores == 5
     assert prog.cli_command == command
 
-    expect_sample_bam = dict(zip(samples, BAMS))
-    assert len(prog.sample_bam) == len(expect_sample_bam)
-    for k, v in expect_sample_bam.items():
-        assert prog.sample_bam[k] == v
+    assert prog.samples == samples
 
     expect_sample_ploidy = {sample: 4 for sample in samples}
     assert len(prog.sample_ploidy) == len(expect_sample_ploidy)
     for k, v in expect_sample_ploidy.items():
+        assert prog.sample_ploidy[k] == v
+
+
+def test_Program__cli_lists():
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / 'test_io/data'
+
+    BED = str(path / 'simple.bed.gz')
+    VCF = str(path / 'simple.vcf.gz')
+    REF = str(path / 'simple.fasta')
+
+    # partial overlap with bam samples
+    samples = ['SAMPLE3', 'SAMPLE4', 'SAMPLE1']
+
+    bams = [
+        str(path / 'simple.sample1.deep.bam'),
+        str(path / 'simple.sample2.deep.bam'),
+        str(path / 'simple.sample3.deep.bam')
+    ]
+
+    # write some files to use in io
+    dirpath = tempfile.mkdtemp()
+
+    tmp_bam_list = dirpath + '/bams.txt'
+    with open(tmp_bam_list, 'w') as f:
+        f.write('\n'.join(bams))
+    
+    tmp_sample_list = dirpath + '/samples.txt'
+    with open(tmp_sample_list, 'w') as f:
+        f.write('\n'.join(samples))
+
+    tmp_sample_ploidy = dirpath + '/sample-ploidy.txt'
+    with open(tmp_sample_ploidy, 'w') as f:
+        f.write('SAMPLE3\t2\n')
+        f.write('SAMPLE1\t6\n')
+        # SAMPLE4 uses default
+
+    command = [
+        'mchap',
+        'denovo',
+        '--bam-list', tmp_bam_list,
+        '--sample-list', tmp_sample_list,
+        '--sample-ploidy', tmp_sample_ploidy,
+        '--ploidy', '4',
+        '--targets', BED,
+        '--variants', VCF,
+        '--reference', REF,
+        '--mcmc-steps', '500',
+        '--mcmc-burn', '100',
+        '--mcmc-seed', '11',
+        '--cores', '5',
+    ]
+
+    prog = program.cli(command)
+
+    # clean up
+    shutil.rmtree(dirpath)
+
+    assert prog.mcmc_steps == 500
+    assert prog.mcmc_burn == 100
+    assert prog.random_seed == 11
+    assert prog.n_cores == 5
+    assert prog.cli_command == command
+
+    assert prog.samples == samples
+    assert prog.bams == bams
+
+    for k, v in zip(samples, [2, 4, 6]):
         assert prog.sample_ploidy[k] == v
 
 
@@ -71,9 +138,9 @@ def test_Program__header():
         'denovo',
         '--bam', BAMS[0], BAMS[1], BAMS[2],
         '--ploidy', '4',
-        '--bed', BED,
-        '--vcf', VCF,
-        '--ref', REF,
+        '--targets', BED,
+        '--variants', VCF,
+        '--reference', REF,
         '--mcmc-steps', '500',
         '--mcmc-burn', '100',
         '--mcmc-seed', '11',
@@ -103,7 +170,7 @@ def test_Program__header():
 
     filters_expect = [
         '##FILTER=<ID=PASS,Description="All filters passed">',
-        '##FILTER=<ID=3m95,Description="Less than 0.95 of read-variant 3-mers represented in haplotypes">',
+        '##FILTER=<ID=3m90,Description="Less than 90.0 percent of read-variant 3-mers represented in haplotypes">',
         '##FILTER=<ID=dp5,Description="Sample has mean read depth less than 5.0">',
         '##FILTER=<ID=rc5,Description="Sample has read (pair) count of less than 5.0">',
         '##FILTER=<ID=pp95,Description="Samples phenotype posterior probability less than 0.95">',
@@ -140,9 +207,9 @@ def test_Program__run():
         'denovo',
         '--bam', BAMS[0], BAMS[1], BAMS[2],
         '--ploidy', '4',
-        '--bed', BED,
-        '--vcf', VCF,
-        '--ref', REF,
+        '--targets', BED,
+        '--variants', VCF,
+        '--reference', REF,
         '--mcmc-steps', '500',
         '--mcmc-burn', '100',
         '--mcmc-seed', '11',

@@ -1,7 +1,7 @@
 import sys
 import argparse
 
-from mchap.application import denovo
+from mchap.application import assemble
 from mchap.application import pedigraph
 
 def main():
@@ -9,7 +9,7 @@ def main():
         'Bayesian assemby of micro-haplotypes in polyploids'
     )
 
-    subprograms = ['denovo', 'pedigraph']
+    subprograms = ['assemble', 'pedigraph']
     parser.add_argument('program',
                         nargs=1,
                         choices=subprograms,
@@ -20,8 +20,9 @@ def main():
     else:
         args = parser.parse_args(sys.argv[1:2])
         prog = args.program[0]
-        if prog == 'denovo':
-            prog = denovo.program
+        if prog == 'assemble':
+            prog = assemble.program
+            prog.cli(sys.argv).run_stdout()
         elif prog == 'pedigraph':
             prog = pedigraph.program
-        prog.cli(sys.argv)
+            prog.cli(sys.argv).run()

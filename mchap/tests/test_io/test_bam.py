@@ -181,33 +181,40 @@ def test_encode_read_distributions():
     )
 
     quals = np.zeros(alleles.shape, dtype=np.int16)
-    quals[alleles >= 0] = 40
+    quals[alleles >= 0] = 20
+    error_rate=0.001
+    
+    prob = 0.98901  # prob of correct call without bi/tri-allelic constraint
+    bi_call = prob / (prob + (1-prob)/3)
+    bi_alt = ((1-prob)/3) / (prob + (1-prob)/3)
+    tri_call = prob / (prob + ((1-prob)/3)*2)
+    tri_alt = ((1-prob)/3) / (prob + ((1-prob)/3)*2)
 
     expect = np.array([
-        [[0.9975, 0.0025, 0. ],
-         [0.9975, 0.0025, 0. ],
+        [[bi_call, bi_alt, 0. ],
+         [bi_call, bi_alt, 0. ],
          [np.nan, np.nan, np.nan]],
 
-        [[0.9975, 0.0025, 0. ],
-         [0.9975, 0.0025, 0. ],
+        [[bi_call, bi_alt, 0. ],
+         [bi_call, bi_alt, 0. ],
          [np.nan, np.nan, np.nan]],
 
-        [[0.0025, 0.9975, 0. ],
-         [0.0025, 0.9975, 0. ],
+        [[bi_alt, bi_call, 0. ],
+         [bi_alt, bi_call, 0. ],
          [np.nan, np.nan, np.nan]],
 
-        [[0.9975, 0.0025, 0. ],
-         [0.0025, 0.9975, 0. ],
+        [[bi_call, bi_alt, 0. ],
+         [bi_alt, bi_call, 0. ],
          [np.nan, np.nan, np.nan]],
         [[np.nan, np.nan, 0. ],
          [np.nan, np.nan, 0. ],
-         [0.00125, 0.00125, 0.9975]]
+         [tri_alt, tri_alt, tri_call]]
     ])
 
     actual = bam.encode_read_distributions(
         locus,
         alleles,
         quals,
-        error_rate=0.0024,
+        error_rate=error_rate,
     )
     np.testing.assert_array_almost_equal(expect, actual)

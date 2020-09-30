@@ -133,9 +133,9 @@ def test_sample_alleles():
         [[0.9, 0.1, 0.0], [0.4, 0.3, 0.3]]
     ])
 
-    acumulate = np.zeros(array.shape, dtype=np.int)
+    acumulate = np.zeros(array.shape, dtype=np.float)
     for _ in range(10000):
-        acumulate += allelic.as_probabilistic(probabilistic.sample_alleles(array), 3, dtype=np.int)
+        acumulate += allelic.as_probabilistic(probabilistic.sample_alleles(array), 3, dtype=np.float)
 
     # should be no samples from zero probability alleles
     assert acumulate[0][0][-1] == 0
