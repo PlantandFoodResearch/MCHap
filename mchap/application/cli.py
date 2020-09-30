@@ -22,6 +22,7 @@ def main():
         prog = args.program[0]
         if prog == 'assemble':
             prog = assemble.program
+            prog.cli(sys.argv).run_stdout()
         elif prog == 'pedigraph':
             prog = pedigraph.program
-        prog.cli(sys.argv)
+            prog.cli(sys.argv).run()
