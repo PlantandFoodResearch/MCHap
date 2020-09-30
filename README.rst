@@ -6,7 +6,7 @@ Polyploid micro-haplotype assembly using Markov chain Monte Carlo simulation.
 Usage
 -----
 
-The wrapper CLI tool is `mchap` and assembly sub-tool is `assemble`.
+The wrapper CLI tool is ``mchap`` and assembly sub-tool is ``assemble``.
 The help text is accessed:
 
 ::
