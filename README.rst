@@ -121,13 +121,14 @@ The full list of ``assemble`` arguments can be seen in the help text:
                             measured as the mean of read depth across each
                             variable position.
     --filter-read-count FILTER_READ_COUNT
-                            Minimum number of read (pairs) within interval
-                            required to include an assembly result (default = 5).
+                            Minimum number of read (pairs) required within a
+                            target interval in order to include an assembly result
+                            (default = 5).
     --filter-probability FILTER_PROBABILITY
                             Minimum sample assembly posterior probability required
                             to call a phenotype i.e. a set of unique haplotypes of
                             unknown dosage (default = 0.95). Genotype dosage will
-                            be called or partially called if it also exceeds This
+                            be called or partially called if it also exceeds this
                             threshold. See also the --best-genotype flag.
     --filter-kmer-k FILTER_KMER_K
                             Size of variant kmer used to filter assembly results

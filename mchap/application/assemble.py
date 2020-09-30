@@ -245,8 +245,8 @@ class program(object):
             type=float,
             nargs=1,
             default=[5.0],
-            help=('Minimum number of read (pairs) within interval required to '
-            'include an assembly result (default = 5).')
+            help=('Minimum number of read (pairs) required within a target '
+            'interval in order to include an assembly result (default = 5).')
         )
 
         parser.add_argument(
@@ -258,7 +258,7 @@ class program(object):
             'a phenotype i.e. a set of unique haplotypes of unknown dosage '
             '(default = 0.95). '
             'Genotype dosage will be called or partially called if it also exceeds '
-            'This threshold. '
+            'this threshold. '
             'See also the --best-genotype flag.')
         )
 
