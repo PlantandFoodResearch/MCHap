@@ -170,7 +170,7 @@ def test_Program__header():
 
     filters_expect = [
         '##FILTER=<ID=PASS,Description="All filters passed">',
-        '##FILTER=<ID=3m95,Description="Less than 0.95 of read-variant 3-mers represented in haplotypes">',
+        '##FILTER=<ID=3m90,Description="Less than 90.0 percent of read-variant 3-mers represented in haplotypes">',
         '##FILTER=<ID=dp5,Description="Sample has mean read depth less than 5.0">',
         '##FILTER=<ID=rc5,Description="Sample has read (pair) count of less than 5.0">',
         '##FILTER=<ID=pp95,Description="Samples phenotype posterior probability less than 0.95">',

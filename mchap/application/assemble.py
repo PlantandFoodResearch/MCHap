@@ -70,9 +70,9 @@ class program(object):
             nargs=1,
             default=[None],
             help=('Bed file containing genomic intervals for haplotype assembly. '
-            'First three columns (contig, start, stop) are manditory. '
+            'First three columns (contig, start, stop) are mandatory. '
             'If present, the fourth column (id) will be used as the variant id in '
-            'the output.'),
+            'the output VCF.'),
         )
 
         parser.add_argument(
@@ -81,7 +81,7 @@ class program(object):
             nargs=1,
             default=[None],
             help=('Tabix indexed VCF file containing SNP variants to be used in '
-            'assembly. Assembled halotypes will only contain the reference and '
+            'assembly. Assembled haplotypes will only contain the reference and '
             'alternate alleles specified within this file.'),
         )
 
@@ -109,7 +109,7 @@ class program(object):
             nargs=1,
             default=[None],
             help=('A file containing a list of bam file paths (one per line). '
-            'This can optionally be used inplace of or combined with the --bam '
+            'This can optionally be used in place of or combined with the --bam '
             'parameter.'),
         )
 
@@ -144,24 +144,8 @@ class program(object):
             help=('Optionally specify a file containing a list of samples to '
                 'haplotype (one sample id per line). '
                 'This file also specifies the sample order in the output. '
-                'If not specified then all samples in the input bamfiles will '
+                'If not specified, all samples in the input bam files will '
                 'be haplotyped.'),
-        )
-
-        parser.set_defaults(call_best_genotype=False)
-        parser.add_argument(
-            '--best-genotype',
-            dest='call_best_genotype',
-            action='store_true',
-            help='Allways call the best supported compleate genotype within the called phenotype.'
-        )
-
-        parser.set_defaults(call_filtered=False)
-        parser.add_argument(
-            '--call-filtered',
-            dest='call_filtered',
-            action='store_true',
-            help='Include genotypes of filtered samples.'
         )
 
         parser.add_argument(
@@ -172,8 +156,32 @@ class program(object):
             help=('Expected base-call error rate of sequences '
             'in addition to base phred scores (default = 0.0). '
             'By default only the phred score of each base call is used to '
-            'calculate its probability of an incorect call. '
+            'calculate its probability of an incorrect call. '
             'The --error-rate value is added to that probability.')
+        )
+
+        parser.set_defaults(call_best_genotype=False)
+        parser.add_argument(
+            '--best-genotype',
+            dest='call_best_genotype',
+            action='store_true',
+            help=('Flag: allways call the best supported complete genotype '
+            'within a called phenotype. This may result in calling genotypes '
+            'with a posterior probability less than --filter-probability '
+            'however a phenotype probability of >= --filter-probability '
+            'is still required.')
+        )
+
+        parser.set_defaults(call_filtered=False)
+        parser.add_argument(
+            '--call-filtered',
+            dest='call_filtered',
+            action='store_true',
+            help=('Flag: include genotype calls for filtered samples. '
+            'Sample filter tags will still indicate samples that have '
+            'been filtered. '
+            'WARNING: this can result in a large VCF file with '
+            'un-informative genotype calls.')
         )
 
         parser.add_argument(
@@ -189,7 +197,7 @@ class program(object):
             type=int,
             nargs=1,
             default=[1000],
-            help='Number of steps to simulate in MCMC (default = 1000).'
+            help='Number of steps to simulate in each MCMC chain (default = 1000).'
         )
 
         parser.add_argument(
@@ -197,7 +205,7 @@ class program(object):
             type=int,
             nargs=1,
             default=[500],
-            help='Number of initial steps to discard from MCMC trace (default = 500).'
+            help='Number of initial steps to discard from each MCMC chain (default = 500).'
         )
 
         parser.add_argument(
@@ -205,10 +213,12 @@ class program(object):
             type=float,
             nargs=1,
             default=[0.999],
-            help=(
-                'Fix alleles that are homozygous with a probability greater '
-                'than or equal to the specified value (default = 0.999).'
-            )
+            help=('Fix alleles that are homozygous with a probability greater '
+            'than or equal to the specified value (default = 0.999). '
+            'The probability of that a variant is homozygous in a sample is '
+            'assessed independently for each variant prior to MCMC simulation. '
+            'If an allele is "fixed" it is not allowed vary within the MCMC thereby '
+            'reducing computational complexity.')
         )
 
         parser.add_argument(
@@ -216,7 +226,7 @@ class program(object):
             type=int,
             nargs=1,
             default=[42],
-            help=('Random seed for MCMC (default = 42).')
+            help=('Random seed for MCMC (default = 42). ')
         )
 
         parser.add_argument(
@@ -224,7 +234,10 @@ class program(object):
             type=float,
             nargs=1,
             default=[5.0],
-            help=('Minimum sample read depth required to include an assembly result (default = 5.0).')
+            help=('Minimum sample read depth required to include an assembly '
+            'result (default = 5.0). '
+            'Read depth is measured as the mean of read depth across each '
+            'variable position.')
         )
 
         parser.add_argument(
@@ -232,7 +245,8 @@ class program(object):
             type=float,
             nargs=1,
             default=[5.0],
-            help=('Minimum number of read (pairs) within interval required to include an assembly result (default = 5).')
+            help=('Minimum number of read (pairs) within interval required to '
+            'include an assembly result (default = 5).')
         )
 
         parser.add_argument(
@@ -240,7 +254,12 @@ class program(object):
             type=float,
             nargs=1,
             default=[0.95],
-            help=('Minimum sample assembly posterior probability required to result (default = 0.95).')
+            help=('Minimum sample assembly posterior probability required to call '
+            'a phenotype i.e. a set of unique haplotypes of unknown dosage '
+            '(default = 0.95). '
+            'Genotype dosage will be called or partially called if it also exceeds '
+            'This threshold. '
+            'See also the --best-genotype flag.')
         )
 
         parser.add_argument(
@@ -248,15 +267,16 @@ class program(object):
             type=int,
             nargs=1,
             default=[3],
-            help=('Size of SNP kmer used to filter assembly results (default = 3).')
+            help=('Size of variant kmer used to filter assembly results (default = 3).')
         )
 
         parser.add_argument(
             '--filter-kmer',
             type=float,
             nargs=1,
-            default=[0.95],
-            help=('Minimum kmer representation required at each position in assembly results (default = 0.95).')
+            default=[0.90],
+            help=('Minimum kmer representation required at each position in assembly '
+            'results (default = 0.90).')
         )
 
         parser.add_argument(
@@ -264,15 +284,17 @@ class program(object):
             nargs=1,
             type=str,
             default=['SM'],
-            help='Read group field to use as sample id (default = "SM").'
+            help=('Read group field to use as sample id (default = "SM"). '
+            'The chosen field determines tha sample ids required in other '
+            'input files e.g. the --sample-list argument.')
         )
 
         parser.add_argument(
             '--cores',
             type=int,
             nargs=1,
-            default=[1],
-            help=('Number of cpu cores to use (default = 1).')
+            default=[2],
+            help=('Number of cpu cores to use (default = 2).')
         )
 
         if len(command) < 3:
@@ -333,6 +355,7 @@ class program(object):
             mcmc_fix_homozygous=args.mcmc_fix_homozygous[0],
             #mcmc_allow_recombinations,
             #mcmc_allow_dosage_swaps,
+            #mcmc_full_length_dosage_swap,
             depth_filter_threshold=args.filter_depth[0],
             read_count_filter_threshold=args.filter_read_count[0],
             probability_filter_threshold=args.filter_probability[0],
