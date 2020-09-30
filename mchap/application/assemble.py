@@ -16,8 +16,7 @@ from mchap.io import \
     encode_read_alleles, \
     encode_read_distributions, \
     qual_of_prob, \
-    vcf, \
-    PFEIFFER_ERROR
+    vcf
 from mchap.io.biotargetsfile import read_biotargets
 
 import warnings
@@ -34,7 +33,7 @@ class program(object):
     call_best_genotype: bool = False
     call_filtered: bool = False
     read_group_field: str = 'SM'
-    read_error_rate: float = PFEIFFER_ERROR
+    read_error_rate: float = 0.0
     mcmc_chains: int = 2
     mcmc_steps: int = 1000
     mcmc_burn: int = 500
@@ -49,7 +48,7 @@ class program(object):
     read_count_filter_threshold: int = 5
     probability_filter_threshold: float = 0.95
     kmer_filter_k: int = 3
-    kmer_filter_theshold: float = 0.95
+    kmer_filter_theshold: float = 0.90
     n_cores: int = 1
     precision: int = 3
     random_seed: int = 42
@@ -169,8 +168,12 @@ class program(object):
             '--error-rate',
             nargs=1,
             type=float,
-            default=[PFEIFFER_ERROR],
-            help='Expected base-call error rate of sequences (default = {}).'.format(PFEIFFER_ERROR)
+            default=[0.0],
+            help=('Expected base-call error rate of sequences '
+            'in addition to base phred scores (default = 0.0). '
+            'By default only the phred score of each base call is used to '
+            'calculate its probability of an incorect call. '
+            'The --error-rate value is added to that probability.')
         )
 
         parser.add_argument(
