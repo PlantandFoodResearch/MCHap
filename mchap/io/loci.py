@@ -5,7 +5,7 @@ import gzip
 import pysam
 from dataclasses import dataclass
 
-from mchap.encoding import allelic
+from mchap.encoding import integer
 
 
 @dataclass(frozen=True, order=True)
@@ -86,13 +86,13 @@ class Locus:
 
     def format_haplotypes(self, array, gap='-'):
         """Format integer encoded alleles as a haplotype string"""
-        variants = allelic.as_characters(array, gap=gap, alleles=self.alleles)
+        variants = integer.as_characters(array, gap=gap, alleles=self.alleles)
         template = self._template_sequence()
         return [template.format(*hap) for hap in variants]
 
     def format_variants(self, array, gap='-'):
         """Format integer encoded alleles as a haplotype string"""
-        return allelic.as_characters(array, gap=gap, alleles=self.alleles)
+        return integer.as_characters(array, gap=gap, alleles=self.alleles)
 
 
 def _parse_bed4_line(line):

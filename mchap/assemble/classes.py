@@ -2,7 +2,7 @@ import numpy as np
 from dataclasses import dataclass
 
 from mchap import mset
-from mchap.encoding import allelic
+from mchap.encoding import integer
 
 
 @dataclass
@@ -157,7 +157,7 @@ class GenotypeMultiTrace(object):
             n_chains, n_steps = self.genotypes.shape[0:2]
             for c in range(n_chains):
                 for i in range(n_steps):
-                    self.genotypes[c, i] = allelic.sort(self.genotypes[c, i])
+                    self.genotypes[c, i] = integer.sort(self.genotypes[c, i])
 
 
     def burn(self, n):

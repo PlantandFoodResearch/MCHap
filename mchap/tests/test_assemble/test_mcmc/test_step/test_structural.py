@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from mchap.testing import simulate_reads
-from mchap.encoding import allelic
+from mchap.encoding import integer
 from mchap.assemble.util import seed_numba, log_likelihoods_as_conditionals
 from mchap.assemble.likelihood import log_likelihood
 from mchap.assemble.mcmc.step import structural
@@ -336,7 +336,7 @@ def test_interval_step():
             allow_recombinations=True,
             allow_dosage_swaps=True,
         )
-        choice = allelic.sort(choice)
+        choice = integer.sort(choice)
         assert choice.tostring() in counts
         counts[choice.tostring()] += 1
     totals = np.zeros(len(options), dtype=np.int)

@@ -1,6 +1,6 @@
 import numpy as np
 
-from mchap.encoding.allelic import as_probabilistic
+from mchap.encoding.integer import as_probabilistic
 from mchap.io.util import prob_of_qual, PFEIFFER_ERROR
 from mchap.assemble.util import random_choice, sample_alleles
 

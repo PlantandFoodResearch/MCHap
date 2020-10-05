@@ -3,7 +3,7 @@ import math
 import pytest
 
 from mchap.assemble import util
-from mchap.encoding import allelic
+from mchap.encoding import integer
 
 
 def test_add_log_prob():
@@ -230,7 +230,7 @@ def test_sample_alleles():
 
     accumulate = np.zeros(array.shape, dtype=np.float)
     for _ in range(10000):
-        accumulate += allelic.as_probabilistic(util.sample_alleles(array), 3, dtype=np.float)
+        accumulate += integer.as_probabilistic(util.sample_alleles(array), 3, dtype=np.float)
 
     # should be no samples from zero probability alleles
     assert accumulate[0][0][-1] == 0

@@ -3,7 +3,7 @@ import numpy as np
 from collections import Counter
 
 from mchap import mset
-from mchap.encoding.allelic import from_strings, as_strings
+from mchap.encoding.integer import from_strings, as_strings
 
 
 def test_add():

@@ -7,7 +7,6 @@ from itertools import combinations_with_replacement as _combinations_with_replac
 from dataclasses import dataclass
 
 from mchap import mset
-from mchap.encoding import allelic
 from mchap.assemble.mcmc.step import mutation, structural
 from mchap.assemble.likelihood import log_likelihood
 from mchap.assemble import util, complexity

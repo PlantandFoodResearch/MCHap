@@ -7,7 +7,7 @@ from itertools import islice
 import multiprocessing as mp
 
 from mchap.assemble.mcmc.denovo import DenovoMCMC
-from mchap.encoding import symbolic
+from mchap.encoding import character
 from mchap.io import \
     read_bed4, \
     extract_sample_ids, \
@@ -454,7 +454,7 @@ class program(object):
 
                 # process read data
                 read_count = read_chars.shape[0]
-                read_depth = symbolic.depth(read_chars)
+                read_depth = character.depth(read_chars)
                 read_chars, read_quals = add_nan_read_if_empty(locus, read_chars, read_quals)
                 read_calls = encode_read_alleles(locus, read_chars)
                 read_dists = encode_read_distributions(
