@@ -39,12 +39,9 @@ def as_probabilistic(
     (the number of possible non-called alleles) to get the probability of 
     each of the non-called alleles.
     If an position is constrained to have fewer than the possible number 
-    of alternate alleles (e.g. a bi-allelic contstraint) using the
-    n_alleles argument then the probability of the alternate alleles 
-    is calculated for all possible alleles before removing the 
-    non-allowed alleles an re-normalizing the remaining probabilities.
-    This can result in the called allele having a probability of greater
-    than p.    
+    of alternate alleles (e.g. a bi-allelic constraint) using the
+    n_alleles argument then the probability across all remaining alleles
+    will sum to less than 1.    
     """
     # check inputs
     array = np.array(array, copy=False)
@@ -65,16 +62,13 @@ def as_probabilistic(
     new = ((1 - p) / error_factor)[..., None] * ~onehot
     calls = p[..., None] * onehot
     new[onehot] = calls[onehot]
-    
+
+    # nan fill gaps
+    new[array < 0] = np.nan
+
     # zero out non-alleles
     new[..., n_alleles[..., None] <= alleles] = 0
-    
-    # normalize 
-    new /= np.nansum(new, axis=-1, keepdims=True)
-    
-    # nan fill gaps and re-zero
-    new[array < 0] = np.nan
-    new[..., n_alleles[..., None] <= alleles] = 0
+
     return new
 
     
