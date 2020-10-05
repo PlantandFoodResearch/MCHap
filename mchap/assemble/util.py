@@ -285,6 +285,43 @@ def count_equivalent_permutations(dosage):
 
 
 @numba.njit
+def sample_alleles(array, dtype=np.int8):
+    """Sample a random set of alleles from probabilities.
+
+    Parameters
+    ----------
+    array : ndarray, float, shape (n_read, n_base, max_allele)
+        Probability of each allele at each base position
+    dtype : type
+        Numpy dtype of alleles.
+
+    Returns
+    ------- 
+    alleles : ndarray, int, shape (n_read, n_base)
+        Sampled alleles
+
+    Notes
+    -----
+    Does not handle gaps (nan values).
+
+    """
+    # normalize
+    shape = array.shape[0:-1]
+
+    array = array.reshape(-1, array.shape[-1])
+    sums = np.sum(array, axis=-1)
+    dists = array / np.expand_dims(sums, -1)
+    n = len(dists)
+
+    alleles = np.empty(n, dtype=dtype)
+
+    for i in range(n):
+        alleles[i] = random_choice(dists[i])
+    
+    return alleles.reshape(shape)
+
+
+@numba.njit
 def seed_numba(seed):
     """Set numba random seed
     """

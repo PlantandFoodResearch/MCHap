@@ -3,6 +3,7 @@ import math
 import pytest
 
 from mchap.assemble import util
+from mchap.encoding import allelic
 
 
 def test_add_log_prob():
@@ -218,3 +219,22 @@ def test_count_equivalent_permutations(dosage, answer):
     dosage = np.array(dosage, dtype=np.int)
     query = util.count_equivalent_permutations(dosage)
     assert query == answer
+
+
+def test_sample_alleles():
+
+    array = np.array([
+        [[0.7, 0.3, 0.0], [0.5, 0.5, 0.0]],
+        [[0.9, 0.1, 0.0], [0.4, 0.3, 0.3]]
+    ])
+
+    accumulate = np.zeros(array.shape, dtype=np.float)
+    for _ in range(10000):
+        accumulate += allelic.as_probabilistic(util.sample_alleles(array), 3, dtype=np.float)
+
+    # should be no samples from zero probability alleles
+    assert accumulate[0][0][-1] == 0
+    
+    # should reproduce original array
+    query = np.round(accumulate/10000, 1)
+    np.testing.assert_array_equal(query, array)
