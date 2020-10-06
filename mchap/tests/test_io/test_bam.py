@@ -184,11 +184,11 @@ def test_encode_read_distributions():
     quals[alleles >= 0] = 20
     error_rate=0.001
     
-    prob = 0.98901  # prob of correct call without bi/tri-allelic constraint
-    bi_call = prob / (prob + (1-prob)/3)
-    bi_alt = ((1-prob)/3) / (prob + (1-prob)/3)
-    tri_call = prob / (prob + ((1-prob)/3)*2)
-    tri_alt = ((1-prob)/3) / (prob + ((1-prob)/3)*2)
+    prob = 0.98901  # prob of correct call
+    bi_call = prob
+    bi_alt = (1 - prob) / 3
+    tri_call = prob
+    tri_alt = (1 - prob) / 3
 
     expect = np.array([
         [[bi_call, bi_alt, 0. ],

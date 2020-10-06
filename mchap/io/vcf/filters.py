@@ -2,7 +2,7 @@ import numpy as np
 from dataclasses import dataclass
 
 from mchap import mset
-from mchap.encoding import allelic, symbolic
+from mchap.encoding import integer
 
 
 @dataclass(frozen=True)
@@ -81,8 +81,8 @@ def _kmer_representation(variants, haplotype_calls, k=3):
     are also present in haplotype_calls.
     """
     # create kmers and counts
-    read_kmers, read_kmer_counts = allelic.kmer_counts(variants, k=k)
-    hap_kmers, _ = allelic.kmer_counts(haplotype_calls, k=k)
+    read_kmers, read_kmer_counts = integer.kmer_counts(variants, k=k)
+    hap_kmers, _ = integer.kmer_counts(haplotype_calls, k=k)
     
     # handle case of no read kmers (i.e. from nan reads)
     if np.prod(read_kmers.shape) == 0:
@@ -93,10 +93,10 @@ def _kmer_representation(variants, haplotype_calls, k=3):
     idx = mset.count(hap_kmers, read_kmers).astype(np.bool) == False
     
     # depth of unique kmers
-    unique_depth = allelic.depth(read_kmers[idx], read_kmer_counts[idx])
+    unique_depth = integer.depth(read_kmers[idx], read_kmer_counts[idx])
 
     # depth of total kmers
-    depth = allelic.depth(read_kmers, read_kmer_counts)
+    depth = integer.depth(read_kmers, read_kmer_counts)
 
     # avoid divide by zero 
     with np.errstate(divide='ignore',invalid='ignore'):

@@ -7,8 +7,6 @@ from itertools import combinations_with_replacement as _combinations_with_replac
 from dataclasses import dataclass
 
 from mchap import mset
-from mchap.encoding import allelic
-from mchap.encoding import probabilistic
 from mchap.assemble.mcmc.step import mutation, structural
 from mchap.assemble.likelihood import log_likelihood
 from mchap.assemble import util, complexity
@@ -163,11 +161,8 @@ class DenovoMCMC(Assembler):
 
         # set the initial genotype
         if initial is None:
-            # for each haplotype, take a random sample of mean of reads
-            var_dist = _read_mean_dist(reads_het)
-            genotype = np.empty((self.ploidy, n_het_base), dtype=np.int8)
-            for i in range(self.ploidy):
-                genotype[i] = probabilistic.sample_alleles(var_dist)
+            dist = _read_mean_dist(reads_het)
+            genotype = np.array([util.sample_alleles(dist) for _ in range(self.ploidy)])
         else:
             # use the provided array
             assert initial.shape == (self.ploidy, n_het_base)
@@ -331,6 +326,10 @@ def _read_mean_dist(reads):
     -------
     mean_read : ndarray, float, shape (n_positions, max_allele)
         The mean probabilities of input reads.
+
+    Notes
+    -----
+    If read distributions are normalized if they do not sum to 1.
     
     """
     # work around to avoid nan values caused by gaps
@@ -346,6 +345,10 @@ def _read_mean_dist(reads):
     n_alleles = np.sum(~np.all(reads == 0, axis=0), axis=1, keepdims=True)
     fill = 1 / np.tile(n_alleles, (1, reads.shape[-1]))
     dist[gaps] = fill[gaps]
+
+    # normalize
+    dist /= dist.sum(axis=-1, keepdims=True)
+
     return dist
 
 

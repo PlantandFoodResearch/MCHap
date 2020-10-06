@@ -172,6 +172,20 @@ def test_HaplotypeAlleleLabeler__count_obs():
     np.testing.assert_array_equal(actual, expect)
 
 
+def test_HaplotypeAlleleLabeler__argsort():
+    alleles = ((0, 0, 0), (1, 1, 1), (1, 0, 0), (0, 1, 1))
+    obj = genotypes.HaplotypeAlleleLabeler(alleles)
+    array = np.array([
+        [0, 1, 1],
+        [0, 1, 1],
+        [1, 1, 1],
+        [-1, -1, -1]
+    ])
+    actual = obj.argsort(array)
+    expect = np.array([2, 0, 1, 3])
+    np.testing.assert_array_equal(actual, expect)
+
+
 def test_HaplotypeAlleleLabeler__label():
     alleles = ((0, 0, 0), (1, 1, 1), (1, 0, 0), (0, 1, 1))
     obj = genotypes.HaplotypeAlleleLabeler(alleles)

@@ -5,7 +5,7 @@ from itertools import combinations as _combinations
 from collections import Counter as _Counter
 
 from mchap import mset
-from mchap.encoding import allelic
+from mchap.encoding import integer
 
 
 def gamete_probabilities(genotypes,
@@ -132,7 +132,7 @@ def cross_probabilities(maternal_gametes,
                     genotype[idx] = hap
                     idx += 1
 
-            genotype = allelic.sort(genotype)
+            genotype = integer.sort(genotype)
             string = genotype.tostring()
             if string not in string_to_genotype:
                 string_to_genotype[string] = genotype

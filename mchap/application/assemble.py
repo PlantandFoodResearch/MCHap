@@ -7,7 +7,7 @@ from itertools import islice
 import multiprocessing as mp
 
 from mchap.assemble.mcmc.denovo import DenovoMCMC
-from mchap.encoding import symbolic
+from mchap.encoding import character, integer
 from mchap.io import \
     read_bed4, \
     extract_sample_ids, \
@@ -413,12 +413,15 @@ class program(object):
             vcf.formatfields.GQ,
             vcf.formatfields.PHQ,
             vcf.formatfields.DP,
-            vcf.formatfields.RC,
+            vcf.formatfields.RCOUNT,
+            vcf.formatfields.RCALLS,
+            vcf.formatfields.MEC,
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PPM, 
             vcf.formatfields.MPGP,
             vcf.formatfields.MPED,
+            vcf.formatfields.RASSIGN,
         )
 
         vcf_header = vcf.VCFHeader(
@@ -454,7 +457,7 @@ class program(object):
 
                 # process read data
                 read_count = read_chars.shape[0]
-                read_depth = symbolic.depth(read_chars)
+                read_depth = character.depth(read_chars)
                 read_chars, read_quals = add_nan_read_if_empty(locus, read_chars, read_quals)
                 read_calls = encode_read_alleles(locus, read_chars)
                 read_dists = encode_read_distributions(
@@ -497,11 +500,14 @@ class program(object):
                 sample_data[sample].update({
                     'GPM': vcf.formatfields.probabilities(genotype[1], self.precision),
                     'PPM': vcf.formatfields.probabilities(phenotype[1].sum(), self.precision),
-                    'RC': read_count,
+                    'RCOUNT': read_count,
+                    'RCALLS': np.sum(read_calls >= 0),
                     'DP': vcf.formatfields.haplotype_depth(read_depth),
                     'GQ': vcf.formatfields.quality(genotype[1]),
                     'PHQ': vcf.formatfields.quality(phenotype[1].sum()),
-                    'FT': filterset
+                    'MEC': integer.minimum_error_correction(read_calls, genotype[0]).sum(),
+                    'FT': filterset,
+                    'RASSIGN': np.round(integer.read_assignment(read_calls, genotype[0]).sum(axis=0), 1),
                 })
 
                 # Null out the genotype and phenotype arrays
@@ -546,6 +552,10 @@ class program(object):
             _, probs, dosage = labeler.label_phenotype_posterior(*phenotype, expected_dosage=True)
             sample_data[sample]['MPGP'] = vcf.formatfields.probabilities(probs, self.precision)
             sample_data[sample]['MPED'] = vcf.formatfields.probabilities(dosage, self.precision)
+
+            # sort the read-count assignment
+            idx = labeler.argsort(genotype[0])
+            sample_data[sample]['RASSIGN'] = list(sample_data[sample]['RASSIGN'][idx])
         
         # construct vcf record
         return vcf.VCFRecord(
