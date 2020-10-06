@@ -248,4 +248,5 @@ def test_Program__run():
     assert str(sample['GT']) == '0/0/1/2'
     assert sample['MPGP'] == [1.0, 0.0, 0.0]
     assert sample['MPED'] == [2.0, 1.0, 1.0]
+    assert sample['MEC'] == 0
     assert str(sample['FT']) == 'PASS'

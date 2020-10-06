@@ -34,6 +34,7 @@ GPM = FormatField(id='GPM', number=1, type='Float', descr='Genotype posterior mo
 PPM = FormatField(id='PPM', number=1, type='Float', descr='Penotype posterior mode probability')
 MPGP = FormatField(id='MPGP', number='.', type='Float', descr='Genotype posterior probabilities of genotypes contributing to the posterior mode phenotype')
 MPED = FormatField(id='MPED', number='.', type='Float', descr='Mode phenotype expected dosage')
+MEC = FormatField(id='MEC', number=1, type='Integer', descr='Minimum error correction')
 
 
 def haplotype_depth(variant_depths):

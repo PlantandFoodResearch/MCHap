@@ -71,3 +71,21 @@ def test_sort():
     answer = np.sort(strings)
     query = integer.as_strings(integer.sort(array))
     np.testing.assert_array_equal(answer, query)
+
+
+def test_minimum_error_correction():
+    reads = np.array([
+        [0, 0, 0, 0, 0],  # 0
+        [0, 0, 0, -1, -1],  # 0
+        [0, 0, 1, 1, 1],  # 2
+        [1, 1, 1, 1, 1],  # 0
+    ])
+
+    genotype = np.array([
+        [0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1],
+    ])
+
+    query = integer.minimum_error_correction(reads, genotype)
+    answer = np.array([0, 0, 2, 0])
+    np.testing.assert_array_equal(answer, query)

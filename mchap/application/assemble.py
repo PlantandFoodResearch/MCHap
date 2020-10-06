@@ -7,7 +7,7 @@ from itertools import islice
 import multiprocessing as mp
 
 from mchap.assemble.mcmc.denovo import DenovoMCMC
-from mchap.encoding import character
+from mchap.encoding import character, integer
 from mchap.io import \
     read_bed4, \
     extract_sample_ids, \
@@ -414,6 +414,7 @@ class program(object):
             vcf.formatfields.PHQ,
             vcf.formatfields.DP,
             vcf.formatfields.RC,
+            vcf.formatfields.MEC,
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PPM, 
@@ -501,6 +502,7 @@ class program(object):
                     'DP': vcf.formatfields.haplotype_depth(read_depth),
                     'GQ': vcf.formatfields.quality(genotype[1]),
                     'PHQ': vcf.formatfields.quality(phenotype[1].sum()),
+                    'MEC': integer.minimum_error_correction(read_calls, genotype[0]).sum(),
                     'FT': filterset
                 })
 
