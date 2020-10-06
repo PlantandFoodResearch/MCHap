@@ -13,5 +13,11 @@ def vcfstr(obj):
             return ','.join(map(vcfstr, obj))
     elif obj is None:
         return '.'
+    elif isinstance(obj, float):
+        i = int(obj)
+        if i == obj:
+            return str(i)
+        else:
+            return str(obj)
     else:
         return str(obj)
