@@ -7,6 +7,15 @@ from itertools import combinations_with_replacement
 from mchap import mset
 
 
+def _allele_argsort(alleles):
+    """Sort alleles for VCF output, null alleles follow called alleles.
+    """
+    a = np.array(alleles, copy=False)
+    idx = np.argsort(a)
+    null =  a[idx] < 0
+    return np.append(idx[~null], idx[null])
+
+
 def _allele_sort(alleles):
     """Sort alleles for VCF output, null alleles follow called alleles.
     """
@@ -131,6 +140,14 @@ class HaplotypeAlleleLabeler(object):
                 allele = labels[tuple(hap)]
                 counts[allele] += 1
         return counts
+
+    def argsort(self, array):
+        """Argsort a genotype array.
+        """
+        labels = {a: i for i, a in enumerate(self.alleles)}
+        alleles = np.array([labels.get(tuple(hap), -1) for hap in array])
+        return _allele_argsort(alleles)
+
     
     def label(self, array, phased=False):
         """Create a VCF genotype from a genotype array.

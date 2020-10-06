@@ -507,10 +507,7 @@ class program(object):
                     'PHQ': vcf.formatfields.quality(phenotype[1].sum()),
                     'MEC': integer.minimum_error_correction(read_calls, genotype[0]).sum(),
                     'FT': filterset,
-                    'RASSIGN': vcf.formatfields.probabilities(
-                        integer.read_assignment(read_calls, genotype[0]).sum(axis=0),
-                        decimals=1,
-                    ),
+                    'RASSIGN': np.round(integer.read_assignment(read_calls, genotype[0]).sum(axis=0), 1),
                 })
 
                 # Null out the genotype and phenotype arrays
@@ -555,6 +552,10 @@ class program(object):
             _, probs, dosage = labeler.label_phenotype_posterior(*phenotype, expected_dosage=True)
             sample_data[sample]['MPGP'] = vcf.formatfields.probabilities(probs, self.precision)
             sample_data[sample]['MPED'] = vcf.formatfields.probabilities(dosage, self.precision)
+
+            # sort the read-count assignment
+            idx = labeler.argsort(genotype[0])
+            sample_data[sample]['RASSIGN'] = sample_data[sample]['RASSIGN'][idx]
         
         # construct vcf record
         return vcf.VCFRecord(
