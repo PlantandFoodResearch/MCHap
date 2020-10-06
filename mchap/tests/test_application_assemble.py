@@ -241,7 +241,7 @@ def test_Program__run():
     sample = format['SAMPLE1']
     assert sample['GPM'] == 1.0
     assert sample['PPM'] == 1.0
-    assert sample['RC'] == 200
+    assert sample['RCOUNT'] == 200
     assert sample['DP'] == 133
     assert sample['GQ'] == 60
     assert sample['PHQ'] == 60

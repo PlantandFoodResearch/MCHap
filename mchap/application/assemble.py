@@ -413,7 +413,7 @@ class program(object):
             vcf.formatfields.GQ,
             vcf.formatfields.PHQ,
             vcf.formatfields.DP,
-            vcf.formatfields.RC,
+            vcf.formatfields.RCOUNT,
             vcf.formatfields.MEC,
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
@@ -498,7 +498,7 @@ class program(object):
                 sample_data[sample].update({
                     'GPM': vcf.formatfields.probabilities(genotype[1], self.precision),
                     'PPM': vcf.formatfields.probabilities(phenotype[1].sum(), self.precision),
-                    'RC': read_count,
+                    'RCOUNT': read_count,
                     'DP': vcf.formatfields.haplotype_depth(read_depth),
                     'GQ': vcf.formatfields.quality(genotype[1]),
                     'PHQ': vcf.formatfields.quality(phenotype[1].sum()),
