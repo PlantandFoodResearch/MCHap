@@ -242,10 +242,12 @@ def test_Program__run():
     assert sample['GPM'] == 1.0
     assert sample['PPM'] == 1.0
     assert sample['RCOUNT'] == 200
+    assert sample['RCALLS'] == 400
     assert sample['DP'] == 133
     assert sample['GQ'] == 60
     assert sample['PHQ'] == 60
     assert str(sample['GT']) == '0/0/1/2'
+    assert sample['RASSIGN'] == [50, 50, 50, 50]
     assert sample['MPGP'] == [1.0, 0.0, 0.0]
     assert sample['MPED'] == [2.0, 1.0, 1.0]
     assert sample['MEC'] == 0

@@ -414,12 +414,14 @@ class program(object):
             vcf.formatfields.PHQ,
             vcf.formatfields.DP,
             vcf.formatfields.RCOUNT,
+            vcf.formatfields.RCALLS,
             vcf.formatfields.MEC,
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PPM, 
             vcf.formatfields.MPGP,
             vcf.formatfields.MPED,
+            vcf.formatfields.RASSIGN,
         )
 
         vcf_header = vcf.VCFHeader(
@@ -499,11 +501,16 @@ class program(object):
                     'GPM': vcf.formatfields.probabilities(genotype[1], self.precision),
                     'PPM': vcf.formatfields.probabilities(phenotype[1].sum(), self.precision),
                     'RCOUNT': read_count,
+                    'RCALLS': np.sum(read_calls >= 0),
                     'DP': vcf.formatfields.haplotype_depth(read_depth),
                     'GQ': vcf.formatfields.quality(genotype[1]),
                     'PHQ': vcf.formatfields.quality(phenotype[1].sum()),
                     'MEC': integer.minimum_error_correction(read_calls, genotype[0]).sum(),
-                    'FT': filterset
+                    'FT': filterset,
+                    'RASSIGN': vcf.formatfields.probabilities(
+                        integer.read_assignment(read_calls, genotype[0]).sum(axis=0),
+                        decimals=1,
+                    ),
                 })
 
                 # Null out the genotype and phenotype arrays

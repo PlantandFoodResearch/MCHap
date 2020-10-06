@@ -29,12 +29,14 @@ DP = FormatField(id='DP', number=1, type='Integer', descr='Read depth')
 PS = FormatField(id='PS', number=1, type='Integer', descr='Phase set')
 FT = FormatField(id='FT', number=1, type='String', descr='Filter indicating if this genotype was called')
 RCOUNT = FormatField(id='RCOUNT', number=1, type='Integer', descr='Total count of read pairs within haplotype interval')
+RCALLS = FormatField(id='RCALLS', number=1, type='Integer', descr='Total count of read base calls matching a known variant')
 GP = FormatField(id='GP', number='G', type='Float', descr='Genotype posterior probabilities')
 GPM = FormatField(id='GPM', number=1, type='Float', descr='Genotype posterior mode probability')
 PPM = FormatField(id='PPM', number=1, type='Float', descr='Penotype posterior mode probability')
 MPGP = FormatField(id='MPGP', number='.', type='Float', descr='Genotype posterior probabilities of genotypes contributing to the posterior mode phenotype')
 MPED = FormatField(id='MPED', number='.', type='Float', descr='Mode phenotype expected dosage')
 MEC = FormatField(id='MEC', number=1, type='Integer', descr='Minimum error correction')
+RASSIGN = FormatField(id='RASSIGN', number='.', type='Float', descr='Approximate number of reads assigned to each haplotype by MEC score')
 
 
 def haplotype_depth(variant_depths):

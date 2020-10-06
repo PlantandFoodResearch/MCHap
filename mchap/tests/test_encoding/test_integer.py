@@ -89,3 +89,25 @@ def test_minimum_error_correction():
     query = integer.minimum_error_correction(reads, genotype)
     answer = np.array([0, 0, 2, 0])
     np.testing.assert_array_equal(answer, query)
+
+
+def read_assignment():
+    reads = np.array([
+        [0, 0, 0, 0, 0],  # 0
+        [0, 0, 0, -1, -1],  # 0
+        [0, 0, 1, 1, 1],  # 2
+        [1, 1, 1, 1, 1],  # 0
+    ])
+
+    genotype = np.array([
+        [0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1],
+    ])
+    query = integer.read_assignment(reads, genotype)
+    answer = np.array([
+        [1.0, 0.0],
+        [1.0, 0.0],
+        [0.0, 1.0],
+        [0.0, 1.0]
+    ])
+    np.testing.assert_array_equal(answer, query)
