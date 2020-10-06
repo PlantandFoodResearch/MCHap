@@ -555,7 +555,7 @@ class program(object):
 
             # sort the read-count assignment
             idx = labeler.argsort(genotype[0])
-            sample_data[sample]['RASSIGN'] = sample_data[sample]['RASSIGN'][idx]
+            sample_data[sample]['RASSIGN'] = list(sample_data[sample]['RASSIGN'][idx])
         
         # construct vcf record
         return vcf.VCFRecord(
