@@ -484,13 +484,13 @@ class program(object):
 
                 # call genotype (array(ploidy, vars), probs)
                 if self.call_best_genotype:
-                    genotype = vcf.call_best_genotype(*phenotype)
+                    genotype = phenotype.mode_genotype()
                 else:
-                    genotype = vcf.call_phenotype(*phenotype, self.probability_filter_threshold)
+                    genotype = phenotype.call_phenotype(self.probability_filter_threshold)
 
                 # apply filters
                 filterset = vcf.filters.FilterCallSet((
-                    prob_filter(phenotype[1].sum()),
+                    prob_filter(phenotype.probabilities.sum()),
                     depth_filter(read_depth),
                     count_filter(read_count),
                     kmer_filter(read_calls, genotype[0]),
@@ -499,12 +499,12 @@ class program(object):
                 # format fields
                 sample_data[sample].update({
                     'GPM': vcf.formatfields.probabilities(genotype[1], self.precision),
-                    'PPM': vcf.formatfields.probabilities(phenotype[1].sum(), self.precision),
+                    'PPM': vcf.formatfields.probabilities(phenotype.probabilities.sum(), self.precision),
                     'RCOUNT': read_count,
                     'RCALLS': np.sum(read_calls >= 0),
                     'DP': vcf.formatfields.haplotype_depth(read_depth),
                     'GQ': vcf.formatfields.quality(genotype[1]),
-                    'PHQ': vcf.formatfields.quality(phenotype[1].sum()),
+                    'PHQ': vcf.formatfields.quality(phenotype.probabilities.sum()),
                     'MEC': integer.minimum_error_correction(read_calls, genotype[0]).sum(),
                     'FT': filterset,
                     'RASSIGN': np.round(integer.read_assignment(read_calls, genotype[0]).sum(axis=0), 1),
@@ -513,7 +513,7 @@ class program(object):
                 # Null out the genotype and phenotype arrays
                 if (not self.call_filtered) and filterset.failed:
                     genotype[0][:] = -1
-                    phenotype[0][:] = -1
+                    phenotype.genotypes[:] = -1
 
                 # store sample genotypes/phenotypes for labeling
                 sample_data[sample]['genotype'] = genotype
@@ -549,7 +549,11 @@ class program(object):
 
             # use labeler to sort gentype probs within phenotype
             phenotype = sample_data[sample]['phenotype']
-            _, probs, dosage = labeler.label_phenotype_posterior(*phenotype, expected_dosage=True)
+            _, probs, dosage = labeler.label_phenotype_posterior(
+                phenotype.genotypes, 
+                phenotype.probabilities, 
+                expected_dosage=True,
+            )
             sample_data[sample]['MPGP'] = vcf.formatfields.probabilities(probs, self.precision)
             sample_data[sample]['MPED'] = vcf.formatfields.probabilities(dosage, self.precision)
 

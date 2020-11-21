@@ -1,5 +1,6 @@
 import numpy as np
 from dataclasses import dataclass
+from functools import reduce
 
 from mchap import mset
 from mchap.encoding import integer
@@ -121,7 +122,77 @@ class PosteriorGenotypeDistribution(object):
         phenotype_labels, probs = (zip(*probs.items()))
         mode = phenotype_labels[np.argmax(probs)]
         idx = labels == mode
+        return PhenotypeDistribution(self.genotypes[idx], self.probabilities[idx])
+
+
+@dataclass
+class PhenotypeDistribution(object):
+    """Distribution of genotypes with identical alleles differing
+    only by dosage.
+
+    Attributes
+    ----------
+    genotypes : ndarray, int, shape (n_genotypes, ploidy, n_positions)
+        Genotypes with identical alleles differing only by dosage.
+    probabilities : ndarray, float, shape (n_genotypes, )
+        Probabilities of each genotype that may not sum to 1.
+
+    """
+    genotypes: np.ndarray
+    probabilities: np.ndarray
+
+    def mode_genotype(self):
+        """Returns the genotype with highest probability.
+
+        Returns
+        -------
+        genotype : ndarray, int, shape (ploidy, n_positions)
+            Genotype with highest probability.
+        probability : float
+            Probability associated with mode genotype.
+        """
+        idx = np.argmax(self.probabilities)
         return self.genotypes[idx], self.probabilities[idx]
+
+
+    def call_phenotype(self, threshold=0.95):
+        """Identifies the most complete set of alleles that 
+        exceeds a probability threshold.
+        If the probability threshold cannot be exceeded the
+        phenotype will be returned with a probability of None
+        """
+        # check mode genotype
+        if np.max(self.probabilities) >= threshold:
+            # mode genotype prob greater than threshold
+            idx = np.argmax(self.probabilities)
+            return self.genotypes[idx], self.probabilities[idx]
+        
+        # result will require some padding with null alleles
+        _, ploidy, n_pos = self.genotypes.shape
+        result = np.zeros((ploidy, n_pos), dtype=self.genotypes.dtype) - 1
+
+        # find genotype combination that meets threshold
+        selected = list()
+        p = 0.0
+        genotypes = list(self.genotypes)
+        probabilities = list(self.probabilities)
+        
+        while p < threshold:
+            if len(probabilities) == 0:
+                # all have been selected
+                break
+            idx = np.argmax(probabilities)
+            p += probabilities.pop(idx)
+            selected.append(genotypes.pop(idx))
+
+        # intercept of selected genotypes
+        alleles = reduce(mset.intercept, selected)
+        
+        # result adds padding with null alleles
+        for i, hap in enumerate(alleles):
+            result[i] = hap
+        
+        return result, p
 
 
 @dataclass
@@ -188,7 +259,7 @@ class GenotypeMultiTrace(object):
         return new
 
     def posterior(self):
-        """Returns a posterior distribution over (phased) genotypes
+        """Returns a posterior distribution over (phased) genotypes.
 
         Returns
         -------
@@ -206,4 +277,22 @@ class GenotypeMultiTrace(object):
         idx = np.flip(np.argsort(probs))
 
         return PosteriorGenotypeDistribution(states[idx], probs[idx])
-    
+
+    def chain_posteriors(self):
+        """Returns a posterior distribution over (phased) genotypes per chain.
+
+        Returns
+        -------
+        posteriors : list[PosteriorGenotypeDistribution]
+            A distribution over unique genotypes recorded in the trace.
+
+        """
+        n_chain = len(self.genotypes)
+        posteriors = [None] * n_chain
+        for chain in range(n_chain):
+            states, counts = mset.unique_counts(self.genotypes[chain])
+            probs = counts / np.sum(counts)
+            idx = np.flip(np.argsort(probs))
+            posterior = PosteriorGenotypeDistribution(states[idx], probs[idx])
+            posteriors[chain] = posterior
+        return posteriors
