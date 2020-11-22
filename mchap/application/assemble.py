@@ -281,6 +281,15 @@ class program(object):
         )
 
         parser.add_argument(
+            '--filter-chain-incongruence',
+            type=float,
+            nargs=1,
+            default=[0.60],
+            help=('Posterior phenotype probability threshold for identification of '
+            'incongruent posterior modes (default = 0.60).')
+        )
+
+        parser.add_argument(
             '--read-group-field',
             nargs=1,
             type=str,
@@ -362,6 +371,7 @@ class program(object):
             probability_filter_threshold=args.filter_probability[0],
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
+            incongruence_filter_threshold=args.filter_chain_incongruence[0],
             n_cores=args.cores[0],
             cli_command=command,
             random_seed=args.mcmc_seed[0]
