@@ -43,6 +43,7 @@ The full list of ``assemble`` arguments can be seen in the help text:
                                 [--filter-probability FILTER_PROBABILITY]
                                 [--filter-kmer-k FILTER_KMER_K]
                                 [--filter-kmer FILTER_KMER]
+                                [--filter-chain-incongruence FILTER_CHAIN_INCONGRUENCE]
                                 [--read-group-field READ_GROUP_FIELD]
                                 [--cores CORES]
 
@@ -136,6 +137,10 @@ The full list of ``assemble`` arguments can be seen in the help text:
     --filter-kmer FILTER_KMER
                             Minimum kmer representation required at each position
                             in assembly results (default = 0.90).
+    --filter-chain-incongruence FILTER_CHAIN_INCONGRUENCE
+                            Posterior phenotype probability threshold for
+                            identification of incongruent posterior modes (default
+                            = 0.60).
     --read-group-field READ_GROUP_FIELD
                             Read group field to use as sample id (default = "SM").
                             The chosen field determines tha sample ids required in

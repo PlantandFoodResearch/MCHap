@@ -199,13 +199,36 @@ class SampleChainPhenotypeIncongruenceFilter(SampleFilter):
     
     @property
     def descr(self):
-        template = 'Replicate markov chains found incongruent phenotypes with posterior probability greater than {}'
-        return template.format(int(self.threshold * 100))
+        template = 'Replicate Markov chains found incongruent phenotypes with posterior probability greater than {}'
+        return template.format(self.threshold)
     
-    def __call__(self, trace):
-        posteriors = trace.chain_posteriors()
-        modes = [dist.mode_phenotype() for dist in posteriors]
-        alleles = [mode.alleles() for mode in modes if mode.probabilities.sum() >= self.threshold]
+    def __call__(self, chain_modes):
+        #posteriors = trace.chain_posteriors()
+        #modes = [dist.mode_phenotype() for dist in posteriors]
+        alleles = [mode.alleles() for mode in chain_modes if mode.probabilities.sum() >= self.threshold]
         count = len({array.tobytes() for array in alleles})
         fails = count > 1
+        return FilterCall(self.id, fails)
+
+
+@dataclass(frozen=True)
+class SampleChainPhenotypeCNVFilter(SampleFilter):
+    threshold: float = 0.60
+        
+    @property
+    def id(self):
+        return 'cnv{}'.format(int(self.threshold * 100))
+    
+    @property
+    def descr(self):
+        template = 'Combined chains found more haplotypes than ploidy with posterior probability greater than {}'
+        return template.format(self.threshold)
+    
+    def __call__(self, chain_modes):
+        #posteriors = trace.chain_posteriors()
+        #modes = [dist.mode_phenotype() for dist in posteriors]
+        alleles = [mode.alleles() for mode in chain_modes if mode.probabilities.sum() >= self.threshold]
+        ploidy = len(alleles[0])
+        count = len(reduce(mset.union, alleles))
+        fails = count > ploidy
         return FilterCall(self.id, fails)

@@ -409,7 +409,8 @@ class program(object):
             vcf.filters.SampleDepthFilter(self.depth_filter_threshold),
             vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold),
             vcf.filters.SamplePhenotypeProbabilityFilter(self.probability_filter_threshold),
-            vcf.filters.SampleChainPhenotypeIncongruenceFilter(self.incongruence_filter_threshold)
+            vcf.filters.SampleChainPhenotypeIncongruenceFilter(self.incongruence_filter_threshold),
+            vcf.filters.SampleChainPhenotypeCNVFilter(self.incongruence_filter_threshold),
         )
 
         info_fields=(
@@ -455,6 +456,7 @@ class program(object):
         count_filter = header.filters[3]
         prob_filter = header.filters[4]
         incongruence_filter = header.filters[5]
+        cnv_filter = header.filters[6]
 
         # format data for sample columns in haplotype vcf
         sample_data = {sample: {} for sample in header.samples}
@@ -501,13 +503,17 @@ class program(object):
                 else:
                     genotype = phenotype.call_phenotype(self.probability_filter_threshold)
 
+                # per chain modes for QC
+                chain_modes = [dist.mode_phenotype() for dist in trace.chain_posteriors()]
+
                 # apply filters
                 filterset = vcf.filters.FilterCallSet((
                     prob_filter(phenotype.probabilities.sum()),
                     depth_filter(read_depth),
                     count_filter(read_count),
                     kmer_filter(read_calls, genotype[0]),
-                    incongruence_filter(trace),
+                    incongruence_filter(chain_modes),
+                    cnv_filter(chain_modes),
                 ))
 
                 # format fields
