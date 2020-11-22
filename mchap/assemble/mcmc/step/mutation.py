@@ -47,7 +47,6 @@ def base_step(genotype, reads, llk, h, j, mask=None):
 
     # cache of log likelihoods calculated with each allele
     llks = np.empty(n_alleles)
-    conditionals = np.empty(n_alleles)
     
     # reuse likelihood for current state
     current_nucleotide = genotype[h, j]
@@ -56,7 +55,7 @@ def base_step(genotype, reads, llk, h, j, mask=None):
     for i in range(n_alleles):
         if (mask is not None) and mask[i]:
             # skip masked allele
-            pass
+            llks[i] = - np.inf
         else:
             if i == current_nucleotide:
                 # no need to recalculate likelihood
