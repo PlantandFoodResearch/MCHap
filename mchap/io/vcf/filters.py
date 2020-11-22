@@ -1,5 +1,6 @@
 import numpy as np
 from dataclasses import dataclass
+from functools import reduce
 
 from mchap import mset
 from mchap.encoding import integer
@@ -185,4 +186,26 @@ class SamplePhenotypeProbabilityFilter(SampleFilter):
     
     def __call__(self, p):
         fails = p < self.threshold
+        return FilterCall(self.id, fails)
+
+
+@dataclass(frozen=True)
+class SampleChainPhenotypeIncongruenceFilter(SampleFilter):
+    threshold: float = 0.60
+        
+    @property
+    def id(self):
+        return 'mci{}'.format(int(self.threshold * 100))
+    
+    @property
+    def descr(self):
+        template = 'Replicate markov chains found incongruent phenotypes with posterior probability greater than {}'
+        return template.format(int(self.threshold * 100))
+    
+    def __call__(self, trace):
+        posteriors = trace.chain_posteriors()
+        modes = [dist.mode_phenotype() for dist in posteriors]
+        alleles = [mode.alleles() for mode in modes if mode.probabilities.sum() >= self.threshold]
+        count = len({array.tobytes() for array in alleles})
+        fails = count > 1
         return FilterCall(self.id, fails)

@@ -141,6 +141,14 @@ class PhenotypeDistribution(object):
     genotypes: np.ndarray
     probabilities: np.ndarray
 
+    def alleles(self):
+        """Returns the unique alleles of the genotype.
+
+        alleles : ndarray, int, shape (n_alleles, n_positions)
+            Unique alleles.
+        """
+        return mset.unique(self.genotypes[0])
+
     def mode_genotype(self):
         """Returns the genotype with highest probability.
 
@@ -153,7 +161,6 @@ class PhenotypeDistribution(object):
         """
         idx = np.argmax(self.probabilities)
         return self.genotypes[idx], self.probabilities[idx]
-
 
     def call_phenotype(self, threshold=0.95):
         """Identifies the most complete set of alleles that 

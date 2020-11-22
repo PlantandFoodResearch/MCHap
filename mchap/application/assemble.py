@@ -49,6 +49,7 @@ class program(object):
     probability_filter_threshold: float = 0.95
     kmer_filter_k: int = 3
     kmer_filter_theshold: float = 0.90
+    incongruence_filter_threshold: float = 0.60
     n_cores: int = 1
     precision: int = 3
     random_seed: int = 42
@@ -398,6 +399,7 @@ class program(object):
             vcf.filters.SampleDepthFilter(self.depth_filter_threshold),
             vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold),
             vcf.filters.SamplePhenotypeProbabilityFilter(self.probability_filter_threshold),
+            vcf.filters.SampleChainPhenotypeIncongruenceFilter(self.incongruence_filter_threshold)
         )
 
         info_fields=(
@@ -442,6 +444,7 @@ class program(object):
         depth_filter = header.filters[2]
         count_filter = header.filters[3]
         prob_filter = header.filters[4]
+        incongruence_filter = header.filters[5]
 
         # format data for sample columns in haplotype vcf
         sample_data = {sample: {} for sample in header.samples}
@@ -477,10 +480,10 @@ class program(object):
                     allow_recombinations=self.mcmc_allow_recombinations,
                     allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
                     random_seed=self.random_seed,
-                ).fit(read_dists)
+                ).fit(read_dists).burn(self.mcmc_burn)
 
                 # posterior mode phenotype is a collection of genotypes
-                phenotype = trace.burn(self.mcmc_burn).posterior().mode_phenotype()
+                phenotype = trace.posterior().mode_phenotype()
 
                 # call genotype (array(ploidy, vars), probs)
                 if self.call_best_genotype:
@@ -494,6 +497,7 @@ class program(object):
                     depth_filter(read_depth),
                     count_filter(read_count),
                     kmer_filter(read_calls, genotype[0]),
+                    incongruence_filter(trace),
                 ))
 
                 # format fields

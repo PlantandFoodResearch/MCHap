@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 
 from mchap.io.vcf import filters
+from mchap import mset
+from mchap.assemble.classes import GenotypeMultiTrace
 
 @pytest.mark.parametrize('obj,expect', [
     pytest.param(filters.FilterCall('pp95', failed=False, applied=True), 'PASS', id='pass'),
@@ -99,4 +101,35 @@ def test_SampleReadCountFilter(obj, expect):
 def test_SamplePhenotypeProbabilityFilter(obj, expect):
     prob = 0.9773
     actual = str(obj(prob))
+    assert actual == expect
+
+
+@pytest.mark.parametrize('obj,expect', [
+    pytest.param(filters.SampleChainPhenotypeIncongruenceFilter(threshold=0.8), 'PASS', id='pass'),
+    pytest.param(filters.SampleChainPhenotypeIncongruenceFilter(threshold=0.6), 'mci60', id='fail'),
+])
+def test_SampleChainPhenotypeIncongruenceFilter(obj, expect):
+    haplotypes = np.array([
+        [0, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1]
+    ])
+
+    g0 = haplotypes[[0, 0, 1, 2]]  # phenotype 1
+    g1 = haplotypes[[0, 1, 1, 2]]  # phenotype 1
+    g2 = haplotypes[[0, 1, 2, 2]]  # phenotype 1
+    g3 = haplotypes[[0, 0, 2, 2]]  # phenotype 2
+    genotypes = np.array([g0, g1, g2, g3])
+
+    t0 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
+    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1] ] # 9:1
+    t2 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
+    t3 = genotypes[[3, 3, 3, 3, 3, 3, 3, 2, 1, 2]]  # 3:7
+    trace = GenotypeMultiTrace(
+        genotypes=np.array([t0, t1, t2, t3]),
+        llks=np.ones((4, 10))
+    )
+
+    actual = str(obj(trace))
     assert actual == expect
