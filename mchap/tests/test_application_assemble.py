@@ -174,6 +174,7 @@ def test_Program__header():
         '##FILTER=<ID=dp5,Description="Sample has mean read depth less than 5.0">',
         '##FILTER=<ID=rc5,Description="Sample has read (pair) count of less than 5.0">',
         '##FILTER=<ID=pp95,Description="Samples phenotype posterior probability less than 0.95">',
+        '##FILTER=<ID=mci60,Description="Replicate markov chains found incongruent phenotypes with posterior probability greater than 60">',
     ]
     filters_actual = [str(i) for i in header.filters]
     assert filters_actual == filters_expect

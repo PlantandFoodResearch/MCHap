@@ -49,6 +49,7 @@ class program(object):
     probability_filter_threshold: float = 0.95
     kmer_filter_k: int = 3
     kmer_filter_theshold: float = 0.90
+    incongruence_filter_threshold: float = 0.60
     n_cores: int = 1
     precision: int = 3
     random_seed: int = 42
@@ -280,6 +281,15 @@ class program(object):
         )
 
         parser.add_argument(
+            '--filter-chain-incongruence',
+            type=float,
+            nargs=1,
+            default=[0.60],
+            help=('Posterior phenotype probability threshold for identification of '
+            'incongruent posterior modes (default = 0.60).')
+        )
+
+        parser.add_argument(
             '--read-group-field',
             nargs=1,
             type=str,
@@ -361,6 +371,7 @@ class program(object):
             probability_filter_threshold=args.filter_probability[0],
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
+            incongruence_filter_threshold=args.filter_chain_incongruence[0],
             n_cores=args.cores[0],
             cli_command=command,
             random_seed=args.mcmc_seed[0]
@@ -398,6 +409,7 @@ class program(object):
             vcf.filters.SampleDepthFilter(self.depth_filter_threshold),
             vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold),
             vcf.filters.SamplePhenotypeProbabilityFilter(self.probability_filter_threshold),
+            vcf.filters.SampleChainPhenotypeIncongruenceFilter(self.incongruence_filter_threshold)
         )
 
         info_fields=(
@@ -442,6 +454,7 @@ class program(object):
         depth_filter = header.filters[2]
         count_filter = header.filters[3]
         prob_filter = header.filters[4]
+        incongruence_filter = header.filters[5]
 
         # format data for sample columns in haplotype vcf
         sample_data = {sample: {} for sample in header.samples}
@@ -477,34 +490,35 @@ class program(object):
                     allow_recombinations=self.mcmc_allow_recombinations,
                     allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
                     random_seed=self.random_seed,
-                ).fit(read_dists)
+                ).fit(read_dists).burn(self.mcmc_burn)
 
                 # posterior mode phenotype is a collection of genotypes
-                phenotype = trace.burn(self.mcmc_burn).posterior().mode_phenotype()
+                phenotype = trace.posterior().mode_phenotype()
 
                 # call genotype (array(ploidy, vars), probs)
                 if self.call_best_genotype:
-                    genotype = vcf.call_best_genotype(*phenotype)
+                    genotype = phenotype.mode_genotype()
                 else:
-                    genotype = vcf.call_phenotype(*phenotype, self.probability_filter_threshold)
+                    genotype = phenotype.call_phenotype(self.probability_filter_threshold)
 
                 # apply filters
                 filterset = vcf.filters.FilterCallSet((
-                    prob_filter(phenotype[1].sum()),
+                    prob_filter(phenotype.probabilities.sum()),
                     depth_filter(read_depth),
                     count_filter(read_count),
                     kmer_filter(read_calls, genotype[0]),
+                    incongruence_filter(trace),
                 ))
 
                 # format fields
                 sample_data[sample].update({
                     'GPM': vcf.formatfields.probabilities(genotype[1], self.precision),
-                    'PPM': vcf.formatfields.probabilities(phenotype[1].sum(), self.precision),
+                    'PPM': vcf.formatfields.probabilities(phenotype.probabilities.sum(), self.precision),
                     'RCOUNT': read_count,
                     'RCALLS': np.sum(read_calls >= 0),
                     'DP': vcf.formatfields.haplotype_depth(read_depth),
                     'GQ': vcf.formatfields.quality(genotype[1]),
-                    'PHQ': vcf.formatfields.quality(phenotype[1].sum()),
+                    'PHQ': vcf.formatfields.quality(phenotype.probabilities.sum()),
                     'MEC': integer.minimum_error_correction(read_calls, genotype[0]).sum(),
                     'FT': filterset,
                     'RASSIGN': np.round(integer.read_assignment(read_calls, genotype[0]).sum(axis=0), 1),
@@ -513,7 +527,7 @@ class program(object):
                 # Null out the genotype and phenotype arrays
                 if (not self.call_filtered) and filterset.failed:
                     genotype[0][:] = -1
-                    phenotype[0][:] = -1
+                    phenotype.genotypes[:] = -1
 
                 # store sample genotypes/phenotypes for labeling
                 sample_data[sample]['genotype'] = genotype
@@ -549,7 +563,11 @@ class program(object):
 
             # use labeler to sort gentype probs within phenotype
             phenotype = sample_data[sample]['phenotype']
-            _, probs, dosage = labeler.label_phenotype_posterior(*phenotype, expected_dosage=True)
+            _, probs, dosage = labeler.label_phenotype_posterior(
+                phenotype.genotypes, 
+                phenotype.probabilities, 
+                expected_dosage=True,
+            )
             sample_data[sample]['MPGP'] = vcf.formatfields.probabilities(probs, self.precision)
             sample_data[sample]['MPED'] = vcf.formatfields.probabilities(dosage, self.precision)
 

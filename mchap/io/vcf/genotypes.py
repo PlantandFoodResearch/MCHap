@@ -25,56 +25,6 @@ def _allele_sort(alleles):
     return tuple(calls + nulls)
 
 
-def call_best_genotype(genotypes, probabilities):
-    """Returns the genotype with highest probability.
-    """
-    assert len(genotypes) == len(probabilities)
-    idx = np.argmax(probabilities)
-    return genotypes[idx], probabilities[idx]
-
-
-def call_phenotype(genotypes, probabilities, threshold=0.95):
-    """Identifies the most complete set of alleles that 
-    exceeds a probability threshold.
-    If the probability threshold cannot be exceeded the
-    phenotype will be returned with a probability of None
-    """
-    assert len(genotypes) == len(probabilities)
-
-    # check mode genotype
-    if np.max(probabilities) >= threshold:
-        # mode genotype prob greater than threshold
-        idx = np.argmax(probabilities)
-        return genotypes[idx], probabilities[idx]
-    
-    # result will require some padding with null alleles
-    _, ploidy, n_pos = genotypes.shape
-    result = np.zeros((ploidy, n_pos), dtype=genotypes.dtype) - 1
-
-    # find genotype combination that meets threshold
-    selected = list()
-    p = 0.0
-    genotypes = list(genotypes)
-    probabilities = list(probabilities)
-    
-    while p < threshold:
-        if len(probabilities) == 0:
-            # all have been selected
-            break
-        idx = np.argmax(probabilities)
-        p += probabilities.pop(idx)
-        selected.append(genotypes.pop(idx))
-
-    # intercept of selected genotypes
-    alleles = reduce(mset.intercept, selected)
-    
-    # result adds padding with null alleles
-    for i, hap in enumerate(alleles):
-        result[i] = hap
-    
-    return result, p
-
-
 @dataclass(order=True, frozen=True)
 class Genotype(object):
     alleles: tuple

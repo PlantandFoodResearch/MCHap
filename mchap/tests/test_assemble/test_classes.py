@@ -41,7 +41,8 @@ def test_PosteriorGenotypeDistribution():
 
     # phenotype is combination of genotypes with same haplotypes
     expect_phen, expect_probs = genotypes[[1, 2]], probabilities[[1,2]]
-    actual_phen, actual_probs = dist.mode_phenotype()
+    phenotype = dist.mode_phenotype()
+    actual_phen, actual_probs = phenotype.genotypes, phenotype.probabilities
     np.testing.assert_array_equal(expect_phen, actual_phen)
     np.testing.assert_array_equal(expect_probs, actual_probs)
 
@@ -90,3 +91,91 @@ def test_GenotypeTrace():
     posterior = trace.posterior()
     np.testing.assert_array_equal(posterior.genotypes, genotypes)
     np.testing.assert_array_equal(posterior.probabilities, counts / counts.sum())
+
+
+def test_PhenotypeDistribution___mode_genotype():
+    array = np.array([
+        [[0, 0, 0],
+         [0, 0, 0],
+         [0, 0, 0],
+         [1, 1, 1]],
+        [[0, 0, 0],
+         [0, 0, 0],
+         [1, 1, 1],
+         [1, 1, 1]],
+        [[0, 0, 0],
+         [1, 1, 1],
+         [1, 1, 1],
+         [1, 1, 1]],
+    ], dtype=np.int8)
+    probs = np.array([0.65, 0.2, 0.1])
+    expect = (array[0], probs[0])
+    dist = classes.PhenotypeDistribution(array, probs)
+    actual = dist.mode_genotype()
+    np.testing.assert_array_equal(expect[0], actual[0])
+    assert expect[1] == actual[1]
+
+
+
+@pytest.mark.parametrize('threshold,expect', [
+    pytest.param(
+        0.99,
+        (np.array([
+            [0, 0, 0],
+            [1, 1, 1],
+            [-1, -1, -1],
+            [-1, -1, -1],
+        ]), 0.95),
+        id='99',
+    ),
+    pytest.param(
+        0.9,
+        (np.array([
+            [0, 0, 0],
+            [1, 1, 1],
+            [-1, -1, -1],
+            [-1, -1, -1],
+        ]), 0.95),
+        id='90',
+    ),
+    pytest.param(
+        0.8,
+        (np.array([
+            [0, 0, 0],
+            [0, 0, 0],
+            [1, 1, 1],
+            [-1, -1, -1],
+        ]), 0.85),
+        id='85',
+    ),
+    pytest.param(
+        0.6,
+        (np.array([
+            [0, 0, 0],
+            [0, 0, 0],
+            [0, 0, 0],
+            [1, 1, 1],
+        ]), 0.65),
+        id='65',
+    ),
+])
+def test_PhenotypeDistribution___call_phenotype(threshold, expect):
+    array = np.array([
+        [[0, 0, 0],
+         [0, 0, 0],
+         [0, 0, 0],
+         [1, 1, 1]],
+        [[0, 0, 0],
+         [0, 0, 0],
+         [1, 1, 1],
+         [1, 1, 1]],
+        [[0, 0, 0],
+         [1, 1, 1],
+         [1, 1, 1],
+         [1, 1, 1]],
+    ], dtype=np.int8)
+    probs = np.array([0.65, 0.2, 0.1])
+    dist = classes.PhenotypeDistribution(array, probs)
+    actual = dist.call_phenotype(threshold=threshold)
+    np.testing.assert_array_equal(expect[0], actual[0])
+    np.testing.assert_almost_equal(expect[1], actual[1])
