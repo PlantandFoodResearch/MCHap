@@ -203,8 +203,6 @@ class SampleChainPhenotypeIncongruenceFilter(SampleFilter):
         return template.format(self.threshold)
     
     def __call__(self, chain_modes):
-        #posteriors = trace.chain_posteriors()
-        #modes = [dist.mode_phenotype() for dist in posteriors]
         alleles = [mode.alleles() for mode in chain_modes if mode.probabilities.sum() >= self.threshold]
         count = len({array.tobytes() for array in alleles})
         fails = count > 1
@@ -225,9 +223,9 @@ class SampleChainPhenotypeCNVFilter(SampleFilter):
         return template.format(self.threshold)
     
     def __call__(self, chain_modes):
-        #posteriors = trace.chain_posteriors()
-        #modes = [dist.mode_phenotype() for dist in posteriors]
         alleles = [mode.alleles() for mode in chain_modes if mode.probabilities.sum() >= self.threshold]
+        if len(alleles) == 0:
+            return FilterCall(self.id, failed=False, applied=False)
         ploidy = len(alleles[0])
         count = len(reduce(mset.union, alleles))
         fails = count > ploidy

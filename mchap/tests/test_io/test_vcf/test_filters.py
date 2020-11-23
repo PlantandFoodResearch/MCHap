@@ -136,6 +136,7 @@ def test_SampleChainPhenotypeIncongruenceFilter(obj, expect):
 
 
 @pytest.mark.parametrize('obj,expect', [
+    pytest.param(filters.SampleChainPhenotypeCNVFilter(threshold=0.99), '.', id='NA'),
     pytest.param(filters.SampleChainPhenotypeCNVFilter(threshold=0.8), 'PASS', id='pass'),
     pytest.param(filters.SampleChainPhenotypeCNVFilter(threshold=0.6), 'cnv60', id='fail'),
 ])
@@ -155,9 +156,9 @@ def test_SampleChainPhenotypeCNVFilter(obj, expect):
     g4 = haplotypes[[0, 2, 3, 4]]  # phenotype 3
     genotypes = np.array([g0, g1, g2, g3, g4])
 
-    t0 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
+    t0 = genotypes[[3, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
     t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1] ] # 9:1
-    t2 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
+    t2 = genotypes[[0, 3, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
     t3 = genotypes[[3, 3, 4, 4, 4, 3, 4, 4, 4, 4]]  # 3:7
     trace = GenotypeMultiTrace(
         genotypes=np.array([t0, t1, t2, t3]),
