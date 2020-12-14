@@ -482,6 +482,7 @@ def interval_step(
         interval=None, 
         allow_recombinations=True,
         allow_dosage_swaps=True,
+        temp=1,
     ):
     """A structural sub-step of an MCMC simulation constrained to 
     a single interval contating a sub-set of positions of a genotype.
@@ -507,6 +508,9 @@ def interval_step(
         Set to False to dis-allow structural steps involving
         dosage changes between parts of a pair of haplotypes
         (default = True).
+    temp : float
+        An inverse temperature in the interval 0, 1 to adjust
+        the sampled distribution by.
 
     Returns
     -------
@@ -519,6 +523,7 @@ def interval_step(
     The `genotype` variable is updated in place.
 
     """
+    assert  0 <= temp <= 1
     # labels for interval/non-interval components of current genotype
     labels = haplotype_segment_labels(genotype, interval)
 
@@ -586,8 +591,14 @@ def interval_step(
     # final option is to keep the current genotype 
     llks[-1] = llk
 
-    # acceptance distribution ratios of each transition option
-    log_accept = (llks - llk) + (log_proposal_ratios)
+    # log acceptance ratio for each proposed step
+    log_accept = llks - llk
+
+    # raise to the temperature
+    log_accept *= temp
+
+    # modify by proposal ratio
+    log_accept += log_proposal_ratios
 
     # calculate conditional probs of acceptance for all transitions
     conditionals = util.log_likelihoods_as_conditionals(log_accept)
@@ -615,7 +626,8 @@ def compound_step(
         intervals,  
         allow_recombinations=True,
         allow_dosage_swaps=True,
-        randomise=True
+        randomise=True,
+        temp=1,
     ):
     """A structural step of an MCMC simulation consisting of
     multiple sub-steps each of which are  constrained to a single 
@@ -646,6 +658,9 @@ def compound_step(
         If True then the order of substeps (as defined by the 
         order of intervals) will be randomly permuted
         (default = True).
+    temp : float
+        An inverse temperature in the interval 0, 1 to adjust
+        the sampled distribution by.
 
     Returns
     -------
@@ -673,5 +688,6 @@ def compound_step(
             interval=intervals[i], 
             allow_recombinations=allow_recombinations,
             allow_dosage_swaps=allow_dosage_swaps,
+            temp=temp,
         )
     return llk
