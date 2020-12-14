@@ -8,7 +8,7 @@ from mchap.assemble.likelihood import log_likelihood
 
 
 @numba.njit
-def base_step(genotype, reads, llk, h, j, mask=None):
+def base_step(genotype, reads, llk, h, j, mask=None, temp=1):
     """Mutation Gibbs sampler step for the jth base position 
     of the hth haplotype.
 
@@ -30,6 +30,9 @@ def base_step(genotype, reads, llk, h, j, mask=None):
     mask : ndarray, bool, shape (n_nucl, )
         Optionally indicate some alleles to skip e.g. alleles 
         which are known to have 0 probability.
+    temp : float
+        An inverse temperature in the interval 0, 1 to adjust
+        the sampled distribution by.
     
     Returns
     -------
@@ -42,6 +45,7 @@ def base_step(genotype, reads, llk, h, j, mask=None):
     Variable `genotype` is updated in place.
 
     """
+    assert  0 <= temp <= 1
     # number of possible alleles given given array size
     n_alleles = reads.shape[-1]
 
@@ -67,7 +71,13 @@ def base_step(genotype, reads, llk, h, j, mask=None):
     # calculate conditional probabilities
     conditionals = util.log_likelihoods_as_conditionals(llks)
 
-    # if a prior is used then it can be multiplied by probs here
+    # update probabilities with temperature
+    # TODO: could apply temp to llks to avoid second normalisation
+    if temp < 1:
+        conditionals **= temp
+        conditionals /= conditionals.sum()
+
+    # random choice using probabilities
     choice = util.random_choice(conditionals)
 
     # update state
@@ -77,7 +87,7 @@ def base_step(genotype, reads, llk, h, j, mask=None):
     return llks[choice]
 
 @numba.njit
-def genotype_compound_step(genotype, reads, llk, mask=None):
+def genotype_compound_step(genotype, reads, llk, mask=None, temp=1):
     """Mutation compound Gibbs sampler step for all base positions 
     of all haplotypes in a genotype.
 
@@ -94,6 +104,9 @@ def genotype_compound_step(genotype, reads, llk, mask=None):
     mask : ndarray, bool, shape (n_base, n_nucl)
         Optionally indicate some alleles to skip e.g. alleles which 
         are known to have 0 probability.
+    temp : float
+        An inverse temperature in the interval 0, 1 to adjust
+        the sampled distribution by.
     
     Returns
     -------
@@ -122,5 +135,5 @@ def genotype_compound_step(genotype, reads, llk, mask=None):
     for i in range(ploidy * n_base):
         h, j = substeps[i]
         sub_mask = None if mask is None else mask[j]
-        llk = base_step(genotype, reads, llk, h, j, sub_mask)
+        llk = base_step(genotype, reads, llk, h, j, sub_mask, temp=temp)
     return llk
