@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from mchap import mset
 from mchap.assemble.mcmc.step import mutation, structural
+from mchap.assemble.mcmc.step.chain import chain_swap_step
 from mchap.assemble.likelihood import log_likelihood
 from mchap.assemble import util, complexity
 from mchap.assemble.classes import Assembler, GenotypeMultiTrace
@@ -284,6 +285,129 @@ def _denovo_gibbs_sampler(
         
         genotype_trace[i] = genotype.copy() # TODO: is this copy needed?
         llk_trace[i] = llk
+    return genotype_trace, llk_trace
+
+
+@numba.njit
+def _denovo_tempered_gibbs_sampler(
+        genotype, 
+        reads, 
+        mask,
+        steps, 
+        break_dist,
+        allow_recombinations,
+        allow_dosage_swaps,
+        full_length_dosage_swap,
+        temperatures,
+        return_heated_trace=False,
+    ):
+    """Gibbs sampler with parallele temporing"""
+    #assert temperatures[-1] == 1.0
+    ploidy, n_base = genotype.shape
+    n_temps = len(temperatures)
+
+    # get number of possible alleles for each position
+    if mask is None:
+        n_alleles = np.zeros(n_base, dtype=np.int8)
+        n_alleles[:] = reads.shape[-1]
+    else:
+        n_alleles = (~mask).sum(axis=-1).astype(np.int8)
+    
+    # number of possible unique haplotypes
+    u_haps = np.prod(n_alleles)
+
+    # one genotype state per temp
+    genotypes = np.empty((n_temps, ploidy, n_base), dtype=genotype.dtype)
+    for t in range(n_temps):
+        genotypes[t] = genotype.copy()
+
+    # likelihood for each genotype at each temp
+    llks = np.empty(n_temps)
+    llks[:] = log_likelihood(reads, genotype)
+
+    if return_heated_trace:
+        # trace for each chain
+        genotype_trace = np.empty((n_temps, steps) + genotype.shape, np.int8)
+        llk_trace = np.empty((n_temps, steps), np.float64)
+    else:
+        # trace for cold chain only
+        genotype_trace = np.empty((1, steps) + genotype.shape, np.int8)
+        llk_trace = np.empty((1, steps), np.float64)
+
+    for i in range(steps):
+
+        for t in range(n_temps):
+
+            # get genotype and likelihood of state this temp
+            llk = llks[t]
+            genotype = genotypes[t]
+            temp = temperatures[t]
+
+            if np.isnan(llk):
+                raise ValueError('Encountered log likelihood of nan')
+            
+            # mutation step
+            llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask, temp=temp)
+            
+            # choose number of break points for structural step
+            n_breaks = util.random_choice(break_dist)
+                
+            # break into intervals for structural step
+            intervals = structural.random_breaks(n_breaks, n_base)
+            
+            # structural step
+            llk = structural.compound_step(
+                genotype=genotype, 
+                reads=reads, 
+                llk=llk, 
+                intervals=intervals,
+                allow_recombinations=allow_recombinations,
+                allow_dosage_swaps=allow_dosage_swaps,
+                temp=temp,
+            )
+
+            # final full length dosage swap
+            if full_length_dosage_swap:
+                llk = structural.compound_step(
+                    genotype=genotype, 
+                    reads=reads, 
+                    llk=llk, 
+                    intervals=np.array([[0, n_base]]),
+                    allow_recombinations=False,
+                    allow_dosage_swaps=True,
+                    temp=temp,
+                )
+            
+            # chain swap step if not the highest temp
+            if t > 0:
+                llk_prev = llks[t - 1]
+                genotype_prev = genotypes[t - 1]
+                temp_prev = temperatures[t - 1]
+                llk, llk_prev = chain_swap_step(
+                    genotype,
+                    llk,
+                    temp,
+                    genotype_prev,
+                    llk_prev,
+                    temp_prev,
+                    u_haps,
+                )
+                llks[t - 1] = llk_prev
+            
+            # save llk of current temp
+            llks[t] = llk
+            
+            # save llk of current temp
+            llks[t] = llk
+        
+        if return_heated_trace:
+            # save state and likelihood of each chain
+            genotype_trace[:, i] = genotypes.copy()
+            llk_trace[:, i] = llks.copy()
+        else:
+            # save state and likelihood of cold chain only
+            genotype_trace[0, i] = genotype.copy()
+            llk_trace[0, i] = llk
     return genotype_trace, llk_trace
 
 
