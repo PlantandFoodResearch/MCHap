@@ -16,11 +16,9 @@ def log_genotype_prior(genotype, unique_haplotypes):
 
 @numba.njit
 def chain_swap_acceptance(
-    genotype_i,
     llk_i,
     log_prior_i,
     temp_i,
-    genotype_j,
     llk_j,
     log_prior_j,
     temp_j,
@@ -53,11 +51,9 @@ def chain_swap_step(
     prior_j = log_genotype_prior(genotype_j, unique_haplotypes)
 
     acceptance = chain_swap_acceptance(
-        genotype_i,
         llk_i,
         prior_i,
         temp_i,
-        genotype_j,
         llk_j,
         prior_j,
         temp_j,
