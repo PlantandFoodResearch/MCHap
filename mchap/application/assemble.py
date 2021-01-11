@@ -34,10 +34,10 @@ class program(object):
     call_filtered: bool = False
     read_group_field: str = 'SM'
     read_error_rate: float = 0.0
+    mcmc_temperatures: tuple = (1.0, )
     mcmc_chains: int = 2
     mcmc_steps: int = 1000
     mcmc_burn: int = 500
-    mcmc_ratio: float = 0.75
     mcmc_alpha: float = 1.0
     mcmc_beta: float = 3.0
     mcmc_fix_homozygous: float = 0.999
@@ -194,6 +194,17 @@ class program(object):
         )
 
         parser.add_argument(
+            '--mcmc-temperatures',
+            type=float,
+            nargs='*',
+            default=[1.0],
+            help=('A list of inverse-temperatures to use for parallel tempered chains. '
+            'These values must be between 0 and 1 and will automatically be sorted in '
+            'ascending order. The cold chain value of 1.0 will be added automatically if '
+            'it is not specified.')
+        )
+
+        parser.add_argument(
             '--mcmc-steps',
             type=int,
             nargs=1,
@@ -345,6 +356,14 @@ class program(object):
             else:
                 sample_ploidy[sample] = args.ploidy[0]
 
+        # add cold chain temperature if not present and sort
+        temperatures = args.mcmc_temperatures
+        temperatures.sort()
+        assert temperatures[0] >= 0.0
+        assert temperatures[-1] <= 1.0
+        if temperatures[-1] != 1.0:
+            temperatures.append(1.0)
+
         return cls(
             args.targets[0],
             args.variants[0],
@@ -357,9 +376,9 @@ class program(object):
             read_group_field=args.read_group_field[0],
             read_error_rate=args.error_rate[0],
             mcmc_chains=args.mcmc_chains[0],
+            mcmc_temperatures=tuple(temperatures),
             mcmc_steps=args.mcmc_steps[0],
             mcmc_burn=args.mcmc_burn[0],
-            #mcmc_ratio,
             #mcmc_alpha,
             #mcmc_beta,
             mcmc_fix_homozygous=args.mcmc_fix_homozygous[0],
@@ -487,10 +506,10 @@ class program(object):
                     ploidy=self.sample_ploidy[sample],
                     steps=self.mcmc_steps,
                     chains=self.mcmc_chains,
-                    ratio=self.mcmc_ratio,
                     fix_homozygous=self.mcmc_fix_homozygous,
                     allow_recombinations=self.mcmc_allow_recombinations,
                     allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
+                    temperatures=self.mcmc_temperatures,
                     random_seed=self.random_seed,
                 ).fit(read_dists).burn(self.mcmc_burn)
 

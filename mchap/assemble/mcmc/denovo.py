@@ -20,7 +20,6 @@ class DenovoMCMC(Assembler):
     ploidy: int
     steps: int = 1000
     chains: int = 2
-    ratio: float = 1.0
     alpha: float = 1.0
     beta: float = 3.0
     n_intervals: int = None
@@ -28,6 +27,7 @@ class DenovoMCMC(Assembler):
     allow_recombinations: bool = True
     allow_dosage_swaps: bool = True
     full_length_dosage_swap: bool = True
+    temperatures: tuple = (1.0, )
     random_seed: int = None
     """De novo haplotype assembly using Markov chain Monte Carlo
     for probabilistically encoded variable positions of NGS reads.
@@ -42,9 +42,6 @@ class DenovoMCMC(Assembler):
     chains : int, optional
         Number of independent MCMC simulations to run
         (default = 2).
-    ratio : float, optional
-        Proportion of steps to include structural sub-steps
-        in the MCMC simulation (default = 1.0).
     alpha, beta : float, optional
         Parameters defining a Beta distribution to sample
         the number of random intervals to generate at each
@@ -73,6 +70,10 @@ class DenovoMCMC(Assembler):
         Include an additional full length dosage swap step
         within each step to ensure mixing between dosage
         levels (default = True).
+    temperatures : array_like float, optional
+        Specify inverse temperatures for parallel tempering
+        these should between 0 and 1 in ascending order with
+        the final value being 1 (default = (1.0, )).
     random_seed: int, optional
         Seed the random seed for numpy and numba RNG
         (default = None).
@@ -184,18 +185,28 @@ class DenovoMCMC(Assembler):
         # mcmc and hence reduces paramater space and compute time.
         mask = np.all(reads_het == 0, axis=-3)
 
+        # ensure temperatures is an ascending array ending in 1.0
+        temperatures = np.sort(self.temperatures)
+        assert temperatures[0] >= 0.0
+        assert temperatures[-1] == 1.0
+
         # run the sampler on the heterozygous positions
         genotypes, llks = _denovo_gibbs_sampler(
             genotype, 
             reads_het, 
             mask=mask,
-            ratio=self.ratio, 
             steps=self.steps, 
             break_dist=break_dist,
             allow_recombinations=self.allow_recombinations,
             allow_dosage_swaps=self.allow_dosage_swaps,
             full_length_dosage_swap=self.full_length_dosage_swap,
+            temperatures=np.array([1.0]),
         )
+
+        # drop the first dimension of each trace component
+        # this dimension is only used if heated chains are returned
+        genotypes = genotypes[0]
+        llks = llks[0]
 
         # return the genotype trace and llks
         if n_het_base == n_base:
@@ -217,79 +228,6 @@ class DenovoMCMC(Assembler):
 
 @numba.njit
 def _denovo_gibbs_sampler(
-        genotype, 
-        reads, 
-        mask,
-        ratio, 
-        steps, 
-        break_dist,
-        allow_recombinations,
-        allow_dosage_swaps,
-        full_length_dosage_swap,
-    ):
-    """Jitted worker function for method `fit` of class `DenovoMCMC`.
-
-    See Also
-    --------
-    DenovoMCMC
-
-    """
-    _, n_base = genotype.shape
-    
-    llk = log_likelihood(reads, genotype)
-    genotype_trace = np.empty((steps,) + genotype.shape, np.int8)
-    llk_trace = np.empty(steps, np.float64)
-    for i in range(steps):
-
-        if np.isnan(llk):
-            raise ValueError('Encountered log likelihood of nan')
-        
-        choice = ratio < np.random.random()
-        
-        if choice:
-            # mutation step only
-            llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask)
-        
-        else:
-            # structural step followed by mutation step
-            
-            # choose number of break points
-            n_breaks = util.random_choice(break_dist)
-            
-            # break into intervals
-            intervals = structural.random_breaks(n_breaks, n_base)
-            
-            # compound structural step
-            llk = structural.compound_step(
-                genotype=genotype, 
-                reads=reads, 
-                llk=llk, 
-                intervals=intervals,
-                allow_recombinations=allow_recombinations,
-                allow_dosage_swaps=allow_dosage_swaps,
-            )
-
-            # followed by mutation step
-            llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask)
-        
-        if full_length_dosage_swap:
-            # final full length dosage swap
-            llk = structural.compound_step(
-                genotype=genotype, 
-                reads=reads, 
-                llk=llk, 
-                intervals=np.array([[0, n_base]]),
-                allow_recombinations=False,
-                allow_dosage_swaps=True,
-            )
-        
-        genotype_trace[i] = genotype.copy() # TODO: is this copy needed?
-        llk_trace[i] = llk
-    return genotype_trace, llk_trace
-
-
-@numba.njit
-def _denovo_tempered_gibbs_sampler(
         genotype, 
         reads, 
         mask,
