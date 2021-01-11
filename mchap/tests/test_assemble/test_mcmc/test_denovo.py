@@ -319,6 +319,53 @@ def test_DenovoMCMC__fuzz():
         assert trace.llks.shape == (n_chains, n_steps)
 
 
+@pytest.mark.parametrize(
+    'temperatures', 
+    [
+        [1.0],
+        [0.1, 1.0],
+        [0.01, 0.1, 1.0],
+        [0.001, 0.01, 0.1, 1.0],
+    ]
+)
+def test_DenovoMCMC__temperatures_bias(temperatures):
+    """Test to ensure the implementation of parallel-tempering does
+    not bias the MCMC results when tempering is not needed.
+    """
+    haplotypes = np.array([
+        [0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 1, 1, 1],
+        [0, 1, 0, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1],
+    ], dtype=np.int8)
+    alt_dosages = np.array([
+        haplotypes[[0,0,1,3]],
+        haplotypes[[0,1,3,3]],
+    ])
+    reads = simulate_reads(
+        haplotypes, 
+        n_reads=16, 
+        uniform_sample=True,
+        errors=False, 
+        qual=(60, 60),
+    )
+    model = denovo.DenovoMCMC(
+        ploidy=4, 
+        steps=2100, 
+        chains=2, 
+        random_seed=11, 
+        temperatures=temperatures
+    )
+    posterior = model.fit(reads).burn(100).posterior()
+    # assert mode the same with consistant probability
+    np.testing.assert_array_equal(posterior.genotypes[0], haplotypes)
+    assert 0.68 > posterior.probabilities[0] > 0.62
+    # assert alt dosages are next most probable
+    assert mset.equal(posterior.genotypes[1:3], alt_dosages)
+    assert 0.045 > posterior.probabilities[1] > posterior.probabilities[2] > 0.035
+    assert 0.01 > posterior.probabilities[3]
+
+
 def test_DenovoMCMC__temperatures_submode():
     """This test is taken from real world example in which the mcmc
     can become stuck in a sub-optimal alternative mode when parallel
