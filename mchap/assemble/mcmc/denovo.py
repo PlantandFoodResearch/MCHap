@@ -200,7 +200,7 @@ class DenovoMCMC(Assembler):
             allow_recombinations=self.allow_recombinations,
             allow_dosage_swaps=self.allow_dosage_swaps,
             full_length_dosage_swap=self.full_length_dosage_swap,
-            temperatures=np.array([1.0]),
+            temperatures=temperatures,
         )
 
         # drop the first dimension of each trace component
