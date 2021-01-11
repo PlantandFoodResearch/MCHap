@@ -5,6 +5,8 @@ import pytest
 from mchap.assemble.mcmc import denovo
 from mchap.assemble.util import seed_numba
 from mchap.testing import simulate_reads
+from mchap.encoding import integer
+from mchap import mset
 
 
 def test_point_beta_probabilities():
@@ -316,3 +318,80 @@ def test_DenovoMCMC__fuzz():
         assert trace.genotypes.shape == (n_chains, n_steps, ploidy, n_base)
         assert trace.llks.shape == (n_chains, n_steps)
 
+
+def test_DenovoMCMC__temperatures_submode():
+    """This test is taken from real world example in which the mcmc
+    can become stuck in a sub-optimal alternative mode when parallel
+    tempering is not used. Note that the optimal mode is not necessarily 
+    the true genotype and the data there may be additional haplotypes due
+    to duplication.
+    """
+    read_counts = [
+        ('000000', 22),
+        ('-00000', 3),
+        ('0000-0', 2),
+        ('00000-', 1),
+        ('000-00', 1),
+        ('001000', 16),
+        ('-01000', 2),
+        ('001---', 2),
+        ('--1000', 3),
+        ('000110', 39),
+        ('-00110', 1),
+        ('----10', 1),
+        ('100101', 3),
+        ('-00101', 3),
+        ('----01', 1),
+        ('110100', 1),
+        ('110---', 2),
+        ('1101--', 1),
+        ('11----', 1),
+        ('0--000', 1),
+        ('---000', 3),
+        ('----00', 4),
+        ('0-----', 2),
+        ('1-----', 2),
+        ('001110', 1),
+    ]
+    strings, counts = zip(*read_counts)
+    calls = integer.from_strings(strings)
+    counts = np.array(list(counts))
+    dists = integer.as_probabilistic(
+        calls, 
+        n_alleles=2, 
+        p=0.999, 
+    )
+    reads = mset.repeat(dists, counts)
+
+    alt_mode = np.array([
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0],
+        [0, 0, 0, 1, 1, 0],
+        [0, 0, 1, 0, 0, 0],
+        [1, 0, 0, 1, 0, 1],
+    ])
+
+    opt_mode = np.array([
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0],
+        [0, 0, 0, 1, 1, 0],
+        [0, 0, 1, 0, 0, 0],
+        [1, 0, 0, 1, 0, 1],
+        [1, 1, 0, 1, 0, 0]
+    ])
+
+    # initialise all chains within sub-optimal mode
+    initial = np.tile(alt_mode, (2, 1, 1))
+
+    # without tempering
+    model = denovo.DenovoMCMC(ploidy=6, steps=1100, temperatures=[1.0], random_seed=1)
+    posterior = model.fit(reads, initial=initial).burn(100).posterior()
+    np.testing.assert_array_equal(posterior.genotypes[0], alt_mode) # sub-optimal mode
+    assert posterior.probabilities[0] > 0.95
+
+    # with tempering
+    model = denovo.DenovoMCMC(ploidy=6, steps=1100, temperatures=[0.1, 1.0], random_seed=1)
+    posterior = model.fit(reads, initial=initial).burn(100).posterior()
+    np.testing.assert_array_equal(posterior.genotypes[0], opt_mode)  # optimal mode
+    assert posterior.probabilities[0] > 0.95
