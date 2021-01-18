@@ -49,33 +49,40 @@ def base_step(genotype, reads, llk, h, j, mask=None, temp=1):
     # number of possible alleles given given array size
     n_alleles = reads.shape[-1]
 
-    # cache of log likelihoods calculated with each allele
+    # store log likelihoods calculated with each allele
     llks = np.empty(n_alleles)
+
+    # store MH acceptance probability for each allele
+    log_accept = np.empty(n_alleles)
     
-    # reuse likelihood for current state
-    current_nucleotide = genotype[h, j]
-    llks[current_nucleotide] = llk
-    
+    # use differences in dosage of haplotype h to calculate
+    # ratio of priors and ratio of proposal probabilities
+    lhapcount = np.log(util.count_haplotype_copies(genotype, h))
+
+    current_nucleotide = genotype[h, j]    
     for i in range(n_alleles):
         if (mask is not None) and mask[i]:
-            # skip masked allele
-            llks[i] = - np.inf
+            # exclude masked allele
+            llks[i] = - np.inf  # log(0.0)
+            log_accept[i] = - np.inf
         else:
             if i == current_nucleotide:
-                # no need to recalculate likelihood
-                pass
+                # store current likelihood
+                llks[i] = llk
+                log_accept[i] = 0.0  # log(1.0)
             else:
                 genotype[h, j] = i
-                llks[i] = log_likelihood(reads, genotype)
+                llk_i = log_likelihood(reads, genotype)
+                lhapcount_i = np.log(util.count_haplotype_copies(genotype, h))
+                llks[i] = llk_i
+                llk_ratio = llk_i - llk
+                # ratio of priors and ratio of proposal probs are each others inverse
+                lprior_ratio = lhapcount - lhapcount_i
+                lproposal_ratio = lhapcount_i - lhapcount
+                log_accept[i] = ((llk_ratio + lprior_ratio) * temp + lproposal_ratio)                
 
-    # calculate conditional probabilities
-    conditionals = util.log_likelihoods_as_conditionals(llks)
-
-    # update probabilities with temperature
-    # TODO: could apply temp to llks to avoid second normalisation
-    if temp < 1:
-        conditionals **= temp
-        conditionals /= conditionals.sum()
+    # calculate conditional probs of acceptance for all transitions
+    conditionals = util.log_likelihoods_as_conditionals(log_accept)
 
     # random choice using probabilities
     choice = util.random_choice(conditionals)

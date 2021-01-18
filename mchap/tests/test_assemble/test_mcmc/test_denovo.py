@@ -362,7 +362,7 @@ def test_DenovoMCMC__temperatures_bias(temperatures):
     assert 0.68 > posterior.probabilities[0] > 0.62
     # assert alt dosages are next most probable
     assert mset.equal(posterior.genotypes[1:3], alt_dosages)
-    assert 0.045 > posterior.probabilities[1] > posterior.probabilities[2] > 0.035
+    assert 0.048 > posterior.probabilities[1] > posterior.probabilities[2] > 0.035
     assert 0.01 > posterior.probabilities[3]
 
 

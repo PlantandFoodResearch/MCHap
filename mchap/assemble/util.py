@@ -149,6 +149,19 @@ def array_equal(x, y, interval=None):
 
 
 @numba.njit
+def count_haplotype_copies(genotype, h):
+    ploidy = len(genotype)
+    count = 1
+    for i in range(ploidy):
+        if i == h:
+            pass
+        else:
+            if array_equal(genotype[i], genotype[h]):
+                count += 1
+    return count
+
+
+@numba.njit
 def get_dosage(dosage, genotype, interval=None):
     """Calculates the dosage of a set of integer encoded haplotypes by 
     checking for array equality.
