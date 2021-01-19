@@ -46,6 +46,7 @@ def base_step(genotype, reads, llk, h, j, mask=None, temp=1):
 
     """
     assert  0 <= temp <= 1
+    ploidy = len(genotype)
     # number of possible alleles given given array size
     n_alleles = reads.shape[-1]
 
@@ -55,11 +56,18 @@ def base_step(genotype, reads, llk, h, j, mask=None, temp=1):
     # store MH acceptance probability for each allele
     log_accept = np.empty(n_alleles)
     
-    # use differences in dosage of haplotype h to calculate
-    # ratio of priors and ratio of proposal probabilities
+    # use differences in count of haplotype h to calculate
+    # ratio of proposal probabilities
     lhapcount = np.log(util.count_haplotype_copies(genotype, h))
 
-    current_nucleotide = genotype[h, j]    
+    # use ratio of permentations of genotypes to calculate
+    # ratio of prior probabilities (under the null prior)
+    dosage = np.empty(ploidy, dtype=np.int8)
+    util.get_dosage(dosage, genotype)
+    lperms = np.log(util.count_equivalent_permutations(dosage))
+
+    current_nucleotide = genotype[h, j]
+    n_options = 0
     for i in range(n_alleles):
         if (mask is not None) and mask[i]:
             # exclude masked allele
@@ -69,29 +77,52 @@ def base_step(genotype, reads, llk, h, j, mask=None, temp=1):
             if i == current_nucleotide:
                 # store current likelihood
                 llks[i] = llk
-                log_accept[i] = 0.0  # log(1.0)
+                log_accept[i] = - np.inf  # log(0)
             else:
+                # count number of possible new genotypes
+                n_options += 1
+
+                # set the current genotype to new genotype
                 genotype[h, j] = i
+
+                # calculate and store log-likelihood: P(G'|R)
                 llk_i = log_likelihood(reads, genotype)
-                lhapcount_i = np.log(util.count_haplotype_copies(genotype, h))
                 llks[i] = llk_i
+
+                # calculate log likelihood ratio: ln(P(G'|R)/P(G|R))
                 llk_ratio = llk_i - llk
-                # ratio of priors and ratio of proposal probs are each others inverse
-                lprior_ratio = lhapcount - lhapcount_i
+
+                # calculate ratio of priors: ln(P(G')/P(G))
+                util.get_dosage(dosage, genotype)
+                lperms_i = np.log(util.count_equivalent_permutations(dosage))
+                lprior_ratio = lperms_i - lperms
+
+                # calculate proposal ratio for detailed balance: ln(g(G|G')/g(G'|G))
+                lhapcount_i = np.log(util.count_haplotype_copies(genotype, h))
                 lproposal_ratio = lhapcount_i - lhapcount
-                log_accept[i] = ((llk_ratio + lprior_ratio) * temp + lproposal_ratio)                
 
-    # calculate conditional probs of acceptance for all transitions
-    conditionals = util.log_likelihoods_as_conditionals(log_accept)
+                # calculate Metropolis-Hastings acceptance probability
+                # ln(min(1, (P(G'|R)P(G')g(G|G')) / (P(G|R)P(G)g(G'|G)))
+                mh_ratio = ((llk_ratio + lprior_ratio) * temp + lproposal_ratio)
+                log_accept[i] = np.minimum(0.0, mh_ratio)  # max prob of log(1)
 
-    # random choice using probabilities
-    choice = util.random_choice(conditionals)
+    # divide acceptance probability by number of steps to choose from
+    log_accept -=  np.log(n_options)
+
+    # convert to probability of proposal * probability of acceptance
+    # then fill in probability that no step is made (i.e. choose the initial state) 
+    probabilities = np.exp(log_accept)
+    probabilities[current_nucleotide] = 1 - probabilities.sum()
+
+    # random choice of new state using probabilities
+    choice = util.random_choice(probabilities)
 
     # update state
     genotype[h, j] = choice
-    
+
     # return final log liklihood
     return llks[choice]
+
 
 @numba.njit
 def genotype_compound_step(genotype, reads, llk, mask=None, temp=1):
