@@ -273,6 +273,30 @@ def factorial_20(x):
 
 
 @numba.njit
+def n_choose_k(n, k):
+    """Calculate n choose k for values of n and k < 20.
+    Parameters
+    ----------
+    n : int
+        Number of elements to choose from.
+    k : int
+        Number of elements to be drawn.
+    
+    Returns
+    -------
+    combinations : int
+        Number of possible combinations of size k drawn from
+        a set of size n.
+    
+    Notes
+    -----
+    Formula: (n!) / (k!(n-k)!)
+
+    """
+    return factorial_20(n) // (factorial_20(k) * factorial_20(n - k))
+
+
+@numba.njit
 def count_equivalent_permutations(dosage):
     """Counts the total number of equivilent genotype perterbations
     based on the genotypes dosage.
