@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from mchap.testing import simulate_reads
+from mchap.testing import simulate_reads, metropolis_hastings_transitions
 from mchap.encoding import integer
 from mchap.assemble.util import seed_numba, log_likelihoods_as_conditionals
 from mchap.assemble.likelihood import log_likelihood
@@ -160,34 +160,34 @@ def test_haplotype_segment_labels(genotype, interval, answer):
 @pytest.mark.parametrize('labels,answer', [
     pytest.param(
         [[0, 0], [1, 0]],
-        np.empty((0, 2), dtype=np.int8),  # no options
+        np.empty((0, 2, 2), dtype=np.int8),  # no options
         id='2x-0'),
     pytest.param(
         [[0, 0], [1, 1]],
-        [[1, 0]],  # 1 option
+        [[[1, 0], [0, 1]]],  # 1 option
         id='2x-1'),
     pytest.param(
         [[0, 0], [0, 1], [0, 1], [0, 0]],
-        np.empty((0, 4), dtype=np.int8),  # no options
+        np.empty((0, 4, 2), dtype=np.int8),  # no options
         id='4x-0'),
     pytest.param(
         [[0, 0], [0, 1], [2, 1], [0, 0]],
-        [[2, 1, 0, 3]],  # 1 option
+        [[[2, 0], [0, 1], [0, 1], [0, 0]]],  # 1 option
         id='4x-1'),
     pytest.param(
         [[0, 0], [0, 1], [2, 1], [3, 0]],
-        [[2, 1, 0, 3],
-         [0, 3, 2, 1],
-         [0, 1, 3, 2]],  # 3 options
+        [[[2, 0], [0, 1], [0, 1], [3, 0]],
+         [[0, 0], [3, 1], [2, 1], [0, 0]],
+         [[0, 0], [0, 1], [3, 1], [2, 0]]],  # 3 options
         id='4x-3'),
     pytest.param(
         [[0, 0], [1, 1], [2, 2], [3, 3]],
-        [[1, 0, 2, 3],
-         [2, 1, 0, 3],
-         [3, 1, 2, 0],
-         [0, 2, 1, 3],
-         [0, 3, 2, 1],
-         [0, 1, 3, 2]],  # all the options
+        [[[1, 0], [0, 1], [2, 2], [3, 3]],
+         [[2, 0], [1, 1], [0, 2], [3, 3]],
+         [[3, 0], [1, 1], [2, 2], [0, 3]],
+         [[0, 0], [2, 1], [1, 2], [3, 3]],
+         [[0, 0], [3, 1], [2, 2], [1, 3]],
+         [[0, 0], [1, 1], [3, 2], [2, 3]]],  # all the options
         id='4x-6'),
 ])
 def test_recombination_step_options(labels, answer):
@@ -203,67 +203,54 @@ def test_recombination_step_options(labels, answer):
 
 
 
-@pytest.mark.parametrize('labels,allow_deletions,answer', [
+@pytest.mark.parametrize('labels,answer', [
     pytest.param(
         [[0, 0], [0, 0]],
-        False,
-        np.empty((0, 2), dtype=np.int8),  # no options
+        np.empty((0, 2, 2), dtype=np.int8),  # no options
         id='2x-hom'),
     pytest.param(
-        [[0, 0], [0, 0]],
-        True,
-        np.empty((0, 2), dtype=np.int8),  # no options
-        id='2x-hom-del'),
-    pytest.param(
         [[0, 0], [1, 0]],
-        False,
-        np.empty((0, 2), dtype=np.int8),  # no options
+        np.empty((0, 2, 2), dtype=np.int8),  # no options
         id='2x-0'),
     pytest.param(
-        [[0, 0], [1, 0]],
-        True,
-        [[1, 1],
-         [0, 0]],  # no options
-        id='2x-del-2'),
-    pytest.param(
         [[0, 0], [0, 0], [0, 0], [3, 0]],
-        False,
-        [[3, 1, 2, 3]],
+        [[[3, 0], [0, 0], [0, 0], [3, 0]]],
         id='4x-1'),
     pytest.param(
-        [[0, 0], [0, 0], [0, 0], [3, 0]],
-        True,
-        [[3, 1, 2, 3],
-         [0, 1, 2, 0]],
-        id='4x-del-2'),
-    pytest.param(
         [[0, 0], [0, 1], [2, 0], [2, 0]],
-        False,
-        [[2, 1, 2, 3],
-         [0, 2, 2, 3],
-         [0, 1, 0, 3]],
+        [[[2, 0], [0, 1], [2, 0], [2, 0]],
+         [[0, 0], [2, 1], [2, 0], [2, 0]],
+         [[0, 0], [0, 1], [0, 0], [2, 0]]],
         id='4x-3'),
     pytest.param(
-        [[0, 0], [0, 1], [2, 0], [2, 0]],
-        True,
-        [[2, 1, 2, 3],
-         [0, 2, 2, 3],
-         [0, 1, 0, 3]],
-        id='4x-del-3'),
+        [[0, 0], [0, 1], [2, 2], [2, 3], [4, 4], [4, 5]],
+        [[[2, 0], [0, 1], [2, 2], [2, 3], [4, 4], [4, 5]],
+         [[4, 0], [0, 1], [2, 2], [2, 3], [4, 4], [4, 5]],
+         [[0, 0], [2, 1], [2, 2], [2, 3], [4, 4], [4, 5]],
+         [[0, 0], [4, 1], [2, 2], [2, 3], [4, 4], [4, 5]],
+         [[0, 0], [0, 1], [0, 2], [2, 3], [4, 4], [4, 5]],
+         [[0, 0], [0, 1], [4, 2], [2, 3], [4, 4], [4, 5]],
+         [[0, 0], [0, 1], [2, 2], [0, 3], [4, 4], [4, 5]],
+         [[0, 0], [0, 1], [2, 2], [4, 3], [4, 4], [4, 5]],
+         [[0, 0], [0, 1], [2, 2], [2, 3], [0, 4], [4, 5]],
+         [[0, 0], [0, 1], [2, 2], [2, 3], [2, 4], [4, 5]],
+         [[0, 0], [0, 1], [2, 2], [2, 3], [4, 4], [0, 5]],
+         [[0, 0], [0, 1], [2, 2], [2, 3], [4, 4], [2, 5]]],
+        id='6x'),
 ])
-def test_dosage_step_options(labels, allow_deletions, answer):
+def test_dosage_step_options(labels, answer):
 
     labels = np.array(labels)
     answer = np.array(answer)
 
-    n_options = structural.dosage_step_n_options(labels, allow_deletions)
-    query = structural.dosage_step_options(labels, allow_deletions)
+    n_options = structural.dosage_step_n_options(labels)
+    query = structural.dosage_step_options(labels)
 
     assert len(query) == n_options
     np.testing.assert_array_equal(query, answer)
 
 
-def test_interval_step():
+def test_interval_step__recombination():
     np.random.seed(42)
     seed_numba(42)
 
@@ -271,7 +258,7 @@ def test_interval_step():
     haplotypes = np.array([
         [0, 0, 0, 0],
         [0, 0, 1, 1],
-        [1, 1, 0, 0],
+        [1, 1, 0, 1],
         [1, 1, 1, 1],
     ])
 
@@ -284,73 +271,225 @@ def test_interval_step():
         qual=(60, 60),
     )
 
+    # interval includes first 2 bases
+    interval = (0, 2)
+
+    # all unique re-arrangements
+    # worst to best match
+    genotypes = np.array([
+        # [[0, 2][0, 2][2, 0][2, 1]], 2:1:1
+        # worst: no matching haps
+        [[0, 0, 1, 1],  
+         [0, 0, 1, 1],
+         [1, 1, 0, 0],
+         [1, 1, 0, 1]],
+        # [[0, 1][0, 2][2, 0][2, 2]], 1:1:1:1
+        # 2nd worst: 2 matching haps
+        [[0, 0, 0, 1],  
+         [0, 0, 1, 1],
+         [1, 1, 0, 0],
+         [1, 1, 1, 1]],
+        # [[0, 0][0, 1][2, 2][2, 2]], 2:1:1
+        # 2nd best: 2 matching haps one with 2 copies
+        [[0, 0, 0, 0],
+         [0, 0, 0, 1],
+         [1, 1, 1, 1],
+         [1, 1, 1, 1]],
+        # [[0, 0][0, 2][2, 1][2, 2]], 1:1:1:1
+        # best: all matching haps
+        [[0, 0, 0, 0],
+         [0, 0, 1, 1],
+         [1, 1, 0, 1],
+         [1, 1, 1, 1]],
+    ])
+
+    # calculate exact posteriors
+    # llk of each genotype
+    llks = np.array([log_likelihood(reads, g) for g in genotypes])
+
+    # prior probability of each genotype based on dosage
+    priors = np.array([12, 24, 12, 24])
+    priors = priors / priors.sum()
+
+    # posterior probabilities from priors and likelihoods
+    exact_posteriors = np.exp(llks + np.log(priors))
+    exact_posteriors = exact_posteriors / exact_posteriors.sum()
+
+    # now run MCMC simulation
     # initial genotype
+    genotype = np.array([
+        [0, 0, 0, 0],
+        [0, 0, 0, 1],
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+    ])
+    llk = log_likelihood(reads, genotype)
+    # count choices of each option
+    counts = {}
+    for g in genotypes:
+        counts[g.tostring()] = 0
+    # simulation
+    for _ in range(100000):
+        llk = structural.interval_step(
+            genotype, 
+            reads, 
+            llk, 
+            interval=interval, 
+            step_type=0,
+        )
+        genotype = integer.sort(genotype)
+        counts[genotype.tostring()] += 1
+    totals = np.zeros(len(genotypes), dtype=np.int)
+    for i, g in enumerate(genotypes):
+        totals[i] = counts[g.tostring()]
+    
+    simulation_posteriors = totals / totals.sum()
+    
+    # simulation posteriors should be almost equal
+    # but there will be some auto-correlation present
+    # in the simulation
+    np.testing.assert_array_almost_equal(
+        exact_posteriors,
+        simulation_posteriors,
+        decimal=2,
+    )
+
+
+def test_interval_step__dosage_swap():
+    """Test posterior probabilities of a small dosage swap only
+    MCMC compared to posterior probabilites calculated from all
+    possible genotypes with and without MH acceptance probability.
+    """
+    np.random.seed(42)
+    seed_numba(42)
+
+    # true haplotypes
+    haplotypes = np.array([
+        [0, 0, 0, 0],
+        [1, 1, 0, 0],
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+    ])
+
+    reads = simulate_reads(
+        haplotypes,
+        n_reads=4,
+        uniform_sample=True,
+        errors=False,
+        error_rate=0.2,
+        qual=(60, 60),
+    )
+
+    # interval includes first 2 bases
+    interval = (0, 2)
+
+    # all unique re-arrangements
+    genotypes = np.array([
+        [[0, 0, 0, 0], # 0  2:1:1
+         [0, 0, 0, 0],
+         [0, 0, 1, 1],
+         [1, 1, 1, 1]], 
+        [[0, 0, 0, 0], # 1  2:1:1
+         [0, 0, 1, 1],
+         [0, 0, 1, 1],
+         [1, 1, 0, 0]],
+        [[0, 0, 0, 0], # 2  2:2
+         [0, 0, 0, 0],
+         [1, 1, 1, 1],
+         [1, 1, 1, 1]],
+        [[0, 0, 0, 0], # 3  1:1:1:1
+         [0, 0, 1, 1],
+         [1, 1, 0, 0],
+         [1, 1, 1, 1]], 
+        [[0, 0, 1, 1], # 4  2:2
+         [0, 0, 1, 1],
+         [1, 1, 0, 0],
+         [1, 1, 0, 0]],
+        [[0, 0, 0, 0], # 5  2:1:1 (true genotype)
+         [1, 1, 0, 0],
+         [1, 1, 1, 1],
+         [1, 1, 1, 1]],
+        [[0, 0, 1, 1], # 6  2:1:1
+         [1, 1, 0, 0],
+         [1, 1, 0, 0],
+         [1, 1, 1, 1]],
+    ])
+
+    # llk of each genotype
+    llks = np.array([log_likelihood(reads, g) for g in genotypes])
+
+    # prior probability of each genotype based on dosage
+    priors = np.array([12, 12, 6, 24, 6, 12, 12])
+    priors = priors / priors.sum()
+
+    # posterior probabilities from priors and likelihoods
+    exact_posteriors = np.exp(llks + np.log(priors))
+    exact_posteriors = exact_posteriors / exact_posteriors.sum()
+
+    # now calculate posteriors using a full transition matrix
+    # possable dosage swap transitions between genotypes
+    legal_transitions = np.array([
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0],
+        [1, 0, 0, 0, 0, 1, 0],
+        [1, 1, 0, 0, 0, 1, 1],
+        [0, 1, 0, 0, 0, 0, 1],
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0],
+    ])
+
+    # MH-transiton probs
+    mh_probs = metropolis_hastings_transitions(legal_transitions, llks, priors)
+
+    # posterior probs based on long run behavior
+    matrix_posteriors = np.linalg.matrix_power(mh_probs, 1000)[0]
+
+    # now calculate the same values using MCMC simulation
+    # counts of each genotype
+    counts = {}
+    for g in genotypes:
+        counts[g.tostring()] = 0
+
+    # initial genotype for simulation
     genotype = np.array([
         [0, 0, 0, 0],
         [0, 0, 0, 0],
         [1, 1, 1, 1],
         [1, 1, 1, 1],
     ])
+    llk = log_likelihood(reads, genotype)
 
-    # interval includes first 2 bases
-    interval = (0, 2)
-
-    # all unique re-arrangements
-    options = np.array([
-        [[0, 0, 0, 0],  # no change
-         [0, 0, 0, 0],
-         [1, 1, 1, 1],
-         [1, 1, 1, 1]],
-        [[0, 0, 0, 0],  # dosage
-         [0, 0, 0, 0],
-         [0, 0, 1, 1],
-         [1, 1, 1, 1]],
-        [[0, 0, 0, 0],  # dosage
-         [1, 1, 0, 0],
-         [1, 1, 1, 1],
-         [1, 1, 1, 1]],
-        [[0, 0, 0, 0],  # recombine
-         [0, 0, 1, 1],
-         [1, 1, 0, 0],
-         [1, 1, 1, 1]],
-    ])
-
-    # calculate and order by llk
-    llks = np.empty(len(options), dtype=np.float64)
-    for i, option in enumerate(options):
-        llks[i] = log_likelihood(reads, option)
-    options = options[np.argsort(llks)]
-
-    # count choices of each option
-    counts = {}
-    for option in options:
-        counts[option.tostring()] = 0
-    for _ in range(1000):
-        choice = genotype.copy()
-        llk = log_likelihood(reads, choice)
-        structural.interval_step(
-            choice, 
+    # MCMC simulation
+    for i in range(100000):
+        #llk = log_likelihood(reads, choice)
+        llk = structural.interval_step(
+            genotype, 
             reads, 
             llk, 
             interval=interval, 
-            allow_recombinations=True,
-            allow_dosage_swaps=True,
+            step_type=1,
         )
-        choice = integer.sort(choice)
-        assert choice.tostring() in counts
-        counts[choice.tostring()] += 1
-    totals = np.zeros(len(options), dtype=np.int)
-    for i, option in enumerate(options):
-        totals[i] = counts[option.tostring()]
-    
-    probs = totals / totals.sum()
-    
-    # check posterior probs in same order as
-    # likelihoods and that values are reasonable
-    assert probs[0] < 0.01
-    assert 0.01 < probs[1] < 0.1
-    assert 0.01 < probs[2] < 0.1
-    assert 0.8 < probs[3]
+        genotype = integer.sort(genotype)
+        counts[genotype.tostring()] += 1
 
-    #TODO independent calculation of posterior probabilities
+    # posteriors from simulation
+    totals = np.zeros(len(genotypes), dtype=np.int)
+    for i, g in enumerate(genotypes):
+        totals[i] = counts[g.tostring()]
+    simulation_posteriors = totals / totals.sum()
     
+    # exact and matrix posteriors should be arbitrarily close
+    np.testing.assert_array_almost_equal(
+        exact_posteriors, 
+        matrix_posteriors,
+        decimal=6
+    )
+
+    # simulation posteriors should be almost equal
+    # but there will be some auto-correlation present
+    # in the simulation
+    np.testing.assert_array_almost_equal(
+        exact_posteriors,
+        simulation_posteriors,
+        decimal=2,
+    )
