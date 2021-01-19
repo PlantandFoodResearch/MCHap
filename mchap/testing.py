@@ -70,3 +70,50 @@ def simulate_reads(
         reads = as_probabilistic(read_haps, n_alleles, p=probs)
 
     return reads
+
+
+def metropolis_hastings_transitions(transitions, llks, priors):
+    """Calculate the transition probabilities based on the
+    Metropolis-Hastings algorithm.
+    
+    Parameters
+    ----------
+    transitions : array_like
+        A binary square matrix indicating posible transitions among states.
+    llk : array_like
+        Log-likelihood of each state.
+    priors : array_like
+        Relative prior=probability of each state.
+
+    Returns
+    -------
+    probabilities : array_like
+        A square transition probability matrix.
+    """
+    # ratio of likelihoods
+    llk_ratios = llks[None, :] - llks[:, None]
+    lk_ratios = np.exp(llk_ratios)
+    
+    # ratio of priors
+    prior_ratios = priors[None, :] / priors[:, None]
+    
+    # proposal ratios for detailed balance
+    proposal_ratios = transitions.sum(axis=0, keepdims=True) / transitions.sum(axis=-1, keepdims=True)
+    proposal_ratios = 1 / proposal_ratios
+    proposal_ratios *= transitions  # zero out illegal transitions
+    
+    # Metropolis-Hastings acceptance probabilities
+    mh = lk_ratios  * proposal_ratios * prior_ratios
+    mh[mh > 1] = 1
+    
+    # probability of proposing each possible transition
+    proposal_probability = transitions / np.sum(transitions, axis=-1, keepdims=True)
+
+    # transition probability is proposal probability * acceptance probability
+    mh *= proposal_probability
+    
+    # probability of no transition is the remainder
+    np.fill_diagonal(mh, 1 - mh.sum(axis=-1))
+    
+    return mh
+
