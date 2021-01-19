@@ -120,3 +120,27 @@ def log_likelihood_structural_change(reads, genotype, haplotype_indices, interva
         llk += np.log(read_prob)
                     
     return llk
+
+
+@numba.njit
+def log_genotype_null_prior(dosage, unique_haplotypes):
+    """Prior probability of a dosage for a non-inbred individual
+    assuming all haplotypes are equally probable.
+
+    Parameters
+    ----------
+    dosage : ndarray, int, shape (ploidy, )
+        Haplotype dosages within a genotype.
+    unique_haplotypes : int
+        Total number of unique possible haplotypes.
+
+    Returns
+    -------
+    lprior : float
+        Log-prior probability of dosage.
+    
+    """
+    ploidy=dosage.sum()
+    genotype_perms = util.count_equivalent_permutations(dosage)
+    log_total_perms = ploidy * np.log(unique_haplotypes)
+    return np.log(genotype_perms) - log_total_perms
