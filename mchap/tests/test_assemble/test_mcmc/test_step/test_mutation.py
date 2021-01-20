@@ -5,6 +5,8 @@ from mchap.assemble.mcmc.step import mutation
 from mchap.assemble.likelihood import log_likelihood
 from mchap.assemble.util import log_likelihoods_as_conditionals
 from mchap.assemble.util import seed_numba
+from mchap.encoding import integer
+
 
 def test_base_step():
 
@@ -116,3 +118,90 @@ def test_genotype_compound_step():
     allele_2_counts = (trace == 2).sum(axis=0).sum(axis=0)
     assert np.all(allele_2_counts[mask[:,2]] == 0)
     assert np.all(allele_2_counts[~mask[:,2]] > 0)
+
+
+def test_genotype_compound_step__posterior():
+    # haps 0,1,0 and 0,0,0
+    reads = np.array([
+        [[0.9, 0.1],
+         [0.1, 0.9],
+         [0.9, 0.1]],
+        [[0.9, 0.1],
+         [0.1, 0.9],
+         [0.9, 0.1]],
+        [[0.9, 0.1],
+         [0.9, 0.1],
+         [0.9, 0.1]],
+        [[0.9, 0.1],
+         [0.9, 0.1],
+         [0.9, 0.1]],
+    ])
+    mask = np.all(reads == 0.0, axis=0)
+
+    genotypes = np.array([
+        [[0, 0],  # 2
+         [0, 0]],
+        [[0, 0],  # 1:1
+         [0, 1]],
+        [[0, 0],  # 1:1
+         [1, 0]],
+        [[0, 0],  # 1:1
+         [1, 1]],
+        [[0, 1],  # 2
+         [0, 1]],
+        [[0, 1],  # 1:1
+         [1, 0]],
+        [[0, 1],  # 1:1
+         [1, 1]],
+        [[1, 0],  # 2
+         [1, 0]],
+        [[1, 0],  # 1:1
+         [1, 1]],
+        [[1, 1],  # 2
+         [1, 1]],
+    ], dtype=np.int8)
+
+    # llk of each genotype
+    llks = np.array([log_likelihood(reads, g) for g in genotypes])
+
+    # prior probability of each genotype based on dosage
+    priors = np.array([1, 2, 2, 2, 1, 2, 2, 1, 2, 1])
+    priors = priors / priors.sum()
+
+    # posterior probabilities from priors and likelihoods
+    exact_posteriors = np.exp(llks + np.log(priors))
+    exact_posteriors = exact_posteriors / exact_posteriors.sum()
+
+
+    # now run MCMC simulation
+    # initial genotype
+    genotype = np.array([
+        [0, 0],
+        [0, 0],
+    ], dtype=np.int8)
+    llk = log_likelihood(reads, genotype)
+    # count choices of each option
+    counts = {}
+    for g in genotypes:
+        counts[g.tostring()] = 0
+    # simulation
+    for _ in range(100000):
+        llk = mutation.genotype_compound_step(
+            genotype, 
+            reads, 
+            llk, 
+            mask=mask
+        )
+        genotype = integer.sort(genotype)
+        counts[genotype.tostring()] += 1
+    totals = np.zeros(len(genotypes), dtype=np.int)
+    for i, g in enumerate(genotypes):
+        totals[i] = counts[g.tostring()]
+    
+    simulation_posteriors = totals / totals.sum()
+
+    np.testing.assert_array_almost_equal(
+        exact_posteriors,
+        simulation_posteriors,
+        decimal=3,
+    )
