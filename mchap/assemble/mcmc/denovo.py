@@ -286,23 +286,33 @@ def _denovo_gibbs_sampler(
             
             # mutation step
             llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask, temp=temp)
+    
             
-            # choose number of break points for structural step
-            n_breaks = util.random_choice(break_dist)
-                
-            # break into intervals for structural step
-            intervals = structural.random_breaks(n_breaks, n_base)
+            # recombinations step
+            if allow_recombinations:
+                n_breaks = util.random_choice(break_dist)
+                intervals = structural.random_breaks(n_breaks, n_base)
+                llk = structural.compound_step(
+                    genotype=genotype, 
+                    reads=reads, 
+                    llk=llk, 
+                    intervals=intervals,
+                    step_type=0,
+                    temp=temp,
+                )
             
-            # structural step
-            llk = structural.compound_step(
-                genotype=genotype, 
-                reads=reads, 
-                llk=llk, 
-                intervals=intervals,
-                allow_recombinations=allow_recombinations,
-                allow_dosage_swaps=allow_dosage_swaps,
-                temp=temp,
-            )
+            # recombinations step
+            if allow_dosage_swaps:
+                n_breaks = util.random_choice(break_dist)
+                intervals = structural.random_breaks(n_breaks, n_base)
+                llk = structural.compound_step(
+                    genotype=genotype, 
+                    reads=reads, 
+                    llk=llk, 
+                    intervals=intervals,
+                    step_type=1,
+                    temp=temp,
+                )
 
             # final full length dosage swap
             if full_length_dosage_swap:
@@ -311,8 +321,7 @@ def _denovo_gibbs_sampler(
                     reads=reads, 
                     llk=llk, 
                     intervals=np.array([[0, n_base]]),
-                    allow_recombinations=False,
-                    allow_dosage_swaps=True,
+                    step_type=1,
                     temp=temp,
                 )
             
