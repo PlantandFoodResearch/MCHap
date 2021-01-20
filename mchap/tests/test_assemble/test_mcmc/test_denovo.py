@@ -2,6 +2,7 @@ import numpy as np
 import numba
 import pytest
 
+from mchap.assemble.likelihood import log_likelihood
 from mchap.assemble.mcmc import denovo
 from mchap.assemble.util import seed_numba
 from mchap.testing import simulate_reads
@@ -332,38 +333,66 @@ def test_DenovoMCMC__temperatures_bias(temperatures):
     """Test to ensure the implementation of parallel-tempering does
     not bias the MCMC results when tempering is not needed.
     """
-    haplotypes = np.array([
-        [0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 1, 1, 1],
-        [0, 1, 0, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1],
-    ], dtype=np.int8)
-    alt_dosages = np.array([
-        haplotypes[[0,0,1,3]],
-        haplotypes[[0,1,3,3]],
+    reads = np.array([
+        [[0.9, 0.1],
+         [0.1, 0.9]],
+        [[0.9, 0.1],
+         [0.1, 0.9]],
+        [[0.9, 0.1],
+         [0.9, 0.1]],
+        [[0.9, 0.1],
+         [0.9, 0.1]],
     ])
-    reads = simulate_reads(
-        haplotypes, 
-        n_reads=16, 
-        uniform_sample=True,
-        errors=False, 
-        qual=(60, 60),
-    )
+    genotypes = np.array([
+        [[0, 0],  # 2
+         [0, 0]],
+        [[0, 0],  # 1:1
+         [0, 1]],
+        [[0, 0],  # 1:1
+         [1, 0]],
+        [[0, 0],  # 1:1
+         [1, 1]],
+        [[0, 1],  # 2
+         [0, 1]],
+        [[0, 1],  # 1:1
+         [1, 0]],
+        [[0, 1],  # 1:1
+         [1, 1]],
+        [[1, 0],  # 2
+         [1, 0]],
+        [[1, 0],  # 1:1
+         [1, 1]],
+        [[1, 1],  # 2
+         [1, 1]],
+    ], dtype=np.int8)
+
+    # calculate exact posteriors
+    llks = np.array([log_likelihood(reads, g) for g in genotypes])
+    priors = np.array([1, 2, 2, 2, 1, 2, 2, 1, 2, 1])
+    priors = priors / priors.sum()
+    exact_posteriors = np.exp(llks + np.log(priors))
+    exact_posteriors = exact_posteriors / exact_posteriors.sum()
+
+    # simulate posteriors
     model = denovo.DenovoMCMC(
-        ploidy=4, 
-        steps=2100, 
-        chains=2, 
+        ploidy=2, 
+        steps=50000, 
+        chains=1, 
         random_seed=11, 
-        temperatures=temperatures
+        temperatures=temperatures,
     )
-    posterior = model.fit(reads).burn(100).posterior()
-    # assert mode the same with consistant probability
-    np.testing.assert_array_equal(posterior.genotypes[0], haplotypes)
-    assert 0.68 > posterior.probabilities[0] > 0.62
-    # assert alt dosages are next most probable
-    assert mset.equal(posterior.genotypes[1:3], alt_dosages)
-    assert 0.048 > posterior.probabilities[1] > posterior.probabilities[2] > 0.035
-    assert 0.01 > posterior.probabilities[3]
+    trace = model.fit(reads)
+    posterior = trace.burn(100).posterior()
+    simulation_posteriors = {g.tostring(): 0 for g in genotypes}
+    simulation_posteriors.update({g.tostring(): p for g, p in zip(posterior.genotypes, posterior.probabilities)})
+    simulation_posteriors = [simulation_posteriors[g.tostring()] for g in genotypes]
+
+    # check posteriors are similar
+    np.testing.assert_array_almost_equal(
+        exact_posteriors,
+        simulation_posteriors,
+        decimal=2,
+    )
 
 
 def test_DenovoMCMC__temperatures_submode():
