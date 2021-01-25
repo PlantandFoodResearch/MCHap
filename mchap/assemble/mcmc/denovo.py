@@ -24,9 +24,9 @@ class DenovoMCMC(Assembler):
     beta: float = 3.0
     n_intervals: int = None
     fix_homozygous: float = 0.999
-    allow_recombinations: bool = True
-    allow_dosage_swaps: bool = True
-    full_length_dosage_swap: bool = True
+    recombination_step_probability: float = 0.5
+    partial_dosage_step_probability: float = 0.5
+    dosage_step_probability: float = 1.0
     temperatures: tuple = (1.0, )
     random_seed: int = None
     """De novo haplotype assembly using Markov chain Monte Carlo
@@ -44,8 +44,9 @@ class DenovoMCMC(Assembler):
         (default = 2).
     alpha, beta : float, optional
         Parameters defining a Beta distribution to sample
-        the number of random intervals to generate at each
-        structural step in the MCMC simulation 
+        the number of random intervals to generate for each
+        within-interval recombination and dosage step
+        within the MCMC simulation.
         (defaults = 1.0, 3.0).
     n_intervals : int, optional
         If set structural steps in the MCMC will always use
@@ -58,18 +59,18 @@ class DenovoMCMC(Assembler):
         during the MCMC simulation. This can greatly improve
         performance when there are multiple homozygous 
         alleles (default = 0.999).
-    allow_recombinations : bool, optional
-        Set to False to dis-allow structural steps involving
-        the recombination of part of a pair of haplotypes
-        (default = True).
-    allow_dosage_swaps : bool, optional
-        Set to False to dis-allow structural steps involving
-        dosage changes between parts of a pair of haplotypes
-        (default = True).
-    full_length_dosage_swap : bool, optional
-        Include an additional full length dosage swap step
-        within each step to ensure mixing between dosage
-        levels (default = True).
+    recombination_step_probability : float, optional
+        Probability of performing a recombination sub-step during
+        each step of the MCMC.
+        (default = 0.5).
+    partial_dosage_step_probability : float, optional
+        Probability of performing a within-interval dosage sub-step
+        during each step of the MCMC.
+        (default = 0.5).
+    dosage_step_probability : float, optional
+        Probability of performing a dosage sub-step during
+        each step of the MCMC.
+        (default = 1.0).
     temperatures : array_like float, optional
         Specify inverse temperatures for parallel tempering
         these should between 0 and 1 in ascending order with
@@ -198,9 +199,9 @@ class DenovoMCMC(Assembler):
             n_alleles=n_alleles,
             steps=self.steps, 
             break_dist=break_dist,
-            allow_recombinations=self.allow_recombinations,
-            allow_dosage_swaps=self.allow_dosage_swaps,
-            full_length_dosage_swap=self.full_length_dosage_swap,
+            recombination_step_probability=self.recombination_step_probability,
+            partial_dosage_step_probability=self.partial_dosage_step_probability,
+            dosage_step_probability=self.dosage_step_probability,
             temperatures=temperatures,
         )
 
@@ -234,9 +235,9 @@ def _denovo_gibbs_sampler(
         n_alleles,
         steps, 
         break_dist,
-        allow_recombinations,
-        allow_dosage_swaps,
-        full_length_dosage_swap,
+        recombination_step_probability,
+        partial_dosage_step_probability,
+        dosage_step_probability,
         temperatures,
         return_heated_trace=False,
     ):
@@ -289,7 +290,7 @@ def _denovo_gibbs_sampler(
     
             
             # recombinations step
-            if allow_recombinations:
+            if np.random.rand() <= recombination_step_probability:
                 n_breaks = util.random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
                 llk = structural.compound_step(
@@ -303,7 +304,7 @@ def _denovo_gibbs_sampler(
                 )
             
             # interval dosage step
-            if allow_dosage_swaps:
+            if np.random.rand() <= partial_dosage_step_probability:
                 n_breaks = util.random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
                 llk = structural.compound_step(
@@ -317,7 +318,7 @@ def _denovo_gibbs_sampler(
                 )
 
             # final full length dosage swap
-            if full_length_dosage_swap:
+            if np.random.rand() <= dosage_step_probability:
                 llk = structural.compound_step(
                     genotype=genotype, 
                     reads=reads, 
