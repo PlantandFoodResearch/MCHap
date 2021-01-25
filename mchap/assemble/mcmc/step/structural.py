@@ -4,7 +4,7 @@ import numpy as np
 import numba
 
 from mchap.assemble import util
-from mchap.assemble.likelihood import log_likelihood_structural_change
+from mchap.assemble.likelihood import log_likelihood_structural_change, log_genotype_prior
 
 
 @numba.njit
@@ -460,6 +460,8 @@ def interval_step(
     genotype,
     reads,
     llk,
+    unique_haplotypes,
+    inbreeding=0,
     interval=None,
     step_type=0,
     temp=1,
@@ -479,6 +481,10 @@ def interval_step(
     llk : float
         The log-likelihood of the current genotype state in the MCMC
         simulation.
+    unique_haplotypes : int
+        Total number of unique haplotypes possible at this locus.
+    inbreeding : float
+        Expected inbreeding coefficient of the genotype.
     interval : ndarray, int, shape (2, )
         The interval constraining the step.
     step_type : int
@@ -515,12 +521,11 @@ def interval_step(
         return llk
     log_proposal_prob = np.log(1 / n_options)
     
-    # use ratio of permentations of genotypes to calculate
-    # ratio of prior probabilities (under the null prior)
+    # ratio of prior probabilities
     ploidy = len(genotype)
     dosage = np.empty(ploidy, dtype=np.int8)
     util.get_dosage(dosage, genotype)
-    lperms = np.log(util.count_equivalent_permutations(dosage))
+    lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
     
     # store values for all options and current genotype
     llks = np.empty(n_options + 1)
@@ -542,8 +547,8 @@ def interval_step(
                 
         # calculate ratio of priors: ln(P(G')/P(G))
         util.get_dosage(dosage, option_labels[i])
-        lperms_i = np.log(util.count_equivalent_permutations(dosage))
-        lprior_ratio = lperms_i - lperms
+        lprior_i = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
+        lprior_ratio = lprior_i - lprior
         
         # balance proposal distribution
         if step_type==0:
@@ -584,10 +589,12 @@ def interval_step(
 
 @numba.njit
 def compound_step(
-    genotype, 
-    reads, 
-    llk, 
-    intervals,  
+    genotype,
+    reads,
+    llk,
+    intervals,
+    n_alleles=None,
+    inbreeding=0,
     step_type=0,
     randomise=True,
     temp=1,
@@ -609,6 +616,10 @@ def compound_step(
         simulation.
     intervals : ndarray, int, shape (n_intervals, 2)
         The interval constraining each sub-step within this step.
+    n_alleles : ndarray, int, shape (n_base, )
+        The number of possible alleles at each base position.
+    inbreeding : float
+        Expected inbreeding coefficient of the genotype.
     step_type : int
         0 for recombination or 1 for dosage swap.
     randomise : bool, optional
@@ -633,6 +644,12 @@ def compound_step(
     
     n_intervals = len(intervals)
 
+    if n_alleles is None:
+        _, n_base, max_allele = reads.shape
+        unique_haplotypes = max_allele ** n_base
+    else:
+        unique_haplotypes = np.prod(n_alleles)
+
     if randomise:
         intervals = intervals[np.random.permutation(np.arange(n_intervals))]
 
@@ -640,9 +657,11 @@ def compound_step(
     for i in range(n_intervals):
         llk = interval_step(
             genotype, 
-            reads, 
-            llk, 
-            interval=intervals[i], 
+            reads,
+            llk,
+            unique_haplotypes=unique_haplotypes,
+            inbreeding=inbreeding,
+            interval=intervals[i],
             step_type=step_type,
             temp=temp,
         )

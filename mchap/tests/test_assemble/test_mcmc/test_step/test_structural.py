@@ -334,6 +334,7 @@ def test_interval_step__recombination():
             genotype, 
             reads, 
             llk, 
+            unique_haplotypes=2**4,
             interval=interval, 
             step_type=0,
         )
@@ -465,7 +466,8 @@ def test_interval_step__dosage_swap():
         llk = structural.interval_step(
             genotype, 
             reads, 
-            llk, 
+            llk,
+            unique_haplotypes=2**4,
             interval=interval, 
             step_type=1,
         )
