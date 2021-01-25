@@ -184,6 +184,7 @@ class DenovoMCMC(Assembler):
         # Masking alleles stops that allele being assessed in the
         # mcmc and hence reduces paramater space and compute time.
         mask = np.all(reads_het == 0, axis=-3)
+        n_alleles=np.sum(~mask, axis=-1).astype(np.int8)
 
         # ensure temperatures is an ascending array ending in 1.0
         temperatures = np.sort(self.temperatures)
@@ -194,7 +195,7 @@ class DenovoMCMC(Assembler):
         genotypes, llks = _denovo_gibbs_sampler(
             genotype, 
             reads_het, 
-            mask=mask,
+            n_alleles=n_alleles,
             steps=self.steps, 
             break_dist=break_dist,
             allow_recombinations=self.allow_recombinations,
@@ -230,7 +231,7 @@ class DenovoMCMC(Assembler):
 def _denovo_gibbs_sampler(
         genotype, 
         reads, 
-        mask,
+        n_alleles,
         steps, 
         break_dist,
         allow_recombinations,
@@ -243,13 +244,6 @@ def _denovo_gibbs_sampler(
     #assert temperatures[-1] == 1.0
     ploidy, n_base = genotype.shape
     n_temps = len(temperatures)
-
-    # get number of possible alleles for each position
-    if mask is None:
-        n_alleles = np.zeros(n_base, dtype=np.int8)
-        n_alleles[:] = reads.shape[-1]
-    else:
-        n_alleles = (~mask).sum(axis=-1).astype(np.int8)
     
     # number of possible unique haplotypes
     u_haps = np.prod(n_alleles)
@@ -285,7 +279,13 @@ def _denovo_gibbs_sampler(
                 raise ValueError('Encountered log likelihood of nan')
             
             # mutation step
-            llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask, temp=temp)
+            llk = mutation.genotype_compound_step(
+                genotype,
+                reads,
+                llk,
+                n_alleles=n_alleles,
+                temp=temp
+            )
     
             
             # recombinations step
@@ -297,11 +297,12 @@ def _denovo_gibbs_sampler(
                     reads=reads, 
                     llk=llk, 
                     intervals=intervals,
+                    n_alleles=n_alleles,
                     step_type=0,
                     temp=temp,
                 )
             
-            # recombinations step
+            # interval dosage step
             if allow_dosage_swaps:
                 n_breaks = util.random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
@@ -310,6 +311,7 @@ def _denovo_gibbs_sampler(
                     reads=reads, 
                     llk=llk, 
                     intervals=intervals,
+                    n_alleles=n_alleles,
                     step_type=1,
                     temp=temp,
                 )
@@ -321,6 +323,7 @@ def _denovo_gibbs_sampler(
                     reads=reads, 
                     llk=llk, 
                     intervals=np.array([[0, n_base]]),
+                    n_alleles=n_alleles,
                     step_type=1,
                     temp=temp,
                 )
@@ -331,13 +334,13 @@ def _denovo_gibbs_sampler(
                 genotype_prev = genotypes[t - 1]
                 temp_prev = temperatures[t - 1]
                 llk, llk_prev = chain_swap_step(
-                    genotype,
-                    llk,
-                    temp,
-                    genotype_prev,
-                    llk_prev,
-                    temp_prev,
-                    u_haps,
+                    genotype_i=genotype,
+                    llk_i=llk,
+                    temp_i=temp,
+                    genotype_j=genotype_prev,
+                    llk_j=llk_prev,
+                    temp_j=temp_prev,
+                    unique_haplotypes=u_haps,
                 )
                 llks[t - 1] = llk_prev
             
