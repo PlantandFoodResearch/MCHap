@@ -2,16 +2,7 @@ import numpy as np
 import numba
 
 from mchap.assemble import util
-
-
-@numba.njit
-def log_genotype_prior(genotype, unique_haplotypes):
-    ploidy, _ = genotype.shape
-    dosage = np.zeros(ploidy, dtype=np.int8)
-    util.get_dosage(dosage, genotype)
-    n_perms = util.count_equivalent_permutations(dosage)
-    total_perms = unique_haplotypes ** ploidy
-    return np.log(n_perms) - np.log(total_perms)
+from mchap.assemble.likelihood import log_genotype_prior
 
 
 @numba.njit
@@ -46,9 +37,18 @@ def chain_swap_step(
     llk_j,
     temp_j,
     unique_haplotypes,
+    inbreeding=0,
 ):
-    prior_i = log_genotype_prior(genotype_i, unique_haplotypes)
-    prior_j = log_genotype_prior(genotype_j, unique_haplotypes)
+    ploidy, _ = genotype_i.shape
+    dosage = np.zeros(ploidy, dtype=np.int8)
+
+    # prior for genotype i dosage
+    util.get_dosage(dosage, genotype_i)
+    prior_i = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
+
+    # prior for genotype j dosage
+    util.get_dosage(dosage, genotype_j)
+    prior_j = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
 
     acceptance = chain_swap_acceptance(
         llk_i,

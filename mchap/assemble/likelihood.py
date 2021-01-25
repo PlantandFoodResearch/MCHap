@@ -148,7 +148,7 @@ def log_genotype_null_prior(dosage, unique_haplotypes):
 
 
 @numba.njit
-def log_genotype_prior(dosage, unique_haplotypes, inbreding=0):
+def log_genotype_prior(dosage, unique_haplotypes, inbreeding=0):
     """Prior probability of a dosage for an individual genotype
     assuming all haplotypes are equally probable.
 
@@ -167,14 +167,14 @@ def log_genotype_prior(dosage, unique_haplotypes, inbreding=0):
         Log-prior probability of dosage.
     
     """
-    assert 0 <= inbreding < 1
+    assert 0 <= inbreeding < 1
 
     # if not inbred use null prior
-    if inbreding == 0:
+    if inbreeding == 0:
         return log_genotype_null_prior(dosage, unique_haplotypes)
 
     # calculate the dispersion parameter for the PMF
-    dispersion = (1 / unique_haplotypes) * ((1 - inbreding) / inbreding)
+    dispersion = (1 / unique_haplotypes) * ((1 - inbreeding) / inbreeding)
 
     # sum of one dispertion parameter per allele
     ploidy = np.sum(dosage)
