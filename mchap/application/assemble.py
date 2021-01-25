@@ -30,6 +30,7 @@ class program(object):
     bams: list
     samples: list
     sample_ploidy: dict
+    sample_inbreeding: dict
     call_best_genotype: bool = False
     call_filtered: bool = False
     read_group_field: str = 'SM'
@@ -41,9 +42,9 @@ class program(object):
     mcmc_alpha: float = 1.0
     mcmc_beta: float = 3.0
     mcmc_fix_homozygous: float = 0.999
-    mcmc_allow_recombinations: bool = True
-    mcmc_allow_dosage_swaps: bool = True
-    mcmc_full_length_dosage_swap: bool = True
+    mcmc_recombination_step_probability: float = 0.5
+    mcmc_partial_dosage_step_probability: float = 0.5
+    mcmc_dosage_step_probability: bool = 1.0
     depth_filter_threshold: float = 5.0
     read_count_filter_threshold: int = 5
     probability_filter_threshold: float = 0.95
@@ -150,6 +151,30 @@ class program(object):
         )
 
         parser.add_argument(
+            '--inbreeding',
+            type=float,
+            nargs=1,
+            default=[0.0],
+            help=('Default inbreeding coefficient for all samples (default = 0.0). '
+            'This value is used for all samples which are not specified using '
+            'the --sample-inbreeding parameter'),
+        )
+
+        parser.add_argument(
+            '--sample-inbreeding',
+            type=str,
+            nargs=1,
+            default=[None],
+            help=(
+                'A file containing a list of samples with an inbreeding coefficient '
+                'used to indicate where their expected inbreeding coefficient '
+                'default value. Each line should contain a sample identifier '
+                'followed by a tab and then a inbreeding coefficient value '
+                'within the interval [0, 1]'
+            ),
+        )
+
+        parser.add_argument(
             '--error-rate',
             nargs=1,
             type=float,
@@ -239,6 +264,33 @@ class program(object):
             nargs=1,
             default=[42],
             help=('Random seed for MCMC (default = 42). ')
+        )
+
+        parser.add_argument(
+            '--mcmc-recombination-step-probability',
+            type=float,
+            nargs=1,
+            default=[0.5],
+            help=('Probability of performing a recombination sub-step during '
+            'each step of the MCMC. (default = 0.5).')
+        )
+
+        parser.add_argument(
+            '--mcmc-partial-dosage-step-probability',
+            type=float,
+            nargs=1,
+            default=[0.5],
+            help=('Probability of performing a within-interval dosage sub-step during '
+            'each step of the MCMC. (default = 0.5).')
+        )
+
+        parser.add_argument(
+            '--mcmc-dosage-step-probability',
+            type=float,
+            nargs=1,
+            default=[1.0],
+            help=('Probability of performing a dosage sub-step during '
+            'each step of the MCMC. (default = 1.0).')
         )
 
         parser.add_argument(
@@ -356,6 +408,21 @@ class program(object):
             else:
                 sample_ploidy[sample] = args.ploidy[0]
 
+        # sample inbreeding where it differs from default
+        sample_inbreeding = dict()
+        if args.sample_inbreeding[0]:
+            with open(args.sample_inbreeding[0]) as f:
+                for line in f.readlines():
+                    sample, inbreeding = line.strip().split('\t')
+                    sample_ploidy[sample] = float(inbreeding)
+
+        # default inbreeding
+        for sample in samples:
+            if sample in sample_inbreeding:
+                pass
+            else:
+                sample_inbreeding[sample] = args.inbreeding[0]
+
         # add cold chain temperature if not present and sort
         temperatures = args.mcmc_temperatures
         temperatures.sort()
@@ -365,12 +432,13 @@ class program(object):
             temperatures.append(1.0)
 
         return cls(
-            args.targets[0],
-            args.variants[0],
-            args.reference[0],
-            bams,
-            samples,
-            sample_ploidy,
+            bed=args.targets[0],
+            vcf=args.variants[0],
+            ref=args.reference[0],
+            bams=bams,
+            samples=samples,
+            sample_ploidy=sample_ploidy,
+            sample_inbreeding=sample_inbreeding,
             call_best_genotype=args.call_best_genotype,
             call_filtered=args.call_filtered,
             read_group_field=args.read_group_field[0],
@@ -382,9 +450,9 @@ class program(object):
             #mcmc_alpha,
             #mcmc_beta,
             mcmc_fix_homozygous=args.mcmc_fix_homozygous[0],
-            #mcmc_allow_recombinations,
-            #mcmc_allow_dosage_swaps,
-            #mcmc_full_length_dosage_swap,
+            mcmc_recombination_step_probability=args.mcmc_recombination_step_probability[0],
+            mcmc_partial_dosage_step_probability=args.mcmc_partial_dosage_step_probability[0],
+            mcmc_dosage_step_probability=args.mcmc_dosage_step_probability[0],
             depth_filter_threshold=args.filter_depth[0],
             read_count_filter_threshold=args.filter_read_count[0],
             probability_filter_threshold=args.filter_probability[0],
@@ -502,13 +570,15 @@ class program(object):
                 )
 
                 # assemble
-                trace = DenovoMCMC.parameterize(
+                trace = DenovoMCMC(
                     ploidy=self.sample_ploidy[sample],
+                    inbreeding=self.sample_inbreeding[sample],
                     steps=self.mcmc_steps,
                     chains=self.mcmc_chains,
                     fix_homozygous=self.mcmc_fix_homozygous,
-                    allow_recombinations=self.mcmc_allow_recombinations,
-                    allow_dosage_swaps=self.mcmc_allow_dosage_swaps,
+                    recombination_step_probability=self.mcmc_recombination_step_probability,
+                    partial_dosage_step_probability=self.mcmc_partial_dosage_step_probability,
+                    dosage_step_probability=self.mcmc_dosage_step_probability,
                     temperatures=self.mcmc_temperatures,
                     random_seed=self.random_seed,
                 ).fit(read_dists).burn(self.mcmc_burn)
