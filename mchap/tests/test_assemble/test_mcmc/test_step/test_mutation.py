@@ -39,7 +39,7 @@ def test_base_step():
          [0.9, 0.1, 0.0],
          [0.8, 0.1, 0.1]],
     ])
-    mask = np.all(reads == 0.0, axis=0)
+    u_haps = int(2 * 2 * 3)
 
     # conditional probs of possible genotypes
     llks = np.array([
@@ -63,7 +63,15 @@ def test_base_step():
     }
     n_steps = 100_000
     for _ in range(n_steps):
-        llk = mutation.base_step(genotype, reads, llk=llk, h=h, j=j, mask=mask[j])
+        llk = mutation.base_step(
+            genotype,
+            reads,
+            llk=llk,
+            h=h,
+            j=j,
+            unique_haplotypes=u_haps,
+            n_alleles=2,
+        )
         counts[genotype.tostring()] += 1
     
     actual = np.array([
@@ -92,6 +100,7 @@ def test_genotype_compound_step():
          [0.8, 0.1, 0.1]],
     ])
     mask = np.all(reads == 0.0, axis=0)
+    n_alleles = np.sum(~mask, axis=-1).astype(np.int8)
 
     # intial genotype
     genotype = np.array([
@@ -106,7 +115,7 @@ def test_genotype_compound_step():
 
     seed_numba(42)
     for i in range(n_steps):
-        llk = mutation.genotype_compound_step(genotype, reads, llk, mask=mask)
+        llk = mutation.genotype_compound_step(genotype, reads, llk, n_alleles=n_alleles)
         trace[i] = genotype.copy()
 
     # count allele 1 occurance
@@ -137,6 +146,7 @@ def test_genotype_compound_step__posterior():
          [0.9, 0.1]],
     ])
     mask = np.all(reads == 0.0, axis=0)
+    n_alleles = np.sum(~mask, axis=-1).astype(np.int8)
 
     genotypes = np.array([
         [[0, 0],  # 2
@@ -190,7 +200,7 @@ def test_genotype_compound_step__posterior():
             genotype, 
             reads, 
             llk, 
-            mask=mask
+            n_alleles=n_alleles
         )
         genotype = integer.sort(genotype)
         counts[genotype.tostring()] += 1

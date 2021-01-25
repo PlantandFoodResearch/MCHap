@@ -4,11 +4,11 @@ import numpy as np
 import numba
 
 from mchap.assemble import util
-from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
 
 
 @numba.njit
-def base_step(genotype, reads, llk, h, j, mask=None, temp=1):
+def base_step(genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_alleles=None, temp=1):
     """Mutation Gibbs sampler step for the jth base position 
     of the hth haplotype.
 
@@ -27,9 +27,12 @@ def base_step(genotype, reads, llk, h, j, mask=None, temp=1):
         Index of the haplotype to be mutated.
     j : int
         Index of the base position to be mutated
-    mask : ndarray, bool, shape (n_nucl, )
-        Optionally indicate some alleles to skip e.g. alleles 
-        which are known to have 0 probability.
+    unique_haplotypes : int
+        Total number of unique haplotypes possible at this locus.
+    inbreeding : float
+        Expected inbreeding coefficient of the genotype.
+    n_alleles : int
+        Number of possible base alleles at this positions.
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
@@ -48,7 +51,8 @@ def base_step(genotype, reads, llk, h, j, mask=None, temp=1):
     assert  0 <= temp <= 1
     ploidy = len(genotype)
     # number of possible alleles given given array size
-    n_alleles = reads.shape[-1]
+    if n_alleles is None:
+        n_alleles = reads.shape[-1]
 
     # store log likelihoods calculated with each allele
     llks = np.empty(n_alleles)
@@ -60,51 +64,45 @@ def base_step(genotype, reads, llk, h, j, mask=None, temp=1):
     # ratio of proposal probabilities
     lhapcount = np.log(util.count_haplotype_copies(genotype, h))
 
-    # use ratio of permentations of genotypes to calculate
-    # ratio of prior probabilities (under the null prior)
+    # ratio of prior probabilities
     dosage = np.empty(ploidy, dtype=np.int8)
     util.get_dosage(dosage, genotype)
-    lperms = np.log(util.count_equivalent_permutations(dosage))
+    lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
 
     current_nucleotide = genotype[h, j]
     n_options = 0
     for i in range(n_alleles):
-        if (mask is not None) and mask[i]:
-            # exclude masked allele
-            llks[i] = - np.inf  # log(0.0)
-            log_accept[i] = - np.inf
+        if i == current_nucleotide:
+            # store current likelihood
+            llks[i] = llk
+            log_accept[i] = - np.inf  # log(0)
         else:
-            if i == current_nucleotide:
-                # store current likelihood
-                llks[i] = llk
-                log_accept[i] = - np.inf  # log(0)
-            else:
-                # count number of possible new genotypes
-                n_options += 1
+            # count number of possible new genotypes
+            n_options += 1
 
-                # set the current genotype to new genotype
-                genotype[h, j] = i
+            # set the current genotype to new genotype
+            genotype[h, j] = i
 
-                # calculate and store log-likelihood: P(G'|R)
-                llk_i = log_likelihood(reads, genotype)
-                llks[i] = llk_i
+            # calculate and store log-likelihood: P(G'|R)
+            llk_i = log_likelihood(reads, genotype)
+            llks[i] = llk_i
 
-                # calculate log likelihood ratio: ln(P(G'|R)/P(G|R))
-                llk_ratio = llk_i - llk
+            # calculate log likelihood ratio: ln(P(G'|R)/P(G|R))
+            llk_ratio = llk_i - llk
 
-                # calculate ratio of priors: ln(P(G')/P(G))
-                util.get_dosage(dosage, genotype)
-                lperms_i = np.log(util.count_equivalent_permutations(dosage))
-                lprior_ratio = lperms_i - lperms
+            # calculate ratio of priors: ln(P(G')/P(G))
+            util.get_dosage(dosage, genotype)
+            lprior_i = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
+            lprior_ratio = lprior_i - lprior
 
-                # calculate proposal ratio for detailed balance: ln(g(G|G')/g(G'|G))
-                lhapcount_i = np.log(util.count_haplotype_copies(genotype, h))
-                lproposal_ratio = lhapcount_i - lhapcount
+            # calculate proposal ratio for detailed balance: ln(g(G|G')/g(G'|G))
+            lhapcount_i = np.log(util.count_haplotype_copies(genotype, h))
+            lproposal_ratio = lhapcount_i - lhapcount
 
-                # calculate Metropolis-Hastings acceptance probability
-                # ln(min(1, (P(G'|R)P(G')g(G|G')) / (P(G|R)P(G)g(G'|G)))
-                mh_ratio = ((llk_ratio + lprior_ratio) * temp + lproposal_ratio)
-                log_accept[i] = np.minimum(0.0, mh_ratio)  # max prob of log(1)
+            # calculate Metropolis-Hastings acceptance probability
+            # ln(min(1, (P(G'|R)P(G')g(G|G')) / (P(G|R)P(G)g(G'|G)))
+            mh_ratio = ((llk_ratio + lprior_ratio) * temp + lproposal_ratio)
+            log_accept[i] = np.minimum(0.0, mh_ratio)  # max prob of log(1)
 
     # divide acceptance probability by number of steps to choose from
     log_accept -=  np.log(n_options)
@@ -125,7 +123,14 @@ def base_step(genotype, reads, llk, h, j, mask=None, temp=1):
 
 
 @numba.njit
-def genotype_compound_step(genotype, reads, llk, mask=None, temp=1):
+def genotype_compound_step(
+    genotype,
+    reads,
+    llk,
+    inbreeding=0,
+    n_alleles=None,
+    temp=1,
+):
     """Mutation compound Gibbs sampler step for all base positions 
     of all haplotypes in a genotype.
 
@@ -139,9 +144,10 @@ def genotype_compound_step(genotype, reads, llk, mask=None, temp=1):
     llk : float
         Log-likelihood of the initial haplotype state given the 
         observed reads.
-    mask : ndarray, bool, shape (n_base, n_nucl)
-        Optionally indicate some alleles to skip e.g. alleles which 
-        are known to have 0 probability.
+    inbreeding : float
+        Expected inbreeding coefficient of the genotype.
+    n_alleles : ndarray, int, shape (n_base, )
+        The number of possible alleles at each base position.
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
@@ -158,6 +164,14 @@ def genotype_compound_step(genotype, reads, llk, mask=None, temp=1):
     """
     ploidy, n_base = genotype.shape
 
+    if n_alleles is None:
+        max_allele = reads.shape[-1]
+        n_alleles = np.empty(n_base, dtype=np.int8)
+        n_alleles[:] = max_allele
+        unique_haplotypes = n_base ** max_allele
+    else:
+        unique_haplotypes = np.prod(n_alleles)
+
     # matrix of haplotype-base combinations
     substeps = np.empty((ploidy * n_base, 2), dtype=np.int8) 
 
@@ -172,6 +186,15 @@ def genotype_compound_step(genotype, reads, llk, mask=None, temp=1):
 
     for i in range(ploidy * n_base):
         h, j = substeps[i]
-        sub_mask = None if mask is None else mask[j]
-        llk = base_step(genotype, reads, llk, h, j, sub_mask, temp=temp)
+        llk = base_step(
+            genotype=genotype,
+            reads=reads,
+            llk=llk,
+            h=h,
+            j=j,
+            unique_haplotypes=unique_haplotypes,
+            inbreeding=inbreeding,
+            n_alleles=n_alleles[j],
+            temp=temp,
+        )
     return llk
