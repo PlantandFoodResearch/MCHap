@@ -18,6 +18,7 @@ from mchap.assemble.classes import Assembler, GenotypeMultiTrace
 class DenovoMCMC(Assembler):
 
     ploidy: int
+    inbreeding: float = 0
     steps: int = 1000
     chains: int = 2
     alpha: float = 1.0
@@ -35,7 +36,9 @@ class DenovoMCMC(Assembler):
     Attributes
     ----------
     ploidy : int
-        Ploidy of organisim at the assembled locus.
+        Ploidy of organism at the assembled locus.
+    inbreeding : float
+        Expected inbreeding coefficient of genotype.
     steps : int, optional
         Number of steps to run in each MCMC simulation
         (default = 1000).
@@ -194,8 +197,9 @@ class DenovoMCMC(Assembler):
 
         # run the sampler on the heterozygous positions
         genotypes, llks = _denovo_gibbs_sampler(
-            genotype, 
-            reads_het, 
+            genotype=genotype, 
+            inbreeding=self.inbreeding,
+            reads=reads_het, 
             n_alleles=n_alleles,
             steps=self.steps, 
             break_dist=break_dist,
@@ -203,6 +207,7 @@ class DenovoMCMC(Assembler):
             partial_dosage_step_probability=self.partial_dosage_step_probability,
             dosage_step_probability=self.dosage_step_probability,
             temperatures=temperatures,
+            return_heated_trace=False,
         )
 
         # drop the first dimension of each trace component
@@ -230,10 +235,12 @@ class DenovoMCMC(Assembler):
 
 @numba.njit
 def _denovo_gibbs_sampler(
-        genotype, 
-        reads, 
+        *,
+        genotype,
+        inbreeding,
+        reads,
         n_alleles,
-        steps, 
+        steps,
         break_dist,
         recombination_step_probability,
         partial_dosage_step_probability,
@@ -281,9 +288,10 @@ def _denovo_gibbs_sampler(
             
             # mutation step
             llk = mutation.genotype_compound_step(
-                genotype,
-                reads,
-                llk,
+                genotype=genotype,
+                inbreeding=inbreeding,
+                reads=reads,
+                llk=llk,
                 n_alleles=n_alleles,
                 temp=temp
             )
@@ -295,6 +303,7 @@ def _denovo_gibbs_sampler(
                 intervals = structural.random_breaks(n_breaks, n_base)
                 llk = structural.compound_step(
                     genotype=genotype, 
+                    inbreeding=inbreeding,
                     reads=reads, 
                     llk=llk, 
                     intervals=intervals,
@@ -308,7 +317,8 @@ def _denovo_gibbs_sampler(
                 n_breaks = util.random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
                 llk = structural.compound_step(
-                    genotype=genotype, 
+                    genotype=genotype,
+                    inbreeding=inbreeding,
                     reads=reads, 
                     llk=llk, 
                     intervals=intervals,
@@ -320,7 +330,8 @@ def _denovo_gibbs_sampler(
             # final full length dosage swap
             if np.random.rand() <= dosage_step_probability:
                 llk = structural.compound_step(
-                    genotype=genotype, 
+                    genotype=genotype,
+                    inbreeding=inbreeding,
                     reads=reads, 
                     llk=llk, 
                     intervals=np.array([[0, n_base]]),
@@ -341,6 +352,7 @@ def _denovo_gibbs_sampler(
                     genotype_j=genotype_prev,
                     llk_j=llk_prev,
                     temp_j=temp_prev,
+                    inbreeding=inbreeding,
                     unique_haplotypes=u_haps,
                 )
                 llks[t - 1] = llk_prev
