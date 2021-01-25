@@ -2,6 +2,7 @@
 
 import numpy as np
 import numba
+from math import gamma
 
 from mchap.assemble import util
 
@@ -144,3 +145,55 @@ def log_genotype_null_prior(dosage, unique_haplotypes):
     genotype_perms = util.count_equivalent_permutations(dosage)
     log_total_perms = ploidy * np.log(unique_haplotypes)
     return np.log(genotype_perms) - log_total_perms
+
+
+@numba.njit
+def log_genotype_prior(dosage, unique_haplotypes, inbreding=0):
+    """Prior probability of a dosage for an individual genotype
+    assuming all haplotypes are equally probable.
+
+    Parameters
+    ----------
+    dosage : ndarray, int, shape (ploidy, )
+        Haplotype dosages within a genotype.
+    unique_haplotypes : int
+        Total number of unique possible haplotypes.
+    inbreeding : float
+        Expected inbreeding coefficient in the interval (0, 1).
+
+    Returns
+    -------
+    lprior : float
+        Log-prior probability of dosage.
+    
+    """
+    assert 0 <= inbreding < 1
+
+    # if not inbred use null prior
+    if inbreding == 0:
+        return log_genotype_null_prior(dosage, unique_haplotypes)
+
+    # calculate the dispersion parameter for the PMF
+    dispersion = (1 / unique_haplotypes) * ((1 - inbreding) / inbreding)
+
+    # sum of one dispertion parameter per allele
+    ploidy = np.sum(dosage)
+    sum_dispersion = dispersion * ploidy
+
+    # if dispersion is large then use null prior to avoid overflow
+    if sum_dispersion > 100:
+        return log_genotype_null_prior(dosage, unique_haplotypes)
+
+    # Dirichlet-multinomial probability mass function
+    # left side of equation
+    left = (util.factorial_20(ploidy) * gamma(sum_dispersion)) / gamma(ploidy + sum_dispersion)
+
+    # right side of equation
+    prod = 1.0
+    for i in range(ploidy):
+        dose = dosage[i]
+        if dose > 0:
+            prod *= gamma(dose + dispersion) / (util.factorial_20(dose) * gamma(dispersion))
+
+    # return as log probability
+    return np.log(left * prod)
