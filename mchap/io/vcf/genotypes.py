@@ -121,11 +121,11 @@ class HaplotypeAlleleLabeler(object):
         if np.all(array < 0):
             # null alleles
             genotypes = [Genotype(tuple(-1 for _ in range(ploidy)))]
-            probs = [None]
+            probs = [np.nan]
             if not expected_dosage:
                 return genotypes, probs
             else:
-                return genotypes, probs, [None]
+                return genotypes, probs, [np.nan]
 
         # label observed genotypes
         observed = [self.label(gen) for gen in array]

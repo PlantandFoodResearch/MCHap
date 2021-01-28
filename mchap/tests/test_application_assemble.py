@@ -1,6 +1,7 @@
 import pathlib
 import tempfile
 import shutil
+import pysam
 
 from mchap.version import __version__
 from mchap.io.vcf.headermeta import filedate
@@ -217,40 +218,37 @@ def test_Program__run():
         '--mcmc-seed', '11',
     ]
 
-    samples = ('SAMPLE1', 'SAMPLE2', 'SAMPLE3')
     prog = program.cli(command)
-    out = prog.run()
-    assert out.header.samples == samples
+    result = prog.run()
 
-    records = out.records
-    record = records[0]
-    assert record.chrom == 'CHR1'
-    assert record.pos == 5
-    assert record.id == 'CHR1_05_25'
-    assert record.ref == 'A' * 20
-    assert record.alt == ['AAAAAAAAAAGAAAAAATAA', 'ACAAAAAAAAGAAAAAACAA']
+    # compare to expected VCF
+    with open(str(path / 'simple.output.vcf'), 'r') as f:
+        for i, line in enumerate(f):
+            line = line.strip()
+            if line.startswith('##commandline'):
+                # file paths will differ
+                pass
+            else:
+                if result[i] != line:
+                    print(i, result[i], line)
+                assert result[i] == line
 
-    info = record.info
-    assert info['END'] == 25
-    assert info['SNVPOS'] == '2,11,18'
-    assert info['NS'] == 3
-    assert tuple(info['AC']) == (3, 2)
-    assert info['AN'] == 3
 
-    format = record.format
-    assert set(format.keys()) == set(samples)
+def test_Program__output():
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / 'test_io/data'
 
-    sample = format['SAMPLE1']
-    assert sample['GPM'] == 1.0
-    assert sample['PPM'] == 1.0
-    assert sample['RCOUNT'] == 200
-    assert sample['RCALLS'] == 400
-    assert sample['DP'] == 133
-    assert sample['GQ'] == 60
-    assert sample['PHQ'] == 60
-    assert str(sample['GT']) == '0/0/1/2'
-    assert sample['RASSIGN'] == [50, 50, 50, 50]
-    assert sample['MPGP'] == [1.0, 0.0, 0.0]
-    assert sample['MPED'] == [2.0, 1.0, 1.0]
-    assert sample['MEC'] == 0
-    assert str(sample['FT']) == 'PASS'
+    OUTFILE = str(path / 'simple.output.vcf')
+
+    with open(OUTFILE, 'r') as f:
+        expect = set(l.strip() for l in f.readlines())
+        expect -= {''}
+    
+    with pysam.VariantFile(OUTFILE) as f:
+        header = set(str(f.header).split('\n'))
+        records = set(str(r).strip() for r in f)
+        actual = header | records
+        actual -= {''}
+    
+    assert expect == actual
+

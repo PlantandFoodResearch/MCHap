@@ -14,6 +14,8 @@ def vcfstr(obj):
     elif obj is None:
         return '.'
     elif isinstance(obj, float):
+        if np.isnan(obj):
+            return '.'
         i = int(obj)
         if i == obj:
             return str(i)
