@@ -4,6 +4,7 @@ import numpy as np
 from dataclasses import dataclass
 import pysam
 from itertools import islice
+from collections import Counter
 import multiprocessing as mp
 
 from mchap.assemble.mcmc.denovo import DenovoMCMC
@@ -520,7 +521,6 @@ class program(object):
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PPM, 
-            vcf.formatfields.MPGP,
             vcf.formatfields.MPED,
         )
 
@@ -535,9 +535,7 @@ class program(object):
 
         return vcf_header
 
-    def _assemble_locus(self, header, locus):
-        sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
-
+    def _assemble_locus(self, header, sample_bams, locus):
         # label sample filters
         kmer_filter = header.filters[1]
         depth_filter = header.filters[2]
@@ -648,14 +646,14 @@ class program(object):
             sample_phenotype_dist[i] = phenotype
 
         # labeling alleles
-        labeler = vcf.HaplotypeAlleleLabeler.from_obs(sample_genotype)
-        vcf_REF = locus.sequence
-        vcf_ALTS = locus.format_haplotypes(labeler.alt_array())
+        vcf_haplotypes, vcf_haplotype_counts = vcf_sort_haplotypes(sample_genotype)
+        vcf_alleles = locus.format_haplotypes(vcf_haplotypes)
+        vcf_REF = vcf_alleles[0]
+        vcf_ALTS = vcf_alleles[1:]
 
         # vcf info fields
-        allele_counts = labeler.count_obs(sample_genotype)
-        info_AC = allele_counts[1:],  # exclude reference count
-        info_AN = np.sum(np.greater(allele_counts, 0)),
+        info_AC = vcf_haplotype_counts[1:]
+        info_AN = np.sum(vcf_haplotype_counts > 0)
         info_NS = len(self.samples)
         if not self.call_filtered:
             info_NS -= sum(ft.failed for ft in sample_FT)
@@ -664,21 +662,15 @@ class program(object):
 
         # additional sample data requiring sorted alleles
         sample_GT = np.empty(n_samples, dtype='O')
-        sample_MPGP = np.empty(n_samples, dtype='O')
         sample_MPED = np.empty(n_samples, dtype='O')
-
         for i, sample in enumerate(self.samples):
-            sample_GT[i] = labeler.label(sample_genotype[i])
-
-            # expected dosage
-            phenotype = sample_phenotype_dist[i]
-            _, probs, dosage = labeler.label_phenotype_posterior(
-                phenotype.genotypes, 
-                phenotype.probabilities, 
-                expected_dosage=True,
+            sample_GT[i] = vcf_genotype_string(sample_genotype[i], vcf_haplotypes)
+            dosage_expected = vcf_expected_dosage(
+                sample_phenotype_dist[i].genotypes,
+                sample_phenotype_dist[i].probabilities,
+                vcf_haplotypes,
             )
-            sample_MPGP[i] = np.round(probs, self.precision)
-            sample_MPED[i] = np.round(dosage, self.precision)
+            sample_MPED[i] = np.round(dosage_expected, self.precision)
 
         # vcf line formating
         vcf_INFO = format_vcf_info_field(
@@ -700,7 +692,6 @@ class program(object):
             FT=sample_FT,
             GPM=sample_GPM,
             PPM=sample_PPM,
-            MPGP=sample_MPGP,
             MPED=sample_MPED,
         )
 
@@ -718,13 +709,14 @@ class program(object):
 
     def run(self):
         header = self.header()
+        sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
         pool = mp.Pool(self.n_cores)
-        jobs = ((header, locus) for locus in self.loci())
+        jobs = ((header, sample_bams, locus) for locus in self.loci())
         records = pool.starmap(self._assemble_locus, jobs)
         return list(header.lines()) + records
 
-    def _worker(self, header, locus, queue):
-        line = str(self._assemble_locus(header, locus))
+    def _worker(self, header, sample_bams, locus, queue):
+        line = str(self._assemble_locus(header, sample_bams, locus))
         queue.put(line)
         return line
 
@@ -739,6 +731,7 @@ class program(object):
     def run_stdout(self):
 
         header = self.header()
+        sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
 
         for line in header.lines():
             sys.stdout.write(line + '\n')
@@ -753,7 +746,7 @@ class program(object):
 
         jobs = []
         for locus in self.loci():
-            job = pool.apply_async(self._worker, (header, locus, queue))
+            job = pool.apply_async(self._worker, (header, sample_bams, locus, queue))
             jobs.append(job)
 
         for job in jobs:
@@ -764,12 +757,157 @@ class program(object):
         pool.join()
 
 
+def vcf_sort_haplotypes(genotypes, dtype=np.int8):
+    """Sort unique haplotypes from multiple genotype arrays from
+    most to least frequent with the reference allele first
+
+    Parameters
+    ----------
+    genotypes : list
+        List of ndarrays each with shape (ploidy, n_positions).
+    dtype : type
+        Numpy dtype for returned array.
+    
+    Returns
+    -------
+    haplotypes : ndarray, int, shape (n_haplotypes, n_positions)
+        Unique haplotypes sorted by frequency with reference allele first.
+    counts : ndarray, int, shape (n_haplotypes, )
+        Count of each haplotype
+
+    """
+    haplotypes = np.concatenate(genotypes)
+    _, n_pos = haplotypes.shape
+    
+    # count observed haps
+    counts = Counter(tuple(hap) for hap in haplotypes)
+    
+    # ref and null haps are special values
+    ref = (0, ) * n_pos
+    null = (-1, ) * n_pos
+    
+    # remove null haps from count if present
+    if null in counts:
+        _ = counts.pop(null)
+    
+    # seperate ref count
+    if ref not in counts:
+        ref_count = 0
+    else:
+        ref_count = counts.pop(ref)
+
+    # order by frequency then insert ref first
+    pairs = counts.most_common()
+    pairs = [(ref, ref_count)] + pairs
+    
+    # convert back to arrays
+    haplotypes = np.array([a for a, _ in pairs], dtype=dtype)
+    counts = np.array([c for _, c in pairs])
+    
+    return haplotypes, counts
+
+
+def vcf_genotype_string(genotype, haplotypes):
+    """Convert a genotype array to a VCF genotype (GT) string
+
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, n_positions)
+        Integer encoded genotype.
+    haplotypes : ndarray, int, shape (n_haplotypes, n_positions)
+        Unique haplotypes sorted by frequency with reference allele first.
+
+    Returns
+    -------
+    string : str
+        VCF genotype string.
+    """
+    assert genotype.dtype == haplotypes.dtype
+    labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
+    alleles = [labels.get(h.tobytes(), -1) for h in genotype]
+    alleles.sort()
+    chars = [str(a) for a in alleles if a >= 0]
+    chars += ['.' for a in alleles if a < 0]
+    return '/'.join(chars)
+
+
+def vcf_expected_dosage(genotypes, probabilities, haplotypes):
+    """Calculate the expected floating point dosage based on a phenotype distribution.
+
+    Parameters
+    ----------
+    genotypes : ndarray, int, shape (n_genotypes, ploidy, n_positions)
+        Integer encoded genotypes containing the same alleles in different dosage.
+    probabilities : ndarray, int, shape (n_genotypes, ).
+        Probability of each genotype.
+
+    Returns
+    -------
+    expected_dosage: ndarray, float, shape (n_alleles, )
+        Expected count of each allele.
+    """
+    assert genotypes.dtype == haplotypes.dtype
+
+    # if all alleles are null then no dosage
+    if np.all(genotypes < 0):
+        return np.array([np.nan])
+
+    # label genotype alleles
+    labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
+    alleles = [[labels[h.tobytes()] for h in g] for g in genotypes]
+
+    # values for sorting genotypes, this works because all
+    # genotypes share the same alleles in different dosage
+    vals = [np.sum(g) for g in alleles]
+    
+    # normalised probability of each dosage
+    probs = probabilities[np.argsort(vals)]
+    probs /= probs.sum()
+    
+    # per genotype allele counts
+    uniques, counts = zip(*[np.unique(g, return_counts=True) for g in alleles])
+    counts = np.array(counts)
+    
+    # assert all dosage variants contain same alleles
+    for i in range(1, len(uniques)):
+        np.testing.assert_array_equal(uniques[0], uniques[i])
+    
+    # expectation of dosage
+    expected = np.sum(counts * probs[:, None], axis=0)
+    
+    return expected
+
+
 def format_vcf_info_field(**kwargs):
+    """Format key-value pairs into a VCF info field.
+
+    Parameters
+    ----------
+    kwargs
+        Key value pairs of info field codes to values.
+    
+    Returns
+    -------
+    string : str
+        VCF info field.
+    """
     parts = ['{}={}'.format(k, vcfstr(v)) for k, v in kwargs.items()]
     return ';'.join(parts)
 
 
 def format_vcf_sample_field(**kwargs):
+    """Format key-value pairs into a VCF format field.
+
+    Parameters
+    ----------
+    kwargs
+        Key value pairs of info field codes to arrays of values per sample.
+    
+    Returns
+    -------
+    string : str
+        VCF format and sample columns.
+    """
     fields, arrays = zip(*kwargs.items())
     fields = ':'.join(fields)
     lengths = np.array([len(a) for a in arrays])
@@ -794,5 +932,33 @@ def format_vcf_line(
     info=None, 
     format=None,
 ):
+    """Format a VCF record line.
+
+    Parameters
+    ----------
+    chrom : str
+        Variant chromosome or contig.
+    pos : int
+        Variant position.
+    id : str
+        Variant ID.
+    ref : str
+        Reference allele.
+    alt : list, str
+        Alternate alleles.
+    qual : int
+        Variant quality.
+    filter : str
+        Variant filter codes.
+    info : str
+        Variant INFO string.
+    format : str
+        Variant format codes and sample values.
+
+    Returns
+    -------
+    line : str
+        VCF record line.
+    """
     fields = [chrom, pos, id, ref, alt, qual, filter, info, format]
     return '\t'.join(vcfstr(f) for f in fields)
