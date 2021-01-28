@@ -1,7 +1,10 @@
 import pathlib
 import tempfile
+import os
+import sys
 import shutil
 import pysam
+import pytest
 
 from mchap.version import __version__
 from mchap.io.vcf.headermeta import filedate
@@ -228,10 +231,76 @@ def test_Program__run():
             if line.startswith('##commandline'):
                 # file paths will differ
                 pass
+            elif line.startswith('##fileDate'):
+                # new date should be greater than test vcf date
+                assert result[i] > line
             else:
-                if result[i] != line:
-                    print(i, result[i], line)
                 assert result[i] == line
+
+
+@pytest.mark.parametrize("n_cores", [1, 2])
+def test_Program__run_stdout(n_cores):
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / 'test_io/data'
+
+    BED = str(path / 'simple.bed.gz')
+    VCF = str(path / 'simple.vcf.gz')
+    REF = str(path / 'simple.fasta')
+    BAMS = [
+        str(path / 'simple.sample1.deep.bam'),
+        str(path / 'simple.sample2.deep.bam'),
+        str(path / 'simple.sample3.deep.bam')
+    ]
+
+    command = [
+        'mchap',
+        'denovo',
+        '--bam', BAMS[0], BAMS[1], BAMS[2],
+        '--ploidy', '4',
+        '--targets', BED,
+        '--variants', VCF,
+        '--reference', REF,
+        '--mcmc-steps', '500',
+        '--mcmc-burn', '100',
+        '--mcmc-seed', '11',
+    ]
+
+    prog = program.cli(command)
+
+    # capture stdout in file
+    _, out_filename = tempfile.mkstemp()
+    stdout = sys.stdout
+    sys.stdout = open(out_filename, 'w')
+    prog.run_stdout()
+    sys.stdout.close()
+
+    # replace stdout
+    sys.stdout = stdout
+
+    # compare output to expected
+    with open(out_filename, 'r') as f:
+        actual = f.readlines()
+    with open(str(path / 'simple.output.vcf'), 'r') as f:
+        expected = f.readlines()
+    
+    if n_cores > 1:
+        # output may be in different order
+        actual.sort()
+        expected.sort()
+
+    for act, exp in zip(actual, expected):
+        # file paths will make full line differ
+        if act.startswith('##commandline'):
+            assert exp.startswith('##commandline')
+        elif act.startswith('##fileDate'):
+            # new date should be greater than test vcf date
+            assert exp.startswith('##fileDate')
+            assert act > exp
+        else:
+            assert act == exp
+
+    # cleanup
+    os.remove(out_filename)
 
 
 def test_Program__output():

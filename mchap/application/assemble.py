@@ -38,7 +38,7 @@ class program(object):
     read_group_field: str = 'SM'
     read_error_rate: float = 0.0
     mcmc_temperatures: tuple = (1.0, )
-    mcmc_chains: int = 2
+    mcmc_chains: int = 1
     mcmc_steps: int = 1000
     mcmc_burn: int = 500
     mcmc_alpha: float = 1.0
@@ -728,7 +728,18 @@ class program(object):
             sys.stdout.write(line + '\n')
             sys.stdout.flush()
 
+    def _run_stdout_single_core(self):
+        header = self.header()
+        sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
+        for line in header.lines():
+            sys.stdout.write(line + '\n')
+        for locus in self.loci():
+            line = self._assemble_locus(header, sample_bams, locus)
+            sys.stdout.write(line + '\n')
+
     def run_stdout(self):
+        if self.n_cores <= 1:
+            self._run_stdout_single_core()
 
         header = self.header()
         sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
