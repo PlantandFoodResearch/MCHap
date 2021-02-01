@@ -38,6 +38,23 @@ def read_sample_pedigree_map(path):
     return sample_pedigree
 
 
+def parse_sam_region(string):
+    """Parse 1-based genomic region string into 0-based tuple.
+    """
+    if not string:
+        return ()
+    parts = string.strip().split(':')
+    if len(parts) == 1:
+        chrom = parts[0]
+        return (chrom, )
+    else:
+        chrom = parts[0]
+        positions = parts[1].split('-')
+        positions = [int(s) for s in positions]
+        positions[0] = positions[0] - 1  # offset 
+        return (chrom, ) + tuple(positions)
+
+
 def ancestors(graph, *args, stop=None):
     """Iterate over all ancestor nodes in a DiGraph given
     one or more initial Nodes.
@@ -306,7 +323,7 @@ class program(object):
     def iter_graphs(self):
         with pysam.VariantFile(self.vcf) as vcf:
             if self.region:
-                variants = vcf.fetch(self.region)
+                variants = vcf.fetch(*parse_sam_region(self.region))
             else:
                 variants = vcf.fetch()
 
