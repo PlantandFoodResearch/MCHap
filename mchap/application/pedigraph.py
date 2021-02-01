@@ -485,7 +485,8 @@ def variant_haplotype_graph(
     haps = (variant.ref, )
     if variant.alts:
         haps += variant.alts
-    positions = variant.info['VP']
+    positions = variant.info['SNVPOS']
+    positions = [p -1 for p in positions]  # SNVPOS is 1-based
     if simplify_haplotypes:
         counts = [(pos, len({h[pos] for h in haps})) for pos in positions]
         positions = [pos for pos, count in counts if count > 1]
