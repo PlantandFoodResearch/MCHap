@@ -474,7 +474,7 @@ class program(object):
     def _header_contigs(self):
         with pysam.Fastafile(self.ref) as fasta:
             contigs = [
-                vcf.ContigHeader(c, l)
+                vcf.headermeta.ContigHeader(c, l)
                 for c, l in zip(fasta.references, fasta.lengths)
             ]
         return contigs
@@ -641,7 +641,7 @@ class program(object):
             sample_phenotype_dist[i] = phenotype
 
         # labeling alleles
-        vcf_haplotypes, vcf_haplotype_counts = vcf_sort_haplotypes(sample_genotype)
+        vcf_haplotypes, vcf_haplotype_counts = vcf.sort_haplotypes(sample_genotype)
         vcf_alleles = locus.format_haplotypes(vcf_haplotypes)
         vcf_REF = vcf_alleles[0]
         vcf_ALTS = vcf_alleles[1:]
@@ -659,8 +659,8 @@ class program(object):
         sample_GT = np.empty(n_samples, dtype='O')
         sample_MPED = np.empty(n_samples, dtype='O')
         for i, sample in enumerate(self.samples):
-            sample_GT[i] = vcf_genotype_string(sample_genotype[i], vcf_haplotypes)
-            dosage_expected = vcf_expected_dosage(
+            sample_GT[i] = vcf.genotype_string(sample_genotype[i], vcf_haplotypes)
+            dosage_expected = vcf.expected_dosage(
                 sample_phenotype_dist[i].genotypes,
                 sample_phenotype_dist[i].probabilities,
                 vcf_haplotypes,
@@ -668,7 +668,7 @@ class program(object):
             sample_MPED[i] = np.round(dosage_expected, self.precision)
 
         # vcf line formating
-        vcf_INFO = format_vcf_info_field(
+        vcf_INFO = vcf.format_info_field(
             AN=info_AN,
             AC=info_AC,
             NS=info_NS,
@@ -676,7 +676,7 @@ class program(object):
             SNVPOS=info_SNVPOS,
         )
 
-        vcf_FORMAT = format_vcf_sample_field(
+        vcf_FORMAT = vcf.format_sample_field(
             GT=sample_GT,
             GQ=sample_GQ,
             PHQ=sample_PHQ,
@@ -690,7 +690,7 @@ class program(object):
             MPED=sample_MPED,
         )
 
-        return format_vcf_line(
+        return vcf.format_record(
             chrom=locus.contig, 
             pos=locus.start + 1,  # 0-based BED to 1-based VCF 
             id=locus.name, 
@@ -761,210 +761,3 @@ class program(object):
         queue.put('KILL')
         pool.close()
         pool.join()
-
-
-def vcf_sort_haplotypes(genotypes, dtype=np.int8):
-    """Sort unique haplotypes from multiple genotype arrays from
-    most to least frequent with the reference allele first
-
-    Parameters
-    ----------
-    genotypes : list
-        List of ndarrays each with shape (ploidy, n_positions).
-    dtype : type
-        Numpy dtype for returned array.
-    
-    Returns
-    -------
-    haplotypes : ndarray, int, shape (n_haplotypes, n_positions)
-        Unique haplotypes sorted by frequency with reference allele first.
-    counts : ndarray, int, shape (n_haplotypes, )
-        Count of each haplotype
-
-    """
-    haplotypes = np.concatenate(genotypes)
-    _, n_pos = haplotypes.shape
-    
-    # count observed haps
-    counts = Counter(tuple(hap) for hap in haplotypes)
-    
-    # ref and null haps are special values
-    ref = (0, ) * n_pos
-    null = (-1, ) * n_pos
-    
-    # remove null haps from count if present
-    if null in counts:
-        _ = counts.pop(null)
-    
-    # seperate ref count
-    if ref not in counts:
-        ref_count = 0
-    else:
-        ref_count = counts.pop(ref)
-
-    # order by frequency then insert ref first
-    pairs = counts.most_common()
-    pairs = [(ref, ref_count)] + pairs
-    
-    # convert back to arrays
-    haplotypes = np.array([a for a, _ in pairs], dtype=dtype)
-    counts = np.array([c for _, c in pairs])
-    
-    return haplotypes, counts
-
-
-def vcf_genotype_string(genotype, haplotypes):
-    """Convert a genotype array to a VCF genotype (GT) string
-
-    Parameters
-    ----------
-    genotype : ndarray, int, shape (ploidy, n_positions)
-        Integer encoded genotype.
-    haplotypes : ndarray, int, shape (n_haplotypes, n_positions)
-        Unique haplotypes sorted by frequency with reference allele first.
-
-    Returns
-    -------
-    string : str
-        VCF genotype string.
-    """
-    assert genotype.dtype == haplotypes.dtype
-    labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
-    alleles = [labels.get(h.tobytes(), -1) for h in genotype]
-    alleles.sort()
-    chars = [str(a) for a in alleles if a >= 0]
-    chars += ['.' for a in alleles if a < 0]
-    return '/'.join(chars)
-
-
-def vcf_expected_dosage(genotypes, probabilities, haplotypes):
-    """Calculate the expected floating point dosage based on a phenotype distribution.
-
-    Parameters
-    ----------
-    genotypes : ndarray, int, shape (n_genotypes, ploidy, n_positions)
-        Integer encoded genotypes containing the same alleles in different dosage.
-    probabilities : ndarray, int, shape (n_genotypes, ).
-        Probability of each genotype.
-
-    Returns
-    -------
-    expected_dosage: ndarray, float, shape (n_alleles, )
-        Expected count of each allele.
-    """
-    assert genotypes.dtype == haplotypes.dtype
-
-    # if all alleles are null then no dosage
-    if np.all(genotypes < 0):
-        return np.array([np.nan])
-
-    # label genotype alleles
-    labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
-    alleles = [[labels[h.tobytes()] for h in g] for g in genotypes]
-
-    # values for sorting genotypes, this works because all
-    # genotypes share the same alleles in different dosage
-    vals = [np.sum(g) for g in alleles]
-    
-    # normalised probability of each dosage
-    probs = probabilities[np.argsort(vals)]
-    probs /= probs.sum()
-    
-    # per genotype allele counts
-    uniques, counts = zip(*[np.unique(g, return_counts=True) for g in alleles])
-    counts = np.array(counts)
-    
-    # assert all dosage variants contain same alleles
-    for i in range(1, len(uniques)):
-        np.testing.assert_array_equal(uniques[0], uniques[i])
-    
-    # expectation of dosage
-    expected = np.sum(counts * probs[:, None], axis=0)
-    
-    return expected
-
-
-def format_vcf_info_field(**kwargs):
-    """Format key-value pairs into a VCF info field.
-
-    Parameters
-    ----------
-    kwargs
-        Key value pairs of info field codes to values.
-    
-    Returns
-    -------
-    string : str
-        VCF info field.
-    """
-    parts = ['{}={}'.format(k, vcfstr(v)) for k, v in kwargs.items()]
-    return ';'.join(parts)
-
-
-def format_vcf_sample_field(**kwargs):
-    """Format key-value pairs into a VCF format field.
-
-    Parameters
-    ----------
-    kwargs
-        Key value pairs of info field codes to arrays of values per sample.
-    
-    Returns
-    -------
-    string : str
-        VCF format and sample columns.
-    """
-    fields, arrays = zip(*kwargs.items())
-    fields = ':'.join(fields)
-    lengths = np.array([len(a) for a in arrays])
-    length = lengths[0]
-    assert np.all(lengths == length)
-    sample_data = np.empty(length, dtype='O')
-    for i in range(length):
-        sample_data[i] = ':'.join((vcfstr(a[i]) for a in arrays))
-    sample_data = '\t'.join(sample_data)
-    return '{}\t{}'.format(fields, sample_data)
-
-
-def format_vcf_line(
-    *, 
-    chrom=None, 
-    pos=None, 
-    id=None, 
-    ref=None, 
-    alt=None, 
-    qual=None, 
-    filter=None, 
-    info=None, 
-    format=None,
-):
-    """Format a VCF record line.
-
-    Parameters
-    ----------
-    chrom : str
-        Variant chromosome or contig.
-    pos : int
-        Variant position.
-    id : str
-        Variant ID.
-    ref : str
-        Reference allele.
-    alt : list, str
-        Alternate alleles.
-    qual : int
-        Variant quality.
-    filter : str
-        Variant filter codes.
-    info : str
-        Variant INFO string.
-    format : str
-        Variant format codes and sample values.
-
-    Returns
-    -------
-    line : str
-        VCF record line.
-    """
-    fields = [chrom, pos, id, ref, alt, qual, filter, info, format]
-    return '\t'.join(vcfstr(f) for f in fields)
