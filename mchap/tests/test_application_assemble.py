@@ -303,7 +303,10 @@ def test_Program__run_stdout(n_cores):
     os.remove(out_filename)
 
 
-def test_Program__output():
+def test_Program__output_pysam():
+    """Test that program output can be parsed by pysam and that the
+    parsed output matches the initial output.
+    """
     path = pathlib.Path(__file__).parent.absolute()
     path = path / 'test_io/data'
 
@@ -320,4 +323,58 @@ def test_Program__output():
         actual -= {''}
     
     assert expect == actual
+
+
+def test_Program__output_bed_positions():
+    """Tests that 1-based VCF intervals match the initial 0-based BED intervals.
+
+    Note that with pysam variant objects the `.pos` attribute returns the 1-based
+    position from the VCF and the `.start` attribute returns the adjusted 0-based
+    position.
+    Pysam `.fetch` methods expect 0-based integer arguments. 
+    """
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / 'test_io/data'
+
+    BEDFILE = str(path / 'simple.bed')
+    OUTFILE = str(path / 'simple.output.vcf')
+
+    # map of named intervals from bed4 file
+    with open(BEDFILE) as bed:
+        intervals = bed.readlines()
+    intervals = [line.strip().split('\t') for line in intervals]
+    intervals = {
+        name: (contig, int(start), int(stop)) 
+        for contig, start, stop, name in intervals
+    }
+
+    with pysam.VariantFile(OUTFILE) as vcf:
+        for variant in vcf:
+            # use 0-based start to match 0-based bed file
+            name = variant.id
+            interval = (variant.contig, variant.start, variant.stop)
+            assert intervals[name] == interval
+
+
+def test_Program__output_reference_positions():
+    """Tests that VCF reference alleles match the reference genome.
+
+    Note that with pysam variant objects the `.pos` attribute returns the 1-based
+    position from the VCF and the `.start` attribute returns the adjusted 0-based
+    position.
+    Pysam `.fetch` methods expect 0-based integer arguments. 
+    """
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / 'test_io/data'
+
+    REFFILE = str(path / 'simple.fasta')
+    OUTFILE = str(path / 'simple.output.vcf')
+
+    reference = pysam.FastaFile(REFFILE)
+    with pysam.VariantFile(OUTFILE) as vcf:
+        for variant in vcf:
+            # fetch with tuple of values expects a zero-based start
+            ref_allele = reference.fetch(variant.contig, variant.start, variant.stop)
+            assert ref_allele == variant.ref
+    reference.close()
 

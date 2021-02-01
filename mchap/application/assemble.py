@@ -697,7 +697,7 @@ class program(object):
 
         return format_vcf_line(
             chrom=locus.contig, 
-            pos=locus.start, 
+            pos=locus.start + 1,  # 0-based BED to 1-based VCF 
             id=locus.name, 
             ref=vcf_REF, 
             alt=vcf_ALTS, 
