@@ -1,156 +1,102 @@
 import pytest
 import numpy as np
 
-from mchap.io.vcf import genotypes
+from mchap.io import vcf
 
 
-@pytest.mark.parametrize('alleles,phased,expect', [
-    pytest.param((0,1,2,-1), False, '0/1/2/.', id='un-phased'),
-    pytest.param((0,1,2,-1), True, '0|1|2|.', id='phased'),
-])
-def test_Genotype__str(alleles, phased, expect):
-    obj = genotypes.Genotype(alleles, phased=phased)
-    actual = str(obj)
-    assert actual == expect
-
-
-def test_Genotype__sorted():
-    alleles = (0,-1,2,1)
-    obj = genotypes.Genotype(alleles).sorted()
-    actual = obj.alleles
-    expect = (0,1,2,-1)
-    assert actual == expect
-
-
-def test_HaplotypeAlleleLabeler__from_obs__ref():
-    array = np.array([
-        [[0, 1, 1],
-         [0, 1, 1],
-         [1, 1, 1],
-         [-1, -1, -1]],
-        [[0, 0, 0],
-         [0, 0, 0],
-         [1 ,1 ,1],
-         [1, 1, 1]],
-        [[0, 0, 0],
-         [0, 0, 0],
-         [1, 1, 1],
-         [1, 1, 1]],
-    ])
-    # counts = 4:5:2
-    expect = ((0, 0, 0), (1, 1, 1), (0, 1, 1))
-    actual = genotypes.HaplotypeAlleleLabeler.from_obs(array).alleles
-    assert actual == expect
-
-
-def test_HaplotypeAlleleLabeler__from_obs__no_ref():
-    array = np.array([
-        [[0, 1, 1],
-         [0, 1, 1],
-         [1, 1, 1],
-         [-1, -1, -1]],
-        [[1, 0, 0],
-         [1, 0, 0],
-         [1 ,1 ,1],
-         [1, 1, 1]],
-        [[1, 0, 0],
-         [1, 0, 0],
-         [1, 1, 1],
-         [1, 1, 1]],
-    ])
-    # counts = 0:5:4:2
-    expect = ((0, 0, 0), (1, 1, 1), (1, 0, 0), (0, 1, 1))
-    actual = genotypes.HaplotypeAlleleLabeler.from_obs(array).alleles
-    assert actual == expect
-
-
-def test_HaplotypeAlleleLabeler__count_obs():
-    array = np.array([
-        [[0, 1, 1],
-         [0, 1, 1],
-         [1, 1, 1],
-         [-1, -1, -1]],
-        [[1, 0, 0],
-         [1, 0, 0],
-         [1 ,1 ,1],
-         [1, 1, 1]],
-        [[1, 0, 0],
-         [1, 0, 0],
-         [1, 1, 1],
-         [1, 1, 1]],
-    ])
-    obj = genotypes.HaplotypeAlleleLabeler.from_obs(array)
-    actual = obj.count_obs(array)
-    expect = np.array([0, 5, 4, 2])
-    np.testing.assert_array_equal(actual, expect)
-
-
-def test_HaplotypeAlleleLabeler__argsort():
-    alleles = ((0, 0, 0), (1, 1, 1), (1, 0, 0), (0, 1, 1))
-    obj = genotypes.HaplotypeAlleleLabeler(alleles)
-    array = np.array([
+def test_genotype_string():
+    haplotypes = np.array([
+        [0, 0, 0],
+        [1, 0, 1],
         [0, 1, 1],
-        [0, 1, 1],
-        [1, 1, 1],
-        [-1, -1, -1]
-    ])
-    actual = obj.argsort(array)
-    expect = np.array([2, 0, 1, 3])
-    np.testing.assert_array_equal(actual, expect)
-
-
-def test_HaplotypeAlleleLabeler__label():
-    alleles = ((0, 0, 0), (1, 1, 1), (1, 0, 0), (0, 1, 1))
-    obj = genotypes.HaplotypeAlleleLabeler(alleles)
-    array = np.array([
-        [0, 1, 1],
-        [0, 1, 1],
-        [1, 1, 1],
-        [-1, -1, -1]
-    ])
-    actual = obj.label(array)
-    expect = genotypes.Genotype((1, 3, 3, -1))
-    assert actual == expect
-
-
-def test_HaplotypeAlleleLabeler__label_phenotype_posterior():
-    alleles = ((0, 0, 0), (1, 1, 1), (1, 0, 0), (0, 1, 1))
-    obj = genotypes.HaplotypeAlleleLabeler(alleles)
-
-    array = np.array([
-        [[0, 0, 0],
-         [0, 0, 0],
-         [0, 0, 0],
-         [1, 1, 1]],
-        [[0, 0, 0],
-         [0, 0, 0],
-         [1, 1, 1],
-         [1, 1, 1]],
     ], dtype=np.int8)
-    probs = np.array([0.7, 0.1])
+    genotype = np.array([
+        [0, 1, 1],
+        [0, 0, 0],
+        [-1, -1, -1],
+        [0, 1, 1],
+    ], dtype=np.int8)
 
-    expect_genotypes = [
-        genotypes.Genotype((0, 0, 0, 1)),
-        genotypes.Genotype((0, 0, 1, 1)),
-        genotypes.Genotype((0, 1, 1, 1)),
-    ]
-    expect_probs = [0.7, 0.1, 0.0]
-    expect_dosage = [2.875, 1.125]
+    expect = '0/2/2/.'
+    actual = vcf.genotype_string(genotype, haplotypes)
+    assert actual == expect
 
-    # all output
-    actual = obj.label_phenotype_posterior(
-        array, 
-        probs, 
-        unobserved=True, 
-        expected_dosage=True
-    )
-    assert actual == (expect_genotypes, expect_probs, expect_dosage)
 
-    # minimal output
-    actual = obj.label_phenotype_posterior(
-        array, 
-        probs, 
-        unobserved=False, 
-        expected_dosage=False
-    )
-    assert actual == (expect_genotypes[0:2], expect_probs[0:2])
+def test_sort_haplotypes__ref():
+    genotypes = np.array([
+        [[0, 1, 1],
+         [0, 1, 1],
+         [1, 1, 1],
+         [-1, -1, -1]],
+        [[0, 0, 0],
+         [0, 0, 0],
+         [1 ,1 ,1],
+         [1, 1, 1]],
+        [[0, 0, 0],
+         [0, 0, 0],
+         [1, 1, 1],
+         [1, 1, 1]],
+    ], np.int8)
+    actual, counts = vcf.sort_haplotypes(genotypes)
+
+    expect = np.array([
+        [0, 0, 0],
+        [1, 1, 1],
+        [0, 1, 1],
+    ], np.int8)
+    expect_counts = np.array([4, 5, 2])
+
+    np.testing.assert_array_equal(actual, expect)
+    np.testing.assert_array_equal(counts, expect_counts)
+
+
+def test_sort_haplotypes__no_ref():
+    genotypes = np.array([
+        [[0, 1, 1],
+         [0, 1, 1],
+         [1, 1, 1],
+         [-1, -1, -1]],
+        [[1, 0, 0],
+         [1, 0, 0],
+         [1 ,1 ,1],
+         [1, 1, 1]],
+        [[1, 0, 0],
+         [1, 0, 0],
+         [1, 1, 1],
+         [1, 1, 1]],
+    ], np.int8)
+    actual, counts = vcf.sort_haplotypes(genotypes)
+
+    expect = np.array([
+        [0, 0, 0], 
+        [1, 1, 1], 
+        [1, 0, 0], 
+        [0, 1, 1],
+    ], np.int8)
+    expect_counts = np.array([0, 5, 4, 2])
+
+    np.testing.assert_array_equal(actual, expect)
+    np.testing.assert_array_equal(counts, expect_counts)
+
+
+def test_expected_dosage():
+    haplotypes = np.array([
+        [0, 0, 0],
+        [1, 0, 1],
+        [0, 1, 1],
+    ], dtype=np.int8)
+    genotypes = np.array([
+        [[0, 0, 0],
+         [0, 0, 0],
+         [0, 0, 0],
+         [0, 1, 1]],
+        [[0, 0, 0],
+         [0, 0, 0],
+         [0, 1, 1],
+         [0, 1, 1]],
+    ], dtype=np.int8)
+    probs = np.array([0.9, 0.1])
+
+    actual = vcf.expected_dosage(genotypes, probs, haplotypes)
+    expect = np.array([2.9, 1.1])
+    np.testing.assert_almost_equal(actual, expect)
