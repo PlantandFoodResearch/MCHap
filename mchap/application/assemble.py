@@ -471,28 +471,29 @@ class program(object):
         for b in bed:
             yield b.set_sequence(self.ref).set_variants(self.vcf)
 
-    def header(self):
-
-        # io
-        samples = self.samples
-
+    def _header_contigs(self):
         with pysam.Fastafile(self.ref) as fasta:
-            contigs = tuple(
+            contigs = [
                 vcf.ContigHeader(c, l)
                 for c, l in zip(fasta.references, fasta.lengths)
-            )
+            ]
+        return contigs
+
+    def header(self):
 
         # define vcf template
-        meta_fields=(
+        meta_fields=[
             vcf.headermeta.fileformat('v4.3'),
             vcf.headermeta.filedate(),
             vcf.headermeta.source(),
             vcf.headermeta.phasing('None'),
             vcf.headermeta.commandline(self.cli_command),
             vcf.headermeta.randomseed(self.random_seed),
-        )
+        ]
 
-        filters=(
+        contigs = self._header_contigs()
+
+        filters=[
             vcf.filters.SamplePassFilter(),
             vcf.filters.SampleKmerFilter(self.kmer_filter_k, self.kmer_filter_theshold),
             vcf.filters.SampleDepthFilter(self.depth_filter_threshold),
@@ -500,17 +501,17 @@ class program(object):
             vcf.filters.SamplePhenotypeProbabilityFilter(self.probability_filter_threshold),
             vcf.filters.SampleChainPhenotypeIncongruenceFilter(self.incongruence_filter_threshold),
             vcf.filters.SampleChainPhenotypeCNVFilter(self.incongruence_filter_threshold),
-        )
+        ]
 
-        info_fields=(
+        info_fields=[
             vcf.infofields.AN,
             vcf.infofields.AC,
             vcf.infofields.NS,
             vcf.infofields.END,
             vcf.infofields.SNVPOS,
-        )
+        ]
 
-        format_fields=(
+        format_fields=[
             vcf.formatfields.GT,
             vcf.formatfields.GQ,
             vcf.formatfields.PHQ,
@@ -522,27 +523,21 @@ class program(object):
             vcf.formatfields.GPM,
             vcf.formatfields.PPM, 
             vcf.formatfields.MPED,
-        )
+        ]
 
-        vcf_header = vcf.VCFHeader(
-            meta=meta_fields,
-            contigs=contigs,
-            filters=filters,
-            info_fields=info_fields,
-            format_fields=format_fields,
-            samples=tuple(samples),
-        )
+        columns = [vcf.headermeta.columns(self.samples)]
 
-        return vcf_header
+        header = meta_fields + contigs + filters + info_fields + format_fields + columns
+        return [str(line) for line in header]
 
-    def _assemble_locus(self, header, sample_bams, locus):
-        # label sample filters
-        kmer_filter = header.filters[1]
-        depth_filter = header.filters[2]
-        count_filter = header.filters[3]
-        prob_filter = header.filters[4]
-        incongruence_filter = header.filters[5]
-        cnv_filter = header.filters[6]
+    def _assemble_locus(self, sample_bams, locus):
+        # sample filters
+        kmer_filter = vcf.filters.SampleKmerFilter(self.kmer_filter_k, self.kmer_filter_theshold)
+        depth_filter = vcf.filters.SampleDepthFilter(self.depth_filter_threshold)
+        count_filter = vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold)
+        prob_filter = vcf.filters.SamplePhenotypeProbabilityFilter(self.probability_filter_threshold)
+        incongruence_filter = vcf.filters.SampleChainPhenotypeIncongruenceFilter(self.incongruence_filter_threshold)
+        cnv_filter = vcf.filters.SampleChainPhenotypeCNVFilter(self.incongruence_filter_threshold)
 
         # arrays of sample data in order
         n_samples = len(self.samples)
@@ -711,12 +706,12 @@ class program(object):
         header = self.header()
         sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
         pool = mp.Pool(self.n_cores)
-        jobs = ((header, sample_bams, locus) for locus in self.loci())
+        jobs = ((sample_bams, locus) for locus in self.loci())
         records = pool.starmap(self._assemble_locus, jobs)
-        return list(header.lines()) + records
+        return header + records
 
-    def _worker(self, header, sample_bams, locus, queue):
-        line = str(self._assemble_locus(header, sample_bams, locus))
+    def _worker(self, sample_bams, locus, queue):
+        line = str(self._assemble_locus(sample_bams, locus))
         queue.put(line)
         return line
 
@@ -731,10 +726,10 @@ class program(object):
     def _run_stdout_single_core(self):
         header = self.header()
         sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
-        for line in header.lines():
+        for line in header:
             sys.stdout.write(line + '\n')
         for locus in self.loci():
-            line = self._assemble_locus(header, sample_bams, locus)
+            line = self._assemble_locus(sample_bams, locus)
             sys.stdout.write(line + '\n')
 
     def run_stdout(self):
@@ -744,7 +739,7 @@ class program(object):
         header = self.header()
         sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
 
-        for line in header.lines():
+        for line in header:
             sys.stdout.write(line + '\n')
         sys.stdout.flush()
 
@@ -757,7 +752,7 @@ class program(object):
 
         jobs = []
         for locus in self.loci():
-            job = pool.apply_async(self._worker, (header, sample_bams, locus, queue))
+            job = pool.apply_async(self._worker, (sample_bams, locus, queue))
             jobs.append(job)
 
         for job in jobs:

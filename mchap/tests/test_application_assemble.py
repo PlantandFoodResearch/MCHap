@@ -7,7 +7,7 @@ import pysam
 import pytest
 
 from mchap.version import __version__
-from mchap.io.vcf.headermeta import filedate
+from mchap.io.vcf.headermeta import filedate, columns
 from mchap.application.assemble import program
 
 
@@ -153,6 +153,7 @@ def test_Program__header():
     prog = program.cli(command)
     header = prog.header()
 
+    # meta lines should be at the top
     meta_expect = [
         '##fileformat=VCFv4.3',
         str(filedate()),
@@ -161,7 +162,7 @@ def test_Program__header():
         '##commandline="{}"'.format(' '.join(command)),
         '##randomseed=11',
     ]
-    meta_actual = [str(i) for i in header.meta]
+    meta_actual = header[0:6]
     assert meta_actual == meta_expect
 
     contigs_expect = [
@@ -169,7 +170,7 @@ def test_Program__header():
         '##contig=<ID=CHR2,length=60>',
         '##contig=<ID=CHR3,length=60>',
     ]
-    contigs_actual = [str(i) for i in header.contigs]
+    contigs_actual = [line for line in header if line.startswith('##contig')]
     assert contigs_actual == contigs_expect
 
     filters_expect = [
@@ -181,19 +182,13 @@ def test_Program__header():
         '##FILTER=<ID=mci60,Description="Replicate Markov chains found incongruent phenotypes with posterior probability greater than 0.6">',
         '##FILTER=<ID=cnv60,Description="Combined chains found more haplotypes than ploidy with posterior probability greater than 0.6">',
     ]
-    filters_actual = [str(i) for i in header.filters]
+    filters_actual = [line for line in header if line.startswith('##FILTER')]
     assert filters_actual == filters_expect
 
-
-    samples_expect = ('SAMPLE1', 'SAMPLE2', 'SAMPLE3')
-    samples_actual = header.samples
-    assert samples_actual == samples_expect
-
-    columns_expect = ('CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT')
-    columns_expect += samples_expect
-    columns_actual = header.columns()
-    assert columns_expect == columns_actual
-
+    samples_expect = ['SAMPLE1', 'SAMPLE2', 'SAMPLE3']
+    columns_expect = columns(samples_expect)
+    columns_actual = [line for line in header if line.startswith('#CHROM')][0]
+    assert columns_actual == columns_expect
 
 def test_Program__run():
     path = pathlib.Path(__file__).parent.absolute()

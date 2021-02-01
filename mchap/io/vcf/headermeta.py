@@ -51,3 +51,18 @@ def reference(path):
 
 def phasing(string):
     return MetaHeader('phasing', string)
+
+
+def columns(samples):
+    cols = [
+        'CHROM',
+        'POS',
+        'ID',
+        'REF',
+        'ALT',
+        'QUAL',
+        'FILTER',
+        'INFO',
+        'FORMAT',
+    ]
+    return '#' + '\t'.join(cols) + '\t' + '\t'.join(samples)
