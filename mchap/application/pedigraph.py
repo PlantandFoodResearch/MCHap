@@ -8,8 +8,34 @@ import pysam
 import warnings
 from dataclasses import dataclass
 
-from mchap.io.biotargetsfile import read_biotargets
-from mchap.io.vcf.genotypes import Genotype
+
+def read_pedigree(path, label_column=0):
+    """File containing map of pedigree node name to father and mother nodes.
+    Missing parents should be specified as '.'.
+    """
+    with open(path, 'r') as f:
+        lines = f.readlines()
+    lines = [line.strip().split('\t') for line in lines]
+    digraph = nx.DiGraph()
+    for line in lines:
+        assert len(line) >= 3
+        child, father, mother = line[0], line[1], line[2]
+        digraph.add_node(child, label=line[label_column])
+        if father != '.':
+            digraph.add_edge(father, child)
+        if mother != '.':
+            digraph.add_edge(mother, child)
+    return digraph
+
+
+def read_sample_pedigree_map(path):
+    """File containing map of VCF sample names to a pedigree nodes.
+    """
+    with open(path, 'r') as f:
+        lines = f.readlines()
+    lines = [line.strip().split('\t') for line in lines]
+    sample_pedigree = {sample: node for sample, node in lines}
+    return sample_pedigree
 
 
 def ancestors(graph, *args, stop=None):
@@ -125,7 +151,7 @@ class program(object):
             type=str,
             nargs=1,
             default=[],
-            help='Biotargets file with pedigree fields.',
+            help='Tab seperated file mapping child nodes to father and mother nodes.',
         )
 
         parser.add_argument(
@@ -133,7 +159,7 @@ class program(object):
             type=str,
             nargs=1,
             default=[None],
-            help='Biotargets file mapping sample ids (first column) to pedigree items.',
+            help='File containing map of VCF sample names to a pedigree nodes.',
         )
 
         parser.add_argument(
@@ -146,10 +172,10 @@ class program(object):
 
         parser.add_argument(
             '--label-column',
-            type=str,
+            type=int,
             nargs=1,
-            default=['label'],
-            help='Column name to use as pedigree item labels.',
+            default=[0],
+            help='Column of pedigree file to use as pedigree item labels.',
         )
 
         parser.set_defaults(simplify_haplotypes=False)
@@ -244,17 +270,11 @@ class program(object):
             sys.exit(1)
         args = parser.parse_args(command[2:])
 
-        btf_ped = read_biotargets(args.ped[0])
-        digraph = btf_ped.pedigree_digraph()
 
-        if btf_ped and args.sample_pedigree_map[0]:
-            btf_map = read_biotargets(args.sample_pedigree_map[0])
-            sample_col = btf_map.header.column_names()[0]
-            pedigree_col = btf_ped.header.pedigree_column()
-            sample_map = {
-                d[sample_col]: d[pedigree_col] 
-                for d in btf_map.iter_dicts()
-            }
+        digraph = read_pedigree(args.ped[0], label_column=args.label_column[0])
+
+        if args.sample_pedigree_map[0]:
+            sample_map = read_sample_pedigree_map(args.sample_pedigree_map[0])
         else:
             sample_map = None
 
@@ -270,7 +290,6 @@ class program(object):
             sample_map=sample_map,
             style=style,
             default_ploidy=args.default_ploidy[0],
-            label=args.label_column[0],
             simplify_haplotypes=args.simplify_haplotypes,
             transpose_haplotypes=args.transpose_haplotypes,
             show_sample_names=args.show_sample_names,
@@ -357,8 +376,9 @@ def variant_genotype_graph(
     ped_sample_genotypes = {}
     ped_sample_filtered = {}
     for sample, record in variant.samples.items():
-        tup = tuple(-1 if a is None else a for a in record['GT'])
-        genotype = str(Genotype(tup, record.phased))
+        tup = tuple('.' if a is None else str(a) for a in record['GT'])
+        sep = '|' if record.phased else '/'
+        genotype = sep.join(tup)
         if sample_map:
             ped_item = sample_map[sample]
         else:
