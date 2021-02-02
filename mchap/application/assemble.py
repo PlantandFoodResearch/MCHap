@@ -509,6 +509,7 @@ class program(object):
             vcf.infofields.NS,
             vcf.infofields.END,
             vcf.infofields.SNVPOS,
+            vcf.infofields.AD,
         ]
 
         format_fields=[
@@ -523,6 +524,7 @@ class program(object):
             vcf.formatfields.GPM,
             vcf.formatfields.PPM, 
             vcf.formatfields.MPED,
+            vcf.formatfields.AD,
         ]
 
         columns = [vcf.headermeta.columns(self.samples)]
@@ -658,6 +660,7 @@ class program(object):
         # additional sample data requiring sorted alleles
         sample_GT = np.empty(n_samples, dtype='O')
         sample_MPED = np.empty(n_samples, dtype='O')
+        sample_AD = np.empty((n_samples, len(vcf_alleles)), dtype=int)
         for i, sample in enumerate(self.samples):
             sample_GT[i] = vcf.genotype_string(sample_genotype[i], vcf_haplotypes)
             dosage_expected = vcf.expected_dosage(
@@ -666,6 +669,7 @@ class program(object):
                 vcf_haplotypes,
             )
             sample_MPED[i] = np.round(dosage_expected, self.precision)
+            sample_AD[i] = np.sum(integer.read_assignment(sample_read_calls[i], vcf_haplotypes) == 1, axis=0)
 
         # vcf line formating
         vcf_INFO = vcf.format_info_field(
@@ -674,6 +678,7 @@ class program(object):
             NS=info_NS,
             END=info_END,
             SNVPOS=info_SNVPOS,
+            AD=sample_AD.sum(axis=0)
         )
 
         vcf_FORMAT = vcf.format_sample_field(
@@ -688,6 +693,7 @@ class program(object):
             GPM=sample_GPM,
             PPM=sample_PPM,
             MPED=sample_MPED,
+            AD=sample_AD,
         )
 
         return vcf.format_record(

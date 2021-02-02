@@ -1,6 +1,6 @@
 ##fileformat=VCFv4.3
 ##fileDate=20210128
-##source=mchap v0.2.3
+##source=mchap v0.3.0
 ##phasing=None
 ##commandline="mchap denovo --bam simple.sample1.deep.bam simple.sample2.deep.bam simple.sample3.deep.bam --ploidy 4 --targets simple.bed.gz --variants simple.vcf.gz --reference simple.fasta --mcmc-steps 500 --mcmc-burn 100 --mcmc-seed 11"
 ##randomseed=11
@@ -19,6 +19,7 @@
 ##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of samples with data">
 ##INFO=<ID=END,Number=1,Type=Integer,Description="End position on CHROM">
 ##INFO=<ID=SNVPOS,Number=.,Type=Integer,Description="Relative (1-based) positions of SNVs within haplotypes">
+##INFO=<ID=AD,Number=R,Type=Integer,Description="Total number of reads unambiguously assigned to each allele based on MEC">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality">
 ##FORMAT=<ID=PHQ,Number=1,Type=Integer,Description="Phenotype quality">
@@ -30,7 +31,8 @@
 ##FORMAT=<ID=GPM,Number=1,Type=Float,Description="Genotype posterior mode probability">
 ##FORMAT=<ID=PPM,Number=1,Type=Float,Description="Penotype posterior mode probability">
 ##FORMAT=<ID=MPED,Number=.,Type=Float,Description="Mode phenotype expected dosage">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Number of reads unambiguously assigned to each allele based on MEC">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1	SAMPLE2	SAMPLE3
-CHR1	6	CHR1_05_25	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	.	AN=3;AC=3,2;NS=3;END=25;SNVPOS=2,11,18	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:FT:GPM:PPM:MPED	0/0/1/2:60:60:133:200:400:0:PASS:1:1:2,1,1	0/0/1/1:60:60:133:200:400:0:PASS:1:1:2,2	0/0/0/2:60:60:133:200:400:0:PASS:1:1:3,1
-CHR1	31	CHR1_30_50	AAAAAAAAAAAAAAAAAAAA	.	.	.	AN=0;AC=.;NS=3;END=50;SNVPOS=.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:FT:GPM:PPM:MPED	0/0/0/0:60:60:.:240:0:0:PASS:1:1:.	0/0/0/0:60:60:.:240:0:0:PASS:1:1:.	0/0/0/0:60:60:.:240:0:0:PASS:1:1:.
-CHR2	11	CHR2_10_30	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAGAAAAAAAAAA,AAAAAAAAATAAAAAAAAAA,AAAATAAAAGAAAAAAAAAA	.	.	AN=4;AC=3,2,1;NS=3;END=30;SNVPOS=5,10	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:FT:GPM:PPM:MPED	0/0/0/2:60:60:140:240:280:0:PASS:1:1:3,1	0/0/1/2:60:60:140:240:280:0:PASS:1:1:2,1,1	0/1/1/3:60:60:140:240:280:0:PASS:1:1:1,2,1
+CHR1	6	CHR1_05_25	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	.	AN=3;AC=3,2;NS=3;END=25;SNVPOS=2,11,18;AD=350,150,100	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:FT:GPM:PPM:MPED:AD	0/0/1/2:60:60:133:200:400:0:PASS:1:1:2,1,1:100,50,50	0/0/1/1:60:60:133:200:400:0:PASS:1:1:2,2:100,100,0	0/0/0/2:60:60:133:200:400:0:PASS:1:1:3,1:150,0,50
+CHR1	31	CHR1_30_50	AAAAAAAAAAAAAAAAAAAA	.	.	.	AN=0;AC=.;NS=3;END=50;SNVPOS=.;AD=720	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:FT:GPM:PPM:MPED:AD	0/0/0/0:60:60:.:240:0:0:PASS:1:1:.:240	0/0/0/0:60:60:.:240:0:0:PASS:1:1:.:240	0/0/0/0:60:60:.:240:0:0:PASS:1:1:.:240
+CHR2	11	CHR2_10_30	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAGAAAAAAAAAA,AAAAAAAAATAAAAAAAAAA,AAAATAAAAGAAAAAAAAAA	.	.	AN=4;AC=3,2,1;NS=3;END=30;SNVPOS=5,10;AD=240,90,80,30	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:FT:GPM:PPM:MPED:AD	0/0/0/2:60:60:140:240:280:0:PASS:1:1:3,1:120,0,40,0	0/0/1/2:60:60:140:240:280:0:PASS:1:1:2,1,1:80,30,40,0	0/1/1/3:60:60:140:240:280:0:PASS:1:1:1,2,1:40,60,0,30

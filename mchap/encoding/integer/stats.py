@@ -25,7 +25,7 @@ def minimum_error_correction(reads, genotype):
     return diff.sum(axis=-1).min(axis=-1)
 
 
-def read_assignment(reads, genotype):
+def read_assignment(reads, haplotypes):
     """
     Estimate the number of alleles assigned to each haplotype
     based on minimum error correction of individual reads.
@@ -34,7 +34,7 @@ def read_assignment(reads, genotype):
     ----------
     reads : ndarray, int, shape (n_reads, n_base)
         Array of integers encoding alleles.
-    genotype : ndarray, int, shape (ploidy, n_base)
+    haplotypes : ndarray, int, shape (ploidy, n_base)
         Array of integers encoding alleles.
 
     Returns
@@ -51,11 +51,10 @@ def read_assignment(reads, genotype):
 
     """
     reads = np.expand_dims(reads, 1)
-    genotype = np.expand_dims(genotype, 0)
+    genotype = np.expand_dims(haplotypes, 0)
     diff = reads != genotype
     diff &= reads >= 0
     diff = diff.sum(axis=-1)
     mec = diff.min(axis=-1, keepdims=True)
     match = diff == mec
     return match / match.sum(axis=-1, keepdims=True)
-
