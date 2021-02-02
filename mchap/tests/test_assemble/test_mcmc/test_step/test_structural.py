@@ -327,7 +327,7 @@ def test_interval_step__recombination():
     # count choices of each option
     counts = {}
     for g in genotypes:
-        counts[g.tostring()] = 0
+        counts[g.tobytes()] = 0
     # simulation
     for _ in range(100000):
         llk = structural.interval_step(
@@ -339,10 +339,10 @@ def test_interval_step__recombination():
             step_type=0,
         )
         genotype = integer.sort(genotype)
-        counts[genotype.tostring()] += 1
+        counts[genotype.tobytes()] += 1
     totals = np.zeros(len(genotypes), dtype=np.int)
     for i, g in enumerate(genotypes):
-        totals[i] = counts[g.tostring()]
+        totals[i] = counts[g.tobytes()]
     
     simulation_posteriors = totals / totals.sum()
     
@@ -449,7 +449,7 @@ def test_interval_step__dosage_swap():
     # counts of each genotype
     counts = {}
     for g in genotypes:
-        counts[g.tostring()] = 0
+        counts[g.tobytes()] = 0
 
     # initial genotype for simulation
     genotype = np.array([
@@ -472,12 +472,12 @@ def test_interval_step__dosage_swap():
             step_type=1,
         )
         genotype = integer.sort(genotype)
-        counts[genotype.tostring()] += 1
+        counts[genotype.tobytes()] += 1
 
     # posteriors from simulation
     totals = np.zeros(len(genotypes), dtype=np.int)
     for i, g in enumerate(genotypes):
-        totals[i] = counts[g.tostring()]
+        totals[i] = counts[g.tobytes()]
     simulation_posteriors = totals / totals.sum()
     
     # exact and matrix posteriors should be arbitrarily close

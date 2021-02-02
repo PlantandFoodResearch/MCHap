@@ -54,9 +54,9 @@ def subtract(array_x, array_y):
     assert array_x.dtype == array_y.dtype
     element_shape = array_x.shape[1:]
     
-    x_map = {element.tostring(): element for element in array_x}
-    x_counts = _Counter(element.tostring() for element in array_x)
-    y_counts = _Counter(element.tostring() for element in array_y)
+    x_map = {element.tobytes(): element for element in array_x}
+    x_counts = _Counter(element.tobytes() for element in array_x)
+    y_counts = _Counter(element.tobytes() for element in array_y)
     
     counts = x_counts - y_counts
     shape = (sum(counts.values()), *element_shape)
@@ -95,9 +95,9 @@ def intercept(array_x, array_y):
     assert array_x.dtype == array_y.dtype
     element_shape = array_x.shape[1:]
     
-    x_map = {element.tostring(): element for element in array_x}
-    x_counts = _Counter(element.tostring() for element in array_x)
-    y_counts = _Counter(element.tostring() for element in array_y)
+    x_map = {element.tobytes(): element for element in array_x}
+    x_counts = _Counter(element.tobytes() for element in array_x)
+    y_counts = _Counter(element.tobytes() for element in array_y)
     
     counts = x_counts & y_counts
     shape = (sum(counts.values()), *element_shape)
@@ -136,10 +136,10 @@ def union(array_x, array_y):
     assert array_x.dtype == array_y.dtype
     element_shape = array_x.shape[1:]
     
-    u_map = {element.tostring(): element for element in array_x}
-    u_map.update({element.tostring(): element for element in array_y})
-    x_counts = _Counter(element.tostring() for element in array_x)
-    y_counts = _Counter(element.tostring() for element in array_y)
+    u_map = {element.tobytes(): element for element in array_x}
+    u_map.update({element.tobytes(): element for element in array_y})
+    x_counts = _Counter(element.tobytes() for element in array_x)
+    y_counts = _Counter(element.tobytes() for element in array_y)
     
     counts = x_counts | y_counts
     shape = (sum(counts.values()), *element_shape)
@@ -177,8 +177,8 @@ def equal(array_x, array_y):
     assert array_x.ndim == array_y.ndim
     assert array_x.dtype == array_y.dtype
 
-    counts_x = _Counter(a.tostring() for a in array_x)
-    counts_y = _Counter(a.tostring() for a in array_y)
+    counts_x = _Counter(a.tobytes() for a in array_x)
+    counts_y = _Counter(a.tobytes() for a in array_y)
 
     return counts_x == counts_y
 
@@ -205,8 +205,8 @@ def contains(array_x, array_y):
     of elements.
     
     """
-    counts_x = _Counter(a.tostring() for a in array_x)
-    counts_y = _Counter(a.tostring() for a in array_y)
+    counts_x = _Counter(a.tobytes() for a in array_x)
+    counts_y = _Counter(a.tobytes() for a in array_y)
 
     return len(counts_y - counts_x) == 0
 
@@ -233,8 +233,8 @@ def within(array_x, array_y):
     of elements.
     
     """
-    counts_x = _Counter(a.tostring() for a in array_x)
-    counts_y = _Counter(a.tostring() for a in array_y)
+    counts_x = _Counter(a.tobytes() for a in array_x)
+    counts_y = _Counter(a.tobytes() for a in array_y)
 
     return len(counts_x - counts_y) == 0
 
@@ -255,10 +255,10 @@ def unique_idx(array):
         element.
 
     """
-    strings = {a.tostring() for a in array}
+    strings = {a.tobytes() for a in array}
     idx = np.zeros(len(array)).astype(np.bool)
     for i in range(len(idx)):
-        string = array[i].tostring()
+        string = array[i].tobytes()
         if string in strings:
             strings -= {string}
             idx[i] = True
@@ -313,10 +313,10 @@ def categorize(array, categories):
     # category indices are category labels
     labels = {}
     for i, cat in enumerate(categories):
-        labels[cat.tostring()] = i
+        labels[cat.tobytes()] = i
     labeled = np.empty(len(array), np.int)
     for i, a in enumerate(array):
-        label = labels.get(a.tostring(), -1)  # -1 is unlabeled
+        label = labels.get(a.tobytes(), -1)  # -1 is unlabeled
         labeled[i] = label
     return labeled
 
@@ -347,10 +347,10 @@ def count(array, categories):
     """
     assert categories.ndim == array.ndim
     assert categories.dtype == array.dtype
-    strings = _Counter(a.tostring() for a in array)
+    strings = _Counter(a.tobytes() for a in array)
     counts = np.zeros(len(categories), dtype=np.int)
     for i, cat in enumerate(categories):
-        string = cat.tostring()
+        string = cat.tobytes()
         if string in strings:
             counts[i] = strings[string]
         else:

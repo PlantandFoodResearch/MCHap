@@ -383,9 +383,9 @@ def test_DenovoMCMC__temperatures_bias(temperatures):
     )
     trace = model.fit(reads)
     posterior = trace.burn(100).posterior()
-    simulation_posteriors = {g.tostring(): 0 for g in genotypes}
-    simulation_posteriors.update({g.tostring(): p for g, p in zip(posterior.genotypes, posterior.probabilities)})
-    simulation_posteriors = [simulation_posteriors[g.tostring()] for g in genotypes]
+    simulation_posteriors = {g.tobytes(): 0 for g in genotypes}
+    simulation_posteriors.update({g.tobytes(): p for g, p in zip(posterior.genotypes, posterior.probabilities)})
+    simulation_posteriors = [simulation_posteriors[g.tobytes()] for g in genotypes]
 
     # check posteriors are similar
     np.testing.assert_array_almost_equal(

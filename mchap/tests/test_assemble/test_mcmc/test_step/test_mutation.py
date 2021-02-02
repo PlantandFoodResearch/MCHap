@@ -58,8 +58,8 @@ def test_base_step():
     # sample from dist to aproximate conditionals
     seed_numba(42)
     counts = {
-        genotype_1.tostring(): 0,
-        genotype_2.tostring(): 0,
+        genotype_1.tobytes(): 0,
+        genotype_2.tobytes(): 0,
     }
     n_steps = 100_000
     for _ in range(n_steps):
@@ -72,11 +72,11 @@ def test_base_step():
             unique_haplotypes=u_haps,
             n_alleles=2,
         )
-        counts[genotype.tostring()] += 1
+        counts[genotype.tobytes()] += 1
     
     actual = np.array([
-        counts[genotype_1.tostring()],
-        counts[genotype_2.tostring()],
+        counts[genotype_1.tobytes()],
+        counts[genotype_2.tobytes()],
     ]) / n_steps
 
     assert np.allclose(expect, actual, atol=1e-03)
@@ -193,7 +193,7 @@ def test_genotype_compound_step__posterior():
     # count choices of each option
     counts = {}
     for g in genotypes:
-        counts[g.tostring()] = 0
+        counts[g.tobytes()] = 0
     # simulation
     for _ in range(100000):
         llk = mutation.genotype_compound_step(
@@ -203,10 +203,10 @@ def test_genotype_compound_step__posterior():
             n_alleles=n_alleles
         )
         genotype = integer.sort(genotype)
-        counts[genotype.tostring()] += 1
+        counts[genotype.tobytes()] += 1
     totals = np.zeros(len(genotypes), dtype=np.int)
     for i, g in enumerate(genotypes):
-        totals[i] = counts[g.tostring()]
+        totals[i] = counts[g.tobytes()]
     
     simulation_posteriors = totals / totals.sum()
 

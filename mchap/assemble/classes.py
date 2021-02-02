@@ -108,7 +108,7 @@ class PosteriorGenotypeDistribution(object):
 
         for i, gen in enumerate(self.genotypes):
             phenotype = mset.unique(gen)
-            string = phenotype.tostring()
+            string = phenotype.tobytes()
             if string not in phenotype_labels:
                 label = i
                 phenotype_labels[string] = label

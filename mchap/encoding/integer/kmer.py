@@ -67,7 +67,7 @@ def kmer_counts(array, k=3):
     kmers_dict = {}
     counts_dict = {}
     for kmer in iter_kmers(array, k=k):
-        string = kmer.tostring()
+        string = kmer.tobytes()
         if string not in kmers_dict:
             kmers_dict[string] = kmer
             counts_dict[string] = 1

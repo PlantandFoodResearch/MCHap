@@ -43,7 +43,7 @@ def gamete_probabilities(genotypes,
     string_to_hap = {}
     genotype_strings = np.empty(n_gens * ploidy, dtype='<O')
     for i, hap in enumerate(genotypes.reshape(n_gens * ploidy, n_base)):
-        string = hap.tostring()
+        string = hap.tobytes()
         string_to_hap[string] = hap
         genotype_strings[i] = string
     genotype_strings = np.sort(genotype_strings.reshape(n_gens, ploidy), axis=-1)
@@ -133,7 +133,7 @@ def cross_probabilities(maternal_gametes,
                     idx += 1
 
             genotype = integer.sort(genotype)
-            string = genotype.tostring()
+            string = genotype.tobytes()
             if string not in string_to_genotype:
                 string_to_genotype[string] = genotype
 
