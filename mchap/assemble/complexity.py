@@ -52,7 +52,7 @@ def count_unique_alleles(locus):
         Number of unique alleles at each position defined by the locus.
 
     """
-    return np.fromiter(map(len, locus.alleles), dtype=np.int)
+    return np.fromiter(map(len, locus.alleles), dtype=int)
 
 
 def count_unique_haplotypes(u_alleles):

@@ -181,7 +181,7 @@ def encode_read_alleles(locus, symbols):
 def encode_read_distributions(locus, calls, quals, error_rate=0.0):
 
     # convert error_rate to prob of correct call
-    probs = np.ones((calls.shape), dtype=np.float) * (1 - error_rate)
+    probs = np.ones((calls.shape), dtype=float) * (1 - error_rate)
 
     # convert qual scores to probs and multiply
     probs *= util.prob_of_qual(quals)

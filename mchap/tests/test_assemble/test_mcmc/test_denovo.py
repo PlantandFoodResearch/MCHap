@@ -64,7 +64,7 @@ def test_homozygosity_probabilities():
         errors=False, 
     )
     actual = denovo._homozygosity_probabilities(reads, ploidy) > 0.999
-    expect = np.zeros((6, 2), dtype=np.bool)
+    expect = np.zeros((6, 2), dtype=bool)
     np.testing.assert_array_equal(actual, expect)
 
     # 32 reads
@@ -82,7 +82,7 @@ def test_homozygosity_probabilities():
         [False, False],
         [False, True],
         [False, True],
-    ], dtype=np.bool)
+    ], dtype=bool)
     np.testing.assert_array_equal(actual, expect)
 
 
@@ -94,7 +94,7 @@ def test_DenovoMCMC__all_nans():
     model = denovo.DenovoMCMC(ploidy=ploidy, steps=n_steps, chains=n_chains)
 
     # high read depth
-    reads = np.empty((10, n_base, 2), dtype=np.float)
+    reads = np.empty((10, n_base, 2), dtype=float)
     reads[:] = np.nan
 
     trace = model.fit(reads).burn(n_burn)

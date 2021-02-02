@@ -8,7 +8,7 @@ def as_probabilistic(
     n_alleles=4, 
     p=1.0, 
     error_factor=3, 
-    dtype=np.float):
+    dtype=float):
     """Converts an array of integer encoded alleles to an 
     array of probabilistic row vectors.
 

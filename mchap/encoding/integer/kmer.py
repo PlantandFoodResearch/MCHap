@@ -27,7 +27,7 @@ def iter_kmers(array, k=3):
     """
     n_base = array.shape[-1]
     n_windows = n_base - (k - 1)
-    masks = np.zeros((n_windows, n_base), dtype=np.bool)
+    masks = np.zeros((n_windows, n_base), dtype=bool)
     for i in range(n_windows):
         masks[i][i:i+k]=True
     for read in array.reshape(-1, n_base):
@@ -75,12 +75,12 @@ def kmer_counts(array, k=3):
             counts_dict[string] += 1
             
     if kmer is None:  # handle case of no kmers
-        return np.array([], dtype=array.dtype), np.array([], dtype=np.int)
+        return np.array([], dtype=array.dtype), np.array([], dtype=int)
 
     n_base = len(kmer)
     n_kmer = len(kmers_dict)
     kmers = np.empty((n_kmer, n_base), dtype=array.dtype)
-    counts = np.empty(n_kmer, dtype=np.int)
+    counts = np.empty(n_kmer, dtype=int)
 
     for i, (string, kmer) in enumerate(kmers_dict.items()):
         kmers[i]=kmer
@@ -145,11 +145,11 @@ def kmer_frequency(kmers, counts):
     # position of first coding base
     positions = np.where(is_coding)[1][0::k]
     # number of kmers starting at each position
-    depths = np.zeros(kmers.shape[-2] - (k-1), dtype=np.int)
+    depths = np.zeros(kmers.shape[-2] - (k-1), dtype=int)
     for i, pos in enumerate(positions):
         depths[pos] += counts[i]
     # kmer frequency at it's position
-    freqs = np.empty(len(kmers), dtype=np.float)
+    freqs = np.empty(len(kmers), dtype=float)
     for i, pos in enumerate(positions):
         freqs[i] = counts[i] / depths[pos]
     return freqs

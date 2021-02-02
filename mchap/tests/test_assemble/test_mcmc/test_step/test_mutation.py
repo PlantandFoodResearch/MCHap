@@ -204,7 +204,7 @@ def test_genotype_compound_step__posterior():
         )
         genotype = integer.sort(genotype)
         counts[genotype.tobytes()] += 1
-    totals = np.zeros(len(genotypes), dtype=np.int)
+    totals = np.zeros(len(genotypes), dtype=int)
     for i, g in enumerate(genotypes):
         totals[i] = counts[g.tobytes()]
     

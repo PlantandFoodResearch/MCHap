@@ -70,6 +70,6 @@ def test_count_unique_genotype_permutations():
     pytest.param([1, 1, 1, 1], 24),
 ])
 def test_count_genotype_permutations(dosage, answer):
-    dosage = np.array(dosage, dtype=np.int)
+    dosage = np.array(dosage, dtype=int)
     query = complexity.count_genotype_permutations(dosage)
     assert query == answer

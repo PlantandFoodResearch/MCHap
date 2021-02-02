@@ -63,7 +63,7 @@ def gamete_probabilities(genotypes,
     # convert from hash map of string: prob back to arrays
     n_gametes = len(gamete_probs)
     new = np.empty((n_gametes, ploidy // 2, n_base), dtype=np.int8)
-    new_probs = np.empty(n_gametes, dtype=np.float)
+    new_probs = np.empty(n_gametes, dtype=float)
     for i, (strings, prob) in enumerate(gamete_probs.items()):
         new_probs[i] = prob
         for j, string in enumerate(strings):
@@ -146,7 +146,7 @@ def cross_probabilities(maternal_gametes,
     # convert genotypes bac to arrays
     n_genotypes = len(genotype_probs)
     new = np.empty((n_genotypes, ploidy, n_base), dtype=np.int8)
-    new_probs = np.empty(n_genotypes, dtype=np.float)
+    new_probs = np.empty(n_genotypes, dtype=float)
 
     for i, (string, prob) in enumerate(genotype_probs.items()):
         new_probs[i] = prob

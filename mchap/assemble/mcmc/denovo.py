@@ -161,7 +161,7 @@ class DenovoMCMC(Assembler):
             # tile for each haplotype in each "step"
             genotypes = np.tile(haplotype, (self.steps, self.ploidy, 1))
             # set likelihoods to nan
-            llks = np.empty(self.steps, dtype=np.float)
+            llks = np.empty(self.steps, dtype=float)
             llks[:] = np.nan
             return genotypes, llks
 
@@ -464,7 +464,7 @@ def _homozygosity_probabilities(reads, ploidy):
     # iterate through each base position
     for i in range(len(probs)):
         # number of valid alleles at this base position
-        n_alleles = np.sum(~mask[i]).astype(np.int)
+        n_alleles = np.sum(~mask[i]).astype(int)
         
         # vector of unique alleles 
         alleles = np.arange(n_alleles, dtype=np.int8)
@@ -477,7 +477,7 @@ def _homozygosity_probabilities(reads, ploidy):
         sub_reads = reads[:, i:i+1, :]
         
         # array to store llks
-        llks = np.empty(len(genotypes), dtype = np.float)
+        llks = np.empty(len(genotypes), dtype = float)
         
         # array to store dosage
         dosage = np.ones(ploidy, dtype=np.int8)

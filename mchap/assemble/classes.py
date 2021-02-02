@@ -101,7 +101,7 @@ class PosteriorGenotypeDistribution(object):
         genotypes that consist of the haplotypes of that genotype.
 
         """
-        labels = np.zeros(len(self.genotypes), dtype=np.int)
+        labels = np.zeros(len(self.genotypes), dtype=int)
         phenotype_labels = {}  # string: int
         probs = {}  # int: float
         #phenotypes = {}  # int: array

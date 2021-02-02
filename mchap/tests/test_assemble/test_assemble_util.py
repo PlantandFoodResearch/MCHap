@@ -108,8 +108,8 @@ def test_log_likelihoods_as_conditionals_zeros():
 ])
 def test_array_equal(x, y, interval, answer):
 
-    x = np.array(x, dtype=np.int)
-    y = np.array(y, dtype=np.int)
+    x = np.array(x, dtype=int)
+    y = np.array(y, dtype=int)
 
     query = util.array_equal(x, y, interval=interval)
 
@@ -169,7 +169,7 @@ def test_get_dosage(genotype, interval, answer):
     answer = np.array(answer)
 
     ploidy = len(genotype)
-    dosage = np.ones(ploidy, dtype=np.int)
+    dosage = np.ones(ploidy, dtype=int)
 
     util.get_dosage(dosage, genotype, interval=interval)
 
@@ -185,7 +185,7 @@ def set_dosage():
     )
 
     # target dosage
-    dosage = np.array([3, 1, 0, 0], dtype=np.int)
+    dosage = np.array([3, 1, 0, 0], dtype=int)
 
     util.set_dosage(genotype, dosage)
 
@@ -216,7 +216,7 @@ def test_factorial_20():
     pytest.param([1, 1, 1, 1], 24),
 ])
 def test_count_equivalent_permutations(dosage, answer):
-    dosage = np.array(dosage, dtype=np.int)
+    dosage = np.array(dosage, dtype=int)
     query = util.count_equivalent_permutations(dosage)
     assert query == answer
 
@@ -228,9 +228,9 @@ def test_sample_alleles():
         [[0.9, 0.1, 0.0], [0.4, 0.3, 0.3]]
     ])
 
-    accumulate = np.zeros(array.shape, dtype=np.float)
+    accumulate = np.zeros(array.shape, dtype=float)
     for _ in range(10000):
-        accumulate += integer.as_probabilistic(util.sample_alleles(array), 3, dtype=np.float)
+        accumulate += integer.as_probabilistic(util.sample_alleles(array), 3, dtype=float)
 
     # should be no samples from zero probability alleles
     assert accumulate[0][0][-1] == 0

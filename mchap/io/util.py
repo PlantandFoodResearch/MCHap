@@ -46,4 +46,4 @@ def qual_of_prob(prob, precision=6):
         prob = np.array([maximum if p > maximum else p for p in prob])
         
     prob = np.floor(prob * 10**precision) / 10**precision
-    return np.round((-10 * np.log10((1 - prob)))).astype(np.int)
+    return np.round((-10 * np.log10((1 - prob)))).astype(int)

@@ -87,7 +87,7 @@ def test_structural_change(genotype, haplotype_indices, interval, answer):
 
     genotype = np.array(genotype, dtype=np.int8)
     haplotype_indices = np.array(haplotype_indices, dtype=np.int8)
-    answer = np.array(answer, dtype=np.int)
+    answer = np.array(answer, dtype=int)
 
     structural.structural_change(genotype, haplotype_indices, interval=interval)
 
@@ -150,7 +150,7 @@ def test_structural_change(genotype, haplotype_indices, interval, answer):
 def test_haplotype_segment_labels(genotype, interval, answer):
 
     genotype = np.array(genotype, dtype=np.int8)
-    answer = np.array(answer, dtype=np.int)
+    answer = np.array(answer, dtype=int)
 
     query = structural.haplotype_segment_labels(genotype, interval=interval)
 
@@ -340,7 +340,7 @@ def test_interval_step__recombination():
         )
         genotype = integer.sort(genotype)
         counts[genotype.tobytes()] += 1
-    totals = np.zeros(len(genotypes), dtype=np.int)
+    totals = np.zeros(len(genotypes), dtype=int)
     for i, g in enumerate(genotypes):
         totals[i] = counts[g.tobytes()]
     
@@ -475,7 +475,7 @@ def test_interval_step__dosage_swap():
         counts[genotype.tobytes()] += 1
 
     # posteriors from simulation
-    totals = np.zeros(len(genotypes), dtype=np.int)
+    totals = np.zeros(len(genotypes), dtype=int)
     for i, g in enumerate(genotypes):
         totals[i] = counts[g.tobytes()]
     simulation_posteriors = totals / totals.sum()

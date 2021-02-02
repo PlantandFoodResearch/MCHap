@@ -123,4 +123,4 @@ def depth(array, counts=None):
         return np.sum(is_call(array), axis=-2)
     else:
         counts = np.expand_dims(counts, -1)
-        return np.sum(is_call(array).astype(np.int) * counts, axis=-2)
+        return np.sum(is_call(array).astype(int) * counts, axis=-2)

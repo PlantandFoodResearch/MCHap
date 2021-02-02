@@ -91,7 +91,7 @@ def _kmer_representation(variants, haplotype_calls, k=3):
         return np.ones(n_pos)
 
     # index of kmers not found in haplotypes
-    idx = mset.count(hap_kmers, read_kmers).astype(np.bool) == False
+    idx = mset.count(hap_kmers, read_kmers).astype(bool) == False
     
     # depth of unique kmers
     unique_depth = integer.depth(read_kmers[idx], read_kmer_counts[idx])

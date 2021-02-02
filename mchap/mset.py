@@ -256,7 +256,7 @@ def unique_idx(array):
 
     """
     strings = {a.tobytes() for a in array}
-    idx = np.zeros(len(array)).astype(np.bool)
+    idx = np.zeros(len(array)).astype(bool)
     for i in range(len(idx)):
         string = array[i].tobytes()
         if string in strings:
@@ -314,7 +314,7 @@ def categorize(array, categories):
     labels = {}
     for i, cat in enumerate(categories):
         labels[cat.tobytes()] = i
-    labeled = np.empty(len(array), np.int)
+    labeled = np.empty(len(array), int)
     for i, a in enumerate(array):
         label = labels.get(a.tobytes(), -1)  # -1 is unlabeled
         labeled[i] = label
@@ -348,7 +348,7 @@ def count(array, categories):
     assert categories.ndim == array.ndim
     assert categories.dtype == array.dtype
     strings = _Counter(a.tobytes() for a in array)
-    counts = np.zeros(len(categories), dtype=np.int)
+    counts = np.zeros(len(categories), dtype=int)
     for i, cat in enumerate(categories):
         string = cat.tobytes()
         if string in strings:
