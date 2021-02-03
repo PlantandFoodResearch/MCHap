@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from mchap.testing import simulate_reads
 from mchap.assemble.likelihood import *
 from mchap.assemble.likelihood import _log_dirichlet_multinomial_pmf
 
@@ -75,6 +76,26 @@ def test_log_likelihood():
 
     assert np.round(query, 10) == np.round(answer, 10)
 
+@pytest.mark.parametrize("ploidy,n_base,n_reps", [
+    [2, 3, 10],
+    [2, 5, 10],
+    [4, 3, 10],
+    [4, 8, 10],
+])
+def test_log_likelihood__fuzz(ploidy, n_base, n_reps):
+    np.random.seed(0)
+    for _ in range(n_reps):
+        # 'real' genotype
+        haplotypes = np.random.randint(2, size=(ploidy, n_base))
+        reads = simulate_reads(haplotypes)
+
+        # 'proposed' genotype
+        proposed = np.random.randint(2, size=(ploidy, n_base))
+
+        actual = log_likelihood(reads, proposed)
+        expect = np.log(reference_likelihood(reads, proposed))
+        np.testing.assert_almost_equal(actual, expect, decimal=10)
+
 
 @pytest.mark.parametrize("reads, genotype, haplotype_indices, interval, final_genotype", [
     pytest.param(
@@ -139,6 +160,34 @@ def test_log_likelihood_structural_change(reads, genotype, haplotype_indices, in
 
     assert query == answer
     assert np.round(query, 10) == np.round(reference, 10)
+
+
+@pytest.mark.parametrize("ploidy,n_base,interval,indicies,n_reps", [
+    [4, 5, (0, 3), [1,1,2,3], 10],
+    [4, 5, (1, 4), [1,0,2,3], 10],
+    [4, 8, (0, 3), [1,2,2,3], 10],
+    [4, 8, (3, 7), [0,1,3,2], 10],
+])
+def test_log_likelihood_structural_change__fuzz(ploidy, n_base, interval, indicies, n_reps):
+    np.random.seed(0)
+    indicies = np.array(indicies)
+    for _ in range(n_reps):
+        # 'real' genotype
+        haplotypes = np.random.randint(2, size=(ploidy, n_base))
+        reads = simulate_reads(haplotypes)
+
+        # 'proposed' genotype
+        proposed = np.random.randint(2, size=(ploidy, n_base))
+
+        # log like of proposed change
+        actual = log_likelihood_structural_change(reads, proposed, indicies, interval)
+
+        # make change
+        proposed[:,interval[0]:interval[1]] = proposed[indicies, interval[0]:interval[1]]
+        expect = np.log(reference_likelihood(reads, proposed))
+
+        np.testing.assert_almost_equal(actual, expect, decimal=10)
+
 
 
 @pytest.mark.parametrize("dosage,dispersion,unique_haplotypes,probability", 
