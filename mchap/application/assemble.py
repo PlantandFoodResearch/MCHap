@@ -37,6 +37,10 @@ class program(object):
     call_filtered: bool = False
     read_group_field: str = 'SM'
     read_error_rate: float = 0.0
+    mapping_quality: int = 20
+    skip_duplicates: bool = True
+    skip_qcfail: bool = True
+    skip_supplementary: bool = True
     mcmc_temperatures: tuple = (1.0, )
     mcmc_chains: int = 1
     mcmc_steps: int = 1000
@@ -186,6 +190,47 @@ class program(object):
             'By default only the phred score of each base call is used to '
             'calculate its probability of an incorrect call. '
             'The --error-rate value is added to that probability.')
+        )
+
+        parser.add_argument(
+            '--mapping-quality',
+            nargs=1,
+            type=int,
+            default=[20],
+            help=('Minimum mapping quality of reads used in assembly (default = 20).')
+        )
+
+        parser.set_defaults(skip_duplicates=True)
+        parser.add_argument(
+            '--keep-duplicate-reads',
+            dest='skip_duplicates',
+            action='store_false',
+            help=(
+                'Flag: Use reads marked as duplicates in the assembly '
+                '(these are skipped by default).'
+            )
+        )
+
+        parser.set_defaults(skip_qcfail=True)
+        parser.add_argument(
+            '--keep-qcfail-reads',
+            dest='skip_qcfail',
+            action='store_false',
+            help=(
+                'Flag: Use reads marked as qcfail in the assembly '
+                '(these are skipped by default).'
+            )
+        )
+
+        parser.set_defaults(skip_supplementary=True)
+        parser.add_argument(
+            '--keep-supplementary-reads',
+            dest='skip_supplementary',
+            action='store_false',
+            help=(
+                'Flag: Use reads marked as supplementary in the assembly '
+                '(these are skipped by default).'
+            )
         )
 
         parser.set_defaults(call_best_genotype=False)
@@ -445,6 +490,10 @@ class program(object):
             call_filtered=args.call_filtered,
             read_group_field=args.read_group_field[0],
             read_error_rate=args.error_rate[0],
+            mapping_quality=args.mapping_quality[0],
+            skip_duplicates=args.skip_duplicates,
+            skip_qcfail=args.skip_qcfail,
+            skip_supplementary=args.skip_supplementary,
             mcmc_chains=args.mcmc_chains[0],
             mcmc_temperatures=tuple(temperatures),
             mcmc_steps=args.mcmc_steps[0],
@@ -563,7 +612,15 @@ class program(object):
             path = sample_bams[sample]
 
             # extract read data
-            read_chars, read_quals = extract_read_variants(locus, path, id=self.read_group_field)[sample]
+            read_chars, read_quals = extract_read_variants(
+                locus,
+                path,
+                id=self.read_group_field,
+                min_quality=self.mapping_quality, 
+                skip_duplicates=self.skip_duplicates,
+                skip_qcfail=self.skip_qcfail,
+                skip_supplementary=self.skip_supplementary,
+            )[sample]
 
             # get read stats
             read_count = read_chars.shape[0]

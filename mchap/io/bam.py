@@ -32,14 +32,42 @@ def extract_read_variants(
         locus, 
         path, 
         samples=None,
-        id='ID',
+        id='SM',
         min_quality=20, 
-        read_dicts=False, 
+        skip_duplicates=True,
+        skip_qcfail=True,
+        skip_supplementary=True,
+        read_dicts=False,
     ):
     """Read variants defined for a locus from an alignment file
     
-    Sample is used as the sample identifier and may refere to any field in 
-    a reads read-group e.g. 'ID' or 'SM'.
+    Parameters
+    ----------
+    locus : Locus
+        A locus object defining a genomic locus with known variants.
+    path : str
+        Path to an indexed bam file.
+    samples : list, str
+        List of samples to extract from bam (default is to extract all samples).
+    id : str
+        Read group field to use as sample identifier: 'SM' or 'ID' (default = 'SM').
+    min_quality : int
+        Minimum allowed mapping quality of reads (default = 20).
+    skip_duplicates : bool
+        If true then reads marked as duplicates will be skipped.
+    skip_qcfail : bool
+        If true then reads marked as qcfail will be skipped.
+    skip_supplementary : bool
+        If true then reads marked as supplementary will be skipped.
+    read_dicts : bool
+        If true then a nested dictionary of samples to read-names to individual read arrays
+        will be returned instead of a dictionary of samples to read matrices (used for testing).
+
+    Returns
+    -------
+    sample_reads : dict, tuple, ndarray
+        Mapping of sample names to a pair of matrices containing read base chars and quals.
+
     """
     
     assert id in {'ID', 'SM'}
@@ -90,7 +118,19 @@ def extract_read_variants(
         elif read.mapping_quality < min_quality:
             # skip read
             pass
-        
+
+        elif read.is_duplicate and skip_duplicates:
+            # skip read
+            pass
+
+        elif read.is_qcfail and skip_qcfail:
+            # skip read
+            pass
+
+        elif read.is_supplementary and skip_supplementary:
+            # skip read
+            pass
+
         else:
             
             # look up sample identifier based on RG ID
@@ -174,12 +214,46 @@ def add_nan_read_if_empty(locus, symbols, quals):
     return symbols, quals
 
 
-def encode_read_alleles(locus, symbols):
-    return _as_allelic(symbols, alleles=locus.alleles)
+def encode_read_alleles(locus, chars):
+    """Encode read characters as integer calls based on a locus.
+
+    Parameters
+    ----------
+    locus : Locus
+        A locus object defining a genomic locus with known variants.
+    chars : ndarray, str
+        An array of base call strings.
+    
+    Returns
+    -------
+    calls : ndarray, int
+        Characters called as reference and alternate alleles.
+
+    """
+    return _as_allelic(chars, alleles=locus.alleles)
 
 
 def encode_read_distributions(locus, calls, quals, error_rate=0.0):
+    """Encode allele calls as allele probabilities based on base
+    qual scores and an additional error rate.
 
+    Parameters
+    ----------
+    locus : Locus
+        A locus object defining a genomic locus with known variants.
+    calls : ndarray, int
+        Integer encoded allele calls.
+    quals : ndarray, int
+        Integer call qual scores.
+    error_rate : float
+        Additional error to add to qual based error rate.
+    
+    Returns
+    -------
+    dists : ndarray, float
+        Probabilities for each allele per variant in the locus.
+
+    """
     # convert error_rate to prob of correct call
     probs = np.ones((calls.shape), dtype=float) * (1 - error_rate)
 
