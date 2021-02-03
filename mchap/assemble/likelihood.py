@@ -148,6 +148,48 @@ def log_genotype_null_prior(dosage, unique_haplotypes):
 
 
 @numba.njit
+def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
+    """Dirichlet-Multinomial probability mass function assuming all categories
+    (haplotypes) have equal dispersion parameters (alphas).
+
+    Parameters
+    ----------
+    dosage : ndarray, int, shape (ploidy, )
+        Counts of the observed haplotypes.
+    dispersion : float
+        Dispersion parameter for every possible haplotype.
+    unique_haplotypes : int
+        Total number of unique possible haplotypes.
+
+    Returns
+    -------
+    lprob : float
+        Log-probability.
+    
+    """
+    ploidy = np.sum(dosage)
+    sum_dispersion = dispersion * unique_haplotypes
+
+    # left side of equation
+    left = (util.factorial_20(ploidy) * gamma(sum_dispersion)) / gamma(ploidy + sum_dispersion)
+
+    # this will be nan if dispersion too high in which case treat as
+    # inbreeding of 0 (dispersion approaches inf as inbreeding approaches 0)
+    if np.isnan(left):
+        return log_genotype_null_prior(dosage, unique_haplotypes)
+
+    # right side of equation
+    prod = 1.0
+    for i in range(ploidy):
+        dose = dosage[i]
+        if dose > 0:
+            prod *= gamma(dose + dispersion) / (util.factorial_20(dose) * gamma(dispersion))
+
+    # return as log probability
+    return np.log(left * prod)
+
+
+@numba.njit
 def log_genotype_prior(dosage, unique_haplotypes, inbreeding=0):
     """Prior probability of a dosage for an individual genotype
     assuming all haplotypes are equally probable.
@@ -176,24 +218,5 @@ def log_genotype_prior(dosage, unique_haplotypes, inbreeding=0):
     # calculate the dispersion parameter for the PMF
     dispersion = (1 / unique_haplotypes) * ((1 - inbreeding) / inbreeding)
 
-    # sum of one dispertion parameter per allele
-    ploidy = np.sum(dosage)
-    sum_dispersion = dispersion * ploidy
-
-    # if dispersion is large then use null prior to avoid overflow
-    if sum_dispersion > 100:
-        return log_genotype_null_prior(dosage, unique_haplotypes)
-
-    # Dirichlet-multinomial probability mass function
-    # left side of equation
-    left = (util.factorial_20(ploidy) * gamma(sum_dispersion)) / gamma(ploidy + sum_dispersion)
-
-    # right side of equation
-    prod = 1.0
-    for i in range(ploidy):
-        dose = dosage[i]
-        if dose > 0:
-            prod *= gamma(dose + dispersion) / (util.factorial_20(dose) * gamma(dispersion))
-
-    # return as log probability
-    return np.log(left * prod)
+    # calculate log-prior from Dirichlet-Multinomial PMF
+    return _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes)
