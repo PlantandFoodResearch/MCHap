@@ -121,6 +121,10 @@ class SampleKmerFilter(SampleFilter):
         return template.format(self.threshold * 100, self.k)
     
     def __call__(self, variants, genotype):
+        if np.prod(variants.shape) == 0:
+            # can't apply kmer filter on no reads
+            return FilterCall(self.id, None, applied=False)
+
         n_pos = variants.shape[-1]
         if n_pos < self.k:
             # can't apply kmer filter
