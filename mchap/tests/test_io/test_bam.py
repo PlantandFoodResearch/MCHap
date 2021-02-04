@@ -154,8 +154,6 @@ def test_encode_read_alleles():
 
 
 def test_encode_read_distributions():
-
-    
     variants = (
         loci.SNP('CHR1', 6, 7, '.', alleles=('A', 'C')),
         loci.SNP('CHR1', 15, 16, '.', alleles=('A', 'G')),
@@ -218,3 +216,33 @@ def test_encode_read_distributions():
         error_rate=error_rate,
     )
     np.testing.assert_array_almost_equal(expect, actual)
+
+
+def test_encode_read_distributions__zero_reads():
+
+    variants = (
+        loci.SNP('CHR1', 6, 7, '.', alleles=('A', 'C')),
+        loci.SNP('CHR1', 15, 16, '.', alleles=('A', 'G')),
+        loci.SNP('CHR1', 22, 23, '.', alleles=('A', 'C', 'T')),
+    )
+
+    locus = loci.Locus(
+        contig='CHR1', 
+        start=5, 
+        stop=25, 
+        name='CHR1_05_25', 
+        sequence='A' * 20, 
+        variants=variants
+    )
+
+    n_read = 0
+    n_pos = 7
+    max_allele = np.max(locus.count_alleles())
+
+    calls = np.empty((n_read, n_pos), dtype=np.int8)
+    quals = np.empty((n_read, n_pos), dtype=np.int16)
+
+    expect = np.empty((n_read, n_pos, max_allele), dtype=float)
+    actual = bam.encode_read_distributions(locus, calls, quals)
+    print(expect.shape, actual.shape)
+    np.testing.assert_array_equal(expect, actual)
