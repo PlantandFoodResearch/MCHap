@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from itertools import combinations_with_replacement
 
 from mchap.testing import simulate_reads
 from mchap.assemble.likelihood import *
@@ -242,3 +243,25 @@ def test_log_genotype_prior(dosage, unique_haplotypes, inbreeding, probability):
     dosage = np.array(dosage)
     actual = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
     np.testing.assert_almost_equal(actual, expect, decimal=10)
+
+
+@pytest.mark.parametrize("ploidy,unique_haplotypes,inbreeding", [
+    [2, 16, 0],
+    [2, 16, 0.1],
+    [2, 16, 0.5],
+    [4, 16, 0],
+    [4, 16, 0.15],
+    [4, 16, 0.45],
+    [4, 32, 0],
+    [4, 32, 0.1],
+    [6, 16, 0],
+    [6, 16, 0.2],
+])
+def test_log_genotype_prior__normalised(ploidy, unique_haplotypes, inbreeding):
+    # tests that the prior probabilities of all possible genotypes sum to 1
+    sum_probs = 0.0
+    for genotype in combinations_with_replacement(list(range(unique_haplotypes)), ploidy):
+        _, dosage = np.unique(genotype, return_counts=True)
+        lprob = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
+        sum_probs += np.exp(lprob)
+    np.testing.assert_almost_equal(sum_probs, 1)
