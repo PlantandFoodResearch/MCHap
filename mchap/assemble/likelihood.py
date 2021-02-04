@@ -180,7 +180,7 @@ def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
 
     # right side of equation
     prod = 1.0
-    for i in range(ploidy):
+    for i in range(len(dosage)):
         dose = dosage[i]
         if dose > 0:
             prod *= gamma(dose + dispersion) / (util.factorial_20(dose) * gamma(dispersion))
