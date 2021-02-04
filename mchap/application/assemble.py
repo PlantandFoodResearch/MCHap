@@ -648,6 +648,7 @@ class program(object):
             # assemble haplotypes
             trace = DenovoMCMC(
                 ploidy=self.sample_ploidy[sample],
+                n_alleles=locus.count_alleles(),
                 inbreeding=self.sample_inbreeding[sample],
                 steps=self.mcmc_steps,
                 chains=self.mcmc_chains,

@@ -18,6 +18,7 @@ from mchap.assemble.classes import Assembler, GenotypeMultiTrace
 class DenovoMCMC(Assembler):
 
     ploidy: int
+    n_alleles: list
     inbreeding: float = 0
     steps: int = 1000
     chains: int = 2
@@ -37,6 +38,9 @@ class DenovoMCMC(Assembler):
     ----------
     ploidy : int
         Ploidy of organism at the assembled locus.
+    n_alleles : list, int
+        Number of possible alleles at each position in the
+        assembled locus.
     inbreeding : float
         Expected inbreeding coefficient of genotype.
     steps : int, optional
@@ -110,6 +114,14 @@ class DenovoMCMC(Assembler):
         among all reads.
 
         """
+        n_reads, n_pos, max_allele = reads.shape
+        if n_reads == 0:
+            # mock up a nan read
+            assert len(self.n_alleles) == n_pos
+            n_reads = 1
+            reads = np.empty((n_reads, n_pos, max_allele), dtype=float)
+            reads[:] = np.nan
+
         # set random seed once for all chains
         if self.random_seed is not None:
             np.random.seed(self.random_seed)
@@ -183,12 +195,10 @@ class DenovoMCMC(Assembler):
             break_dist = np.zeros(self.n_intervals, dtype=np.float64)
             break_dist[-1] = 1  # 100% probability of n_intervals -1 break points
 
-        # Automatically mask out alleles for which all reads have a probability of 0
-        # A probability of 0 indicates that the allele is invalid (zero padding)
-        # Masking alleles stops that allele being assessed in the
-        # mcmc and hence reduces paramater space and compute time.
-        mask = np.all(reads_het == 0, axis=-3)
-        n_alleles=np.sum(~mask, axis=-1).astype(np.int8)
+        # only pass through allele numbers for heterozygous positions
+        n_alleles = np.array(self.n_alleles, dtype=np.int8)
+        assert len(n_alleles) == n_base
+        n_alleles = n_alleles[heterozygous]
 
         # ensure temperatures is an ascending array ending in 1.0
         temperatures = np.sort(self.temperatures)
