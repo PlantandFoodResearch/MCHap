@@ -170,23 +170,22 @@ def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
     ploidy = np.sum(dosage)
     sum_dispersion = dispersion * unique_haplotypes
 
-    # left side of equation
-    left = (util.factorial_20(ploidy) * gamma(sum_dispersion)) / gamma(ploidy + sum_dispersion)
-
-    # this will be nan if dispersion too high in which case treat as
-    # inbreeding of 0 (dispersion approaches inf as inbreeding approaches 0)
-    if np.isnan(left):
-        return log_genotype_null_prior(dosage, unique_haplotypes)
+    # left side of equation in log space
+    num = np.log(util.factorial_20(ploidy)) + util.log_gamma(sum_dispersion)
+    denom = util.log_gamma(ploidy + sum_dispersion)
+    left = num - denom
 
     # right side of equation
-    prod = 1.0
+    prod = 0.0  # log(1.0)
     for i in range(len(dosage)):
         dose = dosage[i]
         if dose > 0:
-            prod *= gamma(dose + dispersion) / (util.factorial_20(dose) * gamma(dispersion))
+            num = util.log_gamma(dose + dispersion)
+            denom = np.log(util.factorial_20(dose)) + util.log_gamma(dispersion)
+            prod += (num - denom)
 
     # return as log probability
-    return np.log(left * prod)
+    return left + prod
 
 
 @numba.njit

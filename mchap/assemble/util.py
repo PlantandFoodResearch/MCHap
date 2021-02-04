@@ -1,8 +1,58 @@
 import numpy as np
 import math
 import numba
+import ctypes
+
+from numba.extending import get_cython_function_address
 
 _FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=np.int64)
+
+@numba.njit
+def factorial_20(x):
+    """Returns the factorial of integers in the range [0, 20] (inclusive)
+    
+    Parameters
+    ----------
+    x : int
+        An integer
+
+    Returns
+    -------
+    x_fac : int
+        Factorial of x
+
+    """
+    if x in range(0, 21):
+        return _FACTORIAL_LOOK_UP[x]
+    else:
+        raise ValueError('factorial functuion is only supported for values 0 to 20')
+
+
+# modified from https://stackoverflow.com/questions/54850985/fast-algorithm-for-log-gamma-function/54855769#54855769
+# wich in turn was based on https://github.com/numba/numba/issues/3086
+_PTR = ctypes.POINTER
+_dble = ctypes.c_double
+_ptr_dble = _PTR(_dble)
+_gammaln_addr = get_cython_function_address("scipy.special.cython_special", "gammaln")
+_functype = ctypes.CFUNCTYPE(_dble, _dble)
+_gammaln_float64 = _functype(_gammaln_addr)
+
+@numba.njit
+def log_gamma(x):
+    """Returns the natural log of gamma of x.
+    
+    Parameters
+    ----------
+    x : float
+        A float.
+
+    Returns
+    -------
+    gammaln : float
+        Natural log of gamma of x
+
+    """
+    return _gammaln_float64(x)
 
 
 @numba.njit
@@ -249,27 +299,6 @@ def set_dosage(genotype, dosage):
                     genotype[h_y] = genotype[h_x]
                     dosage[h_x] -= 1
                     dosage[h_y] += 1
-
-
-@numba.njit
-def factorial_20(x):
-    """Returns the factorial of integers in the range [0, 20] (inclusive)
-    
-    Parameters
-    ----------
-    x : int
-        An integer
-
-    Returns
-    -------
-    x_fac : int
-        Factorial of x
-
-    """
-    if x in range(0, 21):
-        return _FACTORIAL_LOOK_UP[x]
-    else:
-        raise ValueError('factorial functuion is only supported for values 0 to 20')
 
 
 @numba.njit
