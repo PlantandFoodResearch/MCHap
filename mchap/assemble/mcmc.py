@@ -13,6 +13,7 @@ from mchap.assemble.tempering import chain_swap_step
 from mchap.assemble.likelihood import log_likelihood
 from mchap.assemble import util
 from mchap.assemble.classes import Assembler, GenotypeMultiTrace
+from mchap.assemble.snpcalling import snp_posterior
 
 
 @dataclass
@@ -152,7 +153,12 @@ class DenovoMCMC(Assembler):
         # identify base positions that are overwhelmingly likely
         # to be homozygous
         # these can be 'fixed' to reduce computational complexity
-        hom_probs = _homozygosity_probabilities(reads, self.ploidy)
+        hom_probs = _homozygosity_probabilities(
+            reads,
+            self.n_alleles,
+            self.ploidy,
+            self.inbreeding
+        )
         fixed = hom_probs >= self.fix_homozygous
         homozygous = np.any(fixed, axis=-1)
         heterozygous = ~homozygous
@@ -450,67 +456,45 @@ def _read_mean_dist(reads):
     return dist
 
 
-def _homozygosity_probabilities(reads, ploidy):
-    """Calculate the posterior probability that an individual
-    is homozygous for each allele at each position.
+def _homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=0):
+    """Calculate posterior probabilities at each single SNP position to determine
+    if an individual is homozygous for a single allele.
 
     Parameters
     ----------
     reads : ndarray, float, shape (n_reads, n_positions, max_allele)
-        Probabilistically encoded variable positions of NGS reads.
+        Reads encoded as probability distributions.
+    n_alleles : array_like, int, shape(n_positions, )
+        Number of possible alleles for each SNP.
     ploidy : int
-        Ploidy oth the individual in question.
+        Ploidy of organism.
+    inbreeding : float
+        Expected inbreeding coefficient of organism.
 
+    Returns
+    -------
+    homozygosity_probs : ndarray, float, shape (n_positions, max_allele)
+        Probability of each homozygous genotype for each SNP
+    
     Notes
     -----
     The probabilities calculated this way are independent
     of alleles at other positions.
     """
-    # probability of homozygousity for each allele at each base position
-    probs = np.zeros(reads.shape[-2:], dtype=reads.dtype)
+    _, n_pos, max_allele = reads.shape
+    probabilites = np.zeros((n_pos, max_allele), dtype=float)
     
-    # mask out zeros used to pad ragged arrays
-    mask = np.all(reads == 0, axis=-3)
-    
-    # iterate through each base position
-    for i in range(len(probs)):
-        # number of valid alleles at this base position
-        n_alleles = np.sum(~mask[i]).astype(int)
-        
-        # vector of unique alleles 
-        alleles = np.arange(n_alleles, dtype=np.int8)
-        
-        # array of every possible genotype (at this single base position)
-        genotypes = list(_combinations_with_replacement(alleles, ploidy))
-        genotypes = np.expand_dims(np.array(genotypes, dtype=np.int8), -1)
-        
-        # read probabilities for this base position
-        sub_reads = reads[:, i:i+1, :]
-        
-        # array to store llks
-        llks = np.empty(len(genotypes), dtype = float)
-        
-        # array to store dosage
-        dosage = np.ones(ploidy, dtype=np.int8)
-        
-        # keep indices of homozygous genotypes
-        homozygous_genotypes = []
-        
-        for j in range(len(llks)):
-            
-            # calculate llk
-            llks[j] = log_likelihood(sub_reads, genotypes[j])
-            
-            # adjust llk for possible permutations of this genotype based on it's dosage
-            util.get_dosage(dosage, genotypes[j])
-            perms = combinatorics.count_genotype_permutations(dosage)
-            llks[j] += np.log(perms)
-            
-            # homozygous genotypes only have a single permutation
-            if perms == 1:
-                homozygous_genotypes.append(j)
-        
-        # insert probabilities for homozygous genotypes into the returned array
-        probs[i, 0:n_alleles] = util.log_likelihoods_as_conditionals(llks)[homozygous_genotypes]
-        
-    return probs
+    for i in range(n_pos):
+        n = n_alleles[i]
+
+        # calculate posterior distribution
+        genotypes, probs = snp_posterior(reads, i, n, ploidy, inbreeding)
+
+        # look at homozygous genotypes
+        homozygous = np.all(genotypes[:, 0:1] == genotypes, axis=-1)
+
+        # these are in same order as the hom allele
+        hom_probs = probs[homozygous]
+        probabilites[i, 0:n] = hom_probs
+
+    return probabilites

@@ -55,6 +55,7 @@ def test_homozygosity_probabilities():
         [0, 1, 1, 1, 1, 1],
     ])
     ploidy = len(haplotypes)
+    n_alleles = [2] * 6
 
     # 16 reads
     reads = simulate_reads(
@@ -63,7 +64,7 @@ def test_homozygosity_probabilities():
         uniform_sample=True,
         errors=False, 
     )
-    actual = mcmc._homozygosity_probabilities(reads, ploidy) > 0.999
+    actual = mcmc._homozygosity_probabilities(reads, n_alleles, ploidy) > 0.999
     expect = np.zeros((6, 2), dtype=bool)
     np.testing.assert_array_equal(actual, expect)
 
@@ -74,7 +75,7 @@ def test_homozygosity_probabilities():
         uniform_sample=True,
         errors=False, 
     )
-    actual = mcmc._homozygosity_probabilities(reads, ploidy) > 0.999
+    actual = mcmc._homozygosity_probabilities(reads, n_alleles, ploidy) > 0.999
     expect = np.array([
         [True, False],
         [False, False],
