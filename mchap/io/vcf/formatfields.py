@@ -32,9 +32,8 @@ RCOUNT = FormatField(id='RCOUNT', number=1, type='Integer', descr='Total count o
 RCALLS = FormatField(id='RCALLS', number=1, type='Integer', descr='Total count of read base calls matching a known variant')
 GP = FormatField(id='GP', number='G', type='Float', descr='Genotype posterior probabilities')
 GPM = FormatField(id='GPM', number=1, type='Float', descr='Genotype posterior mode probability')
-PPM = FormatField(id='PPM', number=1, type='Float', descr='Penotype posterior mode probability')
-MPGP = FormatField(id='MPGP', number='.', type='Float', descr='Genotype posterior probabilities of genotypes contributing to the posterior mode phenotype')
-MPED = FormatField(id='MPED', number='.', type='Float', descr='Mode phenotype expected dosage')
+PHPM = FormatField(id='PHPM', number=1, type='Float', descr='Phenotype posterior mode probability')
+DOSEXP = FormatField(id='DOSEXP', number='.', type='Float', descr='Mode phenotype expected dosage')
 MEC = FormatField(id='MEC', number=1, type='Integer', descr='Minimum error correction')
 AD = FormatField(id='AD', number='R', type='Integer', descr='Number of reads unambiguously assigned to each allele based on MEC')
 

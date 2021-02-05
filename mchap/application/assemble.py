@@ -570,8 +570,8 @@ class program(object):
             vcf.formatfields.MEC,
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
-            vcf.formatfields.PPM, 
-            vcf.formatfields.MPED,
+            vcf.formatfields.PHPM, 
+            vcf.formatfields.DOSEXP,
             vcf.formatfields.AD,
         ]
 
@@ -598,7 +598,7 @@ class program(object):
         sample_DP = np.empty(n_samples, dtype='O')
         sample_FT = np.empty(n_samples, dtype='O')
         sample_GPM = np.empty(n_samples, dtype='O')
-        sample_PPM = np.empty(n_samples, dtype='O')
+        sample_PHPM = np.empty(n_samples, dtype='O')
         sample_RCALLS = np.empty(n_samples, dtype='O')
         sample_GQ = np.empty(n_samples, dtype='O')
         sample_PHQ = np.empty(n_samples, dtype='O')
@@ -681,7 +681,7 @@ class program(object):
 
             # store sample format calls
             sample_GPM[i] = np.round(genotype_prob, self.precision)
-            sample_PPM[i] = np.round(phenotype.probabilities.sum(), self.precision)
+            sample_PHPM[i] = np.round(phenotype.probabilities.sum(), self.precision)
             sample_RCALLS[i] = np.sum(read_calls >= 0)
             sample_GQ[i] = qual_of_prob(genotype_prob)
             sample_PHQ[i] = qual_of_prob(phenotype.probabilities.sum())
@@ -713,7 +713,7 @@ class program(object):
 
         # additional sample data requiring sorted alleles
         sample_GT = np.empty(n_samples, dtype='O')
-        sample_MPED = np.empty(n_samples, dtype='O')
+        sample_DOSEXP = np.empty(n_samples, dtype='O')
         sample_AD = np.empty((n_samples, len(vcf_alleles)), dtype=int)
         for i, sample in enumerate(self.samples):
             sample_GT[i] = vcf.genotype_string(sample_genotype[i], vcf_haplotypes)
@@ -722,7 +722,7 @@ class program(object):
                 sample_phenotype_dist[i].probabilities,
                 vcf_haplotypes,
             )
-            sample_MPED[i] = np.round(dosage_expected, self.precision)
+            sample_DOSEXP[i] = np.round(dosage_expected, self.precision)
             sample_AD[i] = np.sum(integer.read_assignment(sample_read_calls[i], vcf_haplotypes) == 1, axis=0)
 
         # vcf line formating
@@ -745,8 +745,8 @@ class program(object):
             MEC=sample_MEC,
             FT=sample_FT,
             GPM=sample_GPM,
-            PPM=sample_PPM,
-            MPED=sample_MPED,
+            PHPM=sample_PHPM,
+            DOSEXP=sample_DOSEXP,
             AD=sample_AD,
         )
 
