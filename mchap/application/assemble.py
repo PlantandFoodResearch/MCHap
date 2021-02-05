@@ -661,9 +661,9 @@ class program(object):
 
             # call genotype (array(ploidy, vars), probs)
             if self.call_best_genotype:
-                genotype = phenotype.mode_genotype()
+                genotype, genotype_prob = phenotype.mode_genotype()
             else:
-                genotype = phenotype.call_phenotype(self.probability_filter_threshold)
+                genotype, genotype_prob = phenotype.call_phenotype(self.probability_filter_threshold)
 
             # per chain modes for QC
             chain_modes = [dist.mode_phenotype() for dist in trace.chain_posteriors()]
@@ -673,27 +673,27 @@ class program(object):
                 prob_filter(phenotype.probabilities.sum()),
                 depth_filter(read_variant_depth),
                 count_filter(read_count),
-                kmer_filter(read_calls, genotype[0]),
+                kmer_filter(read_calls, genotype),
                 incongruence_filter(chain_modes),
                 cnv_filter(chain_modes),
             ))
             sample_FT[i] = filterset
 
             # store sample format calls
-            sample_GPM[i] = np.round(genotype[1], self.precision)
+            sample_GPM[i] = np.round(genotype_prob, self.precision)
             sample_PPM[i] = np.round(phenotype.probabilities.sum(), self.precision)
             sample_RCALLS[i] = np.sum(read_calls >= 0)
-            sample_GQ[i] = qual_of_prob(genotype[1])
+            sample_GQ[i] = qual_of_prob(genotype_prob)
             sample_PHQ[i] = qual_of_prob(phenotype.probabilities.sum())
-            sample_MEC[i] =  integer.minimum_error_correction(read_calls, genotype[0]).sum()
+            sample_MEC[i] =  integer.minimum_error_correction(read_calls, genotype).sum()
 
             # Null out the genotype and phenotype arrays
             if (not self.call_filtered) and filterset.failed:
-                genotype[0][:] = -1
+                genotype[:] = -1
                 phenotype.genotypes[:] = -1
             
             # store genotype and phenotype
-            sample_genotype[i] = genotype[0]
+            sample_genotype[i] = genotype
             sample_phenotype_dist[i] = phenotype
 
         # labeling alleles
