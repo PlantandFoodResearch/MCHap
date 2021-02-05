@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from mchap.assemble.mcmc.step import mutation
+from mchap.assemble import mutation
 from mchap.assemble.likelihood import log_likelihood
 from mchap.assemble.util import log_likelihoods_as_conditionals
 from mchap.assemble.util import seed_numba

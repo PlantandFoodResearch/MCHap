@@ -3,7 +3,7 @@ import numba
 import pytest
 
 from mchap.assemble.likelihood import log_likelihood
-from mchap.assemble.mcmc import denovo
+from mchap.assemble import mcmc
 from mchap.assemble.util import seed_numba
 from mchap.testing import simulate_reads
 from mchap.encoding import integer
@@ -12,12 +12,12 @@ from mchap import mset
 
 def test_point_beta_probabilities():
 
-    probs = denovo._point_beta_probabilities(6, 1, 1)
+    probs = mcmc._point_beta_probabilities(6, 1, 1)
     assert np.allclose(probs.sum(), 1.0)
     assert np.allclose(probs[0], probs)
 
-    probs1 = denovo._point_beta_probabilities(6, 1, 3)
-    probs2 = denovo._point_beta_probabilities(6, 3, 1)
+    probs1 = mcmc._point_beta_probabilities(6, 1, 3)
+    probs2 = mcmc._point_beta_probabilities(6, 3, 1)
     assert np.allclose(probs1.sum(), 1.0)
     assert np.allclose(probs2.sum(), 1.0)
     assert np.allclose(probs1, probs2[::-1])
@@ -43,7 +43,7 @@ def test_read_mean_dist():
         [0.5, 0.5],
         [0.8, 0.2],
     ])
-    actual = denovo._read_mean_dist(reads)
+    actual = mcmc._read_mean_dist(reads)
     np.testing.assert_array_equal(actual, expect)
 
 
@@ -63,7 +63,7 @@ def test_homozygosity_probabilities():
         uniform_sample=True,
         errors=False, 
     )
-    actual = denovo._homozygosity_probabilities(reads, ploidy) > 0.999
+    actual = mcmc._homozygosity_probabilities(reads, ploidy) > 0.999
     expect = np.zeros((6, 2), dtype=bool)
     np.testing.assert_array_equal(actual, expect)
 
@@ -74,7 +74,7 @@ def test_homozygosity_probabilities():
         uniform_sample=True,
         errors=False, 
     )
-    actual = denovo._homozygosity_probabilities(reads, ploidy) > 0.999
+    actual = mcmc._homozygosity_probabilities(reads, ploidy) > 0.999
     expect = np.array([
         [True, False],
         [False, False],
@@ -92,7 +92,7 @@ def test_DenovoMCMC__zero_reads():
     n_steps = 1000
     n_burn = 500
     n_alleles = [2] * n_base
-    model = denovo.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+    model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
 
     # zero reads
     reads = np.empty((0, n_base, 2), dtype=float)
@@ -109,7 +109,7 @@ def test_DenovoMCMC__all_nans():
     n_steps = 1000
     n_burn = 500
     n_alleles = [2] * n_base
-    model = denovo.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+    model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
 
     # high read depth
     reads = np.empty((10, n_base, 2), dtype=float)
@@ -135,7 +135,7 @@ def test_DenovoMCMC__nans_ignored():
     n_steps = 1000
     n_burn = 500
     n_alleles = [2] * n_base
-    model = denovo.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+    model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
 
     reads1 = simulate_reads(
         haplotypes, 
@@ -171,7 +171,7 @@ def test_DenovoMCMC__non_variable():
     n_steps = 100
     n_burn = 50
     n_alleles = [2] * n_base
-    model = denovo.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+    model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
 
     # high read depth
     reads = simulate_reads(
@@ -205,7 +205,7 @@ def test_DenovoMCMC__diploid():
     n_steps = 1000
     n_burn = 500
     n_alleles = [2] * n_base
-    model = denovo.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+    model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
 
     reads = simulate_reads(
         haplotypes, 
@@ -235,7 +235,7 @@ def test_DenovoMCMC__tetraploid():
     n_steps = 1000
     n_burn = 500
     n_alleles = [2] * n_base
-    model = denovo.DenovoMCMC(
+    model = mcmc.DenovoMCMC(
         ploidy=ploidy, 
         n_alleles=n_alleles, 
         steps=n_steps, 
@@ -313,9 +313,9 @@ def test_DenovoMCMC__seed():
         qual=(60, 60),
     )
 
-    model_1 = denovo.DenovoMCMC(ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=42)
-    model_2 = denovo.DenovoMCMC(ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=33)
-    model_3 = denovo.DenovoMCMC(ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=42)
+    model_1 = mcmc.DenovoMCMC(ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=42)
+    model_2 = mcmc.DenovoMCMC(ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=33)
+    model_3 = mcmc.DenovoMCMC(ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=42)
 
     trace_1 = model_1.fit(reads)
     trace_2 = model_2.fit(reads)
@@ -344,7 +344,7 @@ def test_DenovoMCMC__fuzz():
             size=(ploidy, n_base),
         )
         n_alleles = [np.max(haplotypes) + 1] * n_base
-        model = denovo.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+        model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
         reads = simulate_reads(haplotypes, n_reads=n_reads)
         trace = model.fit(reads)
         assert trace.genotypes.shape == (n_chains, n_steps, ploidy, n_base)
@@ -405,7 +405,7 @@ def test_DenovoMCMC__temperatures_bias(temperatures):
     exact_posteriors = exact_posteriors / exact_posteriors.sum()
 
     # simulate posteriors
-    model = denovo.DenovoMCMC(
+    model = mcmc.DenovoMCMC(
         ploidy=2, 
         n_alleles=[2, 2],
         steps=50000, 
@@ -494,13 +494,13 @@ def test_DenovoMCMC__temperatures_submode():
     initial = np.tile(alt_mode, (2, 1, 1))
 
     # without tempering
-    model = denovo.DenovoMCMC(ploidy=6, n_alleles=n_alleles, steps=1100, temperatures=[1.0], random_seed=1)
+    model = mcmc.DenovoMCMC(ploidy=6, n_alleles=n_alleles, steps=1100, temperatures=[1.0], random_seed=1)
     posterior = model.fit(reads, initial=initial).burn(100).posterior()
     np.testing.assert_array_equal(posterior.genotypes[0], alt_mode) # sub-optimal mode
     assert posterior.probabilities[0] > 0.95
 
     # with tempering
-    model = denovo.DenovoMCMC(ploidy=6, n_alleles=n_alleles, steps=1100, temperatures=[0.1, 1.0], random_seed=1)
+    model = mcmc.DenovoMCMC(ploidy=6, n_alleles=n_alleles, steps=1100, temperatures=[0.1, 1.0], random_seed=1)
     posterior = model.fit(reads, initial=initial).burn(100).posterior()
     np.testing.assert_array_equal(posterior.genotypes[0], opt_mode)  # optimal mode
     assert posterior.probabilities[0] > 0.95

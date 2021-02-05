@@ -7,7 +7,7 @@ from itertools import islice
 from collections import Counter
 import multiprocessing as mp
 
-from mchap.assemble.mcmc.denovo import DenovoMCMC
+from mchap.assemble.mcmc import DenovoMCMC
 from mchap.encoding import character, integer
 from mchap.io.vcf.util import vcfstr
 from mchap.io import \

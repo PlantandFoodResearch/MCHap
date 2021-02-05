@@ -5,7 +5,7 @@ from mchap.testing import simulate_reads, metropolis_hastings_transitions
 from mchap.encoding import integer
 from mchap.assemble.util import seed_numba, log_likelihoods_as_conditionals
 from mchap.assemble.likelihood import log_likelihood
-from mchap.assemble.mcmc.step import structural
+from mchap.assemble import structural
 
 
 @pytest.mark.parametrize('breaks,n', [

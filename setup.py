@@ -23,8 +23,6 @@ setup(
         'mchap',
         'mchap/application',
         'mchap/assemble',
-        'mchap/assemble/mcmc',
-        'mchap/assemble/mcmc/step',
         'mchap/encoding',
         'mchap/encoding/integer',
         'mchap/encoding/character',
