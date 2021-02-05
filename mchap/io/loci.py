@@ -8,6 +8,12 @@ from dataclasses import dataclass
 from mchap.encoding import integer
 
 
+__all__ = [
+    'SNP',
+    'Locus',
+    'read_bed4',
+]
+
 @dataclass(frozen=True, order=True)
 class SNP:
     contig: str
