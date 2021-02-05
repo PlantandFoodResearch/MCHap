@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from itertools import combinations_with_replacement
 
-from mchap.assemble import complexity
+from mchap import combinatorics
 
 
 def test_count_unique_haplotypes():
@@ -13,7 +13,7 @@ def test_count_unique_haplotypes():
     # the number of unique alleles at each variable position within
     # the haplotype
     answer = np.prod(u_alleles)
-    query = complexity.count_unique_haplotypes(u_alleles)
+    query = combinatorics.count_unique_haplotypes(u_alleles)
     assert query == answer
 
 
@@ -29,7 +29,7 @@ def test_count_unique_haplotypes():
 ])
 def test_count_unique_genotypes(u_haps, ploidy, answer):
 
-    query = complexity.count_unique_genotypes(u_haps, ploidy)
+    query = combinatorics.count_unique_genotypes(u_haps, ploidy)
 
     if answer is None:
         # calculate the answer with itertools
@@ -53,7 +53,7 @@ def test_count_unique_genotype_permutations():
     ploidy = 4
 
     answer = u_haps ** ploidy
-    query = complexity.count_unique_genotype_permutations(u_haps, ploidy)
+    query = combinatorics.count_unique_genotype_permutations(u_haps, ploidy)
 
     assert query == answer
 
@@ -71,5 +71,5 @@ def test_count_unique_genotype_permutations():
 ])
 def test_count_genotype_permutations(dosage, answer):
     dosage = np.array(dosage, dtype=int)
-    query = complexity.count_genotype_permutations(dosage)
+    query = combinatorics.count_genotype_permutations(dosage)
     assert query == answer

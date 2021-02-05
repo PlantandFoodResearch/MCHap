@@ -3,57 +3,13 @@
 import numpy as np
 from math import factorial
 
-
-def count_possible_alleles(reads):
-    """Counts the number of possible alleles at each position
-    in a set of probabilistically encoded reads.
-
-    Parameters
-    ----------
-    reads : ndarray, float, shape (n_reads, n_positions, max_allele)
-        A set of reads encoded as probabilistic row vectors.
-
-    Returns
-    -------
-    n_alleles : ndarray, int, shape (n_positions, )
-        Number of possible alleles at each position given the set of reads.
-
-    Notes
-    -----
-    An allele is only possible if one or more reads has a non-zero
-    probability of beain that allele.
-    Hence if all reads are zero-padded at an allele then that
-    allele is not possible given this set of reads.
-
-    """
-    # distributions are padded by 0 prob
-    check_all = np.sum(~np.all(np.nan_to_num(reads) == 0, axis=-3), axis=-1)
-    check_any = np.sum(~np.any(reads == 0, axis=-3), axis=-1)
-    
-    # all read distributions should be in agreement
-    if np.array_equal(check_all, check_any):
-        return check_all
-    
-    else:
-        raise ValueError('Incongruent allele distributions')
-
-
-def count_unique_alleles(locus):
-    """Count the number of alleles at each position of a locus.
-
-    Parameters
-    ----------
-    locus : Locus
-        A Locus object with attribute `alleles`
-
-    Returns
-    -------
-    u_alleles : ndarray, int, shape (n_positions, )
-        Number of unique alleles at each position defined by the locus.
-
-    """
-    return np.fromiter(map(len, locus.alleles), dtype=int)
-
+__all__ = [
+    'count_unique_haplotypes',
+    'count_unique_genotypes',
+    'count_unique_genotypes',
+    'count_unique_genotype_permutations',
+    'count_genotype_permutations',
+]
 
 def count_unique_haplotypes(u_alleles):
     """Calculate the number of unique haplotypes that can exist at 

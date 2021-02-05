@@ -6,11 +6,12 @@ from scipy import stats as _stats
 from itertools import combinations_with_replacement as _combinations_with_replacement
 from dataclasses import dataclass
 
+from mchap import combinatorics
 from mchap import mset
 from mchap.assemble import mutation, structural
 from mchap.assemble.tempering import chain_swap_step
 from mchap.assemble.likelihood import log_likelihood
-from mchap.assemble import util, complexity
+from mchap.assemble import util
 from mchap.assemble.classes import Assembler, GenotypeMultiTrace
 
 
@@ -502,7 +503,7 @@ def _homozygosity_probabilities(reads, ploidy):
             
             # adjust llk for possible permutations of this genotype based on it's dosage
             util.get_dosage(dosage, genotypes[j])
-            perms = complexity.count_genotype_permutations(dosage)
+            perms = combinatorics.count_genotype_permutations(dosage)
             llks[j] += np.log(perms)
             
             # homozygous genotypes only have a single permutation
