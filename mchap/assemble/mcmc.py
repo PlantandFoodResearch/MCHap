@@ -16,6 +16,9 @@ from mchap.assemble.classes import Assembler, GenotypeMultiTrace
 from mchap.assemble.snpcalling import snp_posterior
 
 
+__all__ = ['DenovoMCMC']
+
+
 @dataclass
 class DenovoMCMC(Assembler):
 

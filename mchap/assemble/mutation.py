@@ -7,6 +7,12 @@ from mchap.assemble import util
 from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
 
 
+__all__ = [
+    'base_step',
+    'compound_step'
+]
+
+
 @numba.njit
 def base_step(genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_alleles=None, temp=1):
     """Mutation Gibbs sampler step for the jth base position 

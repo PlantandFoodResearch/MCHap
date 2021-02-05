@@ -4,6 +4,8 @@ import numba
 from mchap.assemble import util
 from mchap.assemble.likelihood import log_genotype_prior
 
+__all__ = ['chain_swap_step']
+
 
 @numba.njit
 def chain_swap_acceptance(

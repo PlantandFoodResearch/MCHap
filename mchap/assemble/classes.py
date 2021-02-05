@@ -5,6 +5,12 @@ from functools import reduce
 from mchap import mset
 from mchap.encoding import integer
 
+__all__ = [
+    'PosteriorGenotypeDistribution',
+    'PhenotypeDistribution',
+    'GenotypeMultiTrace',
+]
+
 
 @dataclass
 class Assembler(object):

@@ -3,6 +3,8 @@ from itertools import combinations_with_replacement
 from mchap.combinatorics import count_unique_genotypes
 from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
 
+__all__ = ['snp_posterior']
+
 
 def snp_posterior(reads, position, n_alleles, ploidy, inbreeding=0):
     """Brute-force the posterior probability across all possible

@@ -6,6 +6,12 @@ import numba
 from mchap.assemble import util
 from mchap.assemble.likelihood import log_likelihood_structural_change, log_genotype_prior
 
+__all__ = [
+    'interval_step',
+    'compound_step',
+    'random_breaks',
+]
+
 
 @numba.njit
 def random_breaks(breaks, n):

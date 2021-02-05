@@ -6,6 +6,12 @@ from math import gamma
 
 from mchap.assemble import util
 
+__all__ = [
+    'log_likelihood',
+    'log_likelihood_structural_change',
+    'log_genotype_prior',
+]
+
 
 @numba.njit
 def log_likelihood(reads, genotype):
