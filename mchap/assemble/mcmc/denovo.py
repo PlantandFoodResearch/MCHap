@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from mchap import mset
 from mchap.assemble.mcmc.step import mutation, structural
-from mchap.assemble.mcmc.step.chain import chain_swap_step
+from mchap.assemble.mcmc.step.tempering import chain_swap_step
 from mchap.assemble.likelihood import log_likelihood
 from mchap.assemble import util, complexity
 from mchap.assemble.classes import Assembler, GenotypeMultiTrace
