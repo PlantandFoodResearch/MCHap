@@ -9,8 +9,24 @@ from mchap.encoding.integer import as_probabilistic as _as_probabilistic
 from mchap.encoding.character import as_allelic as _as_allelic
 
 
-def extract_sample_ids(bam_paths, id='ID'):
-   
+__all__ = [
+    'extract_sample_ids',
+    'extract_read_variants',
+    'encode_read_alleles',
+    'encode_read_distributions',
+]
+
+
+def extract_sample_ids(bam_paths, id='SM'):
+    """Extract sample id's from a list of bam files.
+
+    Parameters
+    ----------
+    bam_paths : list, str
+        List of bam file paths.
+    id : str
+        Read-group field to use as sample id (default = 'SM')
+    """
     if id is None:
         data = {os.path.basename(path): path for path in bam_paths}
     
