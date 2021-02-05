@@ -14,7 +14,6 @@ from mchap.io import \
     read_bed4, \
     extract_sample_ids, \
     extract_read_variants, \
-    add_nan_read_if_empty, \
     encode_read_alleles, \
     encode_read_distributions, \
     qual_of_prob, \
@@ -631,9 +630,6 @@ class program(object):
                 sample_DP[i] = np.nan
             else:
                 sample_DP[i] = np.round(np.mean(read_variant_depth))
-
-            # if no reads insert nan read TODO: more elegant solution
-            read_chars, read_quals = add_nan_read_if_empty(locus, read_chars, read_quals)
 
             # encode reads as alleles and probabilities
             read_calls = encode_read_alleles(locus, read_chars)
