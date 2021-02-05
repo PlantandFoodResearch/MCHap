@@ -2,6 +2,11 @@
 
 import numpy as np
 
+__all__ = [
+    'qual_of_char',
+    'prob_of_qual',
+    'qual_of_prob',
+]
 
 # NGS error rate per base estimated by Pfeiffer et al 2018
 # "Systematic evaluation of error rates and causes in short samples in next-generation sequencing"
@@ -9,6 +14,18 @@ PFEIFFER_ERROR = .0024
 
 
 def qual_of_char(char):
+    """Convert unicode characters of a qual string into an integer value.
+
+    Paramters
+    ---------
+    char : array_like
+        A single char or array of chars.
+    
+    Returns
+    -------
+    qual : array_like
+        A single int or array of integers.
+    """
     if isinstance(char, str):
         qual = ord(char) - 33
         return qual
@@ -25,10 +42,36 @@ def qual_of_char(char):
 
 
 def prob_of_qual(qual):
+    """Convert phred-scaled quality integer into a probability of the call being correct.
+
+    Paramters
+    ---------
+    qual : array_like
+        A single int or array of integers.
+    
+    Returns
+    -------
+    prob : array_like
+        A single float or array of floats.
+    """
     return 1 - (10 ** (qual / -10))
 
 
 def qual_of_prob(prob, precision=6):
+    """Convert a probability of a call being correct into a phred-scaled quality integer.
+
+    Paramters
+    ---------
+    prob : array_like
+        A single float or array of floats.
+    precision : int
+        Max precision to treat the probability
+    
+    Returns
+    -------
+    qual : array_like
+        A single int or array of integers.
+    """
     # cant have a prob of 1 converted to a qual
     # instead convert based on the expected decimal precision of the prob
     # a precision of 6 produces a max qual of 60
