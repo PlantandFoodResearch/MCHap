@@ -297,7 +297,7 @@ def _denovo_gibbs_sampler(
                 raise ValueError('Encountered log likelihood of nan')
             
             # mutation step
-            llk = mutation.genotype_compound_step(
+            llk = mutation.compound_step(
                 genotype=genotype,
                 inbreeding=inbreeding,
                 reads=reads,

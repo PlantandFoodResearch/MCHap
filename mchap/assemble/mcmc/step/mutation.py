@@ -123,7 +123,7 @@ def base_step(genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_all
 
 
 @numba.njit
-def genotype_compound_step(
+def compound_step(
     genotype,
     reads,
     llk,

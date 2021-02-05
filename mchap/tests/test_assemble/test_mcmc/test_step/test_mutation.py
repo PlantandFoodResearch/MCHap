@@ -115,7 +115,7 @@ def test_genotype_compound_step():
 
     seed_numba(42)
     for i in range(n_steps):
-        llk = mutation.genotype_compound_step(genotype, reads, llk, n_alleles=n_alleles)
+        llk = mutation.compound_step(genotype, reads, llk, n_alleles=n_alleles)
         trace[i] = genotype.copy()
 
     # count allele 1 occurance
@@ -196,7 +196,7 @@ def test_genotype_compound_step__posterior():
         counts[g.tobytes()] = 0
     # simulation
     for _ in range(100000):
-        llk = mutation.genotype_compound_step(
+        llk = mutation.compound_step(
             genotype, 
             reads, 
             llk, 
