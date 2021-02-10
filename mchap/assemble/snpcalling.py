@@ -3,7 +3,7 @@ from itertools import combinations_with_replacement
 from mchap.combinatorics import count_unique_genotypes
 from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
 
-__all__ = ['snp_posterior']
+__all__ = ["snp_posterior"]
 
 
 def snp_posterior(reads, position, n_alleles, ploidy, inbreeding=0):
@@ -41,7 +41,7 @@ def snp_posterior(reads, position, n_alleles, ploidy, inbreeding=0):
     u_gens = count_unique_genotypes(n_alleles, ploidy)
     genotypes = np.zeros((u_gens, ploidy), dtype=np.int8) - 1
     probabilities = np.zeros(u_gens, dtype=float)
-        
+
     alleles = np.arange(n_alleles)
     for j, genotype in enumerate(combinations_with_replacement(alleles, ploidy)):
         genotype = np.array(genotype)
@@ -49,10 +49,10 @@ def snp_posterior(reads, position, n_alleles, ploidy, inbreeding=0):
         _, dosage = np.unique(genotype, return_counts=True)
         lprior = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
         # treat as haplotypes with single position
-        llk = log_likelihood(reads[:, position:position+1, :], genotype[..., None])
-            
+        llk = log_likelihood(reads[:, position : position + 1, :], genotype[..., None])
+
         probabilities[j] = np.exp(lprior + llk)
-        
+
     # normalise
     probabilities /= np.nansum(probabilities)
     return genotypes, probabilities

@@ -3,14 +3,14 @@
 import numpy as np
 
 __all__ = [
-    'qual_of_char',
-    'prob_of_qual',
-    'qual_of_prob',
+    "qual_of_char",
+    "prob_of_qual",
+    "qual_of_prob",
 ]
 
 # NGS error rate per base estimated by Pfeiffer et al 2018
 # "Systematic evaluation of error rates and causes in short samples in next-generation sequencing"
-PFEIFFER_ERROR = .0024
+PFEIFFER_ERROR = 0.0024
 
 
 def qual_of_char(char):
@@ -20,7 +20,7 @@ def qual_of_char(char):
     ---------
     char : array_like
         A single char or array of chars.
-    
+
     Returns
     -------
     qual : array_like
@@ -30,7 +30,7 @@ def qual_of_char(char):
         qual = ord(char) - 33
         return qual
     elif isinstance(char, np.ndarray):
-        if char.dtype == np.dtype('<U1'):
+        if char.dtype == np.dtype("<U1"):
             qual = char.copy()
             qual.dtype = np.int32
             qual -= 33
@@ -38,7 +38,7 @@ def qual_of_char(char):
         else:
             raise ValueError('Array must have dtype "<U1"')
     else:
-        raise ValueError('Input must be character or array of characters')
+        raise ValueError("Input must be character or array of characters")
 
 
 def prob_of_qual(qual):
@@ -48,7 +48,7 @@ def prob_of_qual(qual):
     ---------
     qual : array_like
         A single int or array of integers.
-    
+
     Returns
     -------
     prob : array_like
@@ -66,7 +66,7 @@ def qual_of_prob(prob, precision=6):
         A single float or array of floats.
     precision : int
         Max precision to treat the probability
-    
+
     Returns
     -------
     qual : array_like
@@ -87,6 +87,6 @@ def qual_of_prob(prob, precision=6):
     else:
         # prob is array-like
         prob = np.array([maximum if p > maximum else p for p in prob])
-        
-    prob = np.floor(prob * 10**precision) / 10**precision
+
+    prob = np.floor(prob * 10 ** precision) / 10 ** precision
     return np.round((-10 * np.log10((1 - prob)))).astype(int)

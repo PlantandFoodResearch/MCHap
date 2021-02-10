@@ -44,10 +44,10 @@ def read_assignment(reads, haplotypes):
 
     Notes
     -----
-    If a reads minimum error correction score could result 
+    If a reads minimum error correction score could result
     in an assignment to more than one haplotype then it is
     the assignment score is calculated as 1/n where n in
-    the number of possible assignments. 
+    the number of possible assignments.
 
     """
     reads = np.expand_dims(reads, 1)

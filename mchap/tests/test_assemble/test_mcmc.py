@@ -1,5 +1,4 @@
 import numpy as np
-import numba
 import pytest
 
 from mchap.assemble.likelihood import log_likelihood
@@ -24,45 +23,43 @@ def test_point_beta_probabilities():
 
 
 def test_read_mean_dist():
-    reads = np.array([
-        [[0.9, 0.1],
-        [0.8, 0.2],
-        [0.8, 0.2]],
-        [[0.9, 0.1],
-        [0.8, 0.2],
-        [0.8, 0.2]],
-        [[0.9, 0.1],
-        [0.2, 0.8],
-        [np.nan, np.nan]],
-        [[0.9, 0.1],
-        [0.2, 0.8],
-        [np.nan, np.nan]]
-    ])
-    expect = np.array([
-        [0.9, 0.1],
-        [0.5, 0.5],
-        [0.8, 0.2],
-    ])
+    reads = np.array(
+        [
+            [[0.9, 0.1], [0.8, 0.2], [0.8, 0.2]],
+            [[0.9, 0.1], [0.8, 0.2], [0.8, 0.2]],
+            [[0.9, 0.1], [0.2, 0.8], [np.nan, np.nan]],
+            [[0.9, 0.1], [0.2, 0.8], [np.nan, np.nan]],
+        ]
+    )
+    expect = np.array(
+        [
+            [0.9, 0.1],
+            [0.5, 0.5],
+            [0.8, 0.2],
+        ]
+    )
     actual = mcmc._read_mean_dist(reads)
     np.testing.assert_array_equal(actual, expect)
 
 
 def test_homozygosity_probabilities():
-    haplotypes = np.array([
-        [0, 0, 0, 0, 1, 1],
-        [0, 1, 0, 0, 1, 1],
-        [0, 1, 0, 1, 1, 1],
-        [0, 1, 1, 1, 1, 1],
-    ])
+    haplotypes = np.array(
+        [
+            [0, 0, 0, 0, 1, 1],
+            [0, 1, 0, 0, 1, 1],
+            [0, 1, 0, 1, 1, 1],
+            [0, 1, 1, 1, 1, 1],
+        ]
+    )
     ploidy = len(haplotypes)
     n_alleles = [2] * 6
 
     # 16 reads
     reads = simulate_reads(
-        haplotypes, 
-        n_reads=16, 
+        haplotypes,
+        n_reads=16,
         uniform_sample=True,
-        errors=False, 
+        errors=False,
     )
     actual = mcmc._homozygosity_probabilities(reads, n_alleles, ploidy) > 0.999
     expect = np.zeros((6, 2), dtype=bool)
@@ -70,20 +67,23 @@ def test_homozygosity_probabilities():
 
     # 32 reads
     reads = simulate_reads(
-        haplotypes, 
-        n_reads=32, 
+        haplotypes,
+        n_reads=32,
         uniform_sample=True,
-        errors=False, 
+        errors=False,
     )
     actual = mcmc._homozygosity_probabilities(reads, n_alleles, ploidy) > 0.999
-    expect = np.array([
-        [True, False],
-        [False, False],
-        [False, False],
-        [False, False],
-        [False, True],
-        [False, True],
-    ], dtype=bool)
+    expect = np.array(
+        [
+            [True, False],
+            [False, False],
+            [False, False],
+            [False, False],
+            [False, True],
+            [False, True],
+        ],
+        dtype=bool,
+    )
     np.testing.assert_array_equal(actual, expect)
 
 
@@ -93,7 +93,9 @@ def test_DenovoMCMC__zero_reads():
     n_steps = 1000
     n_burn = 500
     n_alleles = [2] * n_base
-    model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+    model = mcmc.DenovoMCMC(
+        ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
+    )
 
     # zero reads
     reads = np.empty((0, n_base, 2), dtype=float)
@@ -110,7 +112,9 @@ def test_DenovoMCMC__all_nans():
     n_steps = 1000
     n_burn = 500
     n_alleles = [2] * n_base
-    model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+    model = mcmc.DenovoMCMC(
+        ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
+    )
 
     # high read depth
     reads = np.empty((10, n_base, 2), dtype=float)
@@ -122,27 +126,30 @@ def test_DenovoMCMC__all_nans():
     assert posterior.probabilities[0] < 0.05
 
 
-
 def test_DenovoMCMC__nans_ignored():
     # nan-reads should have no affect on mcmc
-    haplotypes = np.array([
-        [0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 1, 1, 1],
-        [0, 1, 0, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1],
-    ])
+    haplotypes = np.array(
+        [
+            [0, 0, 0, 0, 0, 0],
+            [0, 1, 0, 1, 1, 1],
+            [0, 1, 0, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1],
+        ]
+    )
     n_chains = 2
     ploidy, n_base = haplotypes.shape
     n_steps = 1000
     n_burn = 500
     n_alleles = [2] * n_base
-    model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+    model = mcmc.DenovoMCMC(
+        ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
+    )
 
     reads1 = simulate_reads(
-        haplotypes, 
-        n_reads=16, 
+        haplotypes,
+        n_reads=16,
         uniform_sample=True,
-        errors=False, 
+        errors=False,
         qual=(60, 60),
     )
 
@@ -162,23 +169,27 @@ def test_DenovoMCMC__nans_ignored():
 
 
 def test_DenovoMCMC__non_variable():
-    haplotypes = np.array([
-        [0, 0, 0, 1, 1, 1],
-        [0, 0, 0, 1, 1, 1],
-        [0, 0, 0, 1, 1, 1],
-    ])
+    haplotypes = np.array(
+        [
+            [0, 0, 0, 1, 1, 1],
+            [0, 0, 0, 1, 1, 1],
+            [0, 0, 0, 1, 1, 1],
+        ]
+    )
     n_chains = 2
     ploidy, n_base = haplotypes.shape
     n_steps = 100
     n_burn = 50
     n_alleles = [2] * n_base
-    model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+    model = mcmc.DenovoMCMC(
+        ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
+    )
 
     # high read depth
     reads = simulate_reads(
-        haplotypes, 
-        n_reads=40, 
-        errors=False, 
+        haplotypes,
+        n_reads=40,
+        errors=False,
         qual=(60, 60),
     )
 
@@ -197,22 +208,26 @@ def test_DenovoMCMC__diploid():
 
     np.random.seed(42)
 
-    haplotypes = np.array([
-        [0, 0, 0, 1, 1, 1],
-        [1, 0, 0, 0, 0, 0],
-    ])
+    haplotypes = np.array(
+        [
+            [0, 0, 0, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0],
+        ]
+    )
     n_chains = 2
     ploidy, n_base = haplotypes.shape
     n_steps = 1000
     n_burn = 500
     n_alleles = [2] * n_base
-    model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+    model = mcmc.DenovoMCMC(
+        ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
+    )
 
     reads = simulate_reads(
-        haplotypes, 
-        n_reads=2, 
+        haplotypes,
+        n_reads=2,
         uniform_sample=True,
-        errors=False, 
+        errors=False,
         qual=(60, 60),
     )
 
@@ -223,33 +238,36 @@ def test_DenovoMCMC__diploid():
         assert posterior.probabilities[0] > 0.90
         np.testing.assert_array_equal(haplotypes, posterior.genotypes[0])
 
+
 def test_DenovoMCMC__tetraploid():
 
-    haplotypes = np.array([
-        [0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 1, 1, 1],
-        [0, 1, 0, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1],
-    ])
+    haplotypes = np.array(
+        [
+            [0, 0, 0, 0, 0, 0],
+            [0, 1, 0, 1, 1, 1],
+            [0, 1, 0, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1],
+        ]
+    )
     n_chains = 2
     ploidy, n_base = haplotypes.shape
     n_steps = 1000
     n_burn = 500
     n_alleles = [2] * n_base
     model = mcmc.DenovoMCMC(
-        ploidy=ploidy, 
-        n_alleles=n_alleles, 
-        steps=n_steps, 
-        chains=n_chains, 
-        random_seed=42
+        ploidy=ploidy,
+        n_alleles=n_alleles,
+        steps=n_steps,
+        chains=n_chains,
+        random_seed=42,
     )
 
     # high read depth
     reads = simulate_reads(
-        haplotypes, 
-        n_reads=40, 
+        haplotypes,
+        n_reads=40,
         uniform_sample=True,
-        errors=False, 
+        errors=False,
         qual=(60, 60),
     )
     for _ in range(10):
@@ -262,10 +280,10 @@ def test_DenovoMCMC__tetraploid():
 
     # medium read depth
     reads = simulate_reads(
-        haplotypes, 
-        n_reads=16, 
+        haplotypes,
+        n_reads=16,
         uniform_sample=True,
-        errors=False, 
+        errors=False,
         qual=(60, 60),
     )
     for _ in range(10):
@@ -278,10 +296,10 @@ def test_DenovoMCMC__tetraploid():
 
     # low read depth
     reads = simulate_reads(
-        haplotypes, 
-        n_reads=8, 
+        haplotypes,
+        n_reads=8,
         uniform_sample=True,
-        errors=False, 
+        errors=False,
         qual=(60, 60),
     )
     for _ in range(10):
@@ -294,12 +312,14 @@ def test_DenovoMCMC__tetraploid():
 
 def test_DenovoMCMC__seed():
 
-    haplotypes = np.array([
-        [0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 1, 1, 1],
-        [0, 1, 0, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1],
-    ])
+    haplotypes = np.array(
+        [
+            [0, 0, 0, 0, 0, 0],
+            [0, 1, 0, 1, 1, 1],
+            [0, 1, 0, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1],
+        ]
+    )
     n_chains = 2
     ploidy, n_base = haplotypes.shape
     n_steps = 1000
@@ -307,16 +327,22 @@ def test_DenovoMCMC__seed():
 
     # medium read depth
     reads = simulate_reads(
-        haplotypes, 
-        n_reads=16, 
+        haplotypes,
+        n_reads=16,
         uniform_sample=True,
-        errors=False, 
+        errors=False,
         qual=(60, 60),
     )
 
-    model_1 = mcmc.DenovoMCMC(ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=42)
-    model_2 = mcmc.DenovoMCMC(ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=33)
-    model_3 = mcmc.DenovoMCMC(ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=42)
+    model_1 = mcmc.DenovoMCMC(
+        ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=42
+    )
+    model_2 = mcmc.DenovoMCMC(
+        ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=33
+    )
+    model_3 = mcmc.DenovoMCMC(
+        ploidy, n_alleles, steps=n_steps, chains=n_chains, random_seed=42
+    )
 
     trace_1 = model_1.fit(reads)
     trace_2 = model_2.fit(reads)
@@ -341,11 +367,13 @@ def test_DenovoMCMC__fuzz():
 
         haplotypes = np.random.choice(
             [0, 1, 2],  # small chance of triallelic base
-            p=[0.45, 0.45, 0.1], 
+            p=[0.45, 0.45, 0.1],
             size=(ploidy, n_base),
         )
         n_alleles = [np.max(haplotypes) + 1] * n_base
-        model = mcmc.DenovoMCMC(ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains)
+        model = mcmc.DenovoMCMC(
+            ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
+        )
         reads = simulate_reads(haplotypes, n_reads=n_reads)
         trace = model.fit(reads)
         assert trace.genotypes.shape == (n_chains, n_steps, ploidy, n_base)
@@ -353,50 +381,41 @@ def test_DenovoMCMC__fuzz():
 
 
 @pytest.mark.parametrize(
-    'temperatures', 
+    "temperatures",
     [
         [1.0],
         [0.1, 1.0],
         [0.01, 0.1, 1.0],
         [0.001, 0.01, 0.1, 1.0],
-    ]
+    ],
 )
 def test_DenovoMCMC__temperatures_bias(temperatures):
     """Test to ensure the implementation of parallel-tempering does
     not bias the MCMC results when tempering is not needed.
     """
-    reads = np.array([
-        [[0.9, 0.1],
-         [0.1, 0.9]],
-        [[0.9, 0.1],
-         [0.1, 0.9]],
-        [[0.9, 0.1],
-         [0.9, 0.1]],
-        [[0.9, 0.1],
-         [0.9, 0.1]],
-    ])
-    genotypes = np.array([
-        [[0, 0],  # 2
-         [0, 0]],
-        [[0, 0],  # 1:1
-         [0, 1]],
-        [[0, 0],  # 1:1
-         [1, 0]],
-        [[0, 0],  # 1:1
-         [1, 1]],
-        [[0, 1],  # 2
-         [0, 1]],
-        [[0, 1],  # 1:1
-         [1, 0]],
-        [[0, 1],  # 1:1
-         [1, 1]],
-        [[1, 0],  # 2
-         [1, 0]],
-        [[1, 0],  # 1:1
-         [1, 1]],
-        [[1, 1],  # 2
-         [1, 1]],
-    ], dtype=np.int8)
+    reads = np.array(
+        [
+            [[0.9, 0.1], [0.1, 0.9]],
+            [[0.9, 0.1], [0.1, 0.9]],
+            [[0.9, 0.1], [0.9, 0.1]],
+            [[0.9, 0.1], [0.9, 0.1]],
+        ]
+    )
+    genotypes = np.array(
+        [
+            [[0, 0], [0, 0]],  # 2
+            [[0, 0], [0, 1]],  # 1:1
+            [[0, 0], [1, 0]],  # 1:1
+            [[0, 0], [1, 1]],  # 1:1
+            [[0, 1], [0, 1]],  # 2
+            [[0, 1], [1, 0]],  # 1:1
+            [[0, 1], [1, 1]],  # 1:1
+            [[1, 0], [1, 0]],  # 2
+            [[1, 0], [1, 1]],  # 1:1
+            [[1, 1], [1, 1]],  # 2
+        ],
+        dtype=np.int8,
+    )
 
     # calculate exact posteriors
     llks = np.array([log_likelihood(reads, g) for g in genotypes])
@@ -407,17 +426,19 @@ def test_DenovoMCMC__temperatures_bias(temperatures):
 
     # simulate posteriors
     model = mcmc.DenovoMCMC(
-        ploidy=2, 
+        ploidy=2,
         n_alleles=[2, 2],
-        steps=50000, 
-        chains=1, 
-        random_seed=11, 
+        steps=50000,
+        chains=1,
+        random_seed=11,
         temperatures=temperatures,
     )
     trace = model.fit(reads)
     posterior = trace.burn(100).posterior()
     simulation_posteriors = {g.tobytes(): 0 for g in genotypes}
-    simulation_posteriors.update({g.tobytes(): p for g, p in zip(posterior.genotypes, posterior.probabilities)})
+    simulation_posteriors.update(
+        {g.tobytes(): p for g, p in zip(posterior.genotypes, posterior.probabilities)}
+    )
     simulation_posteriors = [simulation_posteriors[g.tobytes()] for g in genotypes]
 
     # check posteriors are similar
@@ -431,77 +452,89 @@ def test_DenovoMCMC__temperatures_bias(temperatures):
 def test_DenovoMCMC__temperatures_submode():
     """This test is taken from real world example in which the mcmc
     can become stuck in a sub-optimal alternative mode when parallel
-    tempering is not used. Note that the optimal mode is not necessarily 
+    tempering is not used. Note that the optimal mode is not necessarily
     the true genotype and the data there may be additional haplotypes due
     to duplication.
     """
     read_counts = [
-        ('000000', 22),
-        ('-00000', 3),
-        ('0000-0', 2),
-        ('00000-', 1),
-        ('000-00', 1),
-        ('001000', 16),
-        ('-01000', 2),
-        ('001---', 2),
-        ('--1000', 3),
-        ('000110', 39),
-        ('-00110', 1),
-        ('----10', 1),
-        ('100101', 3),
-        ('-00101', 3),
-        ('----01', 1),
-        ('110100', 1),
-        ('110---', 2),
-        ('1101--', 1),
-        ('11----', 1),
-        ('0--000', 1),
-        ('---000', 3),
-        ('----00', 4),
-        ('0-----', 2),
-        ('1-----', 2),
-        ('001110', 1),
+        ("000000", 22),
+        ("-00000", 3),
+        ("0000-0", 2),
+        ("00000-", 1),
+        ("000-00", 1),
+        ("001000", 16),
+        ("-01000", 2),
+        ("001---", 2),
+        ("--1000", 3),
+        ("000110", 39),
+        ("-00110", 1),
+        ("----10", 1),
+        ("100101", 3),
+        ("-00101", 3),
+        ("----01", 1),
+        ("110100", 1),
+        ("110---", 2),
+        ("1101--", 1),
+        ("11----", 1),
+        ("0--000", 1),
+        ("---000", 3),
+        ("----00", 4),
+        ("0-----", 2),
+        ("1-----", 2),
+        ("001110", 1),
     ]
     strings, counts = zip(*read_counts)
     calls = integer.from_strings(strings)
     counts = np.array(list(counts))
     dists = integer.as_probabilistic(
-        calls, 
-        n_alleles=2, 
-        p=0.999, 
+        calls,
+        n_alleles=2,
+        p=0.999,
     )
     reads = mset.repeat(dists, counts)
     n_alleles = [2] * 6
 
-    alt_mode = np.array([
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 1, 0],
-        [0, 0, 0, 1, 1, 0],
-        [0, 0, 1, 0, 0, 0],
-        [1, 0, 0, 1, 0, 1],
-    ])
+    alt_mode = np.array(
+        [
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0],
+            [0, 0, 0, 1, 1, 0],
+            [0, 0, 1, 0, 0, 0],
+            [1, 0, 0, 1, 0, 1],
+        ]
+    )
 
-    opt_mode = np.array([
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 1, 0],
-        [0, 0, 0, 1, 1, 0],
-        [0, 0, 1, 0, 0, 0],
-        [1, 0, 0, 1, 0, 1],
-        [1, 1, 0, 1, 0, 0]
-    ])
+    opt_mode = np.array(
+        [
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0],
+            [0, 0, 0, 1, 1, 0],
+            [0, 0, 1, 0, 0, 0],
+            [1, 0, 0, 1, 0, 1],
+            [1, 1, 0, 1, 0, 0],
+        ]
+    )
 
     # initialise all chains within sub-optimal mode
     initial = np.tile(alt_mode, (2, 1, 1))
 
     # without tempering
-    model = mcmc.DenovoMCMC(ploidy=6, n_alleles=n_alleles, steps=1100, temperatures=[1.0], random_seed=1)
+    model = mcmc.DenovoMCMC(
+        ploidy=6, n_alleles=n_alleles, steps=1100, temperatures=[1.0], random_seed=1
+    )
     posterior = model.fit(reads, initial=initial).burn(100).posterior()
-    np.testing.assert_array_equal(posterior.genotypes[0], alt_mode) # sub-optimal mode
+    np.testing.assert_array_equal(posterior.genotypes[0], alt_mode)  # sub-optimal mode
     assert posterior.probabilities[0] > 0.95
 
     # with tempering
-    model = mcmc.DenovoMCMC(ploidy=6, n_alleles=n_alleles, steps=1100, temperatures=[0.1, 1.0], random_seed=1)
+    model = mcmc.DenovoMCMC(
+        ploidy=6,
+        n_alleles=n_alleles,
+        steps=1100,
+        temperatures=[0.1, 1.0],
+        random_seed=1,
+    )
     posterior = model.fit(reads, initial=initial).burn(100).posterior()
     np.testing.assert_array_equal(posterior.genotypes[0], opt_mode)  # optimal mode
     assert posterior.probabilities[0] > 0.95

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import numpy as np
 import gzip
 import pysam
 from dataclasses import dataclass
@@ -9,10 +8,11 @@ from mchap.encoding import integer
 
 
 __all__ = [
-    'SNP',
-    'Locus',
-    'read_bed4',
+    "SNP",
+    "Locus",
+    "read_bed4",
 ]
+
 
 @dataclass(frozen=True, order=True)
 class SNP:
@@ -77,26 +77,28 @@ class Locus:
         for pos, string in zip(self.positions, ref_alleles):
             idx = pos - self.start
             for offset, char in enumerate(string):
-                if chars[idx+offset] != char:
-                    message = 'Reference allele does not match sequence at position {}:{}'
+                if chars[idx + offset] != char:
+                    message = (
+                        "Reference allele does not match sequence at position {}:{}"
+                    )
                     raise ValueError(message.format(self.contig, pos + offset))
-                
-                # remove chars
-                chars[idx+offset] = ''
-                
-            # add template position
-            chars[idx] = '{}'
-        
-        # join and return
-        return ''.join(chars)
 
-    def format_haplotypes(self, array, gap='-'):
+                # remove chars
+                chars[idx + offset] = ""
+
+            # add template position
+            chars[idx] = "{}"
+
+        # join and return
+        return "".join(chars)
+
+    def format_haplotypes(self, array, gap="-"):
         """Format integer encoded alleles as a haplotype string"""
         variants = integer.as_characters(array, gap=gap, alleles=self.alleles)
         template = self._template_sequence()
         return [template.format(*hap) for hap in variants]
 
-    def format_variants(self, array, gap='-'):
+    def format_variants(self, array, gap="-"):
         """Format integer encoded alleles as a haplotype string"""
         return integer.as_characters(array, gap=gap, alleles=self.alleles)
 
@@ -113,12 +115,7 @@ def _parse_bed4_line(line):
         name = None
 
     return Locus(
-        contig=contig,
-        start=start,
-        stop=stop,
-        name=name,
-        sequence=None,
-        variants=None
+        contig=contig, start=start, stop=stop, name=name, sequence=None, variants=None
     )
 
 
@@ -127,24 +124,24 @@ def read_bed4(bed, region=None):
     if region:
         # must be gzipped and tabix indexed
         if isinstance(region, str):
-            region = (region, )
+            region = (region,)
         with pysam.TabixFile(bed) as tbx:
             for line in tbx.fetch(*region):
                 yield _parse_bed4_line(line)
 
     else:
         # check if gzipped
-        with open(bed, 'rb') as f:
+        with open(bed, "rb") as f:
             token = f.read(3)
             f.seek(0)
-            if token == b'\x1f\x8b\x08':
+            if token == b"\x1f\x8b\x08":
                 # is gzipped
-                f =  gzip.GzipFile(fileobj=f)
+                f = gzip.GzipFile(fileobj=f)
             else:
                 # not gzipped so assume plain text
                 pass
             for line in f:
-                if line.startswith(b'#'):
+                if line.startswith(b"#"):
                     pass
                 else:
                     yield _parse_bed4_line(line.decode())
@@ -162,12 +159,12 @@ def _merge_snps(x, y):
         x.name == y.name,
         x.start == y.start,
         x.stop == y.stop,
-        x.alleles[0] == y.alleles[0]
+        x.alleles[0] == y.alleles[0],
     ]
 
     if not all(match):
-        x_str = '{}: {}:{}'.format(x.name, x.contig, x.start)
-        y_str = '{}: {}:{}'.format(y.name, y.contig, y.start)
+        x_str = "{}: {}:{}".format(x.name, x.contig, x.start)
+        y_str = "{}: {}:{}".format(y.name, y.contig, y.start)
         message = 'Cannot merge SNPs "{}" and "{}"'.format(x_str, y_str)
         raise ValueError(message)
 
@@ -188,7 +185,7 @@ def _set_locus_variants(locus, variant_file):
     positions = set()
 
     for var in variant_file.fetch(locus.contig, locus.start, locus.stop):
-        alleles = (var.ref, ) + var.alts
+        alleles = (var.ref,) + var.alts
 
         if (var.stop - var.start == 1) and all(len(a) == 1 for a in alleles):
             # is a SNP
@@ -196,18 +193,20 @@ def _set_locus_variants(locus, variant_file):
                 contig=var.contig,
                 start=var.start,
                 stop=var.stop,
-                name=var.id if var.id else '.',
+                name=var.id if var.id else ".",
                 alleles=alleles,
             )
             if snp.start in positions:
                 # attempt to merge duplicates
-                variants = [_merge_snps(s, snp) if s.start == snp.start else s for s in variants]
+                variants = [
+                    _merge_snps(s, snp) if s.start == snp.start else s for s in variants
+                ]
             else:
                 variants.append(snp)
                 positions.add(snp.start)
         else:
             pass
 
-    variants=tuple(variants)
+    variants = tuple(variants)
     locus = locus.set(variants=variants)
     return locus

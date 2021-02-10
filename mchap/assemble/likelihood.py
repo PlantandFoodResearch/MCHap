@@ -2,14 +2,13 @@
 
 import numpy as np
 import numba
-from math import gamma
 
 from mchap.assemble import util
 
 __all__ = [
-    'log_likelihood',
-    'log_likelihood_structural_change',
-    'log_genotype_prior',
+    "log_likelihood",
+    "log_likelihood_structural_change",
+    "log_genotype_prior",
 ]
 
 
@@ -20,31 +19,31 @@ def log_likelihood(reads, genotype):
     Parameters
     ----------
     reads : ndarray, float, shape (n_reads, n_base, n_nucl)
-        Observed reads encoded as an array of 
+        Observed reads encoded as an array of
         probabilistic matrices.
     genotype : ndarray, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded 
+        Set of haplotypes with base positions encoded
         as simple integers from 0 to n_nucl.
 
     Returns
     -------
     llk : float
         Log-likelihood of the observed reads given the genotype.
-    
+
     """
-    
+
     ploidy, n_base = genotype.shape
     n_reads = len(reads)
-       
+
     llk = 0.0
-    
+
     for r in range(n_reads):
-        
+
         read_prob = 0
-        
+
         for h in range(ploidy):
             read_hap_prod = 1.0
-            
+
             for j in range(n_base):
                 i = genotype[h, j]
 
@@ -54,11 +53,11 @@ def log_likelihood(reads, genotype):
                     pass
                 else:
                     read_hap_prod *= val
-            
-            read_prob += read_hap_prod/ploidy
-        
+
+            read_prob += read_hap_prod / ploidy
+
         llk += np.log(read_prob)
-                    
+
     return llk
 
 
@@ -69,41 +68,41 @@ def log_likelihood_structural_change(reads, genotype, haplotype_indices, interva
     Parameters
     ----------
     reads : ndarray, float, shape (n_reads, n_base, n_nucl)
-        Observed reads encoded as an array of 
+        Observed reads encoded as an array of
         probabilistic matrices.
     genotype : ndarray, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as 
+        Set of haplotypes with base positions encoded as
         simple integers from 0 to n_nucl.
     haplotype_indices : ndarray, int, shape (ploidy)
-        Indicies of haplotypes to use within the 
+        Indicies of haplotypes to use within the
         changed interval.
     interval : tuple, int, shape (2, ), optional
-        Interval of base-positions to swap (defaults to 
+        Interval of base-positions to swap (defaults to
         all base positions).
 
     Returns
     -------
     llk : float
-        Log-likelihood of the observed reads given the proposed 
+        Log-likelihood of the observed reads given the proposed
         structural change to the genotype.
-    
+
     """
     ploidy, n_base = genotype.shape
     n_reads = len(reads)
-        
+
     intvl = util.interval_as_range(interval, n_base)
-       
+
     llk = 0.0
-    
+
     for r in range(n_reads):
-        
+
         read_prob = 0
-        
+
         for h in range(ploidy):
             read_hap_prod = 1.0
-            
+
             for j in range(n_base):
-                
+
                 # check if in the altered region
                 if j in intvl:
                     # use base from alternate hap
@@ -111,7 +110,7 @@ def log_likelihood_structural_change(reads, genotype, haplotype_indices, interva
                 else:
                     # use base from current hap
                     h_ = h
-                
+
                 # get nucleotide index
                 i = genotype[h_, j]
 
@@ -121,11 +120,11 @@ def log_likelihood_structural_change(reads, genotype, haplotype_indices, interva
                     pass
                 else:
                     read_hap_prod *= val
-                
-            read_prob += read_hap_prod/ploidy
-        
+
+            read_prob += read_hap_prod / ploidy
+
         llk += np.log(read_prob)
-                    
+
     return llk
 
 
@@ -145,9 +144,9 @@ def log_genotype_null_prior(dosage, unique_haplotypes):
     -------
     lprior : float
         Log-prior probability of dosage.
-    
+
     """
-    ploidy=dosage.sum()
+    ploidy = dosage.sum()
     genotype_perms = util.count_equivalent_permutations(dosage)
     log_total_perms = ploidy * np.log(unique_haplotypes)
     return np.log(genotype_perms) - log_total_perms
@@ -171,7 +170,7 @@ def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
     -------
     lprob : float
         Log-probability.
-    
+
     """
     ploidy = np.sum(dosage)
     sum_dispersion = dispersion * unique_haplotypes
@@ -188,7 +187,7 @@ def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
         if dose > 0:
             num = util.log_gamma(dose + dispersion)
             denom = np.log(util.factorial_20(dose)) + util.log_gamma(dispersion)
-            prod += (num - denom)
+            prod += num - denom
 
     # return as log probability
     return left + prod
@@ -212,7 +211,7 @@ def log_genotype_prior(dosage, unique_haplotypes, inbreeding=0):
     -------
     lprior : float
         Log-prior probability of dosage.
-    
+
     """
     assert 0 <= inbreeding < 1
 

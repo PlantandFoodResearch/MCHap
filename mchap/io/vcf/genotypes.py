@@ -12,7 +12,7 @@ def sort_haplotypes(genotypes, dtype=np.int8):
         List of ndarrays each with shape (ploidy, n_positions).
     dtype : type
         Numpy dtype for returned array.
-    
+
     Returns
     -------
     haplotypes : ndarray, int, shape (n_haplotypes, n_positions)
@@ -23,18 +23,18 @@ def sort_haplotypes(genotypes, dtype=np.int8):
     """
     haplotypes = np.concatenate(genotypes)
     _, n_pos = haplotypes.shape
-    
+
     # count observed haps
     counts = Counter(tuple(hap) for hap in haplotypes)
-    
+
     # ref and null haps are special values
-    ref = (0, ) * n_pos
-    null = (-1, ) * n_pos
-    
+    ref = (0,) * n_pos
+    null = (-1,) * n_pos
+
     # remove null haps from count if present
     if null in counts:
         _ = counts.pop(null)
-    
+
     # seperate ref count
     if ref not in counts:
         ref_count = 0
@@ -44,11 +44,11 @@ def sort_haplotypes(genotypes, dtype=np.int8):
     # order by frequency then insert ref first
     pairs = counts.most_common()
     pairs = [(ref, ref_count)] + pairs
-    
+
     # convert back to arrays
     haplotypes = np.array([a for a, _ in pairs], dtype=dtype)
     counts = np.array([c for _, c in pairs])
-    
+
     return haplotypes, counts
 
 
@@ -72,8 +72,8 @@ def genotype_string(genotype, haplotypes):
     alleles = [labels.get(h.tobytes(), -1) for h in genotype]
     alleles.sort()
     chars = [str(a) for a in alleles if a >= 0]
-    chars += ['.' for a in alleles if a < 0]
-    return '/'.join(chars)
+    chars += ["." for a in alleles if a < 0]
+    return "/".join(chars)
 
 
 def expected_dosage(genotypes, probabilities, haplotypes):
@@ -104,20 +104,20 @@ def expected_dosage(genotypes, probabilities, haplotypes):
     # values for sorting genotypes, this works because all
     # genotypes share the same alleles in different dosage
     vals = [np.sum(g) for g in alleles]
-    
+
     # normalised probability of each dosage
     probs = probabilities[np.argsort(vals)]
     probs /= probs.sum()
-    
+
     # per genotype allele counts
     uniques, counts = zip(*[np.unique(g, return_counts=True) for g in alleles])
     counts = np.array(counts)
-    
+
     # assert all dosage variants contain same alleles
     for i in range(1, len(uniques)):
         np.testing.assert_array_equal(uniques[0], uniques[i])
-    
+
     # expectation of dosage
     expected = np.sum(counts * probs[:, None], axis=0)
-    
+
     return expected

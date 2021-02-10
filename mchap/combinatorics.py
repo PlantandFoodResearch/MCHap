@@ -4,16 +4,17 @@ import numpy as np
 from math import factorial
 
 __all__ = [
-    'count_unique_haplotypes',
-    'count_unique_genotypes',
-    'count_unique_genotypes',
-    'count_unique_genotype_permutations',
-    'count_genotype_permutations',
+    "count_unique_haplotypes",
+    "count_unique_genotypes",
+    "count_unique_genotypes",
+    "count_unique_genotype_permutations",
+    "count_genotype_permutations",
 ]
 
+
 def count_unique_haplotypes(u_alleles):
-    """Calculate the number of unique haplotypes that can exist at 
-    a locus given the number of unique alleles at each variable 
+    """Calculate the number of unique haplotypes that can exist at
+    a locus given the number of unique alleles at each variable
     position within the haplotype interval.
 
     Parameters
@@ -49,12 +50,12 @@ def count_unique_genotypes(u_haps, ploidy):
         equivilent permutations.
 
     """
-    return factorial(u_haps + ploidy -1) // (factorial(ploidy) * factorial(u_haps-1))
+    return factorial(u_haps + ploidy - 1) // (factorial(ploidy) * factorial(u_haps - 1))
 
 
 def count_unique_genotype_permutations(u_haps, ploidy):
     """Calculates number of possible genotypes at a locus (including
-    equivilent permutations) given the number of possible unique 
+    equivilent permutations) given the number of possible unique
     haplotypes at that locus and a ploidy.
 
     Parameters
@@ -75,7 +76,7 @@ def count_unique_genotype_permutations(u_haps, ploidy):
 
 
 def count_haplotype_universial_occurance(u_haps, ploidy):
-    """Counts the number of occurances of a haplotype among all 
+    """Counts the number of occurances of a haplotype among all
     possible unique genotypes at a locus.
 
     Parameters
@@ -84,7 +85,7 @@ def count_haplotype_universial_occurance(u_haps, ploidy):
         Number of possible unique haplotypes.
     ploidy : int
         Number of haplotype copys in an individual.
-    
+
     Returns
     -------
     occurance : int
@@ -93,11 +94,11 @@ def count_haplotype_universial_occurance(u_haps, ploidy):
         of genotypes.
 
     """
-    return factorial(u_haps + ploidy -1) // (factorial(ploidy-1) * factorial(u_haps))
+    return factorial(u_haps + ploidy - 1) // (factorial(ploidy - 1) * factorial(u_haps))
 
 
 def count_genotype_permutations(dosage):
-    """Counts the total number of equivilent genotype permutations 
+    """Counts the total number of equivilent genotype permutations
     for a single given genotype.
 
     Parameters

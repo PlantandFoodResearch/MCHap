@@ -6,18 +6,16 @@ from mchap import mset
 from mchap.encoding import integer
 
 __all__ = [
-    'PosteriorGenotypeDistribution',
-    'PhenotypeDistribution',
-    'GenotypeMultiTrace',
+    "PosteriorGenotypeDistribution",
+    "PhenotypeDistribution",
+    "GenotypeMultiTrace",
 ]
 
 
 @dataclass
 class Assembler(object):
-    """Abstract base class for haplotype assemblers.
+    """Abstract base class for haplotype assemblers."""
 
-    """
-            
     @classmethod
     def parameterize(cls, *args, **kwargs):
         """Returns an instance with specified parameters.
@@ -36,12 +34,11 @@ class Assembler(object):
 
         Notes
         -----
-        This is conveniance method to create a delayed instance of a 
+        This is conveniance method to create a delayed instance of a
         class with Dask.
 
         """
         return cls(*args, **kwargs)
-
 
     def fit(self):
         """Fit an assembler model to a dataset.
@@ -56,13 +53,13 @@ class Assembler(object):
 
 @dataclass
 class PosteriorGenotypeDistribution(object):
-    """Generic class for posterior distribution of 
+    """Generic class for posterior distribution of
     (finite and countable) genotypes.
 
     Attributes
     ----------
     genotypes : ndarray, int, shape (n_genotypes, ploidy, n_positions)
-        The possible genotypes of an individual of known ploidy at a 
+        The possible genotypes of an individual of known ploidy at a
         locus covering n_positions variable positions.
     probabilities : ndarray, float, shape (n_genotypes, )
         Probabilities (summing to 1) of each genotype.
@@ -95,22 +92,22 @@ class PosteriorGenotypeDistribution(object):
             Genotypes which contain only the haplotypes found in the posterior
             mode phenotype (at variable dosage levels).
         probabilities : ndarray, float, shape (n_genotypes, )
-            The posterior probabilities asociated with each 
-            genotype which is congruent with the posterior 
+            The posterior probabilities asociated with each
+            genotype which is congruent with the posterior
             mode phenotype.
 
         Notes
         -----
         The term 'phenotype' is used here to describe a set of unique haplotypes
         without dosage information.
-        Hence for a given phenotype and ploidy > 2 their are one or more congruent 
+        Hence for a given phenotype and ploidy > 2 their are one or more congruent
         genotypes that consist of the haplotypes of that genotype.
 
         """
         labels = np.zeros(len(self.genotypes), dtype=int)
         phenotype_labels = {}  # string: int
         probs = {}  # int: float
-        #phenotypes = {}  # int: array
+        # phenotypes = {}  # int: array
 
         for i, gen in enumerate(self.genotypes):
             phenotype = mset.unique(gen)
@@ -119,13 +116,13 @@ class PosteriorGenotypeDistribution(object):
                 label = i
                 phenotype_labels[string] = label
                 probs[label] = self.probabilities[i]
-                #phenotypes[label] = phenotype
+                # phenotypes[label] = phenotype
             else:
                 label = phenotype_labels[string]
                 probs[label] += self.probabilities[i]
             labels[i] = label
 
-        phenotype_labels, probs = (zip(*probs.items()))
+        phenotype_labels, probs = zip(*probs.items())
         mode = phenotype_labels[np.argmax(probs)]
         idx = labels == mode
         return PhenotypeDistribution(self.genotypes[idx], self.probabilities[idx])
@@ -144,6 +141,7 @@ class PhenotypeDistribution(object):
         Probabilities of each genotype that may not sum to 1.
 
     """
+
     genotypes: np.ndarray
     probabilities: np.ndarray
 
@@ -169,7 +167,7 @@ class PhenotypeDistribution(object):
         return self.genotypes[idx], self.probabilities[idx]
 
     def call_phenotype(self, threshold=0.95):
-        """Identifies the most complete set of alleles that 
+        """Identifies the most complete set of alleles that
         exceeds a probability threshold.
         If the probability threshold cannot be exceeded the
         phenotype will be returned with a probability of None
@@ -179,7 +177,7 @@ class PhenotypeDistribution(object):
             # mode genotype prob greater than threshold
             idx = np.argmax(self.probabilities)
             return self.genotypes[idx], self.probabilities[idx]
-        
+
         # result will require some padding with null alleles
         _, ploidy, n_pos = self.genotypes.shape
         result = np.zeros((ploidy, n_pos), dtype=self.genotypes.dtype) - 1
@@ -189,7 +187,7 @@ class PhenotypeDistribution(object):
         p = 0.0
         genotypes = list(self.genotypes)
         probabilities = list(self.probabilities)
-        
+
         while p < threshold:
             if len(probabilities) == 0:
                 # all have been selected
@@ -200,11 +198,11 @@ class PhenotypeDistribution(object):
 
         # intercept of selected genotypes
         alleles = reduce(mset.intercept, selected)
-        
+
         # result adds padding with null alleles
         for i, hap in enumerate(alleles):
             result[i] = hap
-        
+
         return result, p
 
 
@@ -215,7 +213,7 @@ class GenotypeMultiTrace(object):
     Attributes
     ----------
     genotypes : ndarray, int, shape (n_chains, n_steps, ploidy, n_positions)
-        The genotype recorded at each step of a Markov chain Monte Carlo 
+        The genotype recorded at each step of a Markov chain Monte Carlo
         simulation for a locus covering n_positions variable positions.
     llks : ndarray, float, shape (n_chains, n_steps)
         The log-likelihood calculated for the genotype at each step of
@@ -227,12 +225,12 @@ class GenotypeMultiTrace(object):
     llks: np.ndarray
 
     def __post_init__(self):
-        
-        if (self.genotypes is not None) and (self.genotypes.shape[-1] !=0):
 
-            self.genotypes=self.genotypes.copy()
-            self.llks=self.llks.copy()
-        
+        if (self.genotypes is not None) and (self.genotypes.shape[-1] != 0):
+
+            self.genotypes = self.genotypes.copy()
+            self.llks = self.llks.copy()
+
             assert np.ndim(self.genotypes) == 4
             assert np.ndim(self.llks) == 2
             assert self.genotypes.shape[0:2] == self.llks.shape
@@ -243,28 +241,27 @@ class GenotypeMultiTrace(object):
                 for i in range(n_steps):
                     self.genotypes[c, i] = integer.sort(self.genotypes[c, i])
 
-
     def burn(self, n):
-        """Returns a new GenotypeTrace object without the first 
+        """Returns a new GenotypeTrace object without the first
         `n` observations of each chain.
 
         Parameters
         ----------
         n : int
-            Number of steps to remove from the start of each 
+            Number of steps to remove from the start of each
             chain in the trace.
 
         Returns
         -------
         trace : GenotypeTrace
-            A new instance of the GenotypeTrace without the 
+            A new instance of the GenotypeTrace without the
             first n steps.
 
         """
-        # avoid calling __post_init__ because genotypes should 
+        # avoid calling __post_init__ because genotypes should
         # already be sorted and sorting many genotypes is expensive
-        new =  type(self)(
-            None, 
+        new = type(self)(
+            None,
             None,
         )
         new.genotypes = self.genotypes[:, n:]

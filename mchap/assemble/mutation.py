@@ -1,33 +1,32 @@
 #!/usr/bin/env python3
 
-import numpy as np 
+import numpy as np
 import numba
 
 from mchap.assemble import util
 from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
 
 
-__all__ = [
-    'base_step',
-    'compound_step'
-]
+__all__ = ["base_step", "compound_step"]
 
 
 @numba.njit
-def base_step(genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_alleles=None, temp=1):
-    """Mutation Gibbs sampler step for the jth base position 
+def base_step(
+    genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_alleles=None, temp=1
+):
+    """Mutation Gibbs sampler step for the jth base position
     of the hth haplotype.
 
     Parameters
     ----------
     genotype : ndarray, int, shape (ploidy, n_base)
-        Initial state of haplotypes with base positions encoded 
+        Initial state of haplotypes with base positions encoded
         as simple integers from 0 to n_nucl.
     reads : ndarray, float, shape (n_reads, n_base, n_nucl)
-        Observed reads encoded as an array of probabilistic 
+        Observed reads encoded as an array of probabilistic
         matrices.
     llk : float
-        Log-likelihood of the initial haplotype state given 
+        Log-likelihood of the initial haplotype state given
         the observed reads.
     h : int
         Index of the haplotype to be mutated.
@@ -42,11 +41,11 @@ def base_step(genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_all
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
-    
+
     Returns
     -------
     llk : float
-        New log-likelihood of observed reads given 
+        New log-likelihood of observed reads given
         the updated genotype.
 
     Notes
@@ -54,7 +53,7 @@ def base_step(genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_all
     Variable `genotype` is updated in place.
 
     """
-    assert  0 <= temp <= 1
+    assert 0 <= temp <= 1
     ploidy = len(genotype)
     # number of possible alleles given given array size
     if n_alleles is None:
@@ -65,7 +64,7 @@ def base_step(genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_all
 
     # store MH acceptance probability for each allele
     log_accept = np.empty(n_alleles)
-    
+
     # use differences in count of haplotype h to calculate
     # ratio of proposal probabilities
     lhapcount = np.log(util.count_haplotype_copies(genotype, h))
@@ -81,7 +80,7 @@ def base_step(genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_all
         if i == current_nucleotide:
             # store current likelihood
             llks[i] = llk
-            log_accept[i] = - np.inf  # log(0)
+            log_accept[i] = -np.inf  # log(0)
         else:
             # count number of possible new genotypes
             n_options += 1
@@ -107,14 +106,14 @@ def base_step(genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_all
 
             # calculate Metropolis-Hastings acceptance probability
             # ln(min(1, (P(G'|R)P(G')g(G|G')) / (P(G|R)P(G)g(G'|G)))
-            mh_ratio = ((llk_ratio + lprior_ratio) * temp + lproposal_ratio)
+            mh_ratio = (llk_ratio + lprior_ratio) * temp + lproposal_ratio
             log_accept[i] = np.minimum(0.0, mh_ratio)  # max prob of log(1)
 
     # divide acceptance probability by number of steps to choose from
-    log_accept -=  np.log(n_options)
+    log_accept -= np.log(n_options)
 
     # convert to probability of proposal * probability of acceptance
-    # then fill in probability that no step is made (i.e. choose the initial state) 
+    # then fill in probability that no step is made (i.e. choose the initial state)
     probabilities = np.exp(log_accept)
     probabilities[current_nucleotide] = 1 - probabilities.sum()
 
@@ -137,18 +136,18 @@ def compound_step(
     n_alleles=None,
     temp=1,
 ):
-    """Mutation compound Gibbs sampler step for all base positions 
+    """Mutation compound Gibbs sampler step for all base positions
     of all haplotypes in a genotype.
 
     Parameters
     ----------
     genotype : ndarray, int, shape (ploidy, n_base)
-        Initial state of haplotypes with base positions encoded as 
+        Initial state of haplotypes with base positions encoded as
         simple integers from 0 to n_nucl.
     reads : ndarray, float, shape (n_reads, n_base, n_nucl)
         Observed reads encoded as an array of probabilistic matrices.
     llk : float
-        Log-likelihood of the initial haplotype state given the 
+        Log-likelihood of the initial haplotype state given the
         observed reads.
     inbreeding : float
         Expected inbreeding coefficient of the genotype.
@@ -157,7 +156,7 @@ def compound_step(
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
-    
+
     Returns
     -------
     llk : float
@@ -179,7 +178,7 @@ def compound_step(
         unique_haplotypes = np.prod(n_alleles)
 
     # matrix of haplotype-base combinations
-    substeps = np.empty((ploidy * n_base, 2), dtype=np.int8) 
+    substeps = np.empty((ploidy * n_base, 2), dtype=np.int8)
 
     for h in range(ploidy):
         for j in range(n_base):

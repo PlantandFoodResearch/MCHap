@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 
-import numpy as np 
+import numpy as np
 import numba
 from scipy import stats as _stats
-from itertools import combinations_with_replacement as _combinations_with_replacement
 from dataclasses import dataclass
 
-from mchap import combinatorics
-from mchap import mset
 from mchap.assemble import mutation, structural
 from mchap.assemble.tempering import chain_swap_step
 from mchap.assemble.likelihood import log_likelihood
@@ -16,7 +13,7 @@ from mchap.assemble.classes import Assembler, GenotypeMultiTrace
 from mchap.assemble.snpcalling import snp_posterior
 
 
-__all__ = ['DenovoMCMC']
+__all__ = ["DenovoMCMC"]
 
 
 @dataclass
@@ -34,7 +31,7 @@ class DenovoMCMC(Assembler):
     recombination_step_probability: float = 0.5
     partial_dosage_step_probability: float = 0.5
     dosage_step_probability: float = 1.0
-    temperatures: tuple = (1.0, )
+    temperatures: tuple = (1.0,)
     random_seed: int = None
     """De novo haplotype assembly using Markov chain Monte Carlo
     for probabilistically encoded variable positions of NGS reads.
@@ -69,7 +66,7 @@ class DenovoMCMC(Assembler):
         probability of being homozygous that is greater than
         this value will be fixed as non-variable positions
         during the MCMC simulation. This can greatly improve
-        performance when there are multiple homozygous 
+        performance when there are multiple homozygous
         alleles (default = 0.999).
     recombination_step_probability : float, optional
         Probability of performing a recombination sub-step during
@@ -94,7 +91,7 @@ class DenovoMCMC(Assembler):
     """
 
     def fit(self, reads, initial=None):
-        """Fit the parametized model to a set of probabilistically 
+        """Fit the parametized model to a set of probabilistically
         encoded variable positions of NGS reads.
 
         Parameters
@@ -110,12 +107,12 @@ class DenovoMCMC(Assembler):
         trace : GenotypeMultiTrace
             An instance of GenotypeMultiTrace containing the genotype state
             and log-likelihood at each step in each of the MCMC simulations.
-        
+
         Notes
         -----
         If the initial genotype state is not set by the user
-        then it is automatically set by sampling <ploidy> random 
-        haplotypes from the mean allele probabilities 
+        then it is automatically set by sampling <ploidy> random
+        haplotypes from the mean allele probabilities
         among all reads.
 
         """
@@ -139,9 +136,9 @@ class DenovoMCMC(Assembler):
         genotypes = []
         llks = []
         for chain in range(self.chains):
-            g, l = self._mcmc(reads, initial=initial[chain])
-            genotypes.append(g)
-            llks.append(l)
+            gen_trace, llk_trace = self._mcmc(reads, initial=initial[chain])
+            genotypes.append(gen_trace)
+            llks.append(llk_trace)
 
         # combine traces into multi-trace
         return GenotypeMultiTrace(
@@ -149,24 +146,19 @@ class DenovoMCMC(Assembler):
             np.array(llks),
         )
 
-
     def _mcmc(self, reads, initial=None):
-        """Run a single MCMC simulation.
-        """
+        """Run a single MCMC simulation."""
         # identify base positions that are overwhelmingly likely
         # to be homozygous
         # these can be 'fixed' to reduce computational complexity
         hom_probs = _homozygosity_probabilities(
-            reads,
-            self.n_alleles,
-            self.ploidy,
-            self.inbreeding
+            reads, self.n_alleles, self.ploidy, self.inbreeding
         )
         fixed = hom_probs >= self.fix_homozygous
         homozygous = np.any(fixed, axis=-1)
         heterozygous = ~homozygous
 
-        # subset of read positions which have not been identified 
+        # subset of read positions which have not been identified
         # as homozygous
         reads_het = reads[:, heterozygous]
 
@@ -217,11 +209,11 @@ class DenovoMCMC(Assembler):
 
         # run the sampler on the heterozygous positions
         genotypes, llks = _denovo_gibbs_sampler(
-            genotype=genotype, 
+            genotype=genotype,
             inbreeding=self.inbreeding,
-            reads=reads_het, 
+            reads=reads_het,
             n_alleles=n_alleles,
-            steps=self.steps, 
+            steps=self.steps,
             break_dist=break_dist,
             recombination_step_probability=self.recombination_step_probability,
             partial_dosage_step_probability=self.partial_dosage_step_probability,
@@ -255,24 +247,24 @@ class DenovoMCMC(Assembler):
 
 @numba.njit
 def _denovo_gibbs_sampler(
-        *,
-        genotype,
-        inbreeding,
-        reads,
-        n_alleles,
-        steps,
-        break_dist,
-        recombination_step_probability,
-        partial_dosage_step_probability,
-        dosage_step_probability,
-        temperatures,
-        return_heated_trace=False,
-    ):
+    *,
+    genotype,
+    inbreeding,
+    reads,
+    n_alleles,
+    steps,
+    break_dist,
+    recombination_step_probability,
+    partial_dosage_step_probability,
+    dosage_step_probability,
+    temperatures,
+    return_heated_trace=False,
+):
     """Gibbs sampler with parallele temporing"""
-    #assert temperatures[-1] == 1.0
+    # assert temperatures[-1] == 1.0
     ploidy, n_base = genotype.shape
     n_temps = len(temperatures)
-    
+
     # number of possible unique haplotypes
     u_haps = np.prod(n_alleles)
 
@@ -304,8 +296,8 @@ def _denovo_gibbs_sampler(
             temp = temperatures[t]
 
             if np.isnan(llk):
-                raise ValueError('Encountered log likelihood of nan')
-            
+                raise ValueError("Encountered log likelihood of nan")
+
             # mutation step
             llk = mutation.compound_step(
                 genotype=genotype,
@@ -313,25 +305,24 @@ def _denovo_gibbs_sampler(
                 reads=reads,
                 llk=llk,
                 n_alleles=n_alleles,
-                temp=temp
+                temp=temp,
             )
-    
-            
+
             # recombinations step
             if np.random.rand() <= recombination_step_probability:
                 n_breaks = util.random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
                 llk = structural.compound_step(
-                    genotype=genotype, 
+                    genotype=genotype,
                     inbreeding=inbreeding,
-                    reads=reads, 
-                    llk=llk, 
+                    reads=reads,
+                    llk=llk,
                     intervals=intervals,
                     n_alleles=n_alleles,
                     step_type=0,
                     temp=temp,
                 )
-            
+
             # interval dosage step
             if np.random.rand() <= partial_dosage_step_probability:
                 n_breaks = util.random_choice(break_dist)
@@ -339,8 +330,8 @@ def _denovo_gibbs_sampler(
                 llk = structural.compound_step(
                     genotype=genotype,
                     inbreeding=inbreeding,
-                    reads=reads, 
-                    llk=llk, 
+                    reads=reads,
+                    llk=llk,
                     intervals=intervals,
                     n_alleles=n_alleles,
                     step_type=1,
@@ -352,14 +343,14 @@ def _denovo_gibbs_sampler(
                 llk = structural.compound_step(
                     genotype=genotype,
                     inbreeding=inbreeding,
-                    reads=reads, 
-                    llk=llk, 
+                    reads=reads,
+                    llk=llk,
                     intervals=np.array([[0, n_base]]),
                     n_alleles=n_alleles,
                     step_type=1,
                     temp=temp,
                 )
-            
+
             # chain swap step if not the highest temp
             if t > 0:
                 llk_prev = llks[t - 1]
@@ -376,13 +367,13 @@ def _denovo_gibbs_sampler(
                     unique_haplotypes=u_haps,
                 )
                 llks[t - 1] = llk_prev
-            
+
             # save llk of current temp
             llks[t] = llk
-            
+
             # save llk of current temp
             llks[t] = llk
-        
+
         if return_heated_trace:
             # save state and likelihood of each chain
             genotype_trace[:, i] = genotypes.copy()
@@ -411,7 +402,7 @@ def _point_beta_probabilities(n_base, a=1, b=1):
     -------
     probs : array_like, int, shape (n_base - 1)
         Probabilities for recombination point.
-    
+
     """
     dist = _stats.beta(a, b)
     points = np.arange(1, n_base + 1) / (n_base)
@@ -421,7 +412,7 @@ def _point_beta_probabilities(n_base, a=1, b=1):
 
 
 def _read_mean_dist(reads):
-    """Calculate the element-wise means of a collection of 
+    """Calculate the element-wise means of a collection of
     probabilistically encoded reads.
 
     Parameters
@@ -437,7 +428,7 @@ def _read_mean_dist(reads):
     Notes
     -----
     If read distributions are normalized if they do not sum to 1.
-    
+
     """
     # work around to avoid nan values caused by gaps
     reads = reads.copy()
@@ -478,7 +469,7 @@ def _homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=0):
     -------
     homozygosity_probs : ndarray, float, shape (n_positions, max_allele)
         Probability of each homozygous genotype for each SNP
-    
+
     Notes
     -----
     The probabilities calculated this way are independent
@@ -486,7 +477,7 @@ def _homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=0):
     """
     _, n_pos, max_allele = reads.shape
     probabilites = np.zeros((n_pos, max_allele), dtype=float)
-    
+
     for i in range(n_pos):
         n = n_alleles[i]
 

@@ -1,10 +1,10 @@
-import numpy as np 
+import numpy as np
 import numba
 
 from mchap.assemble import util
 from mchap.assemble.likelihood import log_genotype_prior
 
-__all__ = ['chain_swap_step']
+__all__ = ["chain_swap_step"]
 
 
 @numba.njit
@@ -38,7 +38,7 @@ def chain_swap_acceptance(
     -------
     acceptance_ratio : float
         Probability of accepting a state exchange.
-    
+
     Notes
     -----
     Calculation following equation 11 of Sambridge (2014).
@@ -54,7 +54,7 @@ def chain_swap_acceptance(
     acceptance_ratio = np.exp(frac_1 + frac_2)
     if acceptance_ratio > 1.0:
         acceptance_ratio = 1.0
-    
+
     return acceptance_ratio
 
 
@@ -97,7 +97,7 @@ def chain_swap_step(
         Updated log likelihood for state in the cooler chain.
     llk_j : float
         Updated log likelihood for state in the warmer chain.
-    
+
     Notes
     -----
     If a step is made then genotypes are modified in place.
