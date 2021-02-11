@@ -263,7 +263,7 @@ def test_Program__run():
     result = prog.run()
 
     # compare to expected VCF
-    with open(str(path / "simple.output.vcf"), "r") as f:
+    with open(str(path / "simple.output.deep.vcf"), "r") as f:
         for i, line in enumerate(f):
             line = line.strip()
             if line.startswith("##commandline"):
@@ -330,7 +330,7 @@ def test_Program__run_stdout(n_cores):
     # compare output to expected
     with open(out_filename, "r") as f:
         actual = f.readlines()
-    with open(str(path / "simple.output.vcf"), "r") as f:
+    with open(str(path / "simple.output.deep.vcf"), "r") as f:
         expected = f.readlines()
 
     if n_cores > 1:
@@ -360,7 +360,7 @@ def test_Program__output_pysam():
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
-    OUTFILE = str(path / "simple.output.vcf")
+    OUTFILE = str(path / "simple.output.deep.vcf")
 
     with open(OUTFILE, "r") as f:
         expect = set(line.strip() for line in f.readlines())
@@ -387,7 +387,7 @@ def test_Program__output_bed_positions():
     path = path / "test_io/data"
 
     BEDFILE = str(path / "simple.bed")
-    OUTFILE = str(path / "simple.output.vcf")
+    OUTFILE = str(path / "simple.output.deep.vcf")
 
     # map of named intervals from bed4 file
     with open(BEDFILE) as bed:
@@ -417,7 +417,7 @@ def test_Program__output_reference_positions():
     path = path / "test_io/data"
 
     REFFILE = str(path / "simple.fasta")
-    OUTFILE = str(path / "simple.output.vcf")
+    OUTFILE = str(path / "simple.output.deep.vcf")
 
     reference = pysam.FastaFile(REFFILE)
     with pysam.VariantFile(OUTFILE) as vcf:
