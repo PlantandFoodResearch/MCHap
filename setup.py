@@ -11,7 +11,7 @@ def read_file(file_name):
     return "\n".join(lines)
 
 
-VERSION = read_file("mchap/version.py").split("'")[1]
+VERSION = read_file("mchap/version.py").split('"')[1]
 
 setup(
     name="mchap",
