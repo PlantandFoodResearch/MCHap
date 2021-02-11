@@ -34,7 +34,7 @@ class program(object):
     call_best_genotype: bool = False
     call_filtered: bool = False
     read_group_field: str = "SM"
-    read_error_rate: float = 0.0
+    base_error_rate: float = 0.0
     mapping_quality: int = 20
     skip_duplicates: bool = True
     skip_qcfail: bool = True
@@ -191,7 +191,7 @@ class program(object):
         )
 
         parser.add_argument(
-            "--error-rate",
+            "--base-error-rate",
             nargs=1,
             type=float,
             default=[0.0],
@@ -298,8 +298,8 @@ class program(object):
             "--mcmc-steps",
             type=int,
             nargs=1,
-            default=[1000],
-            help="Number of steps to simulate in each MCMC chain (default = 1000).",
+            default=[1500],
+            help="Number of steps to simulate in each MCMC chain (default = 1500).",
         )
 
         parser.add_argument(
@@ -453,8 +453,8 @@ class program(object):
             "--cores",
             type=int,
             nargs=1,
-            default=[2],
-            help=("Number of cpu cores to use (default = 2)."),
+            default=[1],
+            help=("Number of cpu cores to use (default = 1)."),
         )
 
         if len(command) < 3:
@@ -529,7 +529,7 @@ class program(object):
             call_best_genotype=args.call_best_genotype,
             call_filtered=args.call_filtered,
             read_group_field=args.read_group_field[0],
-            read_error_rate=args.error_rate[0],
+            base_error_rate=args.base_error_rate[0],
             mapping_quality=args.mapping_quality[0],
             skip_duplicates=args.skip_duplicates,
             skip_qcfail=args.skip_qcfail,
@@ -699,7 +699,7 @@ class program(object):
                 locus,
                 read_calls,
                 read_quals,
-                error_rate=self.read_error_rate,
+                error_rate=self.base_error_rate,
             )
 
             # assemble haplotypes
@@ -864,9 +864,7 @@ class program(object):
             line = self._assemble_locus(sample_bams, locus)
             sys.stdout.write(line + "\n")
 
-    def run_stdout(self):
-        if self.n_cores <= 1:
-            self._run_stdout_single_core()
+    def _run_stdout_multi_core(self):
 
         header = self.header()
         sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
@@ -893,3 +891,9 @@ class program(object):
         queue.put("KILL")
         pool.close()
         pool.join()
+
+    def run_stdout(self):
+        if self.n_cores <= 1:
+            self._run_stdout_single_core()
+        else:
+            self._run_stdout_multi_core()

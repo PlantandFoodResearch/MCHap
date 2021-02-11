@@ -311,6 +311,8 @@ def test_Program__run_stdout(n_cores):
         "100",
         "--mcmc-seed",
         "11",
+        "--cores",
+        str(n_cores),
     ]
 
     prog = program.cli(command)
