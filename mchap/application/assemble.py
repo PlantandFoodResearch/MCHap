@@ -501,7 +501,7 @@ class program(object):
             with open(args.sample_inbreeding[0]) as f:
                 for line in f.readlines():
                     sample, inbreeding = line.strip().split("\t")
-                    sample_ploidy[sample] = float(inbreeding)
+                    sample_inbreeding[sample] = float(inbreeding)
 
         # default inbreeding
         for sample in samples:

@@ -101,6 +101,12 @@ def test_Program__cli_lists():
         f.write("SAMPLE1\t6\n")
         # SAMPLE4 uses default
 
+    tmp_sample_inbreeding = dirpath + "/sample-inbreeding.txt"
+    with open(tmp_sample_inbreeding, "w") as f:
+        f.write("SAMPLE3\t0.1\n")
+        f.write("SAMPLE1\t0.2\n")
+        # SAMPLE4 uses default
+
     command = [
         "mchap",
         "denovo",
@@ -112,6 +118,8 @@ def test_Program__cli_lists():
         tmp_sample_ploidy,
         "--ploidy",
         "4",
+        "--sample-inbreeding",
+        tmp_sample_inbreeding,
         "--targets",
         BED,
         "--variants",
@@ -144,6 +152,9 @@ def test_Program__cli_lists():
 
     for k, v in zip(samples, [2, 4, 6]):
         assert prog.sample_ploidy[k] == v
+
+    for k, v in zip(samples, [0.1, 0.0, 0.2]):
+        assert prog.sample_inbreeding[k] == v
 
 
 def test_Program__header():
