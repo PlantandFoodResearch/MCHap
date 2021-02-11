@@ -12,7 +12,11 @@ from mchap.io import (
     encode_read_alleles,
     encode_read_distributions,
 )
-from mchap.encoding.integer import minimum_error_correction, read_assignment
+from mchap.encoding.integer import (
+    minimum_error_correction,
+    read_assignment,
+    kmer_representation,
+)
 from mchap import mset
 from mchap.version import __version__
 
@@ -30,6 +34,7 @@ __all__ = [
     "encode_read_distributions",
     "minimum_error_correction",
     "read_assignment",
+    "kmer_representation",
     "mset",
     "__version__",
 ]

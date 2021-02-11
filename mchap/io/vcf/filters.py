@@ -73,35 +73,6 @@ class FilterCallSet(object):
         return False
 
 
-def _kmer_representation(variants, haplotype_calls, k=3):
-    """Calculates position-wise frequency of read_calls kmers which
-    are also present in haplotype_calls.
-    """
-    # create kmers and counts
-    read_kmers, read_kmer_counts = integer.kmer_counts(variants, k=k)
-    hap_kmers, _ = integer.kmer_counts(haplotype_calls, k=k)
-
-    # handle case of no read kmers (i.e. from nan reads)
-    if np.prod(read_kmers.shape) == 0:
-        _, n_pos = hap_kmers.shape
-        return np.ones(n_pos)
-
-    # index of kmers not found in haplotypes
-    idx = mset.count(hap_kmers, read_kmers) == 0
-
-    # depth of unique kmers
-    unique_depth = integer.depth(read_kmers[idx], read_kmer_counts[idx])
-
-    # depth of total kmers
-    depth = integer.depth(read_kmers, read_kmer_counts)
-
-    # avoid divide by zero
-    with np.errstate(divide="ignore", invalid="ignore"):
-        result = 1 - np.where(depth > 0, unique_depth / depth, 0)
-
-    return result
-
-
 @dataclass(frozen=True)
 class SampleKmerFilter(SampleFilter):
     k: int = 3
@@ -128,7 +99,7 @@ class SampleKmerFilter(SampleFilter):
             # can't apply kmer filter
             return FilterCall(self.id, None, applied=False)
 
-        freqs = _kmer_representation(variants, genotype, k=self.k)
+        freqs = integer.kmer_representation(variants, genotype, k=self.k)
         fail = np.any(freqs < self.threshold)
 
         return FilterCall(self.id, fail)
