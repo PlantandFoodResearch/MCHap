@@ -1,8 +1,60 @@
 import numpy as np
 import math
 import numba
+import ctypes
+
+from numba.extending import get_cython_function_address
 
 _FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=np.int64)
+
+
+@numba.njit
+def factorial_20(x):
+    """Returns the factorial of integers in the range [0, 20] (inclusive)
+
+    Parameters
+    ----------
+    x : int
+        An integer
+
+    Returns
+    -------
+    x_fac : int
+        Factorial of x
+
+    """
+    if x in range(0, 21):
+        return _FACTORIAL_LOOK_UP[x]
+    else:
+        raise ValueError("factorial functuion is only supported for values 0 to 20")
+
+
+# modified from https://stackoverflow.com/questions/54850985/fast-algorithm-for-log-gamma-function/54855769#54855769
+# wich in turn was based on https://github.com/numba/numba/issues/3086
+_PTR = ctypes.POINTER
+_dble = ctypes.c_double
+_ptr_dble = _PTR(_dble)
+_gammaln_addr = get_cython_function_address("scipy.special.cython_special", "gammaln")
+_functype = ctypes.CFUNCTYPE(_dble, _dble)
+_gammaln_float64 = _functype(_gammaln_addr)
+
+
+@numba.njit
+def log_gamma(x):
+    """Returns the natural log of gamma of x.
+
+    Parameters
+    ----------
+    x : float
+        A float.
+
+    Returns
+    -------
+    gammaln : float
+        Natural log of gamma of x
+
+    """
+    return _gammaln_float64(x)
 
 
 @numba.njit
@@ -14,7 +66,7 @@ def interval_as_range(interval, max_range):
         if len(interval) == 2:
             return range(interval[0], interval[1])
         else:
-            raise ValueError('Interval must be `None` or array of length 2')
+            raise ValueError("Interval must be `None` or array of length 2")
 
 
 @numba.njit
@@ -136,12 +188,12 @@ def array_equal(x, y, interval=None):
     Returns
     -------
     equality : bool
-        True if `x` and `y` are equal (within an interval 
+        True if `x` and `y` are equal (within an interval
         if specified).
 
     """
     r = interval_as_range(interval, len(x))
-    
+
     for i in r:
         if x[i] != y[i]:
             return False
@@ -149,43 +201,56 @@ def array_equal(x, y, interval=None):
 
 
 @numba.njit
+def count_haplotype_copies(genotype, h):
+    ploidy = len(genotype)
+    count = 1
+    for i in range(ploidy):
+        if i == h:
+            pass
+        else:
+            if array_equal(genotype[i], genotype[h]):
+                count += 1
+    return count
+
+
+@numba.njit
 def get_dosage(dosage, genotype, interval=None):
-    """Calculates the dosage of a set of integer encoded haplotypes by 
+    """Calculates the dosage of a set of integer encoded haplotypes by
     checking for array equality.
-    
+
     Parameters
     ----------
     dosage : ndarray, int, shape (ploidy)
         Array to update with dosage of each haplotype.
     genotype : ndarray, int, shape (ploidy, n_base)
-        Initial state of haplotypes with base positions encoded as 
+        Initial state of haplotypes with base positions encoded as
         simple integers.
 
     Returns
     -------
     None
-    
+
     Notes
     -----
     The `dosage` variable is updated in place.
-    The `dosage` array should always sum to the number of haplotypes 
+    The `dosage` array should always sum to the number of haplotypes
     in the `genotype`.
-    A value of `0` in the `dosage` array indicates that that haplotype 
+    A value of `0` in the `dosage` array indicates that that haplotype
     is a duplicate of another.
 
     """
     # start with assumption that all are unique
     dosage[:] = 1
-    
+
     ploidy, _ = genotype.shape
-        
+
     for h in range(ploidy):
         if dosage[h] == 0:
             # this haplotype has already been identified as equal to another
             pass
         else:
             # iterate through remaining haps
-            for p in range(h+1, ploidy):
+            for p in range(h + 1, ploidy):
                 if dosage[p] == 0:
                     # this haplotype has already been identified as equal to another
                     pass
@@ -202,7 +267,7 @@ def set_dosage(genotype, dosage):
     Parameters
     ----------
     genotype : ndarray, int, shape (ploidy, n_base)
-        Initial state of haplotypes with alleles at each base 
+        Initial state of haplotypes with alleles at each base
         positions encoded as integers.
     dosage : ndarray, int, shape (ploidy)
         Array with dose of each haplotype.
@@ -210,53 +275,56 @@ def set_dosage(genotype, dosage):
     Returns
     -------
     None
-    
+
     Notes
     -----
     The `dosage` variable is updated in place.
-    The `dosage` array should always sum to the number of 
+    The `dosage` array should always sum to the number of
     haplotypes in the `genotype`.
 
-    """    
+    """
     dosage = dosage.copy()
 
     ploidy = len(genotype)
-    
+
     h_y = 0
-    
+
     for h_x in range(ploidy):
 
         while dosage[h_x] > 1:
-            
+
             # don't iter over dosages we know are no longer 0
             for h_y in range(h_y, ploidy):
-                
+
                 if dosage[h_y] == 0:
-                    
+
                     genotype[h_y] = genotype[h_x]
                     dosage[h_x] -= 1
                     dosage[h_y] += 1
 
 
 @numba.njit
-def factorial_20(x):
-    """Returns the factorial of integers in the range [0, 20] (inclusive)
-    
+def n_choose_k(n, k):
+    """Calculate n choose k for values of n and k < 20.
     Parameters
     ----------
-    x : int
-        An integer
+    n : int
+        Number of elements to choose from.
+    k : int
+        Number of elements to be drawn.
 
     Returns
     -------
-    x_fac : int
-        Factorial of x
+    combinations : int
+        Number of possible combinations of size k drawn from
+        a set of size n.
+
+    Notes
+    -----
+    Formula: (n!) / (k!(n-k)!)
 
     """
-    if x in range(0, 21):
-        return _FACTORIAL_LOOK_UP[x]
-    else:
-        raise ValueError('factorial functuion is only supported for values 0 to 20')
+    return factorial_20(n) // (factorial_20(k) * factorial_20(n - k))
 
 
 @numba.njit
@@ -272,7 +340,7 @@ def count_equivalent_permutations(dosage):
     Notes
     -----
     A genotype is an unsorted multi-set of haplotypes hence rearanging the
-    order of haplotypes in a (heterozygous) genotype can result in equivilent 
+    order of haplotypes in a (heterozygous) genotype can result in equivilent
     permutations
 
     """
@@ -296,7 +364,7 @@ def sample_alleles(array, dtype=np.int8):
         Numpy dtype of alleles.
 
     Returns
-    ------- 
+    -------
     alleles : ndarray, int, shape (n_read, n_base)
         Sampled alleles
 
@@ -317,12 +385,11 @@ def sample_alleles(array, dtype=np.int8):
 
     for i in range(n):
         alleles[i] = random_choice(dists[i])
-    
+
     return alleles.reshape(shape)
 
 
 @numba.njit
 def seed_numba(seed):
-    """Set numba random seed
-    """
+    """Set numba random seed"""
     np.random.seed(seed)

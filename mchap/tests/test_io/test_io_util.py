@@ -4,10 +4,11 @@ from mchap.io import util
 
 
 def test_qual_of_char():
-    chars = np.array([chr(i+33) for i in np.arange(61)])
+    chars = np.array([chr(i + 33) for i in np.arange(61)])
     expect = np.arange(61)
     actual = util.qual_of_char(chars)
     np.testing.assert_array_equal(expect, actual)
+
 
 def test_prob_of_qual():
     qual = np.arange(0, 61, step=10)

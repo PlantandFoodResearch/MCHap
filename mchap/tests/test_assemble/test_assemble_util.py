@@ -1,9 +1,17 @@
 import numpy as np
 import math
+import scipy
 import pytest
 
 from mchap.assemble import util
 from mchap.encoding import integer
+
+
+def test_log_gamma():
+    for i in [0.01, 0.2, 0.7, 1, 10, 55, 120, 500, 1000_000, 100_000_000]:
+        actual = util.log_gamma(i)
+        expect = scipy.special.loggamma(i)
+        assert actual == expect
 
 
 def test_add_log_prob():
@@ -41,7 +49,7 @@ def test_log_likelihoods_as_conditionals():
         length = np.random.randint(2, 10)
         lks = np.random.rand(length)
 
-        # the conditional probabilities are calculated by 
+        # the conditional probabilities are calculated by
         # normalising the vector
         answer = lks / np.sum(lks)
 
@@ -60,13 +68,13 @@ def test_log_likelihoods_as_conditionals_zeros():
     # should be able to handel likelihoods of 0
     lks[5:] = 0
 
-    # the conditional probabilities are calculated by 
+    # the conditional probabilities are calculated by
     # normalising the vector
     answer = lks / np.sum(lks)
 
     # now in log space
     # ignore warning for log of 0 which produces -inf
-    with np.errstate(divide='ignore'):
+    with np.errstate(divide="ignore"):
         llks = np.log(lks)
 
     query = util.log_likelihoods_as_conditionals(llks)
@@ -74,102 +82,69 @@ def test_log_likelihoods_as_conditionals_zeros():
     np.testing.assert_almost_equal(query, answer)
 
 
-@pytest.mark.parametrize('x,y,interval,answer', [
-    pytest.param(
-        [0, 1, 1, 2, 0, 0, 1], 
-        [0, 1, 1, 2, 0, 1, 1], 
-        None, 
-        False, 
-        id='0'),
-    pytest.param(
-        [0, 1, 1, 2, 0, 0, 1], 
-        [0, 1, 1, 2, 0, 1, 1], 
-        (0, 5), 
-        True, 
-        id='1'),
-    pytest.param(
-        [0, 1, 1, 2, 0, 0, 1], 
-        [0, 1, 1, 2, 0, 1, 1], 
-        (5, 7), 
-        False, 
-        id='2'),
-    pytest.param(
-        [0, 1, 1, 2, 0, 0, 1], 
-        [0, 1, 1, 2, 0, 1, 1], 
-        (5, 5), # zero width interval
-        True, 
-        id='3'),
-    pytest.param(
-        [], 
-        [], 
-        None, 
-        True, 
-        id='4'),
-])
+@pytest.mark.parametrize(
+    "x,y,interval,answer",
+    [
+        pytest.param([0, 1, 1, 2, 0, 0, 1], [0, 1, 1, 2, 0, 1, 1], None, False, id="0"),
+        pytest.param(
+            [0, 1, 1, 2, 0, 0, 1], [0, 1, 1, 2, 0, 1, 1], (0, 5), True, id="1"
+        ),
+        pytest.param(
+            [0, 1, 1, 2, 0, 0, 1], [0, 1, 1, 2, 0, 1, 1], (5, 7), False, id="2"
+        ),
+        pytest.param(
+            [0, 1, 1, 2, 0, 0, 1],
+            [0, 1, 1, 2, 0, 1, 1],
+            (5, 5),  # zero width interval
+            True,
+            id="3",
+        ),
+        pytest.param([], [], None, True, id="4"),
+    ],
+)
 def test_array_equal(x, y, interval, answer):
 
-    x = np.array(x, dtype=np.int)
-    y = np.array(y, dtype=np.int)
+    x = np.array(x, dtype=int)
+    y = np.array(y, dtype=int)
 
     query = util.array_equal(x, y, interval=interval)
 
     assert query is answer
 
 
-@pytest.mark.parametrize('genotype,interval,answer', [
-    pytest.param(
-        [[0, 1, 0], [0, 1, 0]],
-        None,
-        [2, 0],
-        id='2x-hom'),
-    pytest.param(
-        [[0, 1, 0], [0, 1, 1]],
-        None,
-        [1, 1],
-        id='2x-het'),
-    pytest.param(
-        [[0, 1, 0], [0, 1, 1]],
-        (0, 2),
-        [2, 0],
-        id='2x-het-hom-interval'),
-    pytest.param(
-        [[0, 1, 0], [0, 1, 1]],
-        (1, 3),
-        [1, 1],
-        id='2x-het-het-interval'),
-    pytest.param(
-        [[0, 1, 0], [0, 1, 1]],
-        (2, 2),
-        [2, 0],
-        id='2x-het-zero-width-interval'),
-    pytest.param(
-        [[0, 1, 0], [0, 1, 1], [0, 1, 0]],
-        None,
-        [2, 1, 0],
-        id='3x-2:1'),
-    pytest.param(
-        [[0, 1, 0], [0, 1, 1], [0, 1, 1]],
-        None,
-        [1, 2, 0],
-        id='3x-1:2'),
-    pytest.param(
-        [[0, 1, 0, 1], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 0, 0]],
-        None,
-        [1, 2, 0, 1],
-        id='4x-1:2:1'),
-    pytest.param(
-        [[0, 1, 0, 1], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 0, 0]],
-        (0, 3),
-        [2, 2, 0, 0],
-        id='4x-2:2-interval'),
-])
+@pytest.mark.parametrize(
+    "genotype,interval,answer",
+    [
+        pytest.param([[0, 1, 0], [0, 1, 0]], None, [2, 0], id="2x-hom"),
+        pytest.param([[0, 1, 0], [0, 1, 1]], None, [1, 1], id="2x-het"),
+        pytest.param([[0, 1, 0], [0, 1, 1]], (0, 2), [2, 0], id="2x-het-hom-interval"),
+        pytest.param([[0, 1, 0], [0, 1, 1]], (1, 3), [1, 1], id="2x-het-het-interval"),
+        pytest.param(
+            [[0, 1, 0], [0, 1, 1]], (2, 2), [2, 0], id="2x-het-zero-width-interval"
+        ),
+        pytest.param([[0, 1, 0], [0, 1, 1], [0, 1, 0]], None, [2, 1, 0], id="3x-2:1"),
+        pytest.param([[0, 1, 0], [0, 1, 1], [0, 1, 1]], None, [1, 2, 0], id="3x-1:2"),
+        pytest.param(
+            [[0, 1, 0, 1], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 0, 0]],
+            None,
+            [1, 2, 0, 1],
+            id="4x-1:2:1",
+        ),
+        pytest.param(
+            [[0, 1, 0, 1], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 0, 0]],
+            (0, 3),
+            [2, 2, 0, 0],
+            id="4x-2:2-interval",
+        ),
+    ],
+)
 def test_get_dosage(genotype, interval, answer):
 
     genotype = np.array(genotype, dtype=np.int8)
     answer = np.array(answer)
 
     ploidy = len(genotype)
-    dosage = np.ones(ploidy, dtype=np.int)
+    dosage = np.ones(ploidy, dtype=int)
 
     util.get_dosage(dosage, genotype, interval=interval)
 
@@ -180,19 +155,17 @@ def set_dosage():
 
     # initial dosage = [1, 2, 0, 1]
     genotype = np.array(
-        [[0, 1, 0, 1], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 0, 0]], 
-        dtype=np.int8
+        [[0, 1, 0, 1], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 0, 0]], dtype=np.int8
     )
 
     # target dosage
-    dosage = np.array([3, 1, 0, 0], dtype=np.int)
+    dosage = np.array([3, 1, 0, 0], dtype=int)
 
     util.set_dosage(genotype, dosage)
 
     # note first haplotypes in same order
     answer = np.array(
-        [[0, 1, 0, 1], [0, 1, 1, 1], [0, 1, 0, 1], [0, 1, 0, 1]], 
-        dtype=np.int8
+        [[0, 1, 0, 1], [0, 1, 1, 1], [0, 1, 0, 1], [0, 1, 0, 1]], dtype=np.int8
     )
 
     np.testing.assert_array_equal(genotype, answer)
@@ -204,37 +177,41 @@ def test_factorial_20():
         assert util.factorial_20(i) == math.factorial(i)
 
 
-@pytest.mark.parametrize('dosage,answer', [
-    pytest.param([2, 0], 1),
-    pytest.param([1, 1], 2),
-    pytest.param([0, 2], 1),
-    pytest.param([1, 1, 1], 6),
-    pytest.param([2, 1, 0], 3),
-    pytest.param([3, 0, 0], 1),
-    pytest.param([4, 0, 0, 0], 1),
-    pytest.param([2, 2, 0, 0], 6),
-    pytest.param([1, 1, 1, 1], 24),
-])
+@pytest.mark.parametrize(
+    "dosage,answer",
+    [
+        pytest.param([2, 0], 1),
+        pytest.param([1, 1], 2),
+        pytest.param([0, 2], 1),
+        pytest.param([1, 1, 1], 6),
+        pytest.param([2, 1, 0], 3),
+        pytest.param([3, 0, 0], 1),
+        pytest.param([4, 0, 0, 0], 1),
+        pytest.param([2, 2, 0, 0], 6),
+        pytest.param([1, 1, 1, 1], 24),
+    ],
+)
 def test_count_equivalent_permutations(dosage, answer):
-    dosage = np.array(dosage, dtype=np.int)
+    dosage = np.array(dosage, dtype=int)
     query = util.count_equivalent_permutations(dosage)
     assert query == answer
 
 
 def test_sample_alleles():
 
-    array = np.array([
-        [[0.7, 0.3, 0.0], [0.5, 0.5, 0.0]],
-        [[0.9, 0.1, 0.0], [0.4, 0.3, 0.3]]
-    ])
+    array = np.array(
+        [[[0.7, 0.3, 0.0], [0.5, 0.5, 0.0]], [[0.9, 0.1, 0.0], [0.4, 0.3, 0.3]]]
+    )
 
-    accumulate = np.zeros(array.shape, dtype=np.float)
+    accumulate = np.zeros(array.shape, dtype=float)
     for _ in range(10000):
-        accumulate += integer.as_probabilistic(util.sample_alleles(array), 3, dtype=np.float)
+        accumulate += integer.as_probabilistic(
+            util.sample_alleles(array), 3, dtype=float
+        )
 
     # should be no samples from zero probability alleles
     assert accumulate[0][0][-1] == 0
-    
+
     # should reproduce original array
-    query = np.round(accumulate/10000, 1)
+    query = np.round(accumulate / 10000, 1)
     np.testing.assert_array_equal(query, array)

@@ -4,6 +4,14 @@ import numpy as np
 from . import sequence
 
 
+__all__ = [
+    "iter_kmers",
+    "kmer_counts",
+    "kmer_positions",
+    "kmer_frequency",
+]
+
+
 def iter_kmers(array, k=3):
     """Generate a sequence of kmer vectors.
 
@@ -18,7 +26,7 @@ def iter_kmers(array, k=3):
     ------
     kmer : ndarray, int, shape (1, )
         Integer encoded alleles of kmer sequence.
-    
+
     Notes
     -----
     Kmer vectors are padded with gap values (`-1`) to
@@ -27,9 +35,9 @@ def iter_kmers(array, k=3):
     """
     n_base = array.shape[-1]
     n_windows = n_base - (k - 1)
-    masks = np.zeros((n_windows, n_base), dtype=np.bool)
+    masks = np.zeros((n_windows, n_base), dtype=bool)
     for i in range(n_windows):
-        masks[i][i:i+k]=True
+        masks[i][i : i + k] = True
     for read in array.reshape(-1, n_base):
         for mask in masks:
             if np.any(sequence.is_gap(read[mask])):
@@ -56,7 +64,7 @@ def kmer_counts(array, k=3):
         Integer encoded alleles of kmer sequences.
     counts : ndarray, int
         Counts of each kmer.
-    
+
     Notes
     -----
     Kmer vectors are padded with gap values (`-1`) to
@@ -67,24 +75,24 @@ def kmer_counts(array, k=3):
     kmers_dict = {}
     counts_dict = {}
     for kmer in iter_kmers(array, k=k):
-        string = kmer.tostring()
+        string = kmer.tobytes()
         if string not in kmers_dict:
             kmers_dict[string] = kmer
             counts_dict[string] = 1
         else:
             counts_dict[string] += 1
-            
+
     if kmer is None:  # handle case of no kmers
-        return np.array([], dtype=array.dtype), np.array([], dtype=np.int)
+        return np.array([], dtype=array.dtype), np.array([], dtype=int)
 
     n_base = len(kmer)
     n_kmer = len(kmers_dict)
     kmers = np.empty((n_kmer, n_base), dtype=array.dtype)
-    counts = np.empty(n_kmer, dtype=np.int)
+    counts = np.empty(n_kmer, dtype=int)
 
     for i, (string, kmer) in enumerate(kmers_dict.items()):
-        kmers[i]=kmer
-        counts[i]=counts_dict[string]
+        kmers[i] = kmer
+        counts[i] = counts_dict[string]
 
     return kmers, counts
 
@@ -104,24 +112,24 @@ def kmer_positions(kmers, end=False):
     -------
     positions : ndarray, int
         positions of each base within each kmer.
-    
+
     """
-    assert end in {False, 'start', 'stop'}
+    assert end in {False, "start", "stop"}
     is_coding = ~sequence.is_gap(kmers)
     # detect k
     k = np.sum(is_coding, axis=-1)
     assert np.all(k[0] == k)
     k = k[0]
-    if end == 'start':
+    if end == "start":
         return np.where(is_coding)[1][0::k]
-    elif end == 'stop':
-        return np.where(is_coding)[1][k-1::k]
+    elif end == "stop":
+        return np.where(is_coding)[1][k - 1 :: k]
     else:
         return np.where(is_coding)[1].reshape(-1, k)
 
 
 def kmer_frequency(kmers, counts):
-    """Calculate the frequency of each kmer among kmers that 
+    """Calculate the frequency of each kmer among kmers that
     overlap it's positional interval.
 
     Parameters
@@ -130,7 +138,7 @@ def kmer_frequency(kmers, counts):
         Integer encoded alleles of kmer sequences.
     counts : ndarray, int
         Counts of each kmer.
-    
+
     Returns
     -------
     frequencies : ndarray, float
@@ -145,11 +153,11 @@ def kmer_frequency(kmers, counts):
     # position of first coding base
     positions = np.where(is_coding)[1][0::k]
     # number of kmers starting at each position
-    depths = np.zeros(kmers.shape[-2] - (k-1), dtype=np.int)
+    depths = np.zeros(kmers.shape[-2] - (k - 1), dtype=int)
     for i, pos in enumerate(positions):
         depths[pos] += counts[i]
     # kmer frequency at it's position
-    freqs = np.empty(len(kmers), dtype=np.float)
+    freqs = np.empty(len(kmers), dtype=float)
     for i, pos in enumerate(positions):
         freqs[i] = counts[i] / depths[pos]
     return freqs

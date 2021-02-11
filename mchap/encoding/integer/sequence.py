@@ -2,6 +2,15 @@
 
 import numpy as np
 
+__all__ = [
+    "is_gap",
+    "is_call",
+    "is_valid",
+    "argsort",
+    "sort",
+    "depth",
+]
+
 
 def is_gap(array):
     """Identify gap positions in an integer encoded biological sequence.
@@ -123,4 +132,4 @@ def depth(array, counts=None):
         return np.sum(is_call(array), axis=-2)
     else:
         counts = np.expand_dims(counts, -1)
-        return np.sum(is_call(array).astype(np.int) * counts, axis=-2)
+        return np.sum(is_call(array).astype(int) * counts, axis=-2)

@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def is_gap(array, gap='-'):
+def is_gap(array, gap="-"):
     """Identify gap positions in an character encoded biological sequence.
 
     Parameters
@@ -20,7 +20,7 @@ def is_gap(array, gap='-'):
     return array == gap
 
 
-def depth(array, gap='-'):
+def depth(array, gap="-"):
     """Position-wise depth of a set of biological sequences that are encoded as characters.
 
     Parameters
@@ -41,4 +41,3 @@ def depth(array, gap='-'):
 
     """
     return np.sum(array != gap, axis=0)
-

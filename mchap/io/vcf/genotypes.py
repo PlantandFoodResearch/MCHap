@@ -1,189 +1,123 @@
 import numpy as np
 from collections import Counter
-from dataclasses import dataclass
-from functools import reduce
-from itertools import combinations_with_replacement
-
-from mchap import mset
 
 
-def _allele_argsort(alleles):
-    """Sort alleles for VCF output, null alleles follow called alleles.
+def sort_haplotypes(genotypes, dtype=np.int8):
+    """Sort unique haplotypes from multiple genotype arrays from
+    most to least frequent with the reference allele first
+
+    Parameters
+    ----------
+    genotypes : list
+        List of ndarrays each with shape (ploidy, n_positions).
+    dtype : type
+        Numpy dtype for returned array.
+
+    Returns
+    -------
+    haplotypes : ndarray, int, shape (n_haplotypes, n_positions)
+        Unique haplotypes sorted by frequency with reference allele first.
+    counts : ndarray, int, shape (n_haplotypes, )
+        Count of each haplotype
+
     """
-    a = np.array(alleles, copy=False)
-    idx = np.argsort(a)
-    null =  a[idx] < 0
-    return np.append(idx[~null], idx[null])
+    haplotypes = np.concatenate(genotypes)
+    _, n_pos = haplotypes.shape
+
+    # count observed haps
+    counts = Counter(tuple(hap) for hap in haplotypes)
+
+    # ref and null haps are special values
+    ref = (0,) * n_pos
+    null = (-1,) * n_pos
+
+    # remove null haps from count if present
+    if null in counts:
+        _ = counts.pop(null)
+
+    # seperate ref count
+    if ref not in counts:
+        ref_count = 0
+    else:
+        ref_count = counts.pop(ref)
+
+    # order by frequency then insert ref first
+    pairs = counts.most_common()
+    pairs = [(ref, ref_count)] + pairs
+
+    # convert back to arrays
+    haplotypes = np.array([a for a, _ in pairs], dtype=dtype)
+    counts = np.array([c for _, c in pairs])
+
+    return haplotypes, counts
 
 
-def _allele_sort(alleles):
-    """Sort alleles for VCF output, null alleles follow called alleles.
+def genotype_string(genotype, haplotypes):
+    """Convert a genotype array to a VCF genotype (GT) string
+
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, n_positions)
+        Integer encoded genotype.
+    haplotypes : ndarray, int, shape (n_haplotypes, n_positions)
+        Unique haplotypes sorted by frequency with reference allele first.
+
+    Returns
+    -------
+    string : str
+        VCF genotype string.
     """
-    calls = [i for i in alleles if i >= 0]
-    nulls = [i for i in alleles if i < 0]
-    calls.sort()
-    return tuple(calls + nulls)
+    assert genotype.dtype == haplotypes.dtype
+    labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
+    alleles = [labels.get(h.tobytes(), -1) for h in genotype]
+    alleles.sort()
+    chars = [str(a) for a in alleles if a >= 0]
+    chars += ["." for a in alleles if a < 0]
+    return "/".join(chars)
 
 
-@dataclass(order=True, frozen=True)
-class Genotype(object):
-    alleles: tuple
-    phased: bool = False
+def expected_dosage(genotypes, probabilities, haplotypes):
+    """Calculate the expected floating point dosage based on a phenotype distribution.
 
-    def __str__(self):
-        sep = '|' if self.phased else '/'
-        return sep.join((str(i) if i >= 0 else '.' for i in self.alleles))
+    Parameters
+    ----------
+    genotypes : ndarray, int, shape (n_genotypes, ploidy, n_positions)
+        Integer encoded genotypes containing the same alleles in different dosage.
+    probabilities : ndarray, int, shape (n_genotypes, ).
+        Probability of each genotype.
 
-    def sorted(self):
-        if self.phased:
-            # can't sort phased data
-            raise ValueError('Cannot sort a phased genotype.')
-        else:
-            # values < 0 must come last
-            alleles = _allele_sort(self.alleles)
-            return type(self)(alleles)
+    Returns
+    -------
+    expected_dosage: ndarray, float, shape (n_alleles, )
+        Expected count of each allele.
+    """
+    assert genotypes.dtype == haplotypes.dtype
 
+    # if all alleles are null then no dosage
+    if np.all(genotypes < 0):
+        return np.array([np.nan])
 
-@dataclass
-class HaplotypeAlleleLabeler(object):
-    alleles: tuple
+    # label genotype alleles
+    labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
+    alleles = [[labels[h.tobytes()] for h in g] for g in genotypes]
 
-    @classmethod
-    def from_obs(cls, genotypes):
-        """Construct a new instance with alternate alleles ordered
-        by frequency among observed genotypes (highest to lowest).
-        """
-        haplotypes = np.concatenate(genotypes)
-        _, n_pos = haplotypes.shape
-        
-        counts = Counter(tuple(hap) for hap in haplotypes)
-        ref = (0, ) * n_pos
-        null = (-1, ) * n_pos
+    # values for sorting genotypes, this works because all
+    # genotypes share the same alleles in different dosage
+    vals = [np.sum(g) for g in alleles]
 
-        if null in counts:
-            _ = counts.pop(null)
+    # normalised probability of each dosage
+    probs = probabilities[np.argsort(vals)]
+    probs /= probs.sum()
 
-        if ref not in counts:
-            ref_count = 0
-        else:
-            ref_count = counts.pop(ref)
+    # per genotype allele counts
+    uniques, counts = zip(*[np.unique(g, return_counts=True) for g in alleles])
+    counts = np.array(counts)
 
-        pairs = counts.most_common()
-        pairs = [(ref, ref_count)] + pairs
+    # assert all dosage variants contain same alleles
+    for i in range(1, len(uniques)):
+        np.testing.assert_array_equal(uniques[0], uniques[i])
 
-        alleles = tuple(a for a, _ in pairs)
+    # expectation of dosage
+    expected = np.sum(counts * probs[:, None], axis=0)
 
-        return cls(alleles)
-
-    def count_obs(self, genotypes):
-        """Counts frequency of alleles amoung observed genotypes 
-        """
-        haplotypes = np.concatenate(genotypes)
-        
-        labels = {a: i for i, a in enumerate(self.alleles)}
-        counts = np.zeros(len(self.alleles), dtype=np.int)
-        for hap in haplotypes:
-            if np.all(hap < 0):
-                # null allele
-                pass
-            else:
-                allele = labels[tuple(hap)]
-                counts[allele] += 1
-        return counts
-
-    def argsort(self, array):
-        """Argsort a genotype array.
-        """
-        labels = {a: i for i, a in enumerate(self.alleles)}
-        alleles = np.array([labels.get(tuple(hap), -1) for hap in array])
-        return _allele_argsort(alleles)
-
-    
-    def label(self, array, phased=False):
-        """Create a VCF genotype from a genotype array.
-        """
-
-        labels = {a: i for i, a in enumerate(self.alleles)}
-
-        alleles = tuple(labels.get(tuple(hap), -1) for hap in array)
-        if not phased:
-            alleles = _allele_sort(alleles)
-        
-        return Genotype(alleles)
-
-    def label_phenotype_posterior(self, array, probs, unobserved=True, expected_dosage=False):
-        """Create a VCF genotype from one or more genotype arrays
-        that share the same alleles but with different dosage.
-        """
-        n_gen, ploidy, n_pos = np.shape(array)
-        assert len(array) == len(probs)
-
-        if np.all(array < 0):
-            # null alleles
-            genotypes = [Genotype(tuple(-1 for _ in range(ploidy)))]
-            probs = [None]
-            if not expected_dosage:
-                return genotypes, probs
-            else:
-                return genotypes, probs, [None]
-
-        # label observed genotypes
-        observed = [self.label(gen) for gen in array]
-
-        # alleles observed in first genotype
-        alleles = set(observed[0].alleles)
-
-        # these should be identical in all observed genotypes
-        assert all(alleles == set(gen.alleles) for gen in observed)
-
-        # phenotype as a sorted tuple
-        alleles = _allele_sort(alleles)
-
-        # all possible genotypes for this phenotype with prob of 0
-        genotypes = {}
-        
-        # optionally include unobserved genotypes
-        if unobserved:
-            opts = combinations_with_replacement(alleles, ploidy - len(alleles))
-            for opt in opts:
-                opt = _allele_sort(alleles + opt)
-                opt = Genotype(opt)
-                genotypes[opt] = 0.0
-
-        # add observed probs
-        for obs, prob in zip(observed, probs):
-            genotypes[obs] = prob
-
-        # unpack dict
-        genotypes, probs = zip(*genotypes.items())
-
-        # sort by genotypes
-        idx = np.argsort(genotypes)
-        genotypes = [genotypes[i] for i in idx]
-        probs = [probs[i] for i in idx]
-
-        if not expected_dosage:
-            return genotypes, probs
-
-        # normalised probs
-        normalised = np.array(probs) / np.sum(probs)
-
-        # dosage weighted by prob of each genotype
-        dosage_exp = np.zeros(len(alleles), dtype=np.float)
-        for gen, p in zip(genotypes, normalised):
-            counts = Counter(gen.alleles)
-            for i, a in enumerate(alleles):
-                dosage_exp[i] += counts[a] * p
-
-        return genotypes, probs, list(dosage_exp)
-
-
-    def ref_array(self):
-        """Returns reference allele array.
-        """
-        return np.array(self.alleles[0], dtype=np.int8)
-
-    def alt_array(self):
-        """Returns array of alternate alleles.
-        """
-        return np.array(self.alleles[1:], dtype=np.int8)
+    return expected

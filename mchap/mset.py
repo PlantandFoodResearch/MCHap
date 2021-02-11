@@ -20,9 +20,9 @@ def add(array_x, array_y):
     Notes
     -----
     Input arrays are treated as multi-sets in which
-    the outer dimention is as an un-ordered collection 
+    the outer dimention is as an un-ordered collection
     of elements.
-    
+
     """
     assert array_x.ndim == array_y.ndim
     assert array_x.dtype == array_y.dtype
@@ -46,23 +46,23 @@ def subtract(array_x, array_y):
     Notes
     -----
     Input arrays are treated as multi-sets in which
-    the outer dimention is as an un-ordered collection 
+    the outer dimention is as an un-ordered collection
     of elements.
-    
+
     """
     assert array_x.ndim == array_y.ndim
     assert array_x.dtype == array_y.dtype
     element_shape = array_x.shape[1:]
-    
-    x_map = {element.tostring(): element for element in array_x}
-    x_counts = _Counter(element.tostring() for element in array_x)
-    y_counts = _Counter(element.tostring() for element in array_y)
-    
+
+    x_map = {element.tobytes(): element for element in array_x}
+    x_counts = _Counter(element.tobytes() for element in array_x)
+    y_counts = _Counter(element.tobytes() for element in array_y)
+
     counts = x_counts - y_counts
     shape = (sum(counts.values()), *element_shape)
-    
+
     result = np.empty(shape, array_x.dtype)
-    
+
     i = 0
     for k, v in counts.items():
         for _ in range(v):
@@ -87,23 +87,23 @@ def intercept(array_x, array_y):
     Notes
     -----
     Input arrays are treated as multi-sets in which
-    the outer dimention is as an un-ordered collection 
+    the outer dimention is as an un-ordered collection
     of elements.
-    
+
     """
     assert array_x.ndim == array_y.ndim
     assert array_x.dtype == array_y.dtype
     element_shape = array_x.shape[1:]
-    
-    x_map = {element.tostring(): element for element in array_x}
-    x_counts = _Counter(element.tostring() for element in array_x)
-    y_counts = _Counter(element.tostring() for element in array_y)
-    
+
+    x_map = {element.tobytes(): element for element in array_x}
+    x_counts = _Counter(element.tobytes() for element in array_x)
+    y_counts = _Counter(element.tobytes() for element in array_y)
+
     counts = x_counts & y_counts
     shape = (sum(counts.values()), *element_shape)
-    
+
     result = np.empty(shape, array_x.dtype)
-    
+
     i = 0
     for k, v in counts.items():
         for _ in range(v):
@@ -128,24 +128,24 @@ def union(array_x, array_y):
     Notes
     -----
     Input arrays are treated as multi-sets in which
-    the outer dimention is as an un-ordered collection 
+    the outer dimention is as an un-ordered collection
     of elements.
-    
+
     """
     assert array_x.ndim == array_y.ndim
     assert array_x.dtype == array_y.dtype
     element_shape = array_x.shape[1:]
-    
-    u_map = {element.tostring(): element for element in array_x}
-    u_map.update({element.tostring(): element for element in array_y})
-    x_counts = _Counter(element.tostring() for element in array_x)
-    y_counts = _Counter(element.tostring() for element in array_y)
-    
+
+    u_map = {element.tobytes(): element for element in array_x}
+    u_map.update({element.tobytes(): element for element in array_y})
+    x_counts = _Counter(element.tobytes() for element in array_x)
+    y_counts = _Counter(element.tobytes() for element in array_y)
+
     counts = x_counts | y_counts
     shape = (sum(counts.values()), *element_shape)
-    
+
     result = np.zeros(shape, array_x.dtype)
-    
+
     i = 0
     for k, v in counts.items():
         for _ in range(v):
@@ -170,21 +170,21 @@ def equal(array_x, array_y):
     Notes
     -----
     Input arrays are treated as multi-sets in which
-    the outer dimention is as an un-ordered collection 
+    the outer dimention is as an un-ordered collection
     of elements.
-    
+
     """
     assert array_x.ndim == array_y.ndim
     assert array_x.dtype == array_y.dtype
 
-    counts_x = _Counter(a.tostring() for a in array_x)
-    counts_y = _Counter(a.tostring() for a in array_y)
+    counts_x = _Counter(a.tobytes() for a in array_x)
+    counts_y = _Counter(a.tobytes() for a in array_y)
 
     return counts_x == counts_y
 
 
 def contains(array_x, array_y):
-    """Check if the elements of array_x are a super-set 
+    """Check if the elements of array_x are a super-set
     of the elements of array_y.
 
     Parameters
@@ -201,18 +201,18 @@ def contains(array_x, array_y):
     Notes
     -----
     Input arrays are treated as multi-sets in which
-    the outer dimention is as an un-ordered collection 
+    the outer dimention is as an un-ordered collection
     of elements.
-    
+
     """
-    counts_x = _Counter(a.tostring() for a in array_x)
-    counts_y = _Counter(a.tostring() for a in array_y)
+    counts_x = _Counter(a.tobytes() for a in array_x)
+    counts_y = _Counter(a.tobytes() for a in array_y)
 
     return len(counts_y - counts_x) == 0
 
 
 def within(array_x, array_y):
-    """Check if the elements of array_x are a sub-set 
+    """Check if the elements of array_x are a sub-set
     of the elements of array_y.
 
     Parameters
@@ -229,12 +229,12 @@ def within(array_x, array_y):
     Notes
     -----
     Input arrays are treated as multi-sets in which
-    the outer dimention is as an un-ordered collection 
+    the outer dimention is as an un-ordered collection
     of elements.
-    
+
     """
-    counts_x = _Counter(a.tostring() for a in array_x)
-    counts_y = _Counter(a.tostring() for a in array_y)
+    counts_x = _Counter(a.tobytes() for a in array_x)
+    counts_y = _Counter(a.tobytes() for a in array_y)
 
     return len(counts_x - counts_y) == 0
 
@@ -251,14 +251,14 @@ def unique_idx(array):
     Returns
     -------
     index_array : ndarray, int, shape (unique_elements, )
-        The index of the first occurrence of each unique 
+        The index of the first occurrence of each unique
         element.
 
     """
-    strings = {a.tostring() for a in array}
-    idx = np.zeros(len(array)).astype(np.bool)
+    strings = {a.tobytes() for a in array}
+    idx = np.zeros(len(array)).astype(bool)
     for i in range(len(idx)):
-        string = array[i].tostring()
+        string = array[i].tobytes()
         if string in strings:
             strings -= {string}
             idx[i] = True
@@ -266,7 +266,7 @@ def unique_idx(array):
 
 
 def unique(array):
-    """Return the unique elements within the outer 
+    """Return the unique elements within the outer
     dimention of an array.
 
     Parameters
@@ -295,12 +295,12 @@ def categorize(array, categories):
     categories : ndarray, int
         Array with elements which are of the same dimentionality
         and type as those of the first input array.
-    
+
     Returns
     -------
     labels_array : ndarray, int, shape (n_categories, )
         The index of the first occurrence of each element
-        of the input array in the categories array. 
+        of the input array in the categories array.
 
     Notes
     -----
@@ -313,10 +313,10 @@ def categorize(array, categories):
     # category indices are category labels
     labels = {}
     for i, cat in enumerate(categories):
-        labels[cat.tostring()] = i
-    labeled = np.empty(len(array), np.int)
+        labels[cat.tobytes()] = i
+    labeled = np.empty(len(array), int)
     for i, a in enumerate(array):
-        label = labels.get(a.tostring(), -1)  # -1 is unlabeled
+        label = labels.get(a.tobytes(), -1)  # -1 is unlabeled
         labeled[i] = label
     return labeled
 
@@ -332,7 +332,7 @@ def count(array, categories):
     categories : ndarray, int
         Array with elements which are of the same dimentionality
         and type as those of the first input array.
-    
+
     Returns
     -------
     counts_array : ndarray, int, shape (n_elements, )
@@ -341,16 +341,16 @@ def count(array, categories):
 
     Notes
     -----
-    The counts within the counts_array are returned in 
+    The counts within the counts_array are returned in
     the same order as elements of the categories array.
 
     """
     assert categories.ndim == array.ndim
     assert categories.dtype == array.dtype
-    strings = _Counter(a.tostring() for a in array)
-    counts = np.zeros(len(categories), dtype=np.int)
+    strings = _Counter(a.tobytes() for a in array)
+    counts = np.zeros(len(categories), dtype=int)
     for i, cat in enumerate(categories):
-        string = cat.tostring()
+        string = cat.tobytes()
         if string in strings:
             counts[i] = strings[string]
         else:
@@ -369,24 +369,24 @@ def unique_counts(array, order=None):
     order : str, optional
         Return results in 'ascending' or 'descending'
         order of counts.
-    
+
     Returns
     -------
     unique_array : ndarray, int
-        Unique elements of the outer dimention of the 
+        Unique elements of the outer dimention of the
         input array.
     counts_array : ndarray, int, shape (n_elements, )
         The count of each unique element.
 
     """
-    assert order in {'ascending', 'descending', None}
+    assert order in {"ascending", "descending", None}
     cats = unique(array)
     counts = count(array, cats)
     if order is None:
         return cats, counts
 
     idx = np.argsort(counts)
-    if order == 'descending':
+    if order == "descending":
         idx = np.flip(idx, axis=0)
 
     return cats[idx], counts[idx]

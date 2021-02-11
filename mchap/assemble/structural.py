@@ -4,7 +4,16 @@ import numpy as np
 import numba
 
 from mchap.assemble import util
-from mchap.assemble.likelihood import log_likelihood_structural_change
+from mchap.assemble.likelihood import (
+    log_likelihood_structural_change,
+    log_genotype_prior,
+)
+
+__all__ = [
+    "interval_step",
+    "compound_step",
+    "random_breaks",
+]
 
 
 @numba.njit
@@ -19,28 +28,28 @@ def random_breaks(breaks, n):
         intervals - 1).
     n : int
         The combined length of intervals
-    
+
     Returns
     -------
     intervals : ndarray, int shape(breaks + 1, 2)
-        Ordered set of half open intervals with combined 
+        Ordered set of half open intervals with combined
         length of n.
 
     Notes
     -----
-    Intervals must be greater than length zero and be 
+    Intervals must be greater than length zero and be
     imediately adjacent to one another with no gaps or
     overlaps.
 
     """
-    
+
     if breaks >= n:
-        raise ValueError('breaks must be smaller then n')
-    
-    indicies = np.ones(n+1, np.bool8)
+        raise ValueError("breaks must be smaller then n")
+
+    indicies = np.ones(n + 1, np.bool8)
     indicies[0] = False
     indicies[-1] = False
-    
+
     for _ in range(breaks):
         options = np.where(indicies)[0]
         if len(options) == 0:
@@ -48,11 +57,11 @@ def random_breaks(breaks, n):
         else:
             point = np.random.choice(options)
             indicies[point] = False
-            
+
     points = np.where(~indicies)[0]
-    
-    intervals = np.zeros((breaks + 1, 2), dtype = np.int64)
-    
+
+    intervals = np.zeros((breaks + 1, 2), dtype=np.int64)
+
     for i in range(breaks + 1):
         intervals[i, 0] = points[i]
         intervals[i, 1] = points[i + 1]
@@ -61,21 +70,21 @@ def random_breaks(breaks, n):
 
 @numba.njit
 def structural_change(genotype, haplotype_indices, interval=None):
-    """Mutate genotype by re-arranging haplotypes 
+    """Mutate genotype by re-arranging haplotypes
     within a given interval.
 
     Parameters
     ----------
     genotype : ndarray, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as 
+        Set of haplotypes with base positions encoded as
         simple integers from 0 to n_allele.
     haplotype_indices : ndarray, int, shape (ploidy)
         Indicies of haplotypes to update alleles from.
     interval : tuple, int, optional
         If set then base-positions copies/swaps between
-        haplotype is constrained to the specified 
+        haplotype is constrained to the specified
         half open interval (defaults = None).
-    
+
     Returns
     -------
     None
@@ -85,19 +94,19 @@ def structural_change(genotype, haplotype_indices, interval=None):
     Variable `genotype` is updated in place.
 
     """
-    
+
     ploidy, n_base = genotype.shape
-        
+
     cache = np.empty(ploidy, dtype=np.int8)
 
     r = util.interval_as_range(interval, n_base)
-    
+
     for j in r:
-        
-        # copy to cache 
+
+        # copy to cache
         for h in range(ploidy):
             cache[h] = genotype[h, j]
-        
+
         # copy new bases back to genotype
         for h in range(ploidy):
             genotype[h, j] = cache[haplotype_indices[h]]
@@ -106,7 +115,7 @@ def structural_change(genotype, haplotype_indices, interval=None):
 @numba.njit
 def recombination_step_n_options(labels):
     """Calculate number of unique haplotype recombination options.
-    
+
     Parameters
     ----------
     labels : ndarray, int, shape (ploidy, 2)
@@ -118,11 +127,6 @@ def recombination_step_n_options(labels):
     n : int
         Number of unique haplotype recombination options
 
-    Notes
-    -----
-    Duplicate copies of haplotypes must be excluded 
-    from the labels array.
-
     See also
     --------
     haplotype_segment_labels
@@ -130,7 +134,7 @@ def recombination_step_n_options(labels):
     """
     ploidy = len(labels)
 
-    # the dosage is used as a simple way to skip 
+    # the dosage is used as a simple way to skip
     # compleately duplicated haplotypes
     dosage = np.empty(ploidy, np.int8)
     util.get_dosage(dosage, labels)
@@ -145,7 +149,9 @@ def recombination_step_n_options(labels):
                 if dosage[h_1] == 0:
                     # this is a duplicate copy of a haplotype
                     pass
-                elif (labels[h_0, 0] == labels[h_1, 0]) or (labels[h_0, 1] == labels[h_1, 1]):
+                elif (labels[h_0, 0] == labels[h_1, 0]) or (
+                    labels[h_0, 1] == labels[h_1, 1]
+                ):
                     # this will result in equivilent genotypes
                     pass
                 else:
@@ -155,7 +161,7 @@ def recombination_step_n_options(labels):
 
 @numba.njit
 def recombination_step_options(labels):
-    """Possible recombinations between pairs of unique haplotypes.
+    """Calculate number of unique haplotype recombination options.
 
     Parameters
     ----------
@@ -165,9 +171,8 @@ def recombination_step_options(labels):
 
     Returns
     -------
-    options : ndarray, int, shape (n_options, ploidy)
-        Possible recombinations between pairs of unique 
-        haplotypes based on the dosage.
+    option_labels : ndarray, int, shape (n, ploidy, 2)
+        Labels for haplotype segments for each of n neighboring genotypes.
 
     See also
     --------
@@ -178,15 +183,17 @@ def recombination_step_options(labels):
     # the dosage is used as a simple way to skip compleately duplicated haplotypes
     dosage = np.empty(ploidy, np.int8)
     util.get_dosage(dosage, labels)
-    
+
     # calculate number of options
-    n_options = recombination_step_n_options(labels)
+    # n_options = recombination_step_n_options(labels)
     # create options array and default to no change
-    options = np.empty((n_options, ploidy), np.int8)
-    for i in range(n_options):
+    max_options = util.n_choose_k(ploidy, 2)
+    options = np.empty((max_options, ploidy, 2), np.int8)
+    for i in range(max_options):
         for j in range(ploidy):
-            options[i, j] = j
-    
+            for k in range(2):
+                options[i, j, k] = labels[j, k]
+
     # populate array with actual changes
     opt = 0
     for h_0 in range(ploidy):
@@ -198,23 +205,25 @@ def recombination_step_options(labels):
                 if dosage[h_1] == 0:
                     # this is a duplicate copy of a haplotype
                     pass
-                elif (labels[h_0, 0] == labels[h_1, 0]) or (labels[h_0, 1] == labels[h_1, 1]):
+                elif (labels[h_0, 0] == labels[h_1, 0]) or (
+                    labels[h_0, 1] == labels[h_1, 1]
+                ):
                     # this will result in equivilent genotypes
                     pass
                 else:
                     # specify recombination
-                    options[opt, h_0] = h_1
-                    options[opt, h_1] = h_0
-                    opt+=1
-
-    return options
+                    options[opt, h_0, 0] = labels[h_1, 0]
+                    options[opt, h_1, 0] = labels[h_0, 0]
+                    opt += 1
+    assert opt <= max_options
+    return options[0:opt]
 
 
 @numba.njit
-def dosage_step_n_options(labels, allow_deletions=False):
-    """Calculate the number of alternative dosages within 
+def dosage_step_n_options(labels):
+    """Calculate the number of alternative dosages within
     one steps distance.
-    
+
     Parameters
     ----------
     labels : ndarray, int, shape (ploidy, 2)
@@ -224,12 +233,8 @@ def dosage_step_n_options(labels, allow_deletions=False):
     Returns
     -------
     n : int
-        The number of dosages within one step of the 
+        The number of dosages within one step of the
         current dosage (excluding the current dosage).
- 
-    Notes
-    -----
-    Dosages must include at least one copy of each unique haplotype.
 
     See also
     --------
@@ -244,7 +249,7 @@ def dosage_step_n_options(labels, allow_deletions=False):
 
     # dosage of the segment of interest
     segment_dosage = np.empty(ploidy, np.int8)
-    util.get_dosage(segment_dosage, labels[:,0:1])
+    util.get_dosage(segment_dosage, labels[:, 0:1])
 
     # number of options
     n = 0
@@ -254,12 +259,8 @@ def dosage_step_n_options(labels, allow_deletions=False):
         if haplotype_dosage[h_0] == 0:
             # this is a full duplicate of a haplotype that has already been visited
             pass
-        elif (not allow_deletions) and (segment_dosage[h_0] == 1):
-            # if segment dosage is 1 then it is the only copy of this segment
-            # hence overwriting it will delete the only copy of this segment
-            # NOTE: if segment dosage is 0 then it is a duplicate so there must be
-            # more than one copy and hence it is ok to continue and overwrite
-            # likewise if segment dosage is > 1 there is more than one copy
+        elif segment_dosage[h_0] == 1:
+            # this would delete the only copy
             pass
         else:
             # h_0 has a segment that may be overwritten
@@ -271,35 +272,27 @@ def dosage_step_n_options(labels, allow_deletions=False):
                     # the haplotypes are different but the segment is identical
                     pass
                 else:
-                    # overwriting the segment of h_0 with the segment of h_1 will result 
+                    # overwriting the segment of h_0 with the segment of h_1 will result
                     # in a novel genotype
                     n += 1
     return n
 
 
 @numba.njit
-def dosage_step_options(labels, allow_deletions=False):
-    """Calculate the number of alternative dosages within 
+def dosage_step_options(labels):
+    """Calculate the number of alternative dosages within
     one steps distance.
-    Dosages must include at least one copy of each unique 
-    haplotype.
 
     Parameters
     ----------
     labels : ndarray, int, shape (ploidy, 2)
         Labels for haplotype segments within and outside
         of some arbitrary range.
-    allow_deletions : bool, optional
-        Set to False to dis-allow dosage changes 
-        that remove part or all of the only 
-        copy of a haplotype from the genotype
-        (default = True).
 
     Returns
     -------
-    n : int
-        The number of dosages within one step of the current 
-        dosage (excluding the current dosage).
+    option_labels : ndarray, int, shape (n, ploidy, 2)
+        Labels for haplotype segments for each of n neighboring genotypes.
 
     See also
     --------
@@ -314,15 +307,19 @@ def dosage_step_options(labels, allow_deletions=False):
 
     # dosage of the segment of interest
     segment_dosage = np.empty(ploidy, np.int8)
-    util.get_dosage(segment_dosage, labels[:,0:1])
+    util.get_dosage(segment_dosage, labels[:, 0:1])
 
     # number of options
-    n_options = dosage_step_n_options(labels, allow_deletions=allow_deletions)
+    max_recievers = np.sum(segment_dosage[segment_dosage > 1])
+    max_donors = np.sum(segment_dosage > 0) - 1
+    max_options = max_recievers * max_donors
+
     # create options array and default to no change
-    options = np.empty((n_options, ploidy), np.int8)
-    for i in range(n_options):
+    options = np.empty((max_options, ploidy, 2), np.int8)
+    for i in range(max_options):
         for j in range(ploidy):
-            options[i, j] = j
+            for k in range(2):
+                options[i, j, k] = labels[j, k]
 
     # h_0 is the potential reciever and h_1 the potential donator
     opt = 0
@@ -330,12 +327,8 @@ def dosage_step_options(labels, allow_deletions=False):
         if haplotype_dosage[h_0] == 0:
             # this is a full duplicate of a haplotype that has already been visited
             pass
-        elif (not allow_deletions) and (segment_dosage[h_0] == 1):
-            # if segment dosage is 1 then it is the only copy of this segment
-            # hence overwriting it will delete the only copy of this segment
-            # NOTE: if segment dosage is 0 then it is a duplicate so there must be
-            # more than one copy and hence it is ok to continue and overwrite
-            # likewise if segment dosage is > 1 there is more than one copy
+        elif segment_dosage[h_0] == 1:
+            # this would delete the only copy
             pass
         else:
             # h_0 has a segment that may be overwritten
@@ -347,11 +340,12 @@ def dosage_step_options(labels, allow_deletions=False):
                     # the haplotypes are different but the segment is identical
                     pass
                 else:
-                    # overwriting the segment of h_0 with the segment of h_1 will result 
+                    # overwriting the segment of h_0 with the segment of h_1 will result
                     # in a novel genotype
-                    options[opt, h_0] = h_1
-                    opt+=1
-    return options
+                    options[opt, h_0, 0] = labels[h_1, 0]
+                    opt += 1
+    assert opt <= max_options
+    return options[0:opt]
 
 
 @numba.njit
@@ -364,7 +358,7 @@ def _label_haplotypes(labels, genotype, interval=None):
     labels : ndarray, int, shape(ploidy, )
         An array to be updated with the haplotype labels
     genotype : ndarray, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as 
+        Set of haplotypes with base positions encoded as
         simple integers from 0 to n_allele.
     interval : tuple, int, optional
         If set then haplotypes are labeled using only those
@@ -406,7 +400,7 @@ def _label_haplotypes(labels, genotype, interval=None):
 
 @numba.njit
 def _interval_inverse_mask(interval, n):
-    """Return a boolean vector of True values outside 
+    """Return a boolean vector of True values outside
     of the specified interval.
 
     Parameters
@@ -430,7 +424,7 @@ def _interval_inverse_mask(interval, n):
         mask = np.zeros(n, np.bool8)
     else:
         mask = np.ones(n, np.bool8)
-        mask[interval[0]:interval[1]] = 0
+        mask[interval[0] : interval[1]] = 0
     return mask
 
 
@@ -438,13 +432,13 @@ def _interval_inverse_mask(interval, n):
 def haplotype_segment_labels(genotype, interval=None):
     """Create a labels matrix in whihe the first coloumn contains
     labels for haplotype segments within the specified range and
-    the second column contains labels for the remander of the 
+    the second column contains labels for the remander of the
     haplotypes.
 
     Parameters
     ----------
     genotype : ndarray, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as 
+        Set of haplotypes with base positions encoded as
         simple integers from 0 to n_allele.
     interval : tuple, int, optional
         If set then the first label of each haplotype will
@@ -461,7 +455,7 @@ def haplotype_segment_labels(genotype, interval=None):
     Notes
     -----
     If no interval is speciefied then the first column will contain
-    labels for the full haplotypes and the second column will 
+    labels for the full haplotypes and the second column will
     contain zeros.
 
     """
@@ -476,42 +470,46 @@ def haplotype_segment_labels(genotype, interval=None):
 
 @numba.njit
 def interval_step(
-        genotype, 
-        reads, 
-        llk, 
-        interval=None, 
-        allow_recombinations=True,
-        allow_dosage_swaps=True,
-    ):
-    """A structural sub-step of an MCMC simulation constrained to 
-    a single interval contating a sub-set of positions of a genotype.
+    genotype,
+    reads,
+    llk,
+    unique_haplotypes,
+    inbreeding=0,
+    interval=None,
+    step_type=0,
+    temp=1,
+):
+    """A structural step of an MCMC simulation consisting of
+    multiple sub-steps each of which are  constrained to a single
+    interval contating a sub-set of positions of a genotype.
 
     Parameters
     ----------
     genotype : ndarray, int, shape (ploidy, n_base)
         The current genotype state in an MCMC simulation consisting
-        of a set of haplotypes with base positions encoded as 
+        of a set of haplotypes with base positions encoded as
         integers from 0 to n_allele.
     reads : ndarray, float, shape (n_reads, n_positions, max_allele)
         Probabilistically encoded variable positions of NGS reads.
     llk : float
         The log-likelihood of the current genotype state in the MCMC
         simulation.
-    interval : tuple, int, optional
-        The interval constraining the domain of this sub-step.
-    allow_recombinations : bool, optional
-        Set to False to dis-allow structural steps involving
-        the recombination of part of a pair of haplotypes
-        (default = True).
-    allow_dosage_swaps : bool, optional
-        Set to False to dis-allow structural steps involving
-        dosage changes between parts of a pair of haplotypes
-        (default = True).
+    unique_haplotypes : int
+        Total number of unique haplotypes possible at this locus.
+    inbreeding : float
+        Expected inbreeding coefficient of the genotype.
+    interval : ndarray, int, shape (2, )
+        The interval constraining the step.
+    step_type : int
+        0 for recombination or 1 for dosage swap.
+    temp : float
+        An inverse temperature in the interval 0, 1 to adjust
+        the sampled distribution by.
 
     Returns
     -------
     llk : float
-        The log-likelihood of the genotype state after the step 
+        The log-likelihood of the genotype state after the step
         has been made.
 
     Notes
@@ -519,89 +517,83 @@ def interval_step(
     The `genotype` variable is updated in place.
 
     """
+    assert 0 <= temp <= 1
     # labels for interval/non-interval components of current genotype
     labels = haplotype_segment_labels(genotype, interval)
 
-    # calculate number of potential steps from current state
-    if allow_recombinations and allow_dosage_swaps:
-        steps = np.append(
-            recombination_step_options(labels),
-            dosage_step_options(labels),
-            axis=0,
-        )
-    elif allow_recombinations:
-        steps = recombination_step_options(labels)
-    elif allow_dosage_swaps:
-        steps = dosage_step_options(labels)
+    # type of structural step:
+    if step_type == 0:
+        option_labels = recombination_step_options(labels)
+    elif step_type == 1:
+        option_labels = dosage_step_options(labels)
     else:
-        raise ValueError('Must allow recombination and/or dosage steps.')
+        raise ValueError("step_type must be 0 (recombination) or 1 (dosage).")
 
-    # number of neighbouring genotypes
-    n_steps = len(steps)
+    n_options = len(option_labels)
+    if n_options == 0:
+        return llk
+    log_proposal_prob = np.log(1 / n_options)
 
-    # non-transition is also an option
-    n_options = n_steps + 1
+    # ratio of prior probabilities
+    ploidy = len(genotype)
+    dosage = np.empty(ploidy, dtype=np.int8)
+    util.get_dosage(dosage, genotype)
+    lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
 
-    # labels for interval/non-interval components of neighbouring genotypes
-    neighbour_labels = labels.copy()
+    # store values for all options and current genotype
+    llks = np.empty(n_options + 1)
+    llks[-1] = -np.inf
+    log_accept = np.empty(n_options + 1)
+    log_accept[-1] = -np.inf
 
-    # Log of ratios of proposal probabilities of transitioning to and from
-    # each neighbouring genotype (required to balance proposal distribution)
-    log_proposal_ratios = np.empty(n_options)
-    for neighbour in range(n_steps):
+    for i in range(n_options):
 
-        # probability of proposing a transition to neighbour
-        to_neighbour_prob = 1 / n_options
-
-        # alter within interval labels to match neighbours genotype 
-        neighbour_labels[:,0] = labels[:,0][steps[neighbour]]
-
-        # probability of proposing a transition back from neighbour
-        neighbour_n_options = 1  # non-transition
-        if allow_recombinations:
-            neighbour_n_options += recombination_step_n_options(neighbour_labels)
-        if allow_dosage_swaps:
-            neighbour_n_options += dosage_step_n_options(neighbour_labels)
-        from_neighbour_prob = 1 / neighbour_n_options
-
-        # store log of ratio of probs
-        ratio = from_neighbour_prob / to_neighbour_prob
-        log_proposal_ratios[neighbour] = np.log(ratio)
-
-    # final option is to keep the current genotype 
-    log_proposal_ratios[-1] = np.log(1.0)
-
-    # log liklihood for each neighbouring genotype and the current
-    llks = np.empty(n_options)
-    
-    # iterate through neighbouring genotypes and calculate log-likelihood
-    for neighbour in range(n_steps):
-        llks[neighbour] = log_likelihood_structural_change(
-            reads, 
-            genotype, 
-            steps[neighbour],
-            interval
+        # log likelihood ratio
+        llk_i = log_likelihood_structural_change(
+            reads,
+            genotype,
+            option_labels[i, :, 0],
+            interval,
         )
+        llks[i] = llk_i
+        llk_ratio = llk_i - llk
 
-    # final option is to keep the current genotype 
-    llks[-1] = llk
+        # calculate ratio of priors: ln(P(G')/P(G))
+        util.get_dosage(dosage, option_labels[i])
+        lprior_i = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
+        lprior_ratio = lprior_i - lprior
 
-    # acceptance distribution ratios of each transition option
-    log_accept = (llks - llk) + (log_proposal_ratios)
+        # balance proposal distribution
+        if step_type == 0:
+            n_return_options = recombination_step_n_options(option_labels[i])
+        elif step_type == 1:
+            n_return_options = dosage_step_n_options(option_labels[i])
+        log_return_prob = np.log(1 / n_return_options)
+        lproposal_ratio = log_return_prob - log_proposal_prob
 
-    # calculate conditional probs of acceptance for all transitions
-    conditionals = util.log_likelihoods_as_conditionals(log_accept)
+        # calculate Metropolis-Hastings acceptance probability
+        # ln(min(1, (P(G'|R)P(G')g(G|G')) / (P(G|R)P(G)g(G'|G)))
+        mh_ratio = (llk_ratio + lprior_ratio) * temp + lproposal_ratio
+        log_accept[i] = np.minimum(0.0, mh_ratio)  # max prob of log(1)
 
-    # choose new genotype based on conditional probabilities
-    choice = util.random_choice(conditionals)
-       
-    if choice == (n_options - 1):
-        # the choice is to keep the current genotype
-        pass
-    else:
-        # update the genotype state
-        structural_change(genotype, steps[choice], interval)
+    # divide acceptance probability by number of steps to choose from
+    log_accept -= np.log(n_options)
+
+    # convert to probability of proposal * probability of acceptance
+    # then fill in probability that no step is made (i.e. choose the initial state)
+    probabilities = np.exp(log_accept)
+    probabilities[-1] = 1 - probabilities.sum()
+
+    # random choice of new state using probabilities
+    choice = util.random_choice(probabilities)
+
+    if choice < n_options:
+        # update genotype
+        structural_change(genotype, option_labels[choice, :, 0], interval)
         llk = llks[choice]
+    else:
+        # all options rejected
+        pass
 
     # return llk of new genotype
     return llk
@@ -609,23 +601,25 @@ def interval_step(
 
 @numba.njit
 def compound_step(
-        genotype, 
-        reads, 
-        llk, 
-        intervals,  
-        allow_recombinations=True,
-        allow_dosage_swaps=True,
-        randomise=True
-    ):
+    genotype,
+    reads,
+    llk,
+    intervals,
+    n_alleles=None,
+    inbreeding=0,
+    step_type=0,
+    randomise=True,
+    temp=1,
+):
     """A structural step of an MCMC simulation consisting of
-    multiple sub-steps each of which are  constrained to a single 
+    multiple sub-steps each of which are  constrained to a single
     interval contating a sub-set of positions of a genotype.
 
     Parameters
     ----------
     genotype : ndarray, int, shape (ploidy, n_base)
         The current genotype state in an MCMC simulation consisting
-        of a set of haplotypes with base positions encoded as 
+        of a set of haplotypes with base positions encoded as
         integers from 0 to n_allele.
     reads : ndarray, float, shape (n_reads, n_positions, max_allele)
         Probabilistically encoded variable positions of NGS reads.
@@ -634,23 +628,24 @@ def compound_step(
         simulation.
     intervals : ndarray, int, shape (n_intervals, 2)
         The interval constraining each sub-step within this step.
-    allow_recombinations : bool, optional
-        Set to False to dis-allow structural steps involving
-        the recombination of part of a pair of haplotypes
-        (default = True).
-    allow_dosage_swaps : bool, optional
-        Set to False to dis-allow structural steps involving
-        dosage changes between parts of a pair of haplotypes
-        (default = True).
+    n_alleles : ndarray, int, shape (n_base, )
+        The number of possible alleles at each base position.
+    inbreeding : float
+        Expected inbreeding coefficient of the genotype.
+    step_type : int
+        0 for recombination or 1 for dosage swap.
     randomise : bool, optional
-        If True then the order of substeps (as defined by the 
+        If True then the order of substeps (as defined by the
         order of intervals) will be randomly permuted
         (default = True).
+    temp : float
+        An inverse temperature in the interval 0, 1 to adjust
+        the sampled distribution by.
 
     Returns
     -------
     llk : float
-        The log-likelihood of the genotype state after the step 
+        The log-likelihood of the genotype state after the step
         has been made.
 
     Notes
@@ -658,8 +653,14 @@ def compound_step(
     The `genotype` variable is updated in place.
 
     """
-    
+
     n_intervals = len(intervals)
+
+    if n_alleles is None:
+        _, n_base, max_allele = reads.shape
+        unique_haplotypes = max_allele ** n_base
+    else:
+        unique_haplotypes = np.prod(n_alleles)
 
     if randomise:
         intervals = intervals[np.random.permutation(np.arange(n_intervals))]
@@ -667,11 +668,13 @@ def compound_step(
     # step through every iterval
     for i in range(n_intervals):
         llk = interval_step(
-            genotype, 
-            reads, 
-            llk, 
-            interval=intervals[i], 
-            allow_recombinations=allow_recombinations,
-            allow_dosage_swaps=allow_dosage_swaps,
+            genotype,
+            reads,
+            llk,
+            unique_haplotypes=unique_haplotypes,
+            inbreeding=inbreeding,
+            interval=intervals[i],
+            step_type=step_type,
+            temp=temp,
         )
     return llk

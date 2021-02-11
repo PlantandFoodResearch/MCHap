@@ -1,6 +1,7 @@
-dataclasses
-gzip
 numpy
 scipy
 numba
 pysam
+networkx
+graphviz
+pytest
