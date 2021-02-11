@@ -4,6 +4,14 @@ import numpy as np
 from . import sequence
 
 
+__all__ = [
+    "iter_kmers",
+    "kmer_counts",
+    "kmer_positions",
+    "kmer_frequency",
+]
+
+
 def iter_kmers(array, k=3):
     """Generate a sequence of kmer vectors.
 

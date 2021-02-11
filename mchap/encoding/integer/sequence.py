@@ -2,6 +2,15 @@
 
 import numpy as np
 
+__all__ = [
+    "is_gap",
+    "is_call",
+    "is_valid",
+    "argsort",
+    "sort",
+    "depth",
+]
+
 
 def is_gap(array):
     """Identify gap positions in an integer encoded biological sequence.

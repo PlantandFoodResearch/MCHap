@@ -2,6 +2,16 @@
 
 import numpy as np
 
+__all__ = [
+    "as_probabilistic",
+    "vector_from_string",
+    "from_strings",
+    "vector_as_string",
+    "as_strings",
+    "vector_as_characters",
+    "as_characters",
+]
+
 
 def as_probabilistic(array, n_alleles=4, p=1.0, error_factor=3, dtype=float):
     """Converts an array of integer encoded alleles to an

@@ -1,5 +1,10 @@
 import numpy as np
 
+__all__ = [
+    "minimum_error_correction",
+    "read_assignment",
+]
+
 
 def minimum_error_correction(reads, genotype):
     """
