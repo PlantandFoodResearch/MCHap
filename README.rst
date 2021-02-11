@@ -22,8 +22,11 @@ This should generally be compressed and written to a file:
     $ mchap assemble ... | bgzip > haplotypes.vcf.gz
 
 
-The :full list:`txt <cli-assemble-help.txt>` of ``assemble`` arguments can accessed with:
+The `full list of arguments`_ for ``assemble`` can accessed with:
 
 ::
 
     $ mchap assemble -h
+
+
+.. _`full list of arguments`: cli-assemble-help.txt
