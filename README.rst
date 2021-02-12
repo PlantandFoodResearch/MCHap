@@ -10,6 +10,7 @@ MCHap and it's dependencies can be installed from source using pip.
 From the root directory of this repository run:
 
 ::
+
     $ pip install -r requirements.txt
     $ python setup.py sdist
     $ pip install mchap-*.tar.gz
