@@ -50,6 +50,7 @@ A simple example of running ``mchap assemble`` may look like this:
 
 Note that the input VCF should be indexed with tabix and the bam files
 and reference genome should be indexed with samtools.
+
 The `full list of arguments`_ for ``assemble`` can accessed with:
 
 ::
