@@ -11,9 +11,9 @@ From the root directory of this repository run:
 
 ::
 
-    $ pip install -r requirements.txt
-    $ python setup.py sdist
-    $ pip install mchap-*.tar.gz
+    pip install -r requirements.txt
+    python setup.py sdist
+    pip install mchap-*.tar.gz
 
 
 Usage
@@ -32,12 +32,13 @@ This should generally be compressed and written to a file:
 
 ::
 
-    $ mchap assemble ... | bgzip > haplotypes.vcf.gz
+    mchap assemble ... | bgzip > haplotypes.vcf.gz
 
 
 A simple example of running ``mchap assemble`` may look like this:
 
 ::
+
     $ mchap assemble \
         --bam file1.bam file2.bam file3.bam \
         --targets loci.bed \
