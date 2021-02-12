@@ -13,7 +13,7 @@ __all__ = [
 
 
 @numba.njit
-def log_likelihood(reads, genotype):
+def log_likelihood(reads, genotype, read_counts=None):
     """Log likelihood of observed reads given a genotype.
 
     Parameters
@@ -24,6 +24,9 @@ def log_likelihood(reads, genotype):
     genotype : ndarray, int, shape (ploidy, n_base)
         Set of haplotypes with base positions encoded
         as simple integers from 0 to n_nucl.
+    read_counts : ndarray, int, shape (n_reads, )
+        Optionally specify the number of observations of
+        each read.
 
     Returns
     -------
@@ -56,13 +59,20 @@ def log_likelihood(reads, genotype):
 
             read_prob += read_hap_prod / ploidy
 
-        llk += np.log(read_prob)
+        log_read_prob = np.log(read_prob)
+
+        if read_counts is not None:
+            log_read_prob *= read_counts[r]
+
+        llk += log_read_prob
 
     return llk
 
 
 @numba.njit
-def log_likelihood_structural_change(reads, genotype, haplotype_indices, interval=None):
+def log_likelihood_structural_change(
+    reads, genotype, haplotype_indices, interval=None, read_counts=None
+):
     """Log likelihood of observed reads given a genotype given a structural change.
 
     Parameters
@@ -79,6 +89,9 @@ def log_likelihood_structural_change(reads, genotype, haplotype_indices, interva
     interval : tuple, int, shape (2, ), optional
         Interval of base-positions to swap (defaults to
         all base positions).
+    read_counts : ndarray, int, shape (n_reads, )
+        Optionally specify the number of observations of
+        each read.
 
     Returns
     -------
@@ -123,7 +136,12 @@ def log_likelihood_structural_change(reads, genotype, haplotype_indices, interva
 
             read_prob += read_hap_prod / ploidy
 
-        llk += np.log(read_prob)
+        log_read_prob = np.log(read_prob)
+
+        if read_counts is not None:
+            log_read_prob *= read_counts[r]
+
+        llk += log_read_prob
 
     return llk
 
