@@ -90,7 +90,7 @@ class DenovoMCMC(Assembler):
 
     """
 
-    def fit(self, reads, initial=None):
+    def fit(self, reads, read_counts=None, initial=None):
         """Fit the parametized model to a set of probabilistically
         encoded variable positions of NGS reads.
 
@@ -98,6 +98,8 @@ class DenovoMCMC(Assembler):
         ----------
         reads : ndarray, float, shape (n_reads, n_positions, max_allele)
             Probabilistically encoded variable positions of NGS reads.
+        read_counts : ndarray, int, shape (n_reads, )
+            Optionally specify the number of observations of each read.
         initial : ndarray, int, shape (n_chains, ploidy, n_positions, max_allele), optional
             Set the initial genotype state of each MCMC simulation
             (default = None).
@@ -136,7 +138,9 @@ class DenovoMCMC(Assembler):
         genotypes = []
         llks = []
         for chain in range(self.chains):
-            gen_trace, llk_trace = self._mcmc(reads, initial=initial[chain])
+            gen_trace, llk_trace = self._mcmc(
+                reads, read_counts=read_counts, initial=initial[chain]
+            )
             genotypes.append(gen_trace)
             llks.append(llk_trace)
 
@@ -146,7 +150,7 @@ class DenovoMCMC(Assembler):
             np.array(llks),
         )
 
-    def _mcmc(self, reads, initial=None):
+    def _mcmc(self, reads, read_counts, initial=None):
         """Run a single MCMC simulation."""
         # identify base positions that are overwhelmingly likely
         # to be homozygous
@@ -212,6 +216,7 @@ class DenovoMCMC(Assembler):
             genotype=genotype,
             inbreeding=self.inbreeding,
             reads=reads_het,
+            read_counts=read_counts,
             n_alleles=n_alleles,
             steps=self.steps,
             break_dist=break_dist,
@@ -251,6 +256,7 @@ def _denovo_gibbs_sampler(
     genotype,
     inbreeding,
     reads,
+    read_counts,
     n_alleles,
     steps,
     break_dist,
@@ -275,7 +281,7 @@ def _denovo_gibbs_sampler(
 
     # likelihood for each genotype at each temp
     llks = np.empty(n_temps)
-    llks[:] = log_likelihood(reads, genotype)
+    llks[:] = log_likelihood(reads, genotype, read_counts=read_counts)
 
     if return_heated_trace:
         # trace for each chain
@@ -306,6 +312,7 @@ def _denovo_gibbs_sampler(
                 llk=llk,
                 n_alleles=n_alleles,
                 temp=temp,
+                read_counts=read_counts,
             )
 
             # recombinations step
@@ -321,6 +328,7 @@ def _denovo_gibbs_sampler(
                     n_alleles=n_alleles,
                     step_type=0,
                     temp=temp,
+                    read_counts=read_counts,
                 )
 
             # interval dosage step
@@ -336,6 +344,7 @@ def _denovo_gibbs_sampler(
                     n_alleles=n_alleles,
                     step_type=1,
                     temp=temp,
+                    read_counts=read_counts,
                 )
 
             # final full length dosage swap
@@ -349,6 +358,7 @@ def _denovo_gibbs_sampler(
                     n_alleles=n_alleles,
                     step_type=1,
                     temp=temp,
+                    read_counts=read_counts,
                 )
 
             # chain swap step if not the highest temp

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pysam
 import multiprocessing as mp
 
+from mchap import mset
 from mchap.assemble.mcmc import DenovoMCMC
 from mchap.encoding import character, integer
 from mchap.io import (
@@ -35,6 +36,7 @@ class program(object):
     call_filtered: bool = False
     read_group_field: str = "SM"
     base_error_rate: float = 0.0
+    ignore_base_phred_scores: bool = False
     mapping_quality: int = 20
     skip_duplicates: bool = True
     skip_qcfail: bool = True
@@ -196,11 +198,23 @@ class program(object):
             type=float,
             default=[0.0],
             help=(
-                "Expected base-call error rate of sequences "
-                "in addition to base phred scores (default = 0.0). "
-                "By default only the phred score of each base call is used to "
-                "calculate its probability of an incorrect call. "
-                "The --error-rate value is added to that probability."
+                "Expected base error rate of read sequences (default = 0.0). "
+                "This is used in addition to base phred-scores by default "
+                "however base phred-scores can be ignored using the "
+                "--ignore-base-phred-scores flag."
+            ),
+        )
+
+        parser.set_defaults(ignore_base_phred_scores=False)
+        parser.add_argument(
+            "--ignore-base-phred-scores",
+            dest="ignore_base_phred_scores",
+            action="store_true",
+            help=(
+                "Flag: Ignore base phred-scores as a source of base error rate. "
+                "This can improve MCMC speed by allowing for greater de-duplication "
+                "of reads however an error rate > 0.0 must be specified with the "
+                "--base-error-rate argument."
             ),
         )
 
@@ -518,6 +532,13 @@ class program(object):
         if temperatures[-1] != 1.0:
             temperatures.append(1.0)
 
+        # must have some source of error in reads
+        if args.ignore_base_phred_scores:
+            if args.base_error_rate[0] == 0.0:
+                raise ValueError(
+                    "Cannot ignore base phred scores if --base-error-rate is 0"
+                )
+
         return cls(
             bed=args.targets[0],
             vcf=args.variants[0],
@@ -530,6 +551,7 @@ class program(object):
             call_filtered=args.call_filtered,
             read_group_field=args.read_group_field[0],
             base_error_rate=args.base_error_rate[0],
+            ignore_base_phred_scores=args.ignore_base_phred_scores,
             mapping_quality=args.mapping_quality[0],
             skip_duplicates=args.skip_duplicates,
             skip_qcfail=args.skip_qcfail,
@@ -695,12 +717,17 @@ class program(object):
             # encode reads as alleles and probabilities
             read_calls = encode_read_alleles(locus, read_chars)
             sample_read_calls[i] = read_calls
+            if self.ignore_base_phred_scores:
+                read_quals = None
             read_dists = encode_read_distributions(
                 locus,
                 read_calls,
                 read_quals,
                 error_rate=self.base_error_rate,
             )
+
+            # de-duplicate reads
+            read_dists_unique, read_dist_counts = mset.unique_counts(read_dists)
 
             # assemble haplotypes
             trace = (
@@ -717,7 +744,7 @@ class program(object):
                     temperatures=self.mcmc_temperatures,
                     random_seed=self.random_seed,
                 )
-                .fit(read_dists)
+                .fit(read_dists_unique, read_counts=read_dist_counts)
                 .burn(self.mcmc_burn)
             )
 

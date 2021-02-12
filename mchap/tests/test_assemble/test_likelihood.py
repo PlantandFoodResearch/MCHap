@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from itertools import combinations_with_replacement
 
+from mchap import mset
 from mchap.testing import simulate_reads
 from mchap.assemble.likelihood import (
     log_likelihood,
@@ -74,6 +75,26 @@ def test_log_likelihood():
     assert np.round(query, 10) == np.round(answer, 10)
 
 
+def test_log_likelihood__read_counts():
+    genotype = np.array(
+        [
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 0, 1, 0, 1, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+        ]
+    )
+    np.random.seed(42)
+    reads = simulate_reads(genotype, n_reads=200, qual=(60, 60))
+    reads_unique, read_counts = mset.unique_counts(reads)
+
+    expect = log_likelihood(reads, genotype)
+    actual = log_likelihood(reads_unique, genotype, read_counts=read_counts)
+
+    # may be slightly off due to float rounding
+    np.testing.assert_almost_equal(actual, expect, decimal=10)
+
+
 @pytest.mark.parametrize(
     "ploidy,n_base,n_reps",
     [
@@ -144,6 +165,31 @@ def test_log_likelihood_structural_change(
 
     assert query == answer
     assert np.round(query, 10) == np.round(reference, 10)
+
+
+def test_log_likelihood_structural_change__read_counts():
+    genotype = np.array(
+        [
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 0, 1, 0, 1, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+        ]
+    )
+    np.random.seed(42)
+    reads = simulate_reads(genotype, n_reads=200, qual=(60, 60))
+    reads_unique, read_counts = mset.unique_counts(reads)
+
+    interval = (3, 8)
+    indices = np.array([0, 2, 2, 3])
+
+    expect = log_likelihood_structural_change(reads, genotype, indices, interval)
+    actual = log_likelihood_structural_change(
+        reads_unique, genotype, indices, interval, read_counts=read_counts
+    )
+
+    # may be slightly off due to float rounding
+    np.testing.assert_almost_equal(actual, expect, decimal=10)
 
 
 @pytest.mark.parametrize(

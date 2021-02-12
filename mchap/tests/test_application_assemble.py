@@ -287,6 +287,62 @@ def test_Program__run():
                 assert result[i] == line
 
 
+def test_Program__run__no_base_phreds():
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / "test_io/data"
+
+    BED = str(path / "simple.bed.gz")
+    VCF = str(path / "simple.vcf.gz")
+    REF = str(path / "simple.fasta")
+    BAMS = [
+        str(path / "simple.sample1.deep.bam"),
+        str(path / "simple.sample2.deep.bam"),
+        str(path / "simple.sample3.deep.bam"),
+    ]
+
+    command = [
+        "mchap",
+        "denovo",
+        "--bam",
+        BAMS[0],
+        BAMS[1],
+        BAMS[2],
+        "--ploidy",
+        "4",
+        "--targets",
+        BED,
+        "--variants",
+        VCF,
+        "--reference",
+        REF,
+        "--base-error-rate",
+        "0.001",
+        "--ignore-base-phred-scores",
+        "--mcmc-steps",
+        "500",
+        "--mcmc-burn",
+        "100",
+        "--mcmc-seed",
+        "11",
+    ]
+
+    prog = program.cli(command)
+    result = prog.run()
+
+    # compare to expected VCF
+    with open(str(path / "simple.output.deep.vcf"), "r") as f:
+        for i, line in enumerate(f):
+            line = line.strip()
+            if line.startswith("##commandline"):
+                # file paths will differ
+                pass
+            elif line.startswith("##fileDate"):
+                # new date should be greater than test vcf date
+                assert result[i] > line
+            else:
+                assert result[i] == line
+
+
 @pytest.mark.parametrize("n_cores", [1, 2])
 def test_Program__run_stdout(n_cores):
     path = pathlib.Path(__file__).parent.absolute()

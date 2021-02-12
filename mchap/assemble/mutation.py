@@ -12,7 +12,16 @@ __all__ = ["base_step", "compound_step"]
 
 @numba.njit
 def base_step(
-    genotype, reads, llk, h, j, unique_haplotypes, inbreeding=0, n_alleles=None, temp=1
+    genotype,
+    reads,
+    llk,
+    h,
+    j,
+    unique_haplotypes,
+    inbreeding=0,
+    n_alleles=None,
+    temp=1,
+    read_counts=None,
 ):
     """Mutation Gibbs sampler step for the jth base position
     of the hth haplotype.
@@ -41,6 +50,9 @@ def base_step(
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
+    read_counts : ndarray, int, shape (n_reads, )
+        Optionally specify the number of observations of
+        each read.
 
     Returns
     -------
@@ -89,7 +101,7 @@ def base_step(
             genotype[h, j] = i
 
             # calculate and store log-likelihood: P(G'|R)
-            llk_i = log_likelihood(reads, genotype)
+            llk_i = log_likelihood(reads, genotype, read_counts=read_counts)
             llks[i] = llk_i
 
             # calculate log likelihood ratio: ln(P(G'|R)/P(G|R))
@@ -135,6 +147,7 @@ def compound_step(
     inbreeding=0,
     n_alleles=None,
     temp=1,
+    read_counts=None,
 ):
     """Mutation compound Gibbs sampler step for all base positions
     of all haplotypes in a genotype.
@@ -156,6 +169,9 @@ def compound_step(
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
+    read_counts : ndarray, int, shape (n_reads, )
+        Optionally specify the number of observations of
+        each read.
 
     Returns
     -------
@@ -201,5 +217,6 @@ def compound_step(
             inbreeding=inbreeding,
             n_alleles=n_alleles[j],
             temp=temp,
+            read_counts=read_counts,
         )
     return llk
