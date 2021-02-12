@@ -242,7 +242,7 @@ def encode_read_alleles(locus, chars):
     return _as_allelic(chars, alleles=locus.alleles)
 
 
-def encode_read_distributions(locus, calls, quals, error_rate=0.0):
+def encode_read_distributions(locus, calls, quals=None, error_rate=0.0):
     """Encode allele calls as allele probabilities based on base
     qual scores and an additional error rate.
 
@@ -263,8 +263,6 @@ def encode_read_distributions(locus, calls, quals, error_rate=0.0):
         Probabilities for each allele per variant in the locus.
 
     """
-    assert calls.shape == quals.shape
-
     # handle case of zero reads
     n_reads, n_pos = calls.shape
     n_alleles = locus.count_alleles()
@@ -277,7 +275,9 @@ def encode_read_distributions(locus, calls, quals, error_rate=0.0):
     probs = np.ones((calls.shape), dtype=float) * (1 - error_rate)
 
     # convert qual scores to probs and multiply
-    probs *= util.prob_of_qual(quals)
+    if quals is not None:
+        assert calls.shape == quals.shape
+        probs *= util.prob_of_qual(quals)
 
     encoded = _as_probabilistic(calls, n_alleles, probs)
     return encoded
