@@ -478,6 +478,7 @@ def interval_step(
     interval=None,
     step_type=0,
     temp=1,
+    read_counts=None,
 ):
     """A structural step of an MCMC simulation consisting of
     multiple sub-steps each of which are  constrained to a single
@@ -505,6 +506,9 @@ def interval_step(
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
+    read_counts : ndarray, int, shape (n_reads, )
+        Optionally specify the number of observations of
+        each read.
 
     Returns
     -------
@@ -553,7 +557,8 @@ def interval_step(
             reads,
             genotype,
             option_labels[i, :, 0],
-            interval,
+            interval=interval,
+            read_counts=read_counts,
         )
         llks[i] = llk_i
         llk_ratio = llk_i - llk
@@ -610,6 +615,7 @@ def compound_step(
     step_type=0,
     randomise=True,
     temp=1,
+    read_counts=None,
 ):
     """A structural step of an MCMC simulation consisting of
     multiple sub-steps each of which are  constrained to a single
@@ -641,6 +647,9 @@ def compound_step(
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
+    read_counts : ndarray, int, shape (n_reads, )
+        Optionally specify the number of observations of
+        each read.
 
     Returns
     -------
@@ -676,5 +685,6 @@ def compound_step(
             interval=intervals[i],
             step_type=step_type,
             temp=temp,
+            read_counts=read_counts,
         )
     return llk

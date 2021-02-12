@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pysam
 import multiprocessing as mp
 
+from mchap import mset
 from mchap.assemble.mcmc import DenovoMCMC
 from mchap.encoding import character, integer
 from mchap.io import (
@@ -702,6 +703,11 @@ class program(object):
                 error_rate=self.base_error_rate,
             )
 
+            # de-duplicate reads
+            read_dists_unique, read_dist_counts = mset.unique_counts(read_dists)
+            # read_dists_unique = read_dists
+            # read_dist_counts = np.ones(len(read_dists_unique), dtype=int)
+
             # assemble haplotypes
             trace = (
                 DenovoMCMC(
@@ -717,7 +723,7 @@ class program(object):
                     temperatures=self.mcmc_temperatures,
                     random_seed=self.random_seed,
                 )
-                .fit(read_dists)
+                .fit(read_dists_unique, read_counts=read_dist_counts)
                 .burn(self.mcmc_burn)
             )
 
