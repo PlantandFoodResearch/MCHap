@@ -677,6 +677,7 @@ class program(object):
         sample_read_calls = np.empty(n_samples, dtype="O")
         sample_genotype = np.empty(n_samples, dtype="O")
         sample_phenotype_dist = np.empty(n_samples, dtype="O")
+        sample_called = np.ones(n_samples, dtype=bool)
         sample_RCOUNT = np.empty(n_samples, dtype="O")
         sample_DP = np.empty(n_samples, dtype="O")
         sample_FT = np.empty(n_samples, dtype="O")
@@ -783,6 +784,12 @@ class program(object):
             sample_PHQ[i] = qual_of_prob(phenotype.probabilities.sum())
             sample_MEC[i] = integer.minimum_error_correction(read_calls, genotype).sum()
 
+            # record samples without calls and null out uncalled
+            if (not self.call_filtered) and filterset.failed:
+                sample_called[i] = False
+                genotype[:] = -1
+                phenotype.genotypes[:] = -1
+
             # store genotype and phenotype
             sample_genotype[i] = genotype
             sample_phenotype_dist[i] = phenotype
@@ -808,11 +815,7 @@ class program(object):
         sample_AD = np.empty((n_samples, len(vcf_alleles)), dtype=int)
 
         for i, sample in enumerate(self.samples):
-            if (not self.call_filtered) and sample_FT[i].failed:
-                # Return null genotype and expected dosage
-                sample_GT[i] = "/".join("." * self.sample_ploidy[sample])
-                sample_DOSEXP[i] = "."
-            else:
+            if sample_called[i]:
                 # Return genotype and expected dosage
                 sample_GT[i] = vcf.genotype_string(sample_genotype[i], vcf_haplotypes)
                 dosage_expected = vcf.expected_dosage(
@@ -821,6 +824,10 @@ class program(object):
                     vcf_haplotypes,
                 )
                 sample_DOSEXP[i] = np.round(dosage_expected, self.precision)
+            else:
+                # Return null genotype and expected dosage
+                sample_GT[i] = "/".join("." * self.sample_ploidy[sample])
+                sample_DOSEXP[i] = "."
             # allways return AD
             sample_AD[i] = np.sum(
                 integer.read_assignment(sample_read_calls[i], vcf_haplotypes) == 1,
