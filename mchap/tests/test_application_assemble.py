@@ -400,6 +400,8 @@ def test_Program__run_stdout(n_cores):
     with open(str(path / "simple.output.deep.vcf"), "r") as f:
         expected = f.readlines()
 
+    assert len(actual) == len(expected)
+
     if n_cores > 1:
         # output may be in different order
         actual.sort()

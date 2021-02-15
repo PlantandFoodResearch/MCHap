@@ -783,11 +783,6 @@ class program(object):
             sample_PHQ[i] = qual_of_prob(phenotype.probabilities.sum())
             sample_MEC[i] = integer.minimum_error_correction(read_calls, genotype).sum()
 
-            # Null out the genotype and phenotype arrays
-            if (not self.call_filtered) and filterset.failed:
-                genotype[:] = -1
-                phenotype.genotypes[:] = -1
-
             # store genotype and phenotype
             sample_genotype[i] = genotype
             sample_phenotype_dist[i] = phenotype
@@ -811,14 +806,22 @@ class program(object):
         sample_GT = np.empty(n_samples, dtype="O")
         sample_DOSEXP = np.empty(n_samples, dtype="O")
         sample_AD = np.empty((n_samples, len(vcf_alleles)), dtype=int)
+
         for i, sample in enumerate(self.samples):
-            sample_GT[i] = vcf.genotype_string(sample_genotype[i], vcf_haplotypes)
-            dosage_expected = vcf.expected_dosage(
-                sample_phenotype_dist[i].genotypes,
-                sample_phenotype_dist[i].probabilities,
-                vcf_haplotypes,
-            )
-            sample_DOSEXP[i] = np.round(dosage_expected, self.precision)
+            if (not self.call_filtered) and sample_FT[i].failed:
+                # Return null genotype and expected dosage
+                sample_GT[i] = "/".join("." * self.sample_ploidy[sample])
+                sample_DOSEXP[i] = "."
+            else:
+                # Return genotype and expected dosage
+                sample_GT[i] = vcf.genotype_string(sample_genotype[i], vcf_haplotypes)
+                dosage_expected = vcf.expected_dosage(
+                    sample_phenotype_dist[i].genotypes,
+                    sample_phenotype_dist[i].probabilities,
+                    vcf_haplotypes,
+                )
+                sample_DOSEXP[i] = np.round(dosage_expected, self.precision)
+            # allways return AD
             sample_AD[i] = np.sum(
                 integer.read_assignment(sample_read_calls[i], vcf_haplotypes) == 1,
                 axis=0,
