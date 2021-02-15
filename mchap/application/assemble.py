@@ -677,6 +677,7 @@ class program(object):
         sample_read_calls = np.empty(n_samples, dtype="O")
         sample_genotype = np.empty(n_samples, dtype="O")
         sample_phenotype_dist = np.empty(n_samples, dtype="O")
+        sample_called = np.ones(n_samples, dtype=bool)
         sample_RCOUNT = np.empty(n_samples, dtype="O")
         sample_DP = np.empty(n_samples, dtype="O")
         sample_FT = np.empty(n_samples, dtype="O")
@@ -783,6 +784,12 @@ class program(object):
             sample_PHQ[i] = qual_of_prob(phenotype.probabilities.sum())
             sample_MEC[i] = integer.minimum_error_correction(read_calls, genotype).sum()
 
+            # record samples without calls and null out uncalled
+            if (not self.call_filtered) and filterset.failed:
+                sample_called[i] = False
+                genotype[:] = -1
+                phenotype.genotypes[:] = -1
+
             # store genotype and phenotype
             sample_genotype[i] = genotype
             sample_phenotype_dist[i] = phenotype
@@ -808,11 +815,7 @@ class program(object):
         sample_AD = np.empty((n_samples, len(vcf_alleles)), dtype=int)
 
         for i, sample in enumerate(self.samples):
-            if (not self.call_filtered) and sample_FT[i].failed:
-                # Return null genotype and expected dosage
-                sample_GT[i] = "/".join("." * self.sample_ploidy[sample])
-                sample_DOSEXP[i] = "."
-            else:
+            if sample_called[i]:
                 # Return genotype and expected dosage
                 sample_GT[i] = vcf.genotype_string(sample_genotype[i], vcf_haplotypes)
                 dosage_expected = vcf.expected_dosage(
@@ -821,6 +824,10 @@ class program(object):
                     vcf_haplotypes,
                 )
                 sample_DOSEXP[i] = np.round(dosage_expected, self.precision)
+            else:
+                # Return null genotype and expected dosage
+                sample_GT[i] = "/".join("." * self.sample_ploidy[sample])
+                sample_DOSEXP[i] = "."
             # allways return AD
             sample_AD[i] = np.sum(
                 integer.read_assignment(sample_read_calls[i], vcf_haplotypes) == 1,
@@ -864,7 +871,29 @@ class program(object):
             format=vcf_FORMAT,
         )
 
+    def _precompile_model(self):
+        """Run mcmc model with dummy data using standard types.
+        This compiles jitted functions on the main thread allowing them
+        to be used across all sub-threads without additional compilation
+        """
+        read_dists = np.array([[[0.9, 0.1], [0.1, 0.9], [0.9, 0.1]]], dtype=float)
+        read_counts = np.array([1], dtype=int)
+        n_alleles = [2, 2, 2]
+
+        model = DenovoMCMC(
+            ploidy=2,
+            n_alleles=n_alleles,
+            inbreeding=0.0,
+            steps=2,
+            chains=1,
+            fix_homozygous=0.999,
+            random_seed=0,
+        )
+        model.fit(read_dists, read_counts=read_counts)
+        return True
+
     def run(self):
+        self._precompile_model()
         header = self.header()
         sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
         pool = mp.Pool(self.n_cores)
@@ -926,4 +955,5 @@ class program(object):
         if self.n_cores <= 1:
             self._run_stdout_single_core()
         else:
+            self._precompile_model()
             self._run_stdout_multi_core()
