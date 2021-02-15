@@ -42,7 +42,7 @@ def test_sum_log_probs():
         assert np.round(query, 10) == np.round(answer, 10)
 
 
-def test_log_likelihoods_as_conditionals():
+def test_normalise_log_probs():
 
     for _ in range(10):
         # a vector of likelihoods that don't sum to 1
@@ -55,12 +55,12 @@ def test_log_likelihoods_as_conditionals():
 
         # now in log space
         llks = np.log(lks)
-        query = util.log_likelihoods_as_conditionals(llks)
+        query = util.normalise_log_probs(llks)
 
         np.testing.assert_almost_equal(query, answer)
 
 
-def test_log_likelihoods_as_conditionals_zeros():
+def test_normalise_log_probs_zeros():
 
     # a vector of likelihoods that don't sum to 1
     lks = np.random.rand(10)
@@ -77,7 +77,7 @@ def test_log_likelihoods_as_conditionals_zeros():
     with np.errstate(divide="ignore"):
         llks = np.log(lks)
 
-    query = util.log_likelihoods_as_conditionals(llks)
+    query = util.normalise_log_probs(llks)
 
     np.testing.assert_almost_equal(query, answer)
 
