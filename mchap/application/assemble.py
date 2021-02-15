@@ -871,7 +871,29 @@ class program(object):
             format=vcf_FORMAT,
         )
 
+    def _precompile_model(self):
+        """Run mcmc model with dummy data using standard types.
+        This compiles jitted functions on the main thread allowing them
+        to be used across all sub-threads without additional compilation
+        """
+        read_dists = np.array([[[0.9, 0.1], [0.1, 0.9], [0.9, 0.1]]], dtype=float)
+        read_counts = np.array([1], dtype=int)
+        n_alleles = [2, 2, 2]
+
+        model = DenovoMCMC(
+            ploidy=2,
+            n_alleles=n_alleles,
+            inbreeding=0.0,
+            steps=2,
+            chains=1,
+            fix_homozygous=0.999,
+            random_seed=0,
+        )
+        model.fit(read_dists, read_counts=read_counts)
+        return True
+
     def run(self):
+        self._precompile_model()
         header = self.header()
         sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
         pool = mp.Pool(self.n_cores)
@@ -933,4 +955,5 @@ class program(object):
         if self.n_cores <= 1:
             self._run_stdout_single_core()
         else:
+            self._precompile_model()
             self._run_stdout_multi_core()
