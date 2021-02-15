@@ -2,7 +2,7 @@ import numpy as np
 
 from mchap.assemble import mutation
 from mchap.assemble.likelihood import log_likelihood
-from mchap.assemble.util import log_likelihoods_as_conditionals
+from mchap.assemble.util import normalise_log_probs
 from mchap.assemble.util import seed_numba
 from mchap.encoding import integer
 
@@ -47,7 +47,7 @@ def test_base_step():
             log_likelihood(reads, genotype_2),
         ]
     )
-    expect = log_likelihoods_as_conditionals(llks)
+    expect = normalise_log_probs(llks)
 
     # intial genotype
     genotype = np.array(

@@ -112,9 +112,9 @@ def sum_log_probs(array):
 
 
 @numba.njit
-def log_likelihoods_as_conditionals(llks):
-    """Returns conditional probabilities of
-    an array of log-transformed likelihoods.
+def normalise_log_probs(llks):
+    """Returns normalised probabilities of
+    an array of log-transformed probabilities.
 
     Parameters
     ----------
@@ -132,10 +132,10 @@ def log_likelihoods_as_conditionals(llks):
 
     # calculate conditional probabilities
     n = len(llks)
-    conditionals = np.empty(n)
+    normalised = np.empty(n)
     for opt in range(n):
-        conditionals[opt] = np.exp(llks[opt] - log_denominator)
-    return conditionals
+        normalised[opt] = np.exp(llks[opt] - log_denominator)
+    return normalised
 
 
 @numba.njit
