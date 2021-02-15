@@ -231,7 +231,7 @@ def test_encode_read_distributions__zero_reads():
     )
 
     n_read = 0
-    n_pos = 7
+    n_pos = len(variants)
     max_allele = np.max(locus.count_alleles())
 
     calls = np.empty((n_read, n_pos), dtype=np.int8)
@@ -240,4 +240,52 @@ def test_encode_read_distributions__zero_reads():
     expect = np.empty((n_read, n_pos, max_allele), dtype=float)
     actual = bam.encode_read_distributions(locus, calls, quals)
     print(expect.shape, actual.shape)
+    np.testing.assert_array_equal(expect, actual)
+
+
+def test_encode_read_distributions__zero_snps():
+
+    variants = ()
+
+    locus = loci.Locus(
+        contig="CHR1",
+        start=5,
+        stop=25,
+        name="CHR1_05_25",
+        sequence="A" * 20,
+        variants=variants,
+    )
+
+    n_read = 10
+    n_pos = len(variants)
+    max_allele = int(np.max(locus.count_alleles(), initial=0))
+
+    calls = np.empty((n_read, n_pos), dtype=np.int8)
+    quals = np.empty((n_read, n_pos), dtype=np.int16)
+    expect = np.empty((n_read, n_pos, max_allele), dtype=float)
+    actual = bam.encode_read_distributions(locus, calls, quals)
+    np.testing.assert_array_equal(expect, actual)
+
+
+def test_encode_read_distributions__zero_reads_or_snps():
+
+    variants = ()
+
+    locus = loci.Locus(
+        contig="CHR1",
+        start=5,
+        stop=25,
+        name="CHR1_05_25",
+        sequence="A" * 20,
+        variants=variants,
+    )
+
+    n_read = 0
+    n_pos = len(variants)
+    max_allele = int(np.max(locus.count_alleles(), initial=0))
+
+    calls = np.empty((n_read, n_pos), dtype=np.int8)
+    quals = np.empty((n_read, n_pos), dtype=np.int16)
+    expect = np.empty((n_read, n_pos, max_allele), dtype=float)
+    actual = bam.encode_read_distributions(locus, calls, quals)
     np.testing.assert_array_equal(expect, actual)

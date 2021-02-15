@@ -34,6 +34,14 @@ def test_read_bed4__plain_vs_zipped():
             sequence=None,
             variants=None,
         ),
+        loci.Locus(
+            contig="CHR3",
+            start=20,
+            stop=40,
+            name="CHR3_20_40",
+            sequence=None,
+            variants=None,
+        ),
     ]
 
     actual = list(loci.read_bed4(plain))
@@ -69,6 +77,14 @@ def test_read_bed4__region():
             start=10,
             stop=30,
             name="CHR2_10_30",
+            sequence=None,
+            variants=None,
+        ),
+        loci.Locus(
+            contig="CHR3",
+            start=20,
+            stop=40,
+            name="CHR3_20_40",
             sequence=None,
             variants=None,
         ),
