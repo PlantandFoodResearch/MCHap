@@ -267,7 +267,7 @@ def encode_read_distributions(locus, calls, quals=None, error_rate=0.0):
     n_reads, n_pos = calls.shape
     n_alleles = locus.count_alleles()
     if n_reads == 0:
-        max_allele = np.max(n_alleles)
+        max_allele = int(np.max(locus.count_alleles(), initial=0))
         encoded = np.empty((n_reads, n_pos, max_allele), dtype=float)
         return encoded
 

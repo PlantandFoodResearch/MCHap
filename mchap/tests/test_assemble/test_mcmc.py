@@ -106,6 +106,44 @@ def test_DenovoMCMC__zero_reads():
     assert posterior.probabilities[0] < 0.05
 
 
+def test_DenovoMCMC__zero_snps():
+    n_chains = 2
+    ploidy, n_base = 4, 0  # no snps in locus
+    n_steps = 1000
+    n_burn = 500
+    n_alleles = []  # no snps in locus
+    model = mcmc.DenovoMCMC(
+        ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
+    )
+
+    reads = np.empty((10, n_base, 0), dtype=float)
+
+    trace = model.fit(reads).burn(n_burn)
+    posterior = trace.posterior()
+    assert trace.genotypes.shape == (n_chains, n_steps - n_burn, ploidy, 0)
+    assert np.all(np.isnan(trace.llks))
+    assert posterior.probabilities[0] == 1  # no variability
+
+
+def test_DenovoMCMC__zero_reads_or_snps():
+    n_chains = 2
+    ploidy, n_base = 4, 0  # no snps in locus
+    n_steps = 1000
+    n_burn = 500
+    n_alleles = []  # no snps in locus
+    model = mcmc.DenovoMCMC(
+        ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
+    )
+
+    reads = np.empty((0, n_base, 0), dtype=float)
+
+    trace = model.fit(reads).burn(n_burn)
+    posterior = trace.posterior()
+    assert trace.genotypes.shape == (n_chains, n_steps - n_burn, ploidy, 0)
+    assert np.all(np.isnan(trace.llks))
+    assert posterior.probabilities[0] == 1  # no variability
+
+
 def test_DenovoMCMC__all_nans():
     n_chains = 2
     ploidy, n_base = 4, 6
