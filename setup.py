@@ -34,7 +34,7 @@ setup(
     python_requires=">3.7.0",
     keywords=["biology", "bioinformatics", "genetics", "genomics"],
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Environment :: Console",
         "Intended Audience :: Science/Research",
         "Natural Language :: English",
