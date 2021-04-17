@@ -343,44 +343,67 @@ def test_Program__run__no_base_phreds():
                 assert result[i] == line
 
 
+@pytest.mark.parametrize(
+    "bams,cli_extra,output_vcf",
+    [
+        (
+            [
+                "simple.sample1.deep.bam",
+                "simple.sample2.deep.bam",
+                "simple.sample3.deep.bam",
+            ],
+            [],
+            "simple.output.deep.vcf",
+        ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            [],
+            "simple.output.mixed_depth.vcf",
+        ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--genotype-likelihoods"],
+            "simple.output.mixed_depth.likelihoods.vcf",
+        ),
+    ],
+)
 @pytest.mark.parametrize("n_cores", [1, 2])
-def test_Program__run_stdout__high_depth(n_cores):
+def test_Program__run_stdout(bams, cli_extra, output_vcf, n_cores):
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
     BED = str(path / "simple.bed.gz")
     VCF = str(path / "simple.vcf.gz")
     REF = str(path / "simple.fasta")
-    BAMS = [
-        str(path / "simple.sample1.deep.bam"),
-        str(path / "simple.sample2.deep.bam"),
-        str(path / "simple.sample3.deep.bam"),
-    ]
+    BAMS = [str(path / bam) for bam in bams]
 
-    command = [
-        "mchap",
-        "assemble",
-        "--bam",
-        BAMS[0],
-        BAMS[1],
-        BAMS[2],
-        "--ploidy",
-        "4",
-        "--targets",
-        BED,
-        "--variants",
-        VCF,
-        "--reference",
-        REF,
-        "--mcmc-steps",
-        "500",
-        "--mcmc-burn",
-        "100",
-        "--mcmc-seed",
-        "11",
-        "--cores",
-        str(n_cores),
-    ]
+    command = (
+        [
+            "mchap",
+            "assemble",
+            "--bam",
+        ]
+        + BAMS
+        + [
+            "--ploidy",
+            "4",
+            "--targets",
+            BED,
+            "--variants",
+            VCF,
+            "--reference",
+            REF,
+            "--mcmc-steps",
+            "500",
+            "--mcmc-burn",
+            "100",
+            "--mcmc-seed",
+            "11",
+            "--cores",
+            str(n_cores),
+        ]
+        + cli_extra
+    )
 
     prog = program.cli(command)
 
@@ -397,86 +420,7 @@ def test_Program__run_stdout__high_depth(n_cores):
     # compare output to expected
     with open(out_filename, "r") as f:
         actual = f.readlines()
-    with open(str(path / "simple.output.deep.vcf"), "r") as f:
-        expected = f.readlines()
-
-    assert len(actual) == len(expected)
-
-    if n_cores > 1:
-        # output may be in different order
-        actual.sort()
-        expected.sort()
-
-    for act, exp in zip(actual, expected):
-        # file paths will make full line differ
-        if act.startswith("##commandline"):
-            assert exp.startswith("##commandline")
-        elif act.startswith("##fileDate"):
-            # new date should be greater than test vcf date
-            assert exp.startswith("##fileDate")
-            assert act > exp
-        else:
-            assert act == exp
-
-    # cleanup
-    os.remove(out_filename)
-
-
-@pytest.mark.parametrize("n_cores", [1, 2])
-def test_Program__run_stdout__mixed_depth(n_cores):
-    path = pathlib.Path(__file__).parent.absolute()
-    path = path / "test_io/data"
-
-    BED = str(path / "simple.bed.gz")
-    VCF = str(path / "simple.vcf.gz")
-    REF = str(path / "simple.fasta")
-    BAMS = [
-        str(path / "simple.sample1.bam"),
-        str(path / "simple.sample2.deep.bam"),
-        str(path / "simple.sample3.bam"),
-    ]
-
-    command = [
-        "mchap",
-        "assemble",
-        "--bam",
-        BAMS[0],
-        BAMS[1],
-        BAMS[2],
-        "--ploidy",
-        "4",
-        "--targets",
-        BED,
-        "--variants",
-        VCF,
-        "--reference",
-        REF,
-        "--mcmc-steps",
-        "500",
-        "--mcmc-burn",
-        "100",
-        "--mcmc-seed",
-        "11",
-        "--cores",
-        str(n_cores),
-    ]
-
-    prog = program.cli(command)
-
-    # capture stdout in file
-    _, out_filename = tempfile.mkstemp()
-    stdout = sys.stdout
-    sys.stdout = open(out_filename, "w")
-    prog.run_stdout()
-    sys.stdout.close()
-
-    # replace stdout
-    sys.stdout = stdout
-
-    # compare output to expected
-    with open(out_filename, "r") as f:
-        actual = f.readlines()
-    with open(str(path / "simple.output.mixed_depth.vcf"), "r") as f:
+    with open(str(path / output_vcf), "r") as f:
         expected = f.readlines()
 
     assert len(actual) == len(expected)
