@@ -6,7 +6,8 @@ import pysam
 import multiprocessing as mp
 
 from mchap import mset
-from mchap.assemble.mcmc import DenovoMCMC
+from mchap.assemble import DenovoMCMC, genotype_likelihoods, genotype_posteriors
+from mchap.assemble.util import natural_log_to_log10
 from mchap.encoding import character, integer
 from mchap.io import (
     read_bed4,
@@ -73,7 +74,9 @@ class program(object):
     kmer_filter_k: int = 3
     kmer_filter_theshold: float = 0.90
     incongruence_filter_threshold: float = 0.60
+    use_assembly_posteriors: bool = False
     report_genotype_likelihoods: bool = False
+    report_genotype_posterior: bool = False
     n_cores: int = 1
     precision: int = 3
     random_seed: int = 42
@@ -468,12 +471,36 @@ class program(object):
             ),
         )
 
+        parser.set_defaults(use_assembly_posteriors=False)
+        parser.add_argument(
+            "--use-assembly-posteriors",
+            dest="use_assembly_posteriors",
+            action="store_true",
+            help=(
+                "Flag: Use posterior probabilities from each individuals "
+                "assembly rather than recomputing posteriors based on the "
+                "observed alleles across all samples. "
+                "This may lead to less robust genotype calls in the presence "
+                "of multi-modality and hence it is recommended to run the "
+                "simulation for longer or using parallel-tempering when "
+                "using this option."
+            ),
+        )
+
         parser.set_defaults(genotype_likelihoods=False)
         parser.add_argument(
             "--genotype-likelihoods",
             dest="genotype_likelihoods",
             action="store_true",
-            help=("Flag: report genotype likelihoods in the GL VCF field."),
+            help=("Flag: Report genotype likelihoods in the GL VCF field."),
+        )
+
+        parser.set_defaults(genotype_posteriors=False)
+        parser.add_argument(
+            "--genotype-posteriors",
+            dest="genotype_posteriors",
+            action="store_true",
+            help=("Flag: Report genotype posterior probabilities in the GP VCF field."),
         )
 
         parser.add_argument(
@@ -601,7 +628,9 @@ class program(object):
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
             incongruence_filter_threshold=args.filter_chain_incongruence[0],
+            use_assembly_posteriors=args.use_assembly_posteriors,
             report_genotype_likelihoods=args.genotype_likelihoods,
+            report_genotype_posterior=args.genotype_posteriors,
             n_cores=args.cores[0],
             cli_command=command,
             random_seed=args.mcmc_seed[0],
@@ -673,6 +702,7 @@ class program(object):
             vcf.formatfields.DOSEXP,
             vcf.formatfields.AD,
             vcf.formatfields.GL,
+            vcf.formatfields.GP,
         ]
 
         columns = [vcf.headermeta.columns(self.samples)]
@@ -726,7 +756,10 @@ class program(object):
         sample_GQ = np.empty(n_samples, dtype="O")
         sample_PHQ = np.empty(n_samples, dtype="O")
         sample_MEC = np.empty(n_samples, dtype="O")
+        sample_log_likelihoods = np.empty(n_samples, dtype="O")
         sample_GL = np.empty(n_samples, dtype="O")
+        sample_posterior_probs = np.empty(n_samples, dtype="O")
+        sample_GP = np.empty(n_samples, dtype="O")
 
         # loop over samples
         for i, sample in enumerate(self.samples):
@@ -848,6 +881,33 @@ class program(object):
                 message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
                 raise SampleAssemblyError(message) from e
 
+        # order VCF alleles
+        vcf_haplotypes, vcf_haplotype_counts = vcf.sort_haplotypes(sample_genotype)
+
+        # genotype likelihoods and posteriors
+        for i, sample in enumerate(self.samples):
+            if self.report_genotype_likelihoods or self.report_genotype_posterior:
+                llks = genotype_likelihoods(
+                    reads=sample_read_dists_unique[i],
+                    read_counts=sample_read_dist_counts[i],
+                    ploidy=self.sample_ploidy[sample],
+                    haplotypes=vcf_haplotypes,
+                )
+                sample_log_likelihoods[i] = llks
+            if self.report_genotype_likelihoods:
+                sample_GL[i] = np.round(natural_log_to_log10(llks), self.precision)
+            if self.report_genotype_posterior:
+                posterior = genotype_posteriors(
+                    log_likelihoods=llks,
+                    ploidy=self.sample_ploidy[sample],
+                    n_alleles=len(vcf_haplotypes),
+                    inbreeding=self.sample_inbreeding[sample],
+                )
+                sample_posterior_probs[i] = posterior
+                sample_GP[i] = np.round(posterior, self.precision)
+
+        # TODO: recalling genotypes based upon observed haplotypes
+
         # labeling alleles
         vcf_haplotypes, vcf_haplotype_counts = vcf.sort_haplotypes(sample_genotype)
         vcf_alleles = locus.format_haplotypes(vcf_haplotypes)
@@ -895,18 +955,6 @@ class program(object):
                     axis=0,
                 )
 
-                # genotype likelihoods
-                if self.report_genotype_likelihoods:
-                    sample_GL[i] = np.round(
-                        vcf.genotype_likelihoods(
-                            reads=sample_read_dists_unique[i],
-                            read_counts=sample_read_dist_counts[i],
-                            ploidy=self.sample_ploidy[sample],
-                            haplotypes=vcf_haplotypes,
-                        ),
-                        self.precision,
-                    )
-
             # end of try clause for specific sample
             except Exception as e:
                 message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
@@ -936,6 +984,7 @@ class program(object):
             DOSEXP=sample_DOSEXP,
             AD=sample_AD,
             GL=sample_GL,
+            GP=sample_GP,
         )
 
         return vcf.format_record(

@@ -365,6 +365,11 @@ def test_Program__run__no_base_phreds():
             ["--genotype-likelihoods"],
             "simple.output.mixed_depth.likelihoods.vcf",
         ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--genotype-posteriors"],
+            "simple.output.mixed_depth.posteriors.vcf",
+        ),
     ],
 )
 @pytest.mark.parametrize("n_cores", [1, 2])

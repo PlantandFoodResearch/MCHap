@@ -7,7 +7,6 @@ from mchap.io.vcf.genotypes import (
     sort_haplotypes,
     genotype_string,
     expected_dosage,
-    genotype_likelihoods,
 )
 from mchap.io.vcf.records import format_info_field, format_sample_field, format_record
 
@@ -18,7 +17,6 @@ __all__ = [
     "filters",
     "sort_haplotypes",
     "genotype_string",
-    "genotype_likelihoods",
     "expected_dosage",
     "format_info_field",
     "format_sample_field",

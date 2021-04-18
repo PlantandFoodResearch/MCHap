@@ -64,6 +64,9 @@ AD = FormatField(
     descr="Number of reads unambiguously assigned to each allele based on MEC",
 )
 GL = FormatField(id="GL", number="G", type="Float", descr="Genotype likelihoods")
+GP = FormatField(
+    id="GP", number="G", type="Float", descr="Genotype posterior probabilities"
+)
 
 
 def haplotype_depth(variant_depths):

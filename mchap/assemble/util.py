@@ -390,6 +390,12 @@ def sample_alleles(array, dtype=np.int8):
 
 
 @numba.njit
+def natural_log_to_log10(x):
+    e = np.exp(1)
+    return x * np.log10(e)
+
+
+@numba.njit
 def seed_numba(seed):
     """Set numba random seed"""
     np.random.seed(seed)
