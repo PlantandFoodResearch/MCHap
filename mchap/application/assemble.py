@@ -73,6 +73,7 @@ class program(object):
     kmer_filter_k: int = 3
     kmer_filter_theshold: float = 0.90
     incongruence_filter_threshold: float = 0.60
+    report_genotype_likelihoods: bool = False
     n_cores: int = 1
     precision: int = 3
     random_seed: int = 42
@@ -467,6 +468,14 @@ class program(object):
             ),
         )
 
+        parser.set_defaults(genotype_likelihoods=False)
+        parser.add_argument(
+            "--genotype-likelihoods",
+            dest="genotype_likelihoods",
+            action="store_true",
+            help=("Flag: report genotype likelihoods in the GL VCF field."),
+        )
+
         parser.add_argument(
             "--read-group-field",
             nargs=1,
@@ -592,6 +601,7 @@ class program(object):
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
             incongruence_filter_threshold=args.filter_chain_incongruence[0],
+            report_genotype_likelihoods=args.genotype_likelihoods,
             n_cores=args.cores[0],
             cli_command=command,
             random_seed=args.mcmc_seed[0],
@@ -662,6 +672,7 @@ class program(object):
             vcf.formatfields.PHPM,
             vcf.formatfields.DOSEXP,
             vcf.formatfields.AD,
+            vcf.formatfields.GL,
         ]
 
         columns = [vcf.headermeta.columns(self.samples)]
@@ -701,6 +712,8 @@ class program(object):
         # arrays of sample data in order
         n_samples = len(self.samples)
         sample_read_calls = np.empty(n_samples, dtype="O")
+        sample_read_dists_unique = np.empty(n_samples, dtype="O")
+        sample_read_dist_counts = np.empty(n_samples, dtype="O")
         sample_genotype = np.empty(n_samples, dtype="O")
         sample_phenotype_dist = np.empty(n_samples, dtype="O")
         sample_called = np.ones(n_samples, dtype=bool)
@@ -713,6 +726,7 @@ class program(object):
         sample_GQ = np.empty(n_samples, dtype="O")
         sample_PHQ = np.empty(n_samples, dtype="O")
         sample_MEC = np.empty(n_samples, dtype="O")
+        sample_GL = np.empty(n_samples, dtype="O")
 
         # loop over samples
         for i, sample in enumerate(self.samples):
@@ -758,6 +772,8 @@ class program(object):
 
                 # de-duplicate reads
                 read_dists_unique, read_dist_counts = mset.unique_counts(read_dists)
+                sample_read_dists_unique[i] = read_dists_unique
+                sample_read_dist_counts[i] = read_dist_counts
 
                 # assemble haplotypes
                 trace = (
@@ -879,6 +895,18 @@ class program(object):
                     axis=0,
                 )
 
+                # genotype likelihoods
+                if self.report_genotype_likelihoods:
+                    sample_GL[i] = np.round(
+                        vcf.genotype_likelihoods(
+                            reads=sample_read_dists_unique[i],
+                            read_counts=sample_read_dist_counts[i],
+                            ploidy=self.sample_ploidy[sample],
+                            haplotypes=vcf_haplotypes,
+                        ),
+                        self.precision,
+                    )
+
             # end of try clause for specific sample
             except Exception as e:
                 message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
@@ -907,6 +935,7 @@ class program(object):
             PHPM=sample_PHPM,
             DOSEXP=sample_DOSEXP,
             AD=sample_AD,
+            GL=sample_GL,
         )
 
         return vcf.format_record(

@@ -2,6 +2,7 @@
 
 import numpy as np
 from math import factorial
+from scipy.special import comb
 
 __all__ = [
     "count_unique_haplotypes",
@@ -50,7 +51,7 @@ def count_unique_genotypes(u_haps, ploidy):
         equivilent permutations.
 
     """
-    return factorial(u_haps + ploidy - 1) // (factorial(ploidy) * factorial(u_haps - 1))
+    return int(comb(u_haps, ploidy, repetition=True))
 
 
 def count_unique_genotype_permutations(u_haps, ploidy):
