@@ -25,6 +25,7 @@ usage: MCMC haplotype assembly [-h] [--targets TARGETS] [--variants VARIANTS]
                                [--filter-kmer-k FILTER_KMER_K]
                                [--filter-kmer FILTER_KMER]
                                [--filter-chain-incongruence FILTER_CHAIN_INCONGRUENCE]
+                               [--genotype-likelihoods]
                                [--read-group-field READ_GROUP_FIELD]
                                [--cores CORES]
 
@@ -166,6 +167,8 @@ optional arguments:
                         Posterior phenotype probability threshold for
                         identification of incongruent posterior modes (default
                         = 0.60).
+  --genotype-likelihoods
+                        Flag: report genotype likelihoods in the GL VCF field.
   --read-group-field READ_GROUP_FIELD
                         Read group field to use as sample id (default = "SM").
                         The chosen field determines tha sample ids required in
