@@ -118,11 +118,11 @@ class SampleDepthFilter(SampleFilter):
         template = "Sample has mean read depth less than {}"
         return template.format(self.threshold)
 
-    def __call__(self, depths, gap="-"):
-        if np.prod(depths.shape) == 0:
-            # can't apply depth filter across 0 variants
+    def __call__(self, depth, gap="-"):
+        if np.isnan(depth):
+            # can't apply
             return FilterCall(self.id, None, applied=False)
-        fail = np.mean(depths) < self.threshold
+        fail = depth < self.threshold
         return FilterCall(self.id, fail)
 
 
