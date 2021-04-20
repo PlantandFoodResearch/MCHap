@@ -5,10 +5,11 @@ import sys
 import shutil
 import pysam
 import pytest
+import numpy as np
 
 from mchap.version import __version__
 from mchap.io.vcf.headermeta import filedate, columns
-from mchap.application.assemble import program
+from mchap.application.assemble import program, _genotype_as_alleles
 
 
 def test_Program__cli():
@@ -523,3 +524,28 @@ def test_Program__output_reference_positions():
             ref_allele = reference.fetch(variant.contig, variant.start, variant.stop)
             assert ref_allele == variant.ref
     reference.close()
+
+
+def test_genotype_as_alleles():
+    haplotypes = np.array(
+        [
+            [0, 0, 0],
+            [1, 0, 1],
+            [0, 1, 1],
+        ],
+        dtype=np.int8,
+    )
+    genotype = np.array(
+        [
+            [0, 1, 1],
+            [0, 0, 0],
+            [-1, -1, -1],
+            [0, 1, 1],
+        ],
+        dtype=np.int8,
+    )
+    haplotype_labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
+
+    expect = np.array([0, 2, 2, -1])
+    actual = _genotype_as_alleles(genotype, haplotype_labels)
+    np.testing.assert_array_equal(actual, expect)
