@@ -215,3 +215,97 @@ def test_sample_alleles():
     # should reproduce original array
     query = np.round(accumulate / 10000, 1)
     np.testing.assert_array_equal(query, array)
+
+
+def test_genotype_alleles_as_index():
+    genotypes = np.array(
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 1],
+            [0, 0, 1, 1],
+            [0, 1, 1, 1],
+            [1, 1, 1, 1],
+            [0, 0, 0, 2],
+            [0, 0, 1, 2],
+            [0, 1, 1, 2],
+            [1, 1, 1, 2],
+            [0, 0, 2, 2],
+            [0, 1, 2, 2],
+            [1, 1, 2, 2],
+            [0, 2, 2, 2],
+            [1, 2, 2, 2],
+            [2, 2, 2, 2],
+            [0, 0, 0, 3],
+            [0, 0, 1, 3],
+            [0, 1, 1, 3],
+            [1, 1, 1, 3],
+            [0, 0, 2, 3],
+            [0, 1, 2, 3],
+            [1, 1, 2, 3],
+            [0, 2, 2, 3],
+            [1, 2, 2, 3],
+            [2, 2, 2, 3],
+            [0, 0, 3, 3],
+            [0, 1, 3, 3],
+            [1, 1, 3, 3],
+            [0, 2, 3, 3],
+            [1, 2, 3, 3],
+            [2, 2, 3, 3],
+            [0, 3, 3, 3],
+            [1, 3, 3, 3],
+            [2, 3, 3, 3],
+            [3, 3, 3, 3],
+        ]
+    )
+    n_genotype = len(genotypes)
+    actual = np.zeros(n_genotype, dtype=int) - 1
+    for i in range(n_genotype):
+        actual[i] = util.genotype_alleles_as_index(genotypes[i])
+    expect = np.arange(n_genotype, dtype=int)
+    np.testing.assert_array_equal(actual, expect)
+
+
+def test_index_as_genotype_alleles():
+    expect = np.array(
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 1],
+            [0, 0, 1, 1],
+            [0, 1, 1, 1],
+            [1, 1, 1, 1],
+            [0, 0, 0, 2],
+            [0, 0, 1, 2],
+            [0, 1, 1, 2],
+            [1, 1, 1, 2],
+            [0, 0, 2, 2],
+            [0, 1, 2, 2],
+            [1, 1, 2, 2],
+            [0, 2, 2, 2],
+            [1, 2, 2, 2],
+            [2, 2, 2, 2],
+            [0, 0, 0, 3],
+            [0, 0, 1, 3],
+            [0, 1, 1, 3],
+            [1, 1, 1, 3],
+            [0, 0, 2, 3],
+            [0, 1, 2, 3],
+            [1, 1, 2, 3],
+            [0, 2, 2, 3],
+            [1, 2, 2, 3],
+            [2, 2, 2, 3],
+            [0, 0, 3, 3],
+            [0, 1, 3, 3],
+            [1, 1, 3, 3],
+            [0, 2, 3, 3],
+            [1, 2, 3, 3],
+            [2, 2, 3, 3],
+            [0, 3, 3, 3],
+            [1, 3, 3, 3],
+            [2, 3, 3, 3],
+            [3, 3, 3, 3],
+        ]
+    )
+    actual = np.zeros(expect.shape, dtype=int)
+    for i in range(len(actual)):
+        actual[i] = util.index_as_genotype_alleles(i, ploidy=4)
+    np.testing.assert_array_equal(actual, expect)

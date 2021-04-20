@@ -31,12 +31,12 @@ def factorial_20(x):
 
 # modified from https://stackoverflow.com/questions/54850985/fast-algorithm-for-log-gamma-function/54855769#54855769
 # wich in turn was based on https://github.com/numba/numba/issues/3086
-_PTR = ctypes.POINTER
+_PTR_gammaln = ctypes.POINTER
 _dble = ctypes.c_double
-_ptr_dble = _PTR(_dble)
+_ptr_dble_gammaln = _PTR_gammaln(_dble)
 _gammaln_addr = get_cython_function_address("scipy.special.cython_special", "gammaln")
-_functype = ctypes.CFUNCTYPE(_dble, _dble)
-_gammaln_float64 = _functype(_gammaln_addr)
+_functype_gammaln = ctypes.CFUNCTYPE(_dble, _dble)
+_gammaln_float64 = _functype_gammaln(_gammaln_addr)
 
 
 @numba.njit
@@ -399,3 +399,100 @@ def natural_log_to_log10(x):
 def seed_numba(seed):
     """Set numba random seed"""
     np.random.seed(seed)
+
+
+@numba.njit
+def _greatest_common_denominatior(x: int, y: int) -> int:
+    while y != 0:
+        t = x % y
+        x = y
+        y = t
+    return x
+
+
+@numba.njit
+def _comb(n: int, k: int) -> int:
+    if k > n:
+        return 0
+    r = 1
+    for d in range(1, k + 1):
+        gcd = _greatest_common_denominatior(r, d)
+        r //= gcd
+        r *= n
+        r //= d // gcd
+        n -= 1
+    return r
+
+
+@numba.njit
+def _comb_with_replacement(n: int, k: int) -> int:
+    n = n + k - 1
+    return _comb(n, k)
+
+
+@numba.njit
+def genotype_alleles_as_index(alleles):
+    """Convert genotypes to the index of their array position
+    following the VCF specification for fields of length G.
+
+    Parameters
+    ----------
+    alleles
+        Integer alleles of the genotype.
+
+    Returns
+    -------
+    index
+        Index of genotype following the sort order described in the
+        VCF spec.
+    """
+    index = 0
+    for i in range(len(alleles)):
+        a = alleles[i]
+        if a >= 0:
+            index += _comb_with_replacement(a, i + 1)
+        elif a < 0:
+            raise ValueError("Allele numbers must be >= 0.")
+    return index
+
+
+@numba.njit
+def index_as_genotype_alleles(index, ploidy):
+    """Convert the index of a genotype sort position to the
+    genotype call indicated by that index following the VCF
+    specification for fields of length G.
+
+    Parameters
+    ----------
+    index
+        Index of genotype following the sort order described in the
+        VCF spec. An index less than 0 is invalid and will return an
+        uncalled genotype.
+    ploidy
+        Ploidy of the genotype.
+
+    Returns
+    -------
+    alleles
+        Integer alleles of the genotype.
+    """
+    out = np.full(ploidy, -2, np.int64)
+    if index < 0:
+        # handle non-call
+        out[:ploidy] = -1
+        return
+    remainder = index
+    for index in range(ploidy):
+        # find allele n for position k
+        p = ploidy - index
+        n = -1
+        new = 0
+        prev = 0
+        while new <= remainder:
+            n += 1
+            prev = new
+            new = _comb_with_replacement(n, p)
+        n -= 1
+        remainder -= prev
+        out[p - 1] = n
+    return out
