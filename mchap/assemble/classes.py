@@ -127,6 +127,44 @@ class PosteriorGenotypeDistribution(object):
         idx = labels == mode
         return PhenotypeDistribution(self.genotypes[idx], self.probabilities[idx])
 
+    # TODO: Speed this up for large distributions
+    def haplotype_probabilities(self, return_weighted=False):
+        """Calculate posterior probability of haplotype occurrence.
+
+        Parameters
+        ----------
+        return_weighted : bool
+            If true a second array will be returned containing the
+            occurrence probability weighted by the haplotype dosage.
+
+        Returns
+        -------
+        haplotypes : ndarray, int, shape (n_haplotypes, n_base)
+            Unique haplotypes.
+        probabilities : ndarray, float, shape (n_haplotypes, )
+            Posterior probability of haplotype occurrence.
+        """
+        n_gen, ploidy, n_base = self.genotypes.shape
+        haps = self.genotypes.reshape(n_gen * ploidy, n_base)
+        uhaps = mset.unique(haps)
+        uprobs = np.zeros(len(uhaps), float)
+        uweighted = np.zeros(len(uhaps), float)
+        for i in range(len(uhaps)):
+            hap = uhaps[i]
+            for j in range(len(self.genotypes)):
+                gen = self.genotypes[j]
+                p = self.probabilities[j]
+                haploid = hap[None, ...]
+                count = mset.count(gen, haploid)[0]
+                if count > 0:
+                    uprobs[i] += p
+                if return_weighted:
+                    uweighted[i] += p * (count / ploidy)
+        if return_weighted:
+            return uhaps, uprobs, uweighted
+        else:
+            return uhaps, uprobs
+
 
 @dataclass
 class PhenotypeDistribution(object):

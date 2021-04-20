@@ -89,6 +89,83 @@ def test_PhenotypeDistribution___mode_genotype():
     assert expect[1] == actual[1]
 
 
+def test_PosteriorGenotypeDistribution__haplotype_probabilities():
+    array = np.array(
+        [
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 1, 1]],
+            [[0, 0, 0], [0, 0, 0], [1, 0, 1], [1, 1, 1]],
+            [[0, 0, 0], [1, 0, 1], [0, 1, 0], [1, 1, 1]],
+        ],
+        dtype=np.int8,
+    )
+    probs = np.array([0.05, 0.65, 0.2, 0.1])
+    dist = classes.PosteriorGenotypeDistribution(array, probs)
+    expect_haps = np.array(
+        [
+            [0, 0, 0],
+            [1, 1, 1],
+            [1, 0, 1],
+            [0, 1, 0],
+        ]
+    )
+    expect_probs = np.array(
+        [
+            0.05 + 0.65 + 0.2 + 0.1,
+            0.65 + 0.2 + 0.1,
+            0.2 + 0.1,
+            0.1,
+        ]
+    )
+    actual_haps, actual_probs = dist.haplotype_probabilities()
+    np.testing.assert_array_equal(actual_haps, expect_haps)
+    np.testing.assert_array_almost_equal(actual_probs, expect_probs)
+
+
+def test_PosteriorGenotypeDistribution__haplotype_probabilities__weights():
+    array = np.array(
+        [
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 1, 1]],
+            [[0, 0, 0], [0, 0, 0], [1, 0, 1], [1, 1, 1]],
+            [[0, 0, 0], [1, 0, 1], [0, 1, 0], [1, 1, 1]],
+        ],
+        dtype=np.int8,
+    )
+    probs = np.array([0.05, 0.65, 0.2, 0.1])
+    dist = classes.PosteriorGenotypeDistribution(array, probs)
+    expect_haps = np.array(
+        [
+            [0, 0, 0],
+            [1, 1, 1],
+            [1, 0, 1],
+            [0, 1, 0],
+        ]
+    )
+    expect_probs = np.array(
+        [
+            0.05 + 0.65 + 0.2 + 0.1,
+            0.65 + 0.2 + 0.1,
+            0.2 + 0.1,
+            0.1,
+        ]
+    )
+    expect_weights = np.array(
+        [
+            0.05 * 1 + 0.65 * (3 / 4) + 0.2 * (2 / 4) + 0.1 * (1 / 4),
+            0.65 * (1 / 4) + 0.2 * (1 / 4) + 0.1 * (1 / 4),
+            0.2 * (1 / 4) + 0.1 * (1 / 4),
+            0.1 * (1 / 4),
+        ]
+    )
+    actual_haps, actual_probs, actual_weights = dist.haplotype_probabilities(
+        return_weighted=True
+    )
+    np.testing.assert_array_equal(actual_haps, expect_haps)
+    np.testing.assert_array_almost_equal(actual_probs, expect_probs)
+    np.testing.assert_array_almost_equal(actual_weights, expect_weights)
+
+
 @pytest.mark.parametrize(
     "threshold,expect",
     [
