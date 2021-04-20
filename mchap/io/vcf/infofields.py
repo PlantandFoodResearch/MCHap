@@ -45,3 +45,10 @@ AD = InfoField(
     type="Integer",
     descr="Total number of reads unambiguously assigned to each allele based on MEC",
 )
+DP = InfoField(id="DP", number=1, type="Integer", descr="Combined depth across samples")
+RCOUNT = InfoField(
+    id="RCOUNT",
+    number=1,
+    type="Integer",
+    descr="Total number of observed reads across all samples",
+)

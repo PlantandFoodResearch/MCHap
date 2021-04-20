@@ -712,6 +712,8 @@ class program(object):
             vcf.infofields.AN,
             vcf.infofields.AC,
             vcf.infofields.NS,
+            vcf.infofields.DP,
+            vcf.infofields.RCOUNT,
             vcf.infofields.END,
             vcf.infofields.SNVPOS,
             vcf.infofields.AD,
@@ -1082,10 +1084,15 @@ class program(object):
             try:
                 genotype = data.sample_genotype[sample]
                 read_calls = data.sample_read_calls[sample]
-                data.sample_AD[sample] = np.sum(
-                    integer.read_assignment(read_calls, data.vcf_haplotypes) == 1,
-                    axis=0,
-                )
+                # if there are no variants then return nan
+                if len(data.locus.variants) == 0:
+                    allele_depth = np.nan
+                else:
+                    allele_depth = np.sum(
+                        integer.read_assignment(read_calls, data.vcf_haplotypes) == 1,
+                        axis=0,
+                    )
+                data.sample_AD[sample] = allele_depth
                 data.sample_MEC[sample] = np.sum(
                     integer.minimum_error_correction(read_calls, genotype)
                 )
@@ -1192,13 +1199,13 @@ class program(object):
         ----------
         data : LocusAssemblyData
             With `locus`, `vcf_haplotypes`, `sample_FT`, `sample_alleles`,
-            `sample_AD`.
+            `sample_DP`, `sample_RCOUNT` and `sample_AD`.
 
         Returns
         -------
         data : LocusAssemblyData
             With `vcf_REF`, `vcf_ALTS`, `info_END`, `info_SNVPOS`, `info_AC`
-            `info_AN`, `info_NS`, `info_AD`.
+            `info_AN`, `info_NS`, `info_DP`, `info_RCOUNT` and `info_AD`.
         """
         # postions
         data.info_END = data.locus.stop
@@ -1222,10 +1229,16 @@ class program(object):
         data.info_NS = np.sum(
             [np.any(alleles >= 0) for alleles in data.sample_alleles.values()]
         )
-        # total allele depths
-        data.info_AD = np.zeros(len(data.vcf_haplotypes), int)
-        for sample_AD in data.sample_AD.values():
-            data.info_AD += sample_AD
+        # total read depth and allele depth
+        if len(data.locus.variants) == 0:
+            # it will be misleading to return a depth of 0 in this case
+            data.info_DP = np.nan
+            data.info_AD = np.nan
+        else:
+            data.info_DP = np.nansum(list(data.sample_DP.values()))
+            data.info_AD = np.nansum(list(data.sample_AD.values()), axis=0)
+        # total read count
+        data.info_RCOUNT = np.nansum(list(data.sample_RCOUNT.values()))
 
     def assemble_locus(self, sample_bams, locus):
         """Assembles samples at a locus and formats resulting data
@@ -1425,8 +1438,11 @@ class LocusAssemblyData(object):
         self.info_AN = None
         self.info_AC = None
         self.info_NS = None
+        self.info_DP = None
+        self.info_RCOUNT = None
         self.info_END = None
         self.info_SNVPOS = None
+        self.info_AD = None
 
     def _sample_dict_as_list(self, d):
         return [d.get(s) for s in self.samples]
@@ -1436,6 +1452,8 @@ class LocusAssemblyData(object):
             AN=self.info_AN,
             AC=self.info_AC,
             NS=self.info_NS,
+            DP=self.info_DP,
+            RCOUNT=self.info_RCOUNT,
             END=self.info_END,
             SNVPOS=self.info_SNVPOS,
             AD=self.info_AD,
