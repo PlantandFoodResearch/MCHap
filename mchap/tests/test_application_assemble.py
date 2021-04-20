@@ -238,7 +238,7 @@ def test_Program__header():
 @pytest.mark.parametrize(
     "cli_extra,output_vcf",
     [
-        (["--use-assembly-posteriors", "--hard-filter"], "simple.output.deep.vcf"),
+        (["--use-assembly-posteriors", "--hard-filter"], "simple.output.deep.old.vcf"),
         (
             [
                 "--use-assembly-posteriors",
@@ -247,7 +247,7 @@ def test_Program__header():
                 "0.001",
                 "--ignore-base-phred-scores",
             ],
-            "simple.output.deep.vcf",
+            "simple.output.deep.old.vcf",
         ),
     ],
 )
@@ -313,8 +313,13 @@ def test_Program__run(cli_extra, output_vcf):
                 "simple.sample2.deep.bam",
                 "simple.sample3.deep.bam",
             ],
-            [],
-            "simple.output.deep.vcf",
+            ["--use-assembly-posteriors", "--hard-filter"],
+            "simple.output.deep.old.vcf",
+        ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--use-assembly-posteriors", "--hard-filter"],
+            "simple.output.mixed_depth.old.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
@@ -418,7 +423,7 @@ def test_Program__output_pysam():
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
-    OUTFILE = str(path / "simple.output.deep.vcf")
+    OUTFILE = str(path / "simple.output.deep.old.vcf")
 
     with open(OUTFILE, "r") as f:
         expect = set(line.strip() for line in f.readlines())
@@ -445,7 +450,7 @@ def test_Program__output_bed_positions():
     path = path / "test_io/data"
 
     BEDFILE = str(path / "simple.bed")
-    OUTFILE = str(path / "simple.output.deep.vcf")
+    OUTFILE = str(path / "simple.output.deep.old.vcf")
 
     # map of named intervals from bed4 file
     with open(BEDFILE) as bed:
@@ -475,7 +480,7 @@ def test_Program__output_reference_positions():
     path = path / "test_io/data"
 
     REFFILE = str(path / "simple.fasta")
-    OUTFILE = str(path / "simple.output.deep.vcf")
+    OUTFILE = str(path / "simple.output.deep.old.vcf")
 
     reference = pysam.FastaFile(REFFILE)
     with pysam.VariantFile(OUTFILE) as vcf:
