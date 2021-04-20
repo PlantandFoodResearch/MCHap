@@ -60,7 +60,6 @@ class program(object):
     samples: list
     sample_ploidy: dict
     sample_inbreeding: dict
-    call_best_genotype: bool = False
     hard_filter_genotype_calls: bool = True
     read_group_field: str = "SM"
     base_error_rate: float = 0.0
@@ -288,20 +287,6 @@ class program(object):
             help=(
                 "Flag: Use reads marked as supplementary in the assembly "
                 "(these are skipped by default)."
-            ),
-        )
-
-        parser.set_defaults(call_best_genotype=False)
-        parser.add_argument(
-            "--best-genotype",
-            dest="call_best_genotype",
-            action="store_true",
-            help=(
-                "Flag: allways call the best supported complete genotype "
-                "within a called phenotype. This may result in calling genotypes "
-                "with a posterior probability less than --filter-probability "
-                "however a phenotype probability of >= --filter-probability "
-                "is still required."
             ),
         )
 
@@ -627,7 +612,6 @@ class program(object):
             samples=samples,
             sample_ploidy=sample_ploidy,
             sample_inbreeding=sample_inbreeding,
-            call_best_genotype=args.call_best_genotype,
             hard_filter_genotype_calls=args.hard_filter,
             read_group_field=args.read_group_field[0],
             base_error_rate=args.base_error_rate[0],
