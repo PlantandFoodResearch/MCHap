@@ -235,7 +235,23 @@ def test_Program__header():
     assert columns_actual == columns_expect
 
 
-def test_Program__run():
+@pytest.mark.parametrize(
+    "cli_extra,output_vcf",
+    [
+        (["--use-assembly-posteriors", "--hard-filter"], "simple.output.deep.vcf"),
+        (
+            [
+                "--use-assembly-posteriors",
+                "--hard-filter",
+                "--base-error-rate",
+                "0.001",
+                "--ignore-base-phred-scores",
+            ],
+            "simple.output.deep.vcf",
+        ),
+    ],
+)
+def test_Program__run(cli_extra, output_vcf):
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
@@ -269,69 +285,13 @@ def test_Program__run():
         "100",
         "--mcmc-seed",
         "11",
-    ]
+    ] + cli_extra
 
     prog = program.cli(command)
     result = prog.run()
 
     # compare to expected VCF
-    with open(str(path / "simple.output.deep.vcf"), "r") as f:
-        for i, line in enumerate(f):
-            line = line.strip()
-            if line.startswith("##commandline"):
-                # file paths will differ
-                pass
-            elif line.startswith("##fileDate"):
-                # new date should be greater than test vcf date
-                assert result[i] > line
-            else:
-                assert result[i] == line
-
-
-def test_Program__run__no_base_phreds():
-    path = pathlib.Path(__file__).parent.absolute()
-    path = path / "test_io/data"
-
-    BED = str(path / "simple.bed.gz")
-    VCF = str(path / "simple.vcf.gz")
-    REF = str(path / "simple.fasta")
-    BAMS = [
-        str(path / "simple.sample1.deep.bam"),
-        str(path / "simple.sample2.deep.bam"),
-        str(path / "simple.sample3.deep.bam"),
-    ]
-
-    command = [
-        "mchap",
-        "assemble",
-        "--bam",
-        BAMS[0],
-        BAMS[1],
-        BAMS[2],
-        "--ploidy",
-        "4",
-        "--targets",
-        BED,
-        "--variants",
-        VCF,
-        "--reference",
-        REF,
-        "--base-error-rate",
-        "0.001",
-        "--ignore-base-phred-scores",
-        "--mcmc-steps",
-        "500",
-        "--mcmc-burn",
-        "100",
-        "--mcmc-seed",
-        "11",
-    ]
-
-    prog = program.cli(command)
-    result = prog.run()
-
-    # compare to expected VCF
-    with open(str(path / "simple.output.deep.vcf"), "r") as f:
+    with open(str(path / output_vcf), "r") as f:
         for i, line in enumerate(f):
             line = line.strip()
             if line.startswith("##commandline"):
