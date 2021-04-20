@@ -728,7 +728,6 @@ class program(object):
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PHPM,
-            vcf.formatfields.DOSEXP,
             vcf.formatfields.AD,
             vcf.formatfields.GL,
             vcf.formatfields.GP,
@@ -1006,19 +1005,6 @@ class program(object):
                 alleles = _genotype_as_alleles(genotype, haplotype_labels)
                 # phenotype
                 phenotype_prob = phenotype.probabilities.sum()
-                if np.any(alleles < 0):
-                    # can't order dosage with missing alleles
-                    dosage_expected = np.nan
-                else:
-                    phenotype_alleles = [
-                        _genotype_as_alleles(g, haplotype_labels)
-                        for g in phenotype.genotypes
-                    ]
-                    idx = np.argsort(
-                        [genotype_alleles_as_index(a) for a in phenotype_alleles]
-                    )
-                    dosage_probs = phenotype.probabilities[idx]
-                    dosage_expected = dosage_probs / dosage_probs.sum()
                 # genotype results
                 data.sample_genotype[sample] = genotype
                 data.sample_alleles[sample] = alleles
@@ -1026,7 +1012,6 @@ class program(object):
                 data.sample_GPM[sample] = np.round(genotype_prob, self.precision)
                 # phenotype results
                 data.sample_PHPM[sample] = np.round(phenotype_prob, self.precision)
-                data.sample_DOSEXP[sample] = np.round(dosage_expected, self.precision)
                 data.sample_PHQ[sample] = qual_of_prob(phenotype_prob)
             except Exception as e:
                 path = data.sample_bams.get(sample)
@@ -1047,7 +1032,7 @@ class program(object):
         -------
         data : LocusAssemblyData
             With `sample_genotype`, `sample_alleles`, `sample_GQ`, `sample_GPM`,
-            `sample_PHPM`, `sample_DOSEXP`, `sample_PHQ`.
+            `sample_PHPM` and `sample_PHQ`.
         """
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
@@ -1068,9 +1053,6 @@ class program(object):
                 data.sample_GQ[sample] = qual_of_prob(genotype_prob)
                 data.sample_GPM[sample] = np.round(genotype_prob, self.precision)
                 # phenotype stats
-                data.sample_DOSEXP[sample] = np.round(
-                    phenotype_probs / phenotype_probs.sum(), self.precision
-                )
                 data.sample_PHPM[sample] = np.round(
                     phenotype_probs.sum(), self.precision
                 )
@@ -1469,7 +1451,6 @@ class LocusAssemblyData(object):
             FT=self._sample_dict_as_list(self.sample_FT),
             GPM=self._sample_dict_as_list(self.sample_GPM),
             PHPM=self._sample_dict_as_list(self.sample_PHPM),
-            DOSEXP=self._sample_dict_as_list(self.sample_DOSEXP),
             AD=self._sample_dict_as_list(self.sample_AD),
             GL=self._sample_dict_as_list(self.sample_GL),
             GP=self._sample_dict_as_list(self.sample_GP),
