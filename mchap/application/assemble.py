@@ -6,8 +6,19 @@ import pysam
 import multiprocessing as mp
 
 from mchap import mset
-from mchap.assemble import DenovoMCMC, genotype_likelihoods, genotype_posteriors
-from mchap.assemble.util import natural_log_to_log10
+from mchap import combinatorics
+from mchap.assemble import (
+    DenovoMCMC,
+    genotype_likelihoods,
+    genotype_posteriors,
+    call_posterior_haplotypes,
+    alternate_dosage_posteriors,
+)
+from mchap.assemble.util import (
+    natural_log_to_log10,
+    index_as_genotype_alleles,
+    genotype_alleles_as_index,
+)
 from mchap.encoding import character, integer
 from mchap.io import (
     read_bed4,
@@ -50,7 +61,7 @@ class program(object):
     sample_ploidy: dict
     sample_inbreeding: dict
     call_best_genotype: bool = False
-    call_filtered: bool = False
+    hard_filter_genotype_calls: bool = True
     read_group_field: str = "SM"
     base_error_rate: float = 0.0
     ignore_base_phred_scores: bool = False
@@ -74,6 +85,7 @@ class program(object):
     kmer_filter_k: int = 3
     kmer_filter_theshold: float = 0.90
     incongruence_filter_threshold: float = 0.60
+    haplotype_posterior_threshold: float = 0.2
     use_assembly_posteriors: bool = False
     report_genotype_likelihoods: bool = False
     report_genotype_posterior: bool = False
@@ -293,17 +305,16 @@ class program(object):
             ),
         )
 
-        parser.set_defaults(call_filtered=False)
+        parser.set_defaults(hard_filter=False)
         parser.add_argument(
-            "--call-filtered",
-            dest="call_filtered",
+            "--hard-filter",
+            dest="hard_filter",
             action="store_true",
             help=(
-                "Flag: include genotype calls for filtered samples. "
-                "Sample filter tags will still indicate samples that have "
-                "been filtered. "
-                "WARNING: this can result in a large VCF file with "
-                "un-informative genotype calls."
+                "Flag: hard filter genotypes. By default filters are applied "
+                "softly so that a sample will still have a genotype call if filtered. "
+                "This flag will hard filter the genotype calls so that filtered calls "
+                "will have their alleles replaced with null alleles ('.')."
             ),
         )
 
@@ -471,6 +482,23 @@ class program(object):
             ),
         )
 
+        parser.add_argument(
+            "--haplotype-posterior-threshold",
+            type=float,
+            nargs=1,
+            default=[0.20],
+            help=(
+                "Posterior probability required for a haplotype to be included in "
+                "the output VCF as an alternative allele. "
+                "The posterior probability of haplotypes is assessed per sample "
+                "and calculated as the probability ot that haplotype being present "
+                "with one or more copies in that individual."
+                "This parameter is the main mechanism to control the number of "
+                "alternate alleles in ech VCF record and hence the breadth "
+                "of likelihoods and posterior distributions (default = 0.20)."
+            ),
+        )
+
         parser.set_defaults(use_assembly_posteriors=False)
         parser.add_argument(
             "--use-assembly-posteriors",
@@ -600,7 +628,7 @@ class program(object):
             sample_ploidy=sample_ploidy,
             sample_inbreeding=sample_inbreeding,
             call_best_genotype=args.call_best_genotype,
-            call_filtered=args.call_filtered,
+            hard_filter_genotype_calls=args.hard_filter,
             read_group_field=args.read_group_field[0],
             base_error_rate=args.base_error_rate[0],
             ignore_base_phred_scores=args.ignore_base_phred_scores,
@@ -629,6 +657,7 @@ class program(object):
             kmer_filter_theshold=args.filter_kmer[0],
             incongruence_filter_threshold=args.filter_chain_incongruence[0],
             use_assembly_posteriors=args.use_assembly_posteriors,
+            haplotype_posterior_threshold=args.haplotype_posterior_threshold[0],
             report_genotype_likelihoods=args.genotype_likelihoods,
             report_genotype_posterior=args.genotype_posteriors,
             n_cores=args.cores[0],
@@ -710,69 +739,32 @@ class program(object):
         header = meta_fields + contigs + filters + info_fields + format_fields + columns
         return [str(line) for line in header]
 
-    def _assemble_locus_wrapped(self, sample_bams, locus):
-        try:
-            result = self._assemble_locus(sample_bams, locus)
-        except Exception as e:
-            message = _LOCUS_ASSEMBLY_ERROR.format(
-                name=locus.name, contig=locus.contig, start=locus.start, stop=locus.stop
-            )
-            raise LocusAssemblyError(message) from e
-        return result
+    def encode_sample_reads(self, data):
+        """Extract and encode reads from each sample at a locus.
 
-    def _assemble_locus(self, sample_bams, locus):
-        # sample filters
-        kmer_filter = vcf.filters.SampleKmerFilter(
-            self.kmer_filter_k, self.kmer_filter_theshold
-        )
-        depth_filter = vcf.filters.SampleDepthFilter(self.depth_filter_threshold)
-        count_filter = vcf.filters.SampleReadCountFilter(
-            self.read_count_filter_threshold
-        )
-        prob_filter = vcf.filters.SamplePhenotypeProbabilityFilter(
-            self.probability_filter_threshold
-        )
-        incongruence_filter = vcf.filters.SampleChainPhenotypeIncongruenceFilter(
-            self.incongruence_filter_threshold
-        )
-        cnv_filter = vcf.filters.SampleChainPhenotypeCNVFilter(
-            self.incongruence_filter_threshold
-        )
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `locus`, `samples`, `sample_bams`, and `sample_inbreeding`.
 
-        # arrays of sample data in order
-        n_samples = len(self.samples)
-        sample_read_calls = np.empty(n_samples, dtype="O")
-        sample_read_dists_unique = np.empty(n_samples, dtype="O")
-        sample_read_dist_counts = np.empty(n_samples, dtype="O")
-        sample_genotype = np.empty(n_samples, dtype="O")
-        sample_phenotype_dist = np.empty(n_samples, dtype="O")
-        sample_called = np.ones(n_samples, dtype=bool)
-        sample_RCOUNT = np.empty(n_samples, dtype="O")
-        sample_DP = np.empty(n_samples, dtype="O")
-        sample_FT = np.empty(n_samples, dtype="O")
-        sample_GPM = np.empty(n_samples, dtype="O")
-        sample_PHPM = np.empty(n_samples, dtype="O")
-        sample_RCALLS = np.empty(n_samples, dtype="O")
-        sample_GQ = np.empty(n_samples, dtype="O")
-        sample_PHQ = np.empty(n_samples, dtype="O")
-        sample_MEC = np.empty(n_samples, dtype="O")
-        sample_log_likelihoods = np.empty(n_samples, dtype="O")
-        sample_GL = np.empty(n_samples, dtype="O")
-        sample_posterior_probs = np.empty(n_samples, dtype="O")
-        sample_GP = np.empty(n_samples, dtype="O")
-
-        # loop over samples
-        for i, sample in enumerate(self.samples):
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `sample_RCOUNT`,  `sample_DP`, `sample_read_calls`,
+            `sample_read_dists_unique` and `sample_read_dist_counts`.
+        """
+        locus = data.locus
+        for sample in data.samples:
 
             # path to bam for this sample
-            path = sample_bams[sample]
+            path = data.sample_bams[sample]
 
             # wrap in try clause to pass sample info back with any exception
             try:
 
                 # extract read data
                 read_chars, read_quals = extract_read_variants(
-                    locus,
+                    data.locus,
                     path,
                     id=self.read_group_field,
                     min_quality=self.mapping_quality,
@@ -783,17 +775,17 @@ class program(object):
 
                 # get read stats
                 read_count = read_chars.shape[0]
-                sample_RCOUNT[i] = read_count
+                data.sample_RCOUNT[sample] = read_count
                 read_variant_depth = character.depth(read_chars)
                 if len(read_variant_depth) == 0:
                     # no variants to score depth
-                    sample_DP[i] = np.nan
+                    data.sample_DP[sample] = np.nan
                 else:
-                    sample_DP[i] = np.round(np.mean(read_variant_depth))
+                    data.sample_DP[sample] = np.round(np.mean(read_variant_depth))
 
                 # encode reads as alleles and probabilities
                 read_calls = encode_read_alleles(locus, read_chars)
-                sample_read_calls[i] = read_calls
+                data.sample_read_calls[sample] = read_calls
                 if self.ignore_base_phred_scores:
                     read_quals = None
                 read_dists = encode_read_distributions(
@@ -802,18 +794,42 @@ class program(object):
                     read_quals,
                     error_rate=self.base_error_rate,
                 )
+                data.sample_RCALLS[sample] = np.sum(read_calls >= 0)
 
                 # de-duplicate reads
                 read_dists_unique, read_dist_counts = mset.unique_counts(read_dists)
-                sample_read_dists_unique[i] = read_dists_unique
-                sample_read_dist_counts[i] = read_dist_counts
+                data.sample_read_dists_unique[sample] = read_dists_unique
+                data.sample_read_dist_counts[sample] = read_dist_counts
 
-                # assemble haplotypes
+            # end of try clause for specific sample
+            except Exception as e:
+                path = data.sample_bams.get(sample)
+                message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
+                raise SampleAssemblyError(message) from e
+        return data
+
+    def assemble_sample_haplotypes(self, data):
+        """De novo haplotype assembly of each sample.
+
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `locus`, `samples`, `sample_ploidy`, `sample_inbreeding`,
+            `sample_read_dists_unique` and `sample_read_dist_counts`.
+
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `sample_mcmc_trace` and  `sample_mcmc_posterior`.
+        """
+        for sample in data.samples:
+            # wrap in try clause to pass sample info back with any exception
+            try:
                 trace = (
                     DenovoMCMC(
-                        ploidy=self.sample_ploidy[sample],
-                        n_alleles=locus.count_alleles(),
-                        inbreeding=self.sample_inbreeding[sample],
+                        ploidy=data.sample_ploidy[sample],
+                        n_alleles=data.locus.count_alleles(),
+                        inbreeding=data.sample_inbreeding[sample],
                         steps=self.mcmc_steps,
                         chains=self.mcmc_chains,
                         fix_homozygous=self.mcmc_fix_homozygous,
@@ -823,181 +839,466 @@ class program(object):
                         temperatures=self.mcmc_temperatures,
                         random_seed=self.random_seed,
                     )
-                    .fit(read_dists_unique, read_counts=read_dist_counts)
+                    .fit(
+                        data.sample_read_dists_unique[sample],
+                        read_counts=data.sample_read_dist_counts[sample],
+                    )
                     .burn(self.mcmc_burn)
                 )
+                data.sample_mcmc_trace[sample] = trace
+                data.sample_mcmc_posterior[sample] = trace.posterior()
 
-                # posterior mode phenotype is a collection of genotypes
-                phenotype = trace.posterior().mode_phenotype()
+            # end of try clause for specific sample
+            except Exception as e:
+                path = data.sample_bams.get(sample)
+                message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
+                raise SampleAssemblyError(message) from e
+        return data
 
-                # call genotype (array(ploidy, vars), probs)
-                if self.call_best_genotype:
-                    genotype, genotype_prob = phenotype.mode_genotype()
-                else:
-                    genotype, genotype_prob = phenotype.call_phenotype(
-                        self.probability_filter_threshold
+    def call_posterior_haplotypes(self, data):
+        """Call vcf haplotypes based on haplotype posterior probabilities
+        within each samples de novo assembly.
+
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `sample_mcmc_posterior`.
+
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `vcf_haplotypes`.
+        """
+        threshold = self.haplotype_posterior_threshold
+        posteriors = list(data.sample_mcmc_posterior.values())
+        data.vcf_haplotypes = call_posterior_haplotypes(posteriors, threshold=threshold)
+        return data
+
+    def encode_sample_assembly_posterior(self, data):
+        """Encodes each samples assembly posterior as its reported posterior distribution
+        in the VCF output field. If likelihoods are reported they will be calculated from
+        the called haplotypes.
+
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `vcf_haplotypes`, `samples`, `sample_ploidy` `sample_read_dists_unique`,
+            `sample_read_dist_counts`, `sample_mcmc_posterior`.
+
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `sample_GL`, `sample_GP`.
+        """
+        # map of VCF haplotype bytes to allele number
+        haplotype_labels = {h.tobytes(): i for i, h in enumerate(data.vcf_haplotypes)}
+        for sample in data.samples:
+            # wrap in try clause to pass sample info back with any exception
+            try:
+                # only need to calculate likelihoods if they are reported
+                if self.report_genotype_likelihoods:
+                    llks = genotype_likelihoods(
+                        reads=data.sample_read_dists_unique[sample],
+                        read_counts=data.sample_read_dist_counts[sample],
+                        ploidy=data.sample_ploidy[sample],
+                        haplotypes=data.vcf_haplotypes,
                     )
+                    data.sample_GL[sample] = np.round(
+                        natural_log_to_log10(llks), self.precision
+                    )
+                # only need to encode posterior dist if reported
+                if self.report_genotype_posterior:
+                    # calculate size of posterior dist array
+                    n_alleles = len(data.vcf_haplotypes)
+                    ploidy = data.sample_ploidy[sample]
+                    n_genotypes = combinatorics.count_unique_genotypes(
+                        n_alleles, ploidy
+                    )
+                    posterior = np.zeros(n_genotypes, dtype=np.int32)
+                    # encode the mcmc posterior as the vcf posterior
+                    mcmc_post = data.sample_mcmc_posterior[sample]
+                    for genotype, prob in zip(
+                        mcmc_post.genotypes, mcmc_post.probabilities
+                    ):
+                        alleles = _genotype_as_alleles(genotype, haplotype_labels)
+                        # cant encode incomplete genotypes
+                        if np.all(alleles >= 0):
+                            idx = genotype_alleles_as_index(alleles)
+                            posterior[idx] = prob
+                    data.sample_GP[sample] = np.round(posterior, self.precision)
+            except Exception as e:
+                path = data.sample_bams.get(sample)
+                message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
+                raise SampleAssemblyError(message) from e
+        return data
 
-                # per chain modes for QC
+    def call_sample_posteriors(self, data):
+        """Re-calculates and encodes each samples genotype likelihoods and posterior
+        probabilities in VCF order based on the haplotypes called across all samples.
+
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `vcf_haplotypes`, `samples`, `sample_ploidy`, `sample_inbreeding`,
+            `sample_read_dists_unique`, `sample_read_dist_counts`,
+            `sample_mcmc_posterior`.
+
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `sample_log_likelihoods`, `sample_GL`, `sample_posterior_probs`, `sample_GP`.
+        """
+        for sample in data.samples:
+            # wrap in try clause to pass sample info back with any exception
+            try:
+                # calculate likelihoods to generate posteriors
+                llks = genotype_likelihoods(
+                    reads=data.sample_read_dists_unique[sample],
+                    read_counts=data.sample_read_dist_counts[sample],
+                    ploidy=data.sample_ploidy[sample],
+                    haplotypes=data.vcf_haplotypes,
+                )
+                data.sample_log_likelihoods[sample] = llks
+                if self.report_genotype_likelihoods:
+                    data.sample_GL[sample] = np.round(
+                        natural_log_to_log10(llks), self.precision
+                    )
+                # calculate genotype posterior for called haplotypes
+                posterior = genotype_posteriors(
+                    log_likelihoods=llks,
+                    ploidy=data.sample_ploidy[sample],
+                    n_alleles=len(data.vcf_haplotypes),
+                    inbreeding=data.sample_inbreeding[sample],
+                )
+                data.sample_posterior_probs[sample] = posterior
+                if self.report_genotype_posterior:
+                    data.sample_GP[sample] = np.round(posterior, self.precision)
+            # end of try clause for specific sample
+            except Exception as e:
+                path = data.sample_bams.get(sample)
+                message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
+                raise SampleAssemblyError(message) from e
+        return data
+
+    def call_sample_assembly_genotype(self, data):
+        """Call sample genotype alleles and phenotype probs based on
+        its assembly posterior.
+
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `vcf_haplotypes`, `samples`, `sample_mcmc_posterior`.
+
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `sample_genotype`, `sample_alleles`, `sample_GQ`, `sample_GPM`,
+            `sample_PHPM`, `sample_DOSEXP`, `sample_PHQ`.
+        """
+        # map of VCF haplotype bytes to allele number
+        haplotype_labels = {h.tobytes(): i for i, h in enumerate(data.vcf_haplotypes)}
+        for sample in data.samples:
+            # wrap in try clause to pass sample info back with any exception
+            try:
+                phenotype = data.sample_mcmc_posterior[sample].mode_phenotype()
+                # genotype
+                genotype, genotype_prob = phenotype.mode_genotype()
+                alleles = _genotype_as_alleles(genotype, haplotype_labels)
+                # phenotype
+                phenotype_prob = phenotype.probabilities.sum()
+                if np.any(alleles < 0):
+                    # can't order dosage with missing alleles
+                    dosage_expected = np.nan
+                else:
+                    phenotype_alleles = [
+                        _genotype_as_alleles(g, haplotype_labels)
+                        for g in phenotype.genotypes
+                    ]
+                    idx = np.argsort(
+                        [genotype_alleles_as_index(a) for a in phenotype_alleles]
+                    )
+                    dosage_probs = phenotype.probabilities[idx]
+                    dosage_expected = dosage_probs / dosage_probs.sum()
+                # genotype results
+                data.sample_genotype[sample] = genotype
+                data.sample_alleles[sample] = alleles
+                data.sample_GQ[sample] = qual_of_prob(genotype_prob)
+                data.sample_GPM[sample] = np.round(genotype_prob, self.precision)
+                # phenotype results
+                data.sample_PHPM[sample] = np.round(phenotype_prob, self.precision)
+                data.sample_DOSEXP[sample] = np.round(dosage_expected, self.precision)
+                data.sample_PHQ[sample] = qual_of_prob(phenotype_prob)
+            except Exception as e:
+                path = data.sample_bams.get(sample)
+                message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
+                raise SampleAssemblyError(message) from e
+        return data
+
+    def call_sample_posterior_genotype(self, data):
+        """Call sample genotype alleles and phenotype probs based on
+        its posterior distribution over called haplotypes.
+
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `vcf_haplotypes`, `samples`, `sample_ploidy`, `sample_posterior_probs`.
+
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `sample_genotype`, `sample_alleles`, `sample_GQ`, `sample_GPM`,
+            `sample_PHPM`, `sample_DOSEXP`, `sample_PHQ`.
+        """
+        for sample in data.samples:
+            # wrap in try clause to pass sample info back with any exception
+            try:
+                # genotype
+                idx = np.argmax(data.sample_posterior_probs[sample])
+                genotype_prob = data.sample_posterior_probs[sample][idx]
+                ploidy = data.sample_ploidy[sample]
+                alleles = index_as_genotype_alleles(idx, ploidy)
+                genotype = data.vcf_haplotypes[alleles]
+                # phenotype
+                _, phenotype_probs = alternate_dosage_posteriors(
+                    alleles, data.sample_posterior_probs[sample]
+                )
+                # genotype results
+                data.sample_genotype[sample] = genotype
+                data.sample_alleles[sample] = alleles
+                data.sample_GQ[sample] = qual_of_prob(genotype_prob)
+                data.sample_GPM[sample] = np.round(genotype_prob, self.precision)
+                # phenotype stats
+                data.sample_DOSEXP[sample] = np.round(
+                    phenotype_probs / phenotype_probs.sum(), self.precision
+                )
+                data.sample_PHPM[sample] = np.round(
+                    phenotype_probs.sum(), self.precision
+                )
+                data.sample_PHQ[sample] = qual_of_prob(phenotype_probs.sum())
+            except Exception as e:
+                path = data.sample_bams.get(sample)
+                message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
+                raise SampleAssemblyError(message) from e
+        return data
+
+    def compute_genotype_read_comparative_stats(self, data):
+        """Computes some statistics comparing called genotypes and haplotypes
+        to initial read sequences.
+
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `vcf_haplotypes`, `samples`, `sample_read_calls`, `sample_genotype`.
+
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `sample_AD`, `sample_MEC`.
+        """
+        for sample in data.samples:
+            # wrap in try clause to pass sample info back with any exception
+            try:
+                genotype = data.sample_genotype[sample]
+                read_calls = data.sample_read_calls[sample]
+                data.sample_AD[sample] = np.sum(
+                    integer.read_assignment(read_calls, data.vcf_haplotypes) == 1,
+                    axis=0,
+                )
+                data.sample_MEC[sample] = np.sum(
+                    integer.minimum_error_correction(read_calls, genotype)
+                )
+            except Exception as e:
+                path = data.sample_bams.get(sample)
+                message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
+                raise SampleAssemblyError(message) from e
+        return data
+
+    def apply_sample_filters(self, data):
+        """Applies sample filters to each sample.
+
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `samples`, `sample_ploidy`, `sample_read_calls`,
+            `sample_RCOUNT`, `sample_DP`, `sample_PHPM`,
+            `sample_genotype`, `sample_mcmc_trace`.
+
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `sample_FT`.
+        """
+        depth_filter = vcf.filters.SampleDepthFilter(self.depth_filter_threshold)
+        count_filter = vcf.filters.SampleReadCountFilter(
+            self.read_count_filter_threshold
+        )
+        incongruence_filter = vcf.filters.SampleChainPhenotypeIncongruenceFilter(
+            self.incongruence_filter_threshold
+        )
+        cnv_filter = vcf.filters.SampleChainPhenotypeCNVFilter(
+            self.incongruence_filter_threshold
+        )
+        # define call related sample filters
+        kmer_filter = vcf.filters.SampleKmerFilter(
+            self.kmer_filter_k, self.kmer_filter_theshold
+        )
+        prob_filter = vcf.filters.SamplePhenotypeProbabilityFilter(
+            self.probability_filter_threshold
+        )
+
+        for sample in data.samples:
+            # wrap in try clause to pass sample info back with any exception
+            try:
+                # per chain modes for MCMC QC
+                trace = data.sample_mcmc_trace[sample]
                 chain_modes = [
                     dist.mode_phenotype() for dist in trace.chain_posteriors()
                 ]
 
-                # apply filters
-                filterset = vcf.filters.FilterCallSet(
-                    (
-                        prob_filter(phenotype.probabilities.sum()),
-                        depth_filter(read_variant_depth),
-                        count_filter(read_count),
-                        kmer_filter(read_calls, genotype),
-                        incongruence_filter(chain_modes),
-                        cnv_filter(chain_modes),
-                    )
+                filts = (
+                    count_filter(data.sample_RCOUNT[sample]),
+                    depth_filter(data.sample_DP[sample]),
+                    incongruence_filter(chain_modes),
+                    cnv_filter(chain_modes),
+                    kmer_filter(
+                        data.sample_read_calls[sample], data.sample_genotype[sample]
+                    ),
+                    prob_filter(data.sample_PHPM[sample]),
                 )
-                sample_FT[i] = filterset
-
-                # store sample format calls
-                sample_GPM[i] = np.round(genotype_prob, self.precision)
-                sample_PHPM[i] = np.round(phenotype.probabilities.sum(), self.precision)
-                sample_RCALLS[i] = np.sum(read_calls >= 0)
-                sample_GQ[i] = qual_of_prob(genotype_prob)
-                sample_PHQ[i] = qual_of_prob(phenotype.probabilities.sum())
-                sample_MEC[i] = integer.minimum_error_correction(
-                    read_calls, genotype
-                ).sum()
-
-                # record samples without calls and null out uncalled
-                if (not self.call_filtered) and filterset.failed:
-                    sample_called[i] = False
-                    genotype[:] = -1
-                    phenotype.genotypes[:] = -1
-
-                # store genotype and phenotype
-                sample_genotype[i] = genotype
-                sample_phenotype_dist[i] = phenotype
-
+                # combine filters
+                filterset = vcf.filters.FilterCallSet(filts)
+                data.sample_FT[sample] = filterset
             # end of try clause for specific sample
             except Exception as e:
+                path = data.sample_bams.get(sample)
                 message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
                 raise SampleAssemblyError(message) from e
+        return data
 
-        # order VCF alleles
-        vcf_haplotypes, vcf_haplotype_counts = vcf.sort_haplotypes(sample_genotype)
+    def encode_sample_genotype_string(self, data):
+        """Generate vcf GT string.
 
-        # genotype likelihoods and posteriors
-        for i, sample in enumerate(self.samples):
-            if self.report_genotype_likelihoods or self.report_genotype_posterior:
-                llks = genotype_likelihoods(
-                    reads=sample_read_dists_unique[i],
-                    read_counts=sample_read_dist_counts[i],
-                    ploidy=self.sample_ploidy[sample],
-                    haplotypes=vcf_haplotypes,
-                )
-                sample_log_likelihoods[i] = llks
-            if self.report_genotype_likelihoods:
-                sample_GL[i] = np.round(natural_log_to_log10(llks), self.precision)
-            if self.report_genotype_posterior:
-                posterior = genotype_posteriors(
-                    log_likelihoods=llks,
-                    ploidy=self.sample_ploidy[sample],
-                    n_alleles=len(vcf_haplotypes),
-                    inbreeding=self.sample_inbreeding[sample],
-                )
-                sample_posterior_probs[i] = posterior
-                sample_GP[i] = np.round(posterior, self.precision)
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `samples`, `sample_alleles`, `sample_FT`,
 
-        # TODO: recalling genotypes based upon observed haplotypes
-
-        # labeling alleles
-        vcf_haplotypes, vcf_haplotype_counts = vcf.sort_haplotypes(sample_genotype)
-        vcf_alleles = locus.format_haplotypes(vcf_haplotypes)
-        vcf_REF = vcf_alleles[0]
-        vcf_ALTS = vcf_alleles[1:]
-
-        # vcf info fields
-        info_AC = vcf_haplotype_counts[1:]
-        info_AN = np.sum(vcf_haplotype_counts > 0)
-        info_NS = len(self.samples)
-        if not self.call_filtered:
-            info_NS -= sum(ft.failed for ft in sample_FT)
-        info_END = locus.stop
-        info_SNVPOS = np.subtract(locus.positions, locus.start) + 1
-
-        # additional sample data requiring sorted alleles
-        sample_GT = np.empty(n_samples, dtype="O")
-        sample_DOSEXP = np.empty(n_samples, dtype="O")
-        sample_AD = np.empty((n_samples, len(vcf_alleles)), dtype=int)
-
-        for i, sample in enumerate(self.samples):
-            path = sample_bams[sample]
-
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `sample_GT`.
+        """
+        for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
             try:
-
-                if sample_called[i]:
-                    # Return genotype and expected dosage
-                    sample_GT[i] = vcf.genotype_string(
-                        sample_genotype[i], vcf_haplotypes
-                    )
-                    dosage_expected = vcf.expected_dosage(
-                        sample_phenotype_dist[i].genotypes,
-                        sample_phenotype_dist[i].probabilities,
-                        vcf_haplotypes,
-                    )
-                    sample_DOSEXP[i] = np.round(dosage_expected, self.precision)
-                else:
-                    # Return null genotype and expected dosage
-                    sample_GT[i] = "/".join("." * self.sample_ploidy[sample])
-                    sample_DOSEXP[i] = "."
-                # allways return AD
-                sample_AD[i] = np.sum(
-                    integer.read_assignment(sample_read_calls[i], vcf_haplotypes) == 1,
-                    axis=0,
-                )
-
-            # end of try clause for specific sample
+                alleles = data.sample_alleles[sample]
+                if self.hard_filter_genotype_calls and data.sample_FT[sample].failed:
+                    # hard filtering
+                    alleles[:] = -1
+                genotype_string = "/".join([str(a) if a >= 0 else "." for a in alleles])
+                data.sample_GT[sample] = genotype_string
             except Exception as e:
+                path = data.sample_bams.get(sample)
                 message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
                 raise SampleAssemblyError(message) from e
+        return data
 
-        # vcf line formating
-        vcf_INFO = vcf.format_info_field(
-            AN=info_AN,
-            AC=info_AC,
-            NS=info_NS,
-            END=info_END,
-            SNVPOS=info_SNVPOS,
-            AD=sample_AD.sum(axis=0),
-        )
+    def get_record_fields(self, data):
+        """Generate VCF record fields.
 
-        vcf_FORMAT = vcf.format_sample_field(
-            GT=sample_GT,
-            GQ=sample_GQ,
-            PHQ=sample_PHQ,
-            DP=sample_DP,
-            RCOUNT=sample_RCOUNT,
-            RCALLS=sample_RCALLS,
-            MEC=sample_MEC,
-            FT=sample_FT,
-            GPM=sample_GPM,
-            PHPM=sample_PHPM,
-            DOSEXP=sample_DOSEXP,
-            AD=sample_AD,
-            GL=sample_GL,
-            GP=sample_GP,
-        )
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `locus`, `vcf_haplotypes`, `sample_FT`, `sample_alleles`,
+            `sample_AD`.
 
-        return vcf.format_record(
-            chrom=locus.contig,
-            pos=locus.start + 1,  # 0-based BED to 1-based VCF
-            id=locus.name,
-            ref=vcf_REF,
-            alt=vcf_ALTS,
-            qual=None,
-            filter=None,
-            info=vcf_INFO,
-            format=vcf_FORMAT,
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `vcf_REF`, `vcf_ALTS`, `info_END`, `info_SNVPOS`, `info_AC`
+            `info_AN`, `info_NS`, `info_AD`.
+        """
+        # postions
+        data.info_END = data.locus.stop
+        data.info_SNVPOS = np.subtract(data.locus.positions, data.locus.start) + 1
+        # sequences
+        vcf_allele_strings = data.locus.format_haplotypes(data.vcf_haplotypes)
+        data.vcf_REF = vcf_allele_strings[0]
+        data.vcf_ALTS = vcf_allele_strings[
+            1:
+        ]  # if len(vcf_allele_strings) > 0 else None
+        # alt allele counts
+        allele_counts = np.zeros(len(data.vcf_haplotypes), int)
+        for array in data.sample_alleles.values():
+            for a in array:
+                if a >= 0:
+                    allele_counts[a] += 1
+        data.info_AC = allele_counts[1:]  # skip ref count
+        # total number of alleles in called genotypes
+        data.info_AN = np.sum(allele_counts > 0)
+        # number of called samples
+        data.info_NS = np.sum(
+            [np.any(alleles >= 0) for alleles in data.sample_alleles.values()]
         )
+        # total allele depths
+        data.info_AD = np.zeros(len(data.vcf_haplotypes), int)
+        for sample_AD in data.sample_AD.values():
+            data.info_AD += sample_AD
+
+    def assemble_locus(self, sample_bams, locus):
+        """Assembles samples at a locus and formats resulting data
+        into a VCF record line.
+
+        Parameters
+        ----------
+        locus
+            Assembly target locus.
+        samples : list
+            Sample identifiers.
+        sample_bams : dict
+            Map for sample identifiers to bam path.
+        sample_ploidy : dict
+            Map of sample identifiers to ploidy.
+        sample_inbreeding : dict
+            Map of sample identifiers to inbreeding.
+
+        Returns
+        -------
+        vcf_record : str
+            VCF variant line.
+
+        """
+        data = LocusAssemblyData(
+            locus=locus,
+            samples=self.samples,
+            sample_bams=sample_bams,
+            sample_ploidy=self.sample_ploidy,
+            sample_inbreeding=self.sample_inbreeding,
+        )
+        self.encode_sample_reads(data)
+        self.assemble_sample_haplotypes(data)
+        self.call_posterior_haplotypes(data)
+        if self.use_assembly_posteriors:
+            self.encode_sample_assembly_posterior(data)
+            self.call_sample_assembly_genotype(data)
+        else:
+            self.call_sample_posteriors(data)
+            self.call_sample_posterior_genotype(data)
+        self.compute_genotype_read_comparative_stats(data)
+        self.apply_sample_filters(data)
+        self.encode_sample_genotype_string(data)
+        self.get_record_fields(data)
+        return data.format_vcf_record()
+
+    def _assemble_locus_wrapped(self, sample_bams, locus):
+        try:
+            result = self.assemble_locus(sample_bams, locus)
+        except Exception as e:
+            message = _LOCUS_ASSEMBLY_ERROR.format(
+                name=locus.name, contig=locus.contig, start=locus.start, stop=locus.stop
+            )
+            raise LocusAssemblyError(message) from e
+        return result
 
     def _precompile_model(self):
         """Run mcmc model with dummy data using standard types.
@@ -1085,3 +1386,123 @@ class program(object):
         else:
             self._precompile_model()
             self._run_stdout_multi_core()
+
+
+class LocusAssemblyData(object):
+    def __init__(self, locus, samples, sample_bams, sample_ploidy, sample_inbreeding):
+        self.locus = locus
+        self.samples = samples  # list[str]
+        self.sample_bams = sample_bams  # dict[str, str]
+        self.sample_ploidy = sample_ploidy  # dict[str, int]
+        self.sample_inbreeding = sample_inbreeding  # dict[str, float]
+
+        # sample data
+        # integer encoded reads
+        self.sample_read_calls = dict()
+        # unique probabalistic reads
+        self.sample_read_dists_unique = dict()
+        # unique probabalistic read counts
+        self.sample_read_dist_counts = dict()
+        # sample mcmc multi trace
+        self.sample_mcmc_trace = dict()
+        # sample mcmc posterior dist object
+        self.sample_mcmc_posterior = dict()
+        # sample mcm phenotype distribtion object
+        self.sample_phenotype_dist = dict()
+        # sample genotype call haplotypes
+        self.sample_genotype = dict()
+        # sample genotype allele numbers
+        self.sample_alleles = dict()
+        # sample log-likelihoods for G
+        self.sample_log_likelihoods = dict()
+        # sample posterior probabilities for G
+        self.sample_posterior_probs = dict()
+        # sample filter set
+        self.sample_filters = dict()
+
+        # vcf sample data
+        self.sample_RCOUNT = dict()
+        self.sample_DP = dict()
+        self.sample_FT = dict()
+        self.sample_GPM = dict()
+        self.sample_PHPM = dict()
+        self.sample_RCALLS = dict()
+        self.sample_GQ = dict()
+        self.sample_PHQ = dict()
+        self.sample_MEC = dict()
+        self.sample_GL = dict()
+        self.sample_GP = dict()
+        self.sample_GT = dict()
+        self.sample_DOSEXP = dict()
+        self.sample_AD = dict()
+
+        # vcf record data
+        self.vcf_haplotypes = None
+        self.vcf_REF = None
+        self.vcf_ALTS = None
+        self.info_AN = None
+        self.info_AC = None
+        self.info_NS = None
+        self.info_END = None
+        self.info_SNVPOS = None
+
+    def _sample_dict_as_list(self, d):
+        return [d.get(s) for s in self.samples]
+
+    def format_vcf_record(self):
+        vcf_INFO = vcf.format_info_field(
+            AN=self.info_AN,
+            AC=self.info_AC,
+            NS=self.info_NS,
+            END=self.info_END,
+            SNVPOS=self.info_SNVPOS,
+            AD=self.info_AD,
+        )
+        vcf_FORMAT = vcf.format_sample_field(
+            GT=self._sample_dict_as_list(self.sample_GT),
+            GQ=self._sample_dict_as_list(self.sample_GQ),
+            PHQ=self._sample_dict_as_list(self.sample_PHQ),
+            DP=self._sample_dict_as_list(self.sample_DP),
+            RCOUNT=self._sample_dict_as_list(self.sample_RCOUNT),
+            RCALLS=self._sample_dict_as_list(self.sample_RCALLS),
+            MEC=self._sample_dict_as_list(self.sample_MEC),
+            FT=self._sample_dict_as_list(self.sample_FT),
+            GPM=self._sample_dict_as_list(self.sample_GPM),
+            PHPM=self._sample_dict_as_list(self.sample_PHPM),
+            DOSEXP=self._sample_dict_as_list(self.sample_DOSEXP),
+            AD=self._sample_dict_as_list(self.sample_AD),
+            GL=self._sample_dict_as_list(self.sample_GL),
+            GP=self._sample_dict_as_list(self.sample_GP),
+        )
+        return vcf.format_record(
+            chrom=self.locus.contig,
+            pos=self.locus.start + 1,  # 0-based BED to 1-based VCF
+            id=self.locus.name,
+            ref=self.vcf_REF,
+            alt=self.vcf_ALTS,
+            qual=None,
+            filter=None,
+            info=vcf_INFO,
+            format=vcf_FORMAT,
+        )
+
+
+def _genotype_as_alleles(genotype, labels):
+    """Convert a  genotype of haplotype arrays to an array
+    of VCF sorted allele integers.
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, n_positions)
+        Integer encoded genotype.
+    labels : dict[bytes, int]
+        Map of haplotype bytes to allele number e.g.
+        `{h.tobytes(): i for i, h in enumerate(haplotypes)}`.
+
+    Returns
+    -------
+    alleles : ndarray, int, shape (ploidy, )
+        VCF sorted alleles.
+    """
+    alleles = np.sort([labels.get(h.tobytes(), -1) for h in genotype])
+    alleles = np.append(alleles[alleles >= 0], alleles[alleles < 0])
+    return alleles
