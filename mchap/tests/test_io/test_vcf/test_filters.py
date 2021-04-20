@@ -79,18 +79,18 @@ def test_SampleKmerFilter(obj, expect):
     [
         pytest.param(
             filters.SampleDepthFilter(threshold=5),
-            np.array([5, 6, 6, 5]),
+            5.5,
             "PASS",
             id="pass",
         ),
         pytest.param(
             filters.SampleDepthFilter(threshold=6),
-            np.array([5, 6, 6, 5]),
+            5.5,
             "dp6",
             id="fail",
         ),
         pytest.param(
-            filters.SampleDepthFilter(threshold=6), np.array([]), ".", id="not-applied"
+            filters.SampleDepthFilter(threshold=6), np.nan, ".", id="not-applied"
         ),
     ],
 )
