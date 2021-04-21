@@ -1,9 +1,6 @@
 import numpy as np
 import math
 import numba
-import ctypes
-
-from numba.extending import get_cython_function_address
 
 _FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=np.int64)
 
@@ -27,34 +24,6 @@ def factorial_20(x):
         return _FACTORIAL_LOOK_UP[x]
     else:
         raise ValueError("factorial functuion is only supported for values 0 to 20")
-
-
-# modified from https://stackoverflow.com/questions/54850985/fast-algorithm-for-log-gamma-function/54855769#54855769
-# wich in turn was based on https://github.com/numba/numba/issues/3086
-_PTR_gammaln = ctypes.POINTER
-_dble = ctypes.c_double
-_ptr_dble_gammaln = _PTR_gammaln(_dble)
-_gammaln_addr = get_cython_function_address("scipy.special.cython_special", "gammaln")
-_functype_gammaln = ctypes.CFUNCTYPE(_dble, _dble)
-_gammaln_float64 = _functype_gammaln(_gammaln_addr)
-
-
-@numba.njit
-def log_gamma(x):
-    """Returns the natural log of gamma of x.
-
-    Parameters
-    ----------
-    x : float
-        A float.
-
-    Returns
-    -------
-    gammaln : float
-        Natural log of gamma of x
-
-    """
-    return _gammaln_float64(x)
 
 
 @numba.njit

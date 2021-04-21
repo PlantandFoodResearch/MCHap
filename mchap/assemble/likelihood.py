@@ -2,6 +2,7 @@
 
 import numpy as np
 import numba
+from math import lgamma
 
 from mchap.assemble import util
 
@@ -194,8 +195,8 @@ def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
     sum_dispersion = dispersion * unique_haplotypes
 
     # left side of equation in log space
-    num = np.log(util.factorial_20(ploidy)) + util.log_gamma(sum_dispersion)
-    denom = util.log_gamma(ploidy + sum_dispersion)
+    num = np.log(util.factorial_20(ploidy)) + lgamma(sum_dispersion)
+    denom = lgamma(ploidy + sum_dispersion)
     left = num - denom
 
     # right side of equation
@@ -203,8 +204,8 @@ def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
     for i in range(len(dosage)):
         dose = dosage[i]
         if dose > 0:
-            num = util.log_gamma(dose + dispersion)
-            denom = np.log(util.factorial_20(dose)) + util.log_gamma(dispersion)
+            num = lgamma(dose + dispersion)
+            denom = np.log(util.factorial_20(dose)) + lgamma(dispersion)
             prod += num - denom
 
     # return as log probability

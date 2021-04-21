@@ -1,17 +1,9 @@
 import numpy as np
 import math
-import scipy
 import pytest
 
 from mchap.assemble import util
 from mchap.encoding import integer
-
-
-def test_log_gamma():
-    for i in [0.01, 0.2, 0.7, 1, 10, 55, 120, 500, 1000_000, 100_000_000]:
-        actual = util.log_gamma(i)
-        expect = scipy.special.loggamma(i)
-        assert actual == expect
 
 
 def test_add_log_prob():
