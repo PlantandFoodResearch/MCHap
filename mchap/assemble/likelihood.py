@@ -13,7 +13,7 @@ __all__ = [
 ]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def log_likelihood(reads, genotype, read_counts=None):
     """Log likelihood of observed reads given a genotype.
 
@@ -70,7 +70,7 @@ def log_likelihood(reads, genotype, read_counts=None):
     return llk
 
 
-@numba.njit
+@numba.njit(cache=True)
 def log_likelihood_structural_change(
     reads, genotype, haplotype_indices, interval=None, read_counts=None
 ):
@@ -147,7 +147,7 @@ def log_likelihood_structural_change(
     return llk
 
 
-@numba.njit
+@numba.njit(cache=True)
 def log_genotype_null_prior(dosage, unique_haplotypes):
     """Prior probability of a dosage for a non-inbred individual
     assuming all haplotypes are equally probable.
@@ -171,7 +171,7 @@ def log_genotype_null_prior(dosage, unique_haplotypes):
     return np.log(genotype_perms) - log_total_perms
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
     """Dirichlet-Multinomial probability mass function assuming all categories
     (haplotypes) have equal dispersion parameters (alphas).
@@ -212,7 +212,7 @@ def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
     return left + prod
 
 
-@numba.njit
+@numba.njit(cache=True)
 def log_genotype_prior(dosage, unique_haplotypes, inbreeding=0):
     """Prior probability of a dosage for an individual genotype
     assuming all haplotypes are equally probable.

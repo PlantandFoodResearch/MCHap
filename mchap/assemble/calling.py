@@ -19,7 +19,7 @@ __all__ = [
 ]
 
 
-@njit
+@njit(cache=True)
 def increment_genotype(genotype):
     """Increment a genotype of allele numbers to the next genotype
     in VCF sort order.
@@ -55,7 +55,7 @@ def increment_genotype(genotype):
     genotype[0:-1] = 0
 
 
-@njit
+@njit(cache=True)
 def _genotype_likelihoods(reads, ploidy, haplotypes, n_genotypes, read_counts=None):
     likelihoods = np.full(n_genotypes, np.nan, np.float32)
     genotype = np.zeros(ploidy, np.int64)
@@ -98,7 +98,7 @@ def genotype_likelihoods(reads, ploidy, haplotypes, read_counts=None):
     )
 
 
-@njit
+@njit(cache=True)
 def genotype_posteriors(log_likelihoods, ploidy, n_alleles, inbreeding=0):
     """Calculate posterior probability of every possible genotype
     for a given set of likelihoods, ploidy, and number of alleles.

@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def random_breaks(breaks, n):
     """Return a set of randomly selected non-overlapping
     intervals which cover a sequence of length n.
@@ -68,7 +68,7 @@ def random_breaks(breaks, n):
     return intervals
 
 
-@numba.njit
+@numba.njit(cache=True)
 def structural_change(genotype, haplotype_indices, interval=None):
     """Mutate genotype by re-arranging haplotypes
     within a given interval.
@@ -112,7 +112,7 @@ def structural_change(genotype, haplotype_indices, interval=None):
             genotype[h, j] = cache[haplotype_indices[h]]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def recombination_step_n_options(labels):
     """Calculate number of unique haplotype recombination options.
 
@@ -159,7 +159,7 @@ def recombination_step_n_options(labels):
     return n
 
 
-@numba.njit
+@numba.njit(cache=True)
 def recombination_step_options(labels):
     """Calculate number of unique haplotype recombination options.
 
@@ -219,7 +219,7 @@ def recombination_step_options(labels):
     return options[0:opt]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def dosage_step_n_options(labels):
     """Calculate the number of alternative dosages within
     one steps distance.
@@ -278,7 +278,7 @@ def dosage_step_n_options(labels):
     return n
 
 
-@numba.njit
+@numba.njit(cache=True)
 def dosage_step_options(labels):
     """Calculate the number of alternative dosages within
     one steps distance.
@@ -348,7 +348,7 @@ def dosage_step_options(labels):
     return options[0:opt]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _label_haplotypes(labels, genotype, interval=None):
     """Label each haplotype in a genotype with
     the index of its first occurance.
@@ -398,7 +398,7 @@ def _label_haplotypes(labels, genotype, interval=None):
                         labels[k] = j
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _interval_inverse_mask(interval, n):
     """Return a boolean vector of True values outside
     of the specified interval.
@@ -428,7 +428,7 @@ def _interval_inverse_mask(interval, n):
     return mask
 
 
-@numba.njit
+@numba.njit(cache=True)
 def haplotype_segment_labels(genotype, interval=None):
     """Create a labels matrix in whihe the first coloumn contains
     labels for haplotype segments within the specified range and
@@ -468,7 +468,7 @@ def haplotype_segment_labels(genotype, interval=None):
     return labels
 
 
-@numba.njit
+@numba.njit(cache=True)
 def interval_step(
     genotype,
     reads,
@@ -604,7 +604,7 @@ def interval_step(
     return llk
 
 
-@numba.njit
+@numba.njit(cache=True)
 def compound_step(
     genotype,
     reads,

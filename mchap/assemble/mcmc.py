@@ -250,7 +250,7 @@ class DenovoMCMC(Assembler):
             return template, llks
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _denovo_gibbs_sampler(
     *,
     genotype,

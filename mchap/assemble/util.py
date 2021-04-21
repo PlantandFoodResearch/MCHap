@@ -5,7 +5,7 @@ import numba
 _FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=np.int64)
 
 
-@numba.njit
+@numba.njit(cache=True)
 def factorial_20(x):
     """Returns the factorial of integers in the range [0, 20] (inclusive)
 
@@ -26,7 +26,7 @@ def factorial_20(x):
         raise ValueError("factorial functuion is only supported for values 0 to 20")
 
 
-@numba.njit
+@numba.njit(cache=True)
 def interval_as_range(interval, max_range):
     # TODO: inline this into the callers and remove
     if interval is None:
@@ -38,7 +38,7 @@ def interval_as_range(interval, max_range):
             raise ValueError("Interval must be `None` or array of length 2")
 
 
-@numba.njit
+@numba.njit(cache=True)
 def add_log_prob(x, y):
     """Sum of two probabilities in log space.
 
@@ -59,7 +59,7 @@ def add_log_prob(x, y):
         return y + np.log1p(np.exp(x - y))
 
 
-@numba.njit
+@numba.njit(cache=True)
 def sum_log_probs(array):
     """Sum of values in log space.
 
@@ -80,7 +80,7 @@ def sum_log_probs(array):
     return acumulate
 
 
-@numba.njit
+@numba.njit(cache=True)
 def normalise_log_probs(llks):
     """Returns normalised probabilities of
     an array of log-transformed probabilities.
@@ -107,7 +107,7 @@ def normalise_log_probs(llks):
     return normalised
 
 
-@numba.njit
+@numba.njit(cache=True)
 def random_choice(probabilities):
     """Random choice of options given a set of probabilities.
 
@@ -125,7 +125,7 @@ def random_choice(probabilities):
     return np.searchsorted(np.cumsum(probabilities), np.random.random(), side="right")
 
 
-@numba.njit
+@numba.njit(cache=True)
 def greedy_choice(probabilities):
     """Greedy choice of options given a set of probabilities.
 
@@ -143,7 +143,7 @@ def greedy_choice(probabilities):
     return np.argmax(probabilities)
 
 
-@numba.njit
+@numba.njit(cache=True)
 def array_equal(x, y, interval=None):
     """Check if two one-dimentional integer arrays are equal.
 
@@ -169,7 +169,7 @@ def array_equal(x, y, interval=None):
     return True
 
 
-@numba.njit
+@numba.njit(cache=True)
 def count_haplotype_copies(genotype, h):
     ploidy = len(genotype)
     count = 1
@@ -182,7 +182,7 @@ def count_haplotype_copies(genotype, h):
     return count
 
 
-@numba.njit
+@numba.njit(cache=True)
 def get_dosage(dosage, genotype, interval=None):
     """Calculates the dosage of a set of integer encoded haplotypes by
     checking for array equality.
@@ -229,7 +229,7 @@ def get_dosage(dosage, genotype, interval=None):
                         dosage[p] = 0
 
 
-@numba.njit
+@numba.njit(cache=True)
 def set_dosage(genotype, dosage):
     """Set a genotype to a new dosage.
 
@@ -272,7 +272,7 @@ def set_dosage(genotype, dosage):
                     dosage[h_y] += 1
 
 
-@numba.njit
+@numba.njit(cache=True)
 def n_choose_k(n, k):
     """Calculate n choose k for values of n and k < 20.
     Parameters
@@ -296,7 +296,7 @@ def n_choose_k(n, k):
     return factorial_20(n) // (factorial_20(k) * factorial_20(n - k))
 
 
-@numba.njit
+@numba.njit(cache=True)
 def count_equivalent_permutations(dosage):
     """Counts the total number of equivilent genotype perterbations
     based on the genotypes dosage.
@@ -321,7 +321,7 @@ def count_equivalent_permutations(dosage):
     return numerator // denominator
 
 
-@numba.njit
+@numba.njit(cache=True)
 def sample_alleles(array, dtype=np.int8):
     """Sample a random set of alleles from probabilities.
 
@@ -358,19 +358,19 @@ def sample_alleles(array, dtype=np.int8):
     return alleles.reshape(shape)
 
 
-@numba.njit
+@numba.njit(cache=True)
 def natural_log_to_log10(x):
     e = np.exp(1)
     return x * np.log10(e)
 
 
-@numba.njit
+@numba.njit(cache=True)
 def seed_numba(seed):
     """Set numba random seed"""
     np.random.seed(seed)
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _greatest_common_denominatior(x: int, y: int) -> int:
     while y != 0:
         t = x % y
@@ -379,7 +379,7 @@ def _greatest_common_denominatior(x: int, y: int) -> int:
     return x
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _comb(n: int, k: int) -> int:
     if k > n:
         return 0
@@ -393,13 +393,13 @@ def _comb(n: int, k: int) -> int:
     return r
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _comb_with_replacement(n: int, k: int) -> int:
     n = n + k - 1
     return _comb(n, k)
 
 
-@numba.njit
+@numba.njit(cache=True)
 def genotype_alleles_as_index(alleles):
     """Convert genotypes to the index of their array position
     following the VCF specification for fields of length G.
@@ -425,7 +425,7 @@ def genotype_alleles_as_index(alleles):
     return index
 
 
-@numba.njit
+@numba.njit(cache=True)
 def index_as_genotype_alleles(index, ploidy):
     """Convert the index of a genotype sort position to the
     genotype call indicated by that index following the VCF

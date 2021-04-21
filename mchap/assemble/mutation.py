@@ -10,7 +10,7 @@ from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
 __all__ = ["base_step", "compound_step"]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def base_step(
     genotype,
     reads,
@@ -139,7 +139,7 @@ def base_step(
     return llks[choice]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def compound_step(
     genotype,
     reads,

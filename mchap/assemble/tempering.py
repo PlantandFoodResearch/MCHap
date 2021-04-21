@@ -7,7 +7,7 @@ from mchap.assemble.likelihood import log_genotype_prior
 __all__ = ["chain_swap_step"]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def chain_swap_acceptance(
     llk_i,
     log_prior_i,
@@ -58,7 +58,7 @@ def chain_swap_acceptance(
     return acceptance_ratio
 
 
-@numba.njit
+@numba.njit(cache=True)
 def chain_swap_step(
     genotype_i,
     llk_i,
