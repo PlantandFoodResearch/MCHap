@@ -7,10 +7,14 @@ usage: MCMC haplotype assembly [-h] [--targets TARGETS] [--variants VARIANTS]
                                [--sample-inbreeding SAMPLE_INBREEDING]
                                [--base-error-rate BASE_ERROR_RATE]
                                [--ignore-base-phred-scores]
+                               [--haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD]
                                [--mapping-quality MAPPING_QUALITY]
                                [--keep-duplicate-reads] [--keep-qcfail-reads]
-                               [--keep-supplementary-reads] [--best-genotype]
-                               [--call-filtered] [--mcmc-chains MCMC_CHAINS]
+                               [--keep-supplementary-reads] [--hard-filter]
+                               [--genotype-likelihoods]
+                               [--genotype-posteriors]
+                               [--use-assembly-posteriors]
+                               [--mcmc-chains MCMC_CHAINS]
                                [--mcmc-temperatures [MCMC_TEMPERATURES [MCMC_TEMPERATURES ...]]]
                                [--mcmc-steps MCMC_STEPS]
                                [--mcmc-burn MCMC_BURN]
@@ -19,13 +23,11 @@ usage: MCMC haplotype assembly [-h] [--targets TARGETS] [--variants VARIANTS]
                                [--mcmc-recombination-step-probability MCMC_RECOMBINATION_STEP_PROBABILITY]
                                [--mcmc-partial-dosage-step-probability MCMC_PARTIAL_DOSAGE_STEP_PROBABILITY]
                                [--mcmc-dosage-step-probability MCMC_DOSAGE_STEP_PROBABILITY]
+                               [--mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD]
                                [--filter-depth FILTER_DEPTH]
                                [--filter-read-count FILTER_READ_COUNT]
-                               [--filter-probability FILTER_PROBABILITY]
                                [--filter-kmer-k FILTER_KMER_K]
                                [--filter-kmer FILTER_KMER]
-                               [--filter-chain-incongruence FILTER_CHAIN_INCONGRUENCE]
-                               [--genotype-likelihoods]
                                [--read-group-field READ_GROUP_FIELD]
                                [--cores CORES]
 
@@ -86,6 +88,16 @@ optional arguments:
                         for greater de-duplication of reads however an error
                         rate > 0.0 must be specified with the --base-error-
                         rate argument.
+  --haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD
+                        Posterior probability required for a haplotype to be
+                        included in the output VCF as an alternative allele.
+                        The posterior probability of haplotypes is assessed
+                        per sample and calculated as the probability ot that
+                        haplotype being present with one or more copies in
+                        that individual.This parameter is the main mechanism
+                        to control the number of alternate alleles in ech VCF
+                        record and hence the breadth of likelihoods and
+                        posterior distributions (default = 0.20).
   --mapping-quality MAPPING_QUALITY
                         Minimum mapping quality of reads used in assembly
                         (default = 20).
@@ -97,16 +109,27 @@ optional arguments:
   --keep-supplementary-reads
                         Flag: Use reads marked as supplementary in the
                         assembly (these are skipped by default).
-  --best-genotype       Flag: allways call the best supported complete
-                        genotype within a called phenotype. This may result in
-                        calling genotypes with a posterior probability less
-                        than --filter-probability however a phenotype
-                        probability of >= --filter-probability is still
-                        required.
-  --call-filtered       Flag: include genotype calls for filtered samples.
-                        Sample filter tags will still indicate samples that
-                        have been filtered. WARNING: this can result in a
-                        large VCF file with un-informative genotype calls.
+  --hard-filter         Flag: hard filter genotypes. By default filters are
+                        applied softly so that a sample will still have a
+                        genotype call if filtered. This flag will hard filter
+                        the genotype calls so that filtered calls will have
+                        their alleles replaced with null alleles ('.').
+  --genotype-likelihoods
+                        Flag: Report genotype likelihoods in the GL VCF field.
+  --genotype-posteriors
+                        Flag: Report genotype posterior probabilities in the
+                        GP VCF field.
+  --use-assembly-posteriors
+                        Flag: Use posterior probabilities from each
+                        individuals assembly rather than recomputing
+                        posteriors based on the observed alleles across all
+                        samples. These posterior probabilities will be used to
+                        call genotypes , metrics related to the genotype, and
+                        the posterior distribution (GP field) if specified.
+                        This may lead to less robust genotype calls in the
+                        presence of multi-modality and hence it is recommended
+                        to run the simulation for longer or using parallel-
+                        tempering when using this option.
   --mcmc-chains MCMC_CHAINS
                         Number of independent MCMC chains per assembly
                         (default = 2).
@@ -142,6 +165,10 @@ optional arguments:
   --mcmc-dosage-step-probability MCMC_DOSAGE_STEP_PROBABILITY
                         Probability of performing a dosage sub-step during
                         each step of the MCMC. (default = 1.0).
+  --mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD
+                        Posterior phenotype probability threshold for
+                        identification of incongruent posterior modes (default
+                        = 0.60).
   --filter-depth FILTER_DEPTH
                         Minimum sample read depth required to include an
                         assembly result (default = 5.0). Read depth is
@@ -151,24 +178,12 @@ optional arguments:
                         Minimum number of read (pairs) required within a
                         target interval in order to include an assembly result
                         (default = 5).
-  --filter-probability FILTER_PROBABILITY
-                        Minimum sample assembly posterior probability required
-                        to call a phenotype i.e. a set of unique haplotypes of
-                        unknown dosage (default = 0.95). Genotype dosage will
-                        be called or partially called if it also exceeds this
-                        threshold. See also the --best-genotype flag.
   --filter-kmer-k FILTER_KMER_K
                         Size of variant kmer used to filter assembly results
                         (default = 3).
   --filter-kmer FILTER_KMER
                         Minimum kmer representation required at each position
                         in assembly results (default = 0.90).
-  --filter-chain-incongruence FILTER_CHAIN_INCONGRUENCE
-                        Posterior phenotype probability threshold for
-                        identification of incongruent posterior modes (default
-                        = 0.60).
-  --genotype-likelihoods
-                        Flag: report genotype likelihoods in the GL VCF field.
   --read-group-field READ_GROUP_FIELD
                         Read group field to use as sample id (default = "SM").
                         The chosen field determines tha sample ids required in
