@@ -80,7 +80,6 @@ class program(object):
     mcmc_dosage_step_probability: bool = 1.0
     depth_filter_threshold: float = 5.0
     read_count_filter_threshold: int = 5
-    probability_filter_threshold: float = 0.95
     kmer_filter_k: int = 3
     kmer_filter_theshold: float = 0.90
     incongruence_filter_threshold: float = 0.60
@@ -470,21 +469,6 @@ class program(object):
         )
 
         parser.add_argument(
-            "--filter-probability",
-            type=float,
-            nargs=1,
-            default=[0.95],
-            help=(
-                "Minimum sample assembly posterior probability required to call "
-                "a phenotype i.e. a set of unique haplotypes of unknown dosage "
-                "(default = 0.95). "
-                "Genotype dosage will be called or partially called if it also exceeds "
-                "this threshold. "
-                "See also the --best-genotype flag."
-            ),
-        )
-
-        parser.add_argument(
             "--filter-kmer-k",
             type=int,
             nargs=1,
@@ -636,7 +620,6 @@ class program(object):
             mcmc_dosage_step_probability=args.mcmc_dosage_step_probability[0],
             depth_filter_threshold=args.filter_depth[0],
             read_count_filter_threshold=args.filter_read_count[0],
-            probability_filter_threshold=args.filter_probability[0],
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
             incongruence_filter_threshold=args.filter_chain_incongruence[0],
@@ -681,9 +664,6 @@ class program(object):
             vcf.filters.SampleKmerFilter(self.kmer_filter_k, self.kmer_filter_theshold),
             vcf.filters.SampleDepthFilter(self.depth_filter_threshold),
             vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold),
-            vcf.filters.SamplePhenotypeProbabilityFilter(
-                self.probability_filter_threshold
-            ),
             vcf.filters.SampleChainPhenotypeIncongruenceFilter(
                 self.incongruence_filter_threshold
             ),
@@ -1115,9 +1095,6 @@ class program(object):
         kmer_filter = vcf.filters.SampleKmerFilter(
             self.kmer_filter_k, self.kmer_filter_theshold
         )
-        prob_filter = vcf.filters.SamplePhenotypeProbabilityFilter(
-            self.probability_filter_threshold
-        )
 
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
@@ -1136,7 +1113,6 @@ class program(object):
                     kmer_filter(
                         data.sample_read_calls[sample], data.sample_genotype[sample]
                     ),
-                    prob_filter(data.sample_PHPM[sample]),
                 )
                 # combine filters
                 filterset = vcf.filters.FilterCallSet(filts)
