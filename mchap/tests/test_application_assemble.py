@@ -222,9 +222,6 @@ def test_Program__header():
         '##FILTER=<ID=3m90,Description="Less than 90.0 percent of read-variant 3-mers represented in haplotypes">',
         '##FILTER=<ID=dp5,Description="Sample has mean read depth less than 5.0">',
         '##FILTER=<ID=rc5,Description="Sample has read (pair) count of less than 5.0">',
-        '##FILTER=<ID=pp95,Description="Samples phenotype posterior probability less than 0.95">',
-        '##FILTER=<ID=mci60,Description="Replicate Markov chains found incongruent phenotypes with posterior probability greater than 0.6">',
-        '##FILTER=<ID=cnv60,Description="Combined chains found more haplotypes than ploidy with posterior probability greater than 0.6">',
     ]
     filters_actual = [line for line in header if line.startswith("##FILTER")]
     assert filters_actual == filters_expect
