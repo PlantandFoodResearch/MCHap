@@ -82,7 +82,7 @@ class program(object):
     read_count_filter_threshold: int = 5
     kmer_filter_k: int = 3
     kmer_filter_theshold: float = 0.90
-    incongruence_filter_threshold: float = 0.60
+    mcmc_incongruence_threshold: float = 0.60
     haplotype_posterior_threshold: float = 0.2
     use_assembly_posteriors: bool = False
     report_genotype_likelihoods: bool = False
@@ -445,6 +445,17 @@ class program(object):
         )
 
         parser.add_argument(
+            "--mcmc-chain-incongruence-threshold",
+            type=float,
+            nargs=1,
+            default=[0.60],
+            help=(
+                "Posterior phenotype probability threshold for identification of "
+                "incongruent posterior modes (default = 0.60)."
+            ),
+        )
+
+        parser.add_argument(
             "--filter-depth",
             type=float,
             nargs=1,
@@ -486,17 +497,6 @@ class program(object):
             help=(
                 "Minimum kmer representation required at each position in assembly "
                 "results (default = 0.90)."
-            ),
-        )
-
-        parser.add_argument(
-            "--filter-chain-incongruence",
-            type=float,
-            nargs=1,
-            default=[0.60],
-            help=(
-                "Posterior phenotype probability threshold for identification of "
-                "incongruent posterior modes (default = 0.60)."
             ),
         )
 
@@ -622,7 +622,7 @@ class program(object):
             read_count_filter_threshold=args.filter_read_count[0],
             kmer_filter_k=args.filter_kmer_k[0],
             kmer_filter_theshold=args.filter_kmer[0],
-            incongruence_filter_threshold=args.filter_chain_incongruence[0],
+            mcmc_incongruence_threshold=args.mcmc_chain_incongruence_threshold[0],
             use_assembly_posteriors=args.use_assembly_posteriors,
             haplotype_posterior_threshold=args.haplotype_posterior_threshold[0],
             report_genotype_likelihoods=args.genotype_likelihoods,
@@ -664,12 +664,6 @@ class program(object):
             vcf.filters.SampleKmerFilter(self.kmer_filter_k, self.kmer_filter_theshold),
             vcf.filters.SampleDepthFilter(self.depth_filter_threshold),
             vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold),
-            vcf.filters.SampleChainPhenotypeIncongruenceFilter(
-                self.incongruence_filter_threshold
-            ),
-            vcf.filters.SampleChainPhenotypeCNVFilter(
-                self.incongruence_filter_threshold
-            ),
         ]
 
         info_fields = [
@@ -694,6 +688,7 @@ class program(object):
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PHPM,
+            vcf.formatfields.MCI,
             vcf.formatfields.AD,
             vcf.formatfields.GL,
             vcf.formatfields.GP,
@@ -785,7 +780,7 @@ class program(object):
         Returns
         -------
         data : LocusAssemblyData
-            With `sample_mcmc_trace` and  `sample_mcmc_posterior`.
+            With `sample_mcmc_trace`,  `sample_mcmc_posterior` and `sample_MCI`.
         """
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
@@ -812,6 +807,9 @@ class program(object):
                 )
                 data.sample_mcmc_trace[sample] = trace
                 data.sample_mcmc_posterior[sample] = trace.posterior()
+                data.sample_MCI[sample] = trace.replicate_incongruence(
+                    threshold=self.mcmc_incongruence_threshold
+                )
 
             # end of try clause for specific sample
             except Exception as e:
@@ -1085,12 +1083,6 @@ class program(object):
         count_filter = vcf.filters.SampleReadCountFilter(
             self.read_count_filter_threshold
         )
-        incongruence_filter = vcf.filters.SampleChainPhenotypeIncongruenceFilter(
-            self.incongruence_filter_threshold
-        )
-        cnv_filter = vcf.filters.SampleChainPhenotypeCNVFilter(
-            self.incongruence_filter_threshold
-        )
         # define call related sample filters
         kmer_filter = vcf.filters.SampleKmerFilter(
             self.kmer_filter_k, self.kmer_filter_theshold
@@ -1099,17 +1091,9 @@ class program(object):
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
             try:
-                # per chain modes for MCMC QC
-                trace = data.sample_mcmc_trace[sample]
-                chain_modes = [
-                    dist.mode_phenotype() for dist in trace.chain_posteriors()
-                ]
-
                 filts = (
                     count_filter(data.sample_RCOUNT[sample]),
                     depth_filter(data.sample_DP[sample]),
-                    incongruence_filter(chain_modes),
-                    cnv_filter(chain_modes),
                     kmer_filter(
                         data.sample_read_calls[sample], data.sample_genotype[sample]
                     ),
@@ -1367,6 +1351,7 @@ class LocusAssemblyData(object):
         self.sample_GT = dict()
         self.sample_DOSEXP = dict()
         self.sample_AD = dict()
+        self.sample_MCI = dict()
 
         # vcf record data
         self.vcf_haplotypes = None
@@ -1406,6 +1391,7 @@ class LocusAssemblyData(object):
             FT=self._sample_dict_as_list(self.sample_FT),
             GPM=self._sample_dict_as_list(self.sample_GPM),
             PHPM=self._sample_dict_as_list(self.sample_PHPM),
+            MCI=self._sample_dict_as_list(self.sample_MCI),
             AD=self._sample_dict_as_list(self.sample_AD),
             GL=self._sample_dict_as_list(self.sample_GL),
             GP=self._sample_dict_as_list(self.sample_GP),

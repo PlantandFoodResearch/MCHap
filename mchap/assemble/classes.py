@@ -344,3 +344,39 @@ class GenotypeMultiTrace(object):
             posterior = PosteriorGenotypeDistribution(states[idx], probs[idx])
             posteriors[chain] = posterior
         return posteriors
+
+    def replicate_incongruence(self, threshold=0.6):
+        """Identifies incongruence between replicate Markov chains.
+
+        Parameters
+        ----------
+        threshold : float
+            Posterior probability required for a chain to be compaired to others.
+
+        Returns
+        -------
+        Incongruence : int
+            0, 1 or 2 indicating no incongruence, incongruence, or incongruence
+            potentially caused by copy-number variation.
+
+        Notes
+        -----
+        A non-replicated MCMC will always return 0.
+        """
+        out = 0
+        chain_modes = [dist.mode_phenotype() for dist in self.chain_posteriors()]
+        alleles = [
+            mode.alleles()
+            for mode in chain_modes
+            if mode.probabilities.sum() >= threshold
+        ]
+        # check for more than one mode
+        mode_count = len({array.tobytes() for array in alleles})
+        if mode_count > 1:
+            out = 1
+            # check for more than ploidy alleles
+            ploidy = len(alleles[0])
+            allele_count = len(reduce(mset.union, alleles))
+            if allele_count > ploidy:
+                out = 2
+        return out

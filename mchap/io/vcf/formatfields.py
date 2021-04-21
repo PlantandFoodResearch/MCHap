@@ -67,6 +67,18 @@ GL = FormatField(id="GL", number="G", type="Float", descr="Genotype likelihoods"
 GP = FormatField(
     id="GP", number="G", type="Float", descr="Genotype posterior probabilities"
 )
+MCI = FormatField(
+    id="MCI",
+    number=1,
+    type="Integer",
+    descr="Replicate Markov-chain incongruence, 0 = none, 1 = incongruence, 2 = putative CNV",
+)
+MCAP = FormatField(
+    id="MCAP",
+    number="R",
+    type="Float",
+    descr="Posterior probability of allele-presence from assembly MCMC",
+)
 
 
 def haplotype_depth(variant_depths):
