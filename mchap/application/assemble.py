@@ -250,6 +250,23 @@ class program(object):
         )
 
         parser.add_argument(
+            "--haplotype-posterior-threshold",
+            type=float,
+            nargs=1,
+            default=[0.20],
+            help=(
+                "Posterior probability required for a haplotype to be included in "
+                "the output VCF as an alternative allele. "
+                "The posterior probability of haplotypes is assessed per sample "
+                "and calculated as the probability ot that haplotype being present "
+                "with one or more copies in that individual."
+                "This parameter is the main mechanism to control the number of "
+                "alternate alleles in ech VCF record and hence the breadth "
+                "of likelihoods and posterior distributions (default = 0.20)."
+            ),
+        )
+
+        parser.add_argument(
             "--mapping-quality",
             nargs=1,
             type=int,
@@ -300,6 +317,38 @@ class program(object):
                 "softly so that a sample will still have a genotype call if filtered. "
                 "This flag will hard filter the genotype calls so that filtered calls "
                 "will have their alleles replaced with null alleles ('.')."
+            ),
+        )
+
+        parser.set_defaults(genotype_likelihoods=False)
+        parser.add_argument(
+            "--genotype-likelihoods",
+            dest="genotype_likelihoods",
+            action="store_true",
+            help=("Flag: Report genotype likelihoods in the GL VCF field."),
+        )
+
+        parser.set_defaults(genotype_posteriors=False)
+        parser.add_argument(
+            "--genotype-posteriors",
+            dest="genotype_posteriors",
+            action="store_true",
+            help=("Flag: Report genotype posterior probabilities in the GP VCF field."),
+        )
+
+        parser.set_defaults(use_assembly_posteriors=False)
+        parser.add_argument(
+            "--use-assembly-posteriors",
+            dest="use_assembly_posteriors",
+            action="store_true",
+            help=(
+                "Flag: Use posterior probabilities from each individuals "
+                "assembly rather than recomputing posteriors based on the "
+                "observed alleles across all samples. "
+                "This may lead to less robust genotype calls in the presence "
+                "of multi-modality and hence it is recommended to run the "
+                "simulation for longer or using parallel-tempering when "
+                "using this option."
             ),
         )
 
@@ -465,55 +514,6 @@ class program(object):
                 "Posterior phenotype probability threshold for identification of "
                 "incongruent posterior modes (default = 0.60)."
             ),
-        )
-
-        parser.add_argument(
-            "--haplotype-posterior-threshold",
-            type=float,
-            nargs=1,
-            default=[0.20],
-            help=(
-                "Posterior probability required for a haplotype to be included in "
-                "the output VCF as an alternative allele. "
-                "The posterior probability of haplotypes is assessed per sample "
-                "and calculated as the probability ot that haplotype being present "
-                "with one or more copies in that individual."
-                "This parameter is the main mechanism to control the number of "
-                "alternate alleles in ech VCF record and hence the breadth "
-                "of likelihoods and posterior distributions (default = 0.20)."
-            ),
-        )
-
-        parser.set_defaults(use_assembly_posteriors=False)
-        parser.add_argument(
-            "--use-assembly-posteriors",
-            dest="use_assembly_posteriors",
-            action="store_true",
-            help=(
-                "Flag: Use posterior probabilities from each individuals "
-                "assembly rather than recomputing posteriors based on the "
-                "observed alleles across all samples. "
-                "This may lead to less robust genotype calls in the presence "
-                "of multi-modality and hence it is recommended to run the "
-                "simulation for longer or using parallel-tempering when "
-                "using this option."
-            ),
-        )
-
-        parser.set_defaults(genotype_likelihoods=False)
-        parser.add_argument(
-            "--genotype-likelihoods",
-            dest="genotype_likelihoods",
-            action="store_true",
-            help=("Flag: Report genotype likelihoods in the GL VCF field."),
-        )
-
-        parser.set_defaults(genotype_posteriors=False)
-        parser.add_argument(
-            "--genotype-posteriors",
-            dest="genotype_posteriors",
-            action="store_true",
-            help=("Flag: Report genotype posterior probabilities in the GP VCF field."),
         )
 
         parser.add_argument(
