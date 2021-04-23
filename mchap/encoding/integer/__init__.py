@@ -1,7 +1,12 @@
 from .sequence import is_gap, is_call, is_valid, argsort, sort, depth
 from .transcode import as_probabilistic, from_strings, as_strings, as_characters
 from .kmer import iter_kmers, kmer_counts, kmer_positions, kmer_frequency
-from .stats import minimum_error_correction, read_assignment, kmer_representation
+from .stats import (
+    minimum_error_correction,
+    read_assignment,
+    kmer_representation,
+    min_kmer_coverage,
+)
 
 __all__ = [
     "is_gap",
@@ -21,4 +26,5 @@ __all__ = [
     "kmer_positions",
     "kmer_frequency",
     "kmer_representation",
+    "min_kmer_coverage",
 ]

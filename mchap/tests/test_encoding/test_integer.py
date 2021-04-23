@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from mchap.encoding import integer
 
@@ -112,3 +113,61 @@ def read_assignment():
     query = integer.read_assignment(reads, genotype)
     answer = np.array([[1.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 1.0]])
     np.testing.assert_array_equal(answer, query)
+
+
+@pytest.mark.parametrize(
+    "reads,genotype,ks,expect",
+    [
+        (
+            [
+                [0, 0],
+                [1, 1],
+                [1, 1],
+            ],
+            [
+                [0, 0],
+                [1, 1],
+            ],
+            [1, 2, 3],
+            [1, 1, np.nan],
+        ),
+        (
+            [
+                [1, 1, 1],
+                [1, 1, 1],
+                [1, 1, 1],
+            ],
+            [
+                [1, 1, 1],
+                [1, 1, 1],
+            ],
+            [1, 2, 3],
+            [1, 1, 1],
+        ),
+        (
+            [
+                [1, 1, 1, 1, -1],  # matching
+                [1, 1, 1, 1, -1],
+                [1, 1, 1, 1, -1],
+                [1, 2, 1, -1, -1],  # non-matching
+                [1, 2, 1, -1, -1],
+                [1, 2, 1, -1, -1],
+            ],
+            [
+                [1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1],
+                [1, 2, 2, 1, 1],
+                [1, 2, 2, 1, 1],
+            ],
+            [1, 2, 3, 4, 5, 6],
+            [1, 0.5, 0.5, 1, np.nan, np.nan],
+        ),
+    ],
+)
+def test_min_kmer_coverage(reads, genotype, ks, expect):
+    reads = np.array(reads, int)
+    genotype = np.array(genotype, int)
+    expect = np.array(expect, float)
+    actual = integer.min_kmer_coverage(reads, genotype, ks=ks)
+    print(actual)
+    np.testing.assert_array_equal(expect, actual)

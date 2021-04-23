@@ -73,6 +73,12 @@ MCI = FormatField(
     type="Integer",
     descr="Replicate Markov-chain incongruence, 0 = none, 1 = incongruence, 2 = putative CNV",
 )
+KMERCOV = FormatField(
+    id="KMERCOV",
+    number=3,
+    type="Float",
+    descr="Minimum proportion of read-SNV 1-, 2-, and 3-mers found in genotype at any position.",
+)
 MCAP = FormatField(
     id="MCAP",
     number="R",

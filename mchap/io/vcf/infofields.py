@@ -33,6 +33,12 @@ AN = InfoField(
 AF = InfoField(id="AF", number="A", type="Float", descr="Allele Frequency")
 AA = InfoField(id="AA", number=1, type="String", descr="Ancestral allele")
 END = InfoField(id="END", number=1, type="Integer", descr="End position on CHROM")
+NVAR = InfoField(
+    id="NVAR",
+    number=1,
+    type="Integer",
+    descr="Number of input variants within assembly locus",
+)
 SNVPOS = InfoField(
     id="SNVPOS",
     number=".",

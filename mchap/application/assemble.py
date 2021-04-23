@@ -676,6 +676,7 @@ class program(object):
             vcf.infofields.DP,
             vcf.infofields.RCOUNT,
             vcf.infofields.END,
+            vcf.infofields.NVAR,
             vcf.infofields.SNVPOS,
             vcf.infofields.AD,
         ]
@@ -688,6 +689,7 @@ class program(object):
             vcf.formatfields.RCOUNT,
             vcf.formatfields.RCALLS,
             vcf.formatfields.MEC,
+            vcf.formatfields.KMERCOV,
             vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PHPM,
@@ -1061,6 +1063,11 @@ class program(object):
                 data.sample_MEC[sample] = np.sum(
                     integer.minimum_error_correction(read_calls, genotype)
                 )
+                data.sample_KMERCOV[sample] = integer.min_kmer_coverage(
+                    read_calls,
+                    genotype,
+                    ks=[1, 2, 3],
+                )
             except Exception as e:
                 path = data.sample_bams.get(sample)
                 message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
@@ -1156,6 +1163,7 @@ class program(object):
         """
         # postions
         data.info_END = data.locus.stop
+        data.info_NVAR = len(data.locus.variants)
         data.info_SNVPOS = np.subtract(data.locus.positions, data.locus.start) + 1
         # sequences
         vcf_allele_strings = data.locus.format_haplotypes(data.vcf_haplotypes)
@@ -1349,6 +1357,7 @@ class LocusAssemblyData(object):
         self.sample_GQ = dict()
         self.sample_PHQ = dict()
         self.sample_MEC = dict()
+        self.sample_KMERCOV = dict()
         self.sample_GL = dict()
         self.sample_GP = dict()
         self.sample_GT = dict()
@@ -1366,6 +1375,7 @@ class LocusAssemblyData(object):
         self.info_DP = None
         self.info_RCOUNT = None
         self.info_END = None
+        self.info_NVAR = None
         self.info_SNVPOS = None
         self.info_AD = None
 
@@ -1380,6 +1390,7 @@ class LocusAssemblyData(object):
             DP=self.info_DP,
             RCOUNT=self.info_RCOUNT,
             END=self.info_END,
+            NVAR=self.info_NVAR,
             SNVPOS=self.info_SNVPOS,
             AD=self.info_AD,
         )
@@ -1391,6 +1402,7 @@ class LocusAssemblyData(object):
             RCOUNT=self._sample_dict_as_list(self.sample_RCOUNT),
             RCALLS=self._sample_dict_as_list(self.sample_RCALLS),
             MEC=self._sample_dict_as_list(self.sample_MEC),
+            KMERCOV=self._sample_dict_as_list(self.sample_KMERCOV),
             FT=self._sample_dict_as_list(self.sample_FT),
             GPM=self._sample_dict_as_list(self.sample_GPM),
             PHPM=self._sample_dict_as_list(self.sample_PHPM),
