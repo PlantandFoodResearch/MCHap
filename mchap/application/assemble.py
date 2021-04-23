@@ -60,7 +60,6 @@ class program(object):
     samples: list
     sample_ploidy: dict
     sample_inbreeding: dict
-    hard_filter_genotype_calls: bool = True
     read_group_field: str = "SM"
     base_error_rate: float = 0.0
     ignore_base_phred_scores: bool = False
@@ -78,10 +77,6 @@ class program(object):
     mcmc_recombination_step_probability: float = 0.5
     mcmc_partial_dosage_step_probability: float = 0.5
     mcmc_dosage_step_probability: bool = 1.0
-    depth_filter_threshold: float = 5.0
-    read_count_filter_threshold: int = 5
-    kmer_filter_k: int = 3
-    kmer_filter_theshold: float = 0.90
     mcmc_incongruence_threshold: float = 0.60
     haplotype_posterior_threshold: float = 0.2
     use_assembly_posteriors: bool = False
@@ -204,7 +199,7 @@ class program(object):
             help=(
                 "Default inbreeding coefficient for all samples (default = 0.0). "
                 "This value is used for all samples which are not specified using "
-                "the --sample-inbreeding parameter"
+                "the --sample-inbreeding parameter."
             ),
         )
 
@@ -218,7 +213,7 @@ class program(object):
                 "used to indicate where their expected inbreeding coefficient "
                 "default value. Each line should contain a sample identifier "
                 "followed by a tab and then a inbreeding coefficient value "
-                "within the interval [0, 1]"
+                "within the interval [0, 1]."
             ),
         )
 
@@ -256,13 +251,53 @@ class program(object):
             help=(
                 "Posterior probability required for a haplotype to be included in "
                 "the output VCF as an alternative allele. "
-                "The posterior probability of haplotypes is assessed per sample "
-                "and calculated as the probability ot that haplotype being present "
+                "The posterior probability of each haplotype is assessed per individual "
+                "and calculated as the probability of that haplotype being present "
                 "with one or more copies in that individual."
+                "A haplotype is included as an alternate allele if it meets this "
+                "posterior probability threshold in at least one individual. "
                 "This parameter is the main mechanism to control the number of "
-                "alternate alleles in ech VCF record and hence the breadth "
-                "of likelihoods and posterior distributions (default = 0.20)."
+                "alternate alleles in ech VCF record and hence the number of genotypes "
+                "assessed when recalculating likelihoods and posterior distributions "
+                "(default = 0.20)."
             ),
+        )
+
+        parser.set_defaults(use_assembly_posteriors=False)
+        parser.add_argument(
+            "--use-assembly-posteriors",
+            dest="use_assembly_posteriors",
+            action="store_true",
+            help=(
+                "Flag: Use posterior probabilities from each individuals "
+                "assembly rather than recomputing posteriors based on the "
+                "observed alleles across all samples. "
+                "These posterior probabilities will be used to call genotypes "
+                ", metrics related to the genotype, and the posterior "
+                "distribution (GP field) if specified. "
+                "This may lead to less robust genotype calls in the presence "
+                "of multi-modality and hence it is recommended to run the "
+                "simulation for longer or using parallel-tempering when "
+                "using this option. "
+                "This option may be more suitable than the default when calling "
+                "haplotypes in unrelated individuals. "
+            ),
+        )
+
+        parser.set_defaults(genotype_likelihoods=False)
+        parser.add_argument(
+            "--genotype-likelihoods",
+            dest="genotype_likelihoods",
+            action="store_true",
+            help=("Flag: Report genotype likelihoods in the GL VCF field."),
+        )
+
+        parser.set_defaults(genotype_posteriors=False)
+        parser.add_argument(
+            "--genotype-posteriors",
+            dest="genotype_posteriors",
+            action="store_true",
+            help=("Flag: Report genotype posterior probabilities in the GP VCF field."),
         )
 
         parser.add_argument(
@@ -303,54 +338,6 @@ class program(object):
             help=(
                 "Flag: Use reads marked as supplementary in the assembly "
                 "(these are skipped by default)."
-            ),
-        )
-
-        parser.set_defaults(hard_filter=False)
-        parser.add_argument(
-            "--hard-filter",
-            dest="hard_filter",
-            action="store_true",
-            help=(
-                "Flag: hard filter genotypes. By default filters are applied "
-                "softly so that a sample will still have a genotype call if filtered. "
-                "This flag will hard filter the genotype calls so that filtered calls "
-                "will have their alleles replaced with null alleles ('.')."
-            ),
-        )
-
-        parser.set_defaults(genotype_likelihoods=False)
-        parser.add_argument(
-            "--genotype-likelihoods",
-            dest="genotype_likelihoods",
-            action="store_true",
-            help=("Flag: Report genotype likelihoods in the GL VCF field."),
-        )
-
-        parser.set_defaults(genotype_posteriors=False)
-        parser.add_argument(
-            "--genotype-posteriors",
-            dest="genotype_posteriors",
-            action="store_true",
-            help=("Flag: Report genotype posterior probabilities in the GP VCF field."),
-        )
-
-        parser.set_defaults(use_assembly_posteriors=False)
-        parser.add_argument(
-            "--use-assembly-posteriors",
-            dest="use_assembly_posteriors",
-            action="store_true",
-            help=(
-                "Flag: Use posterior probabilities from each individuals "
-                "assembly rather than recomputing posteriors based on the "
-                "observed alleles across all samples. "
-                "These posterior probabilities will be used to call genotypes "
-                ", metrics related to the genotype, and the posterior "
-                "distribution (GP field) if specified. "
-                "This may lead to less robust genotype calls in the presence "
-                "of multi-modality and hence it is recommended to run the "
-                "simulation for longer or using parallel-tempering when "
-                "using this option."
             ),
         )
 
@@ -459,51 +446,6 @@ class program(object):
         )
 
         parser.add_argument(
-            "--filter-depth",
-            type=float,
-            nargs=1,
-            default=[5.0],
-            help=(
-                "Minimum sample read depth required to include an assembly "
-                "result (default = 5.0). "
-                "Read depth is measured as the mean of read depth across each "
-                "variable position."
-            ),
-        )
-
-        parser.add_argument(
-            "--filter-read-count",
-            type=float,
-            nargs=1,
-            default=[5.0],
-            help=(
-                "Minimum number of read (pairs) required within a target "
-                "interval in order to include an assembly result (default = 5)."
-            ),
-        )
-
-        parser.add_argument(
-            "--filter-kmer-k",
-            type=int,
-            nargs=1,
-            default=[3],
-            help=(
-                "Size of variant kmer used to filter assembly results (default = 3)."
-            ),
-        )
-
-        parser.add_argument(
-            "--filter-kmer",
-            type=float,
-            nargs=1,
-            default=[0.90],
-            help=(
-                "Minimum kmer representation required at each position in assembly "
-                "results (default = 0.90)."
-            ),
-        )
-
-        parser.add_argument(
             "--read-group-field",
             nargs=1,
             type=str,
@@ -599,7 +541,6 @@ class program(object):
             samples=samples,
             sample_ploidy=sample_ploidy,
             sample_inbreeding=sample_inbreeding,
-            hard_filter_genotype_calls=args.hard_filter,
             read_group_field=args.read_group_field[0],
             base_error_rate=args.base_error_rate[0],
             ignore_base_phred_scores=args.ignore_base_phred_scores,
@@ -621,10 +562,6 @@ class program(object):
                 0
             ],
             mcmc_dosage_step_probability=args.mcmc_dosage_step_probability[0],
-            depth_filter_threshold=args.filter_depth[0],
-            read_count_filter_threshold=args.filter_read_count[0],
-            kmer_filter_k=args.filter_kmer_k[0],
-            kmer_filter_theshold=args.filter_kmer[0],
             mcmc_incongruence_threshold=args.mcmc_chain_incongruence_threshold[0],
             use_assembly_posteriors=args.use_assembly_posteriors,
             haplotype_posterior_threshold=args.haplotype_posterior_threshold[0],
@@ -664,9 +601,6 @@ class program(object):
 
         filters = [
             vcf.filters.SamplePassFilter(),
-            vcf.filters.SampleKmerFilter(self.kmer_filter_k, self.kmer_filter_theshold),
-            vcf.filters.SampleDepthFilter(self.depth_filter_threshold),
-            vcf.filters.SampleReadCountFilter(self.read_count_filter_threshold),
         ]
 
         info_fields = [
@@ -1044,7 +978,7 @@ class program(object):
         Returns
         -------
         data : LocusAssemblyData
-            With `sample_AD`, `sample_MEC`.
+            With `sample_AD`, `sample_MEC` and `sample_KMERCOV`.
         """
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
@@ -1063,55 +997,14 @@ class program(object):
                 data.sample_MEC[sample] = np.sum(
                     integer.minimum_error_correction(read_calls, genotype)
                 )
-                data.sample_KMERCOV[sample] = integer.min_kmer_coverage(
-                    read_calls,
-                    genotype,
-                    ks=[1, 2, 3],
-                )
-            except Exception as e:
-                path = data.sample_bams.get(sample)
-                message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
-                raise SampleAssemblyError(message) from e
-        return data
-
-    def apply_sample_filters(self, data):
-        """Applies sample filters to each sample.
-
-        Parameters
-        ----------
-        data : LocusAssemblyData
-            With `samples`, `sample_ploidy`, `sample_read_calls`,
-            `sample_RCOUNT`, `sample_DP`, `sample_PHPM`,
-            `sample_genotype`, `sample_mcmc_trace`.
-
-        Returns
-        -------
-        data : LocusAssemblyData
-            With `sample_FT`.
-        """
-        depth_filter = vcf.filters.SampleDepthFilter(self.depth_filter_threshold)
-        count_filter = vcf.filters.SampleReadCountFilter(
-            self.read_count_filter_threshold
-        )
-        # define call related sample filters
-        kmer_filter = vcf.filters.SampleKmerFilter(
-            self.kmer_filter_k, self.kmer_filter_theshold
-        )
-
-        for sample in data.samples:
-            # wrap in try clause to pass sample info back with any exception
-            try:
-                filts = (
-                    count_filter(data.sample_RCOUNT[sample]),
-                    depth_filter(data.sample_DP[sample]),
-                    kmer_filter(
-                        data.sample_read_calls[sample], data.sample_genotype[sample]
+                data.sample_KMERCOV[sample] = np.round(
+                    integer.min_kmer_coverage(
+                        read_calls,
+                        genotype,
+                        ks=[1, 2, 3],
                     ),
+                    self.precision,
                 )
-                # combine filters
-                filterset = vcf.filters.FilterCallSet(filts)
-                data.sample_FT[sample] = filterset
-            # end of try clause for specific sample
             except Exception as e:
                 path = data.sample_bams.get(sample)
                 message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
@@ -1124,7 +1017,7 @@ class program(object):
         Parameters
         ----------
         data : LocusAssemblyData
-            With `samples`, `sample_alleles`, `sample_FT`,
+            With `samples` and `sample_alleles`.
 
         Returns
         -------
@@ -1135,9 +1028,6 @@ class program(object):
             # wrap in try clause to pass sample info back with any exception
             try:
                 alleles = data.sample_alleles[sample]
-                if self.hard_filter_genotype_calls and data.sample_FT[sample].failed:
-                    # hard filtering
-                    alleles[:] = -1
                 genotype_string = "/".join([str(a) if a >= 0 else "." for a in alleles])
                 data.sample_GT[sample] = genotype_string
             except Exception as e:
@@ -1152,14 +1042,14 @@ class program(object):
         Parameters
         ----------
         data : LocusAssemblyData
-            With `locus`, `vcf_haplotypes`, `sample_FT`, `sample_alleles`,
+            With `locus`, `vcf_haplotypes`, `sample_alleles`,
             `sample_DP`, `sample_RCOUNT` and `sample_AD`.
 
         Returns
         -------
         data : LocusAssemblyData
-            With `vcf_REF`, `vcf_ALTS`, `info_END`, `info_SNVPOS`, `info_AC`
-            `info_AN`, `info_NS`, `info_DP`, `info_RCOUNT` and `info_AD`.
+            With `vcf_REF`, `vcf_ALTS`, `info_END`, `info_NVAR`, `info_SNVPOS`,
+            `info_AC`, `info_AN`, `info_NS`, `info_DP`, `info_RCOUNT` and `info_AD`.
         """
         # postions
         data.info_END = data.locus.stop
@@ -1235,7 +1125,6 @@ class program(object):
             self.call_sample_posteriors(data)
             self.call_sample_posterior_genotype(data)
         self.compute_genotype_read_comparative_stats(data)
-        self.apply_sample_filters(data)
         self.encode_sample_genotype_string(data)
         self.get_record_fields(data)
         return data.format_vcf_record()
@@ -1350,7 +1239,6 @@ class LocusAssemblyData(object):
         # vcf sample data
         self.sample_RCOUNT = dict()
         self.sample_DP = dict()
-        self.sample_FT = dict()
         self.sample_GPM = dict()
         self.sample_PHPM = dict()
         self.sample_RCALLS = dict()
@@ -1403,7 +1291,6 @@ class LocusAssemblyData(object):
             RCALLS=self._sample_dict_as_list(self.sample_RCALLS),
             MEC=self._sample_dict_as_list(self.sample_MEC),
             KMERCOV=self._sample_dict_as_list(self.sample_KMERCOV),
-            FT=self._sample_dict_as_list(self.sample_FT),
             GPM=self._sample_dict_as_list(self.sample_GPM),
             PHPM=self._sample_dict_as_list(self.sample_PHPM),
             MCI=self._sample_dict_as_list(self.sample_MCI),

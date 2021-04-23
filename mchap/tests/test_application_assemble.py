@@ -219,9 +219,6 @@ def test_Program__header():
 
     filters_expect = [
         '##FILTER=<ID=PASS,Description="All filters passed">',
-        '##FILTER=<ID=3m90,Description="Less than 90.0 percent of read-variant 3-mers represented in haplotypes">',
-        '##FILTER=<ID=dp5,Description="Sample has mean read depth less than 5.0">',
-        '##FILTER=<ID=rc5,Description="Sample has read (pair) count of less than 5.0">',
     ]
     filters_actual = [line for line in header if line.startswith("##FILTER")]
     assert filters_actual == filters_expect
@@ -235,11 +232,10 @@ def test_Program__header():
 @pytest.mark.parametrize(
     "cli_extra,output_vcf",
     [
-        (["--use-assembly-posteriors", "--hard-filter"], "simple.output.deep.old.vcf"),
+        (["--use-assembly-posteriors"], "simple.output.deep.old.vcf"),
         (
             [
                 "--use-assembly-posteriors",
-                "--hard-filter",
                 "--base-error-rate",
                 "0.001",
                 "--ignore-base-phred-scores",
@@ -310,12 +306,12 @@ def test_Program__run(cli_extra, output_vcf):
                 "simple.sample2.deep.bam",
                 "simple.sample3.deep.bam",
             ],
-            ["--use-assembly-posteriors", "--hard-filter"],
+            ["--use-assembly-posteriors"],
             "simple.output.deep.old.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--use-assembly-posteriors", "--hard-filter"],
+            ["--use-assembly-posteriors"],
             "simple.output.mixed_depth.old.vcf",
         ),
         (

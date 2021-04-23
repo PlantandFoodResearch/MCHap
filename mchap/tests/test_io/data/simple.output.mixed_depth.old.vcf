@@ -2,21 +2,19 @@
 ##fileDate=20210420
 ##source=mchap v0.4.0
 ##phasing=None
-##commandline="mchap assemble --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --targets simple.bed.gz --variants simple.vcf.gz --reference simple.fasta --mcmc-steps 500 --mcmc-burn 100 --mcmc-seed 11 --use-assembly-posteriors --hard-filter"
+##commandline="mchap assemble --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --targets simple.bed.gz --variants simple.vcf.gz --reference simple.fasta --mcmc-steps 500 --mcmc-burn 100 --mcmc-seed 11 --use-assembly-posteriors"
 ##randomseed=11
 ##contig=<ID=CHR1,length=60>
 ##contig=<ID=CHR2,length=60>
 ##contig=<ID=CHR3,length=60>
 ##FILTER=<ID=PASS,Description="All filters passed">
-##FILTER=<ID=3m90,Description="Less than 90.0 percent of read-variant 3-mers represented in haplotypes">
-##FILTER=<ID=dp5,Description="Sample has mean read depth less than 5.0">
-##FILTER=<ID=rc5,Description="Sample has read (pair) count of less than 5.0">
 ##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
 ##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
 ##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of samples with data">
 ##INFO=<ID=DP,Number=1,Type=Integer,Description="Combined depth across samples">
 ##INFO=<ID=RCOUNT,Number=1,Type=Integer,Description="Total number of observed reads across all samples">
 ##INFO=<ID=END,Number=1,Type=Integer,Description="End position on CHROM">
+##INFO=<ID=NVAR,Number=1,Type=Integer,Description="Number of input variants within assembly locus">
 ##INFO=<ID=SNVPOS,Number=.,Type=Integer,Description="Relative (1-based) positions of SNVs within haplotypes">
 ##INFO=<ID=AD,Number=R,Type=Integer,Description="Total number of reads unambiguously assigned to each allele based on MEC">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
@@ -26,6 +24,7 @@
 ##FORMAT=<ID=RCOUNT,Number=1,Type=Integer,Description="Total count of read pairs within haplotype interval">
 ##FORMAT=<ID=RCALLS,Number=1,Type=Integer,Description="Total count of read base calls matching a known variant">
 ##FORMAT=<ID=MEC,Number=1,Type=Integer,Description="Minimum error correction">
+##FORMAT=<ID=KMERCOV,Number=3,Type=Float,Description="Minimum proportion of read-SNV 1-, 2-, and 3-mers found in genotype at any position.">
 ##FORMAT=<ID=FT,Number=1,Type=String,Description="Filter indicating if this genotype was called">
 ##FORMAT=<ID=GPM,Number=1,Type=Float,Description="Genotype posterior mode probability">
 ##FORMAT=<ID=PHPM,Number=1,Type=Float,Description="Phenotype posterior mode probability">
@@ -34,7 +33,7 @@
 ##FORMAT=<ID=GL,Number=G,Type=Float,Description="Genotype likelihoods">
 ##FORMAT=<ID=GP,Number=G,Type=Float,Description="Genotype posterior probabilities">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1	SAMPLE2	SAMPLE3
-CHR1	6	CHR1_05_25	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	.	AN=3;AC=3,2;NS=3;DP=159;RCOUNT=240;END=25;SNVPOS=2,11,18;AD=125,105,10	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:FT:GPM:PHPM:MCI:AD:GL:GP	0/0/1/2:7:8:13:20:40:0:PASS:0.785:0.835:0:10,5,5:.:.	0/0/1/1:60:60:133:200:400:0:PASS:1:1:0:100,100,0:.:.	0/0/0/2:4:5:13:20:40:0:PASS:0.619:0.698:0:15,0,5:.:.
-CHR1	31	CHR1_30_50	AAAAAAAAAAAAAAAAAAAA	.	.	.	AN=1;AC=.;NS=3;DP=.;RCOUNT=288;END=50;SNVPOS=.;AD=.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:FT:GPM:PHPM:MCI:AD:GL:GP	0/0/0/0:60:60:.:24:0:0:PASS:1:1:0:.:.:.	0/0/0/0:60:60:.:240:0:0:PASS:1:1:0:.:.:.	0/0/0/0:60:60:.:24:0:0:PASS:1:1:0:.:.:.
-CHR2	11	CHR2_10_30	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAGAAAAAAAAAA,AAAAAAAAATAAAAAAAAAA,AAAATAAAAGAAAAAAAAAA	.	.	AN=4;AC=3,2,1;NS=3;DP=168;RCOUNT=288;END=30;SNVPOS=5,10;AD=96,36,44,3	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:FT:GPM:PHPM:MCI:AD:GL:GP	0/0/0/2:6:8:14:24:28:0:PASS:0.72:0.84:0:12,0,4,0:.:.	0/0/1/2:60:60:140:240:280:0:PASS:1:1:0:80,30,40,0:.:.	0/1/1/3:7:13:14:24:28:0:PASS:0.802:0.95:0:4,6,0,3:.:.
-CHR3	21	CHR3_20_40	AAAAAAAAAAAAAAAAAAAA	.	.	.	AN=0;AC=.;NS=0;DP=.;RCOUNT=0;END=40;SNVPOS=.;AD=.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:FT:GPM:PHPM:MCI:AD:GL:GP	./././.:60:60:.:0:0:0:rc5:1:1:0:.:.:.	./././.:60:60:.:0:0:0:rc5:1:1:0:.:.:.	./././.:60:60:.:0:0:0:rc5:1:1:0:.:.:.
+CHR1	6	CHR1_05_25	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	.	AN=3;AC=3,2;NS=3;DP=159;RCOUNT=240;END=25;NVAR=3;SNVPOS=2,11,18;AD=125,105,10	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:KMERCOV:GPM:PHPM:MCI:AD:GL:GP	0/0/1/2:7:8:13:20:40:0:1,1,1:0.785:0.835:0:10,5,5:.:.	0/0/1/1:60:60:133:200:400:0:1,1,1:1:1:0:100,100,0:.:.	0/0/0/2:4:5:13:20:40:0:1,1,1:0.619:0.698:0:15,0,5:.:.
+CHR1	31	CHR1_30_50	AAAAAAAAAAAAAAAAAAAA	.	.	.	AN=1;AC=.;NS=3;DP=.;RCOUNT=288;END=50;NVAR=0;SNVPOS=.;AD=.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:KMERCOV:GPM:PHPM:MCI:AD:GL:GP	0/0/0/0:60:60:.:24:0:0:.,.,.:1:1:0:.:.:.	0/0/0/0:60:60:.:240:0:0:.,.,.:1:1:0:.:.:.	0/0/0/0:60:60:.:24:0:0:.,.,.:1:1:0:.:.:.
+CHR2	11	CHR2_10_30	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAGAAAAAAAAAA,AAAAAAAAATAAAAAAAAAA,AAAATAAAAGAAAAAAAAAA	.	.	AN=4;AC=3,2,1;NS=3;DP=168;RCOUNT=288;END=30;NVAR=2;SNVPOS=5,10;AD=96,36,44,3	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:KMERCOV:GPM:PHPM:MCI:AD:GL:GP	0/0/0/2:6:8:14:24:28:0:1,1,.:0.72:0.84:0:12,0,4,0:.:.	0/0/1/2:60:60:140:240:280:0:1,1,.:1:1:0:80,30,40,0:.:.	0/1/1/3:7:13:14:24:28:0:1,1,.:0.802:0.95:0:4,6,0,3:.:.
+CHR3	21	CHR3_20_40	AAAAAAAAAAAAAAAAAAAA	.	.	.	AN=1;AC=.;NS=3;DP=.;RCOUNT=0;END=40;NVAR=0;SNVPOS=.;AD=.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:KMERCOV:GPM:PHPM:MCI:AD:GL:GP	0/0/0/0:60:60:.:0:0:0:.,.,.:1:1:0:.:.:.	0/0/0/0:60:60:.:0:0:0:.,.,.:1:1:0:.:.:.	0/0/0/0:60:60:.:0:0:0:.,.,.:1:1:0:.:.:.
