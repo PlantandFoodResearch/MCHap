@@ -427,44 +427,51 @@ def test_Program__run_stdout__region(region, region_id):
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
-    bams = ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"]
     output_vcf = "simple.output.mixed_depth.vcf"
 
     REF = str(path / "simple.fasta")
     VCF = str(path / "simple.vcf.gz")
-    BAMS = [str(path / bam) for bam in bams]
+
+    # match sample to bam
+    sample_bam_pairs = [
+        "SAMPLE1" + "\t" + str(path / "simple.sample1.bam"),
+        "SAMPLE2" + "\t" + str(path / "simple.sample2.deep.bam"),
+        "SAMPLE3" + "\t" + str(path / "simple.sample3.bam"),
+    ]
+
+    # create a tmp file with sample bam pairs
+    dirpath = tempfile.mkdtemp()
+    tmp_sample_bams = dirpath + "/sample-bams.txt"
+    with open(tmp_sample_bams, "w") as f:
+        f.write("\n".join(sample_bam_pairs))
 
     # first part of VCF record line to match to
     contig, interval = region.split(":")
     start, _ = interval.split("-")
     record_start = "{}\t{}".format(contig, int(start) + 1)
 
-    command = (
-        [
-            "mchap",
-            "assemble",
-            "--bam",
-        ]
-        + BAMS
-        + [
-            "--ploidy",
-            "4",
-            "--region",
-            region,
-            "--region-id",
-            region_id,
-            "--variants",
-            VCF,
-            "--reference",
-            REF,
-            "--mcmc-steps",
-            "500",
-            "--mcmc-burn",
-            "100",
-            "--mcmc-seed",
-            "11",
-        ]
-    )
+    command = [
+        "mchap",
+        "assemble",
+        "--sample-bam",
+        tmp_sample_bams,
+        "--ploidy",
+        "4",
+        "--region",
+        region,
+        "--region-id",
+        region_id,
+        "--variants",
+        VCF,
+        "--reference",
+        REF,
+        "--mcmc-steps",
+        "500",
+        "--mcmc-burn",
+        "100",
+        "--mcmc-seed",
+        "11",
+    ]
 
     prog = program.cli(command)
 
@@ -506,6 +513,7 @@ def test_Program__run_stdout__region(region, region_id):
             assert act == exp
 
     # cleanup
+    shutil.rmtree(dirpath)
     os.remove(out_filename)
 
 

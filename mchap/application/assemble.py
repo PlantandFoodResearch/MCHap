@@ -188,7 +188,9 @@ class program(object):
                 "A file containing a list of samples with bam file paths. "
                 "This can optionally be used in place the --bam and --bam-list "
                 "parameters. This is faster than using those parameters when running "
-                "many small jobs."
+                "many small jobs. "
+                "An error will be thrown if a sample is not found within its specified "
+                "bam file."
             ),
         )
 
