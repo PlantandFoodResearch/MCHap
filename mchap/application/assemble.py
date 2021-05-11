@@ -56,8 +56,8 @@ class program(object):
     bed: str
     vcf: str
     ref: str
-    bams: list
     samples: list
+    sample_bams: dict
     sample_ploidy: dict
     sample_inbreeding: dict
     read_group_field: str = "SM"
@@ -478,13 +478,17 @@ class program(object):
         if len(bams) != len(set(bams)):
             raise IOError("Duplicate input bams")
 
+        sample_bams = extract_sample_ids(bams, id=args.read_group_field[0])
+
         # samples
         if args.sample_list[0]:
             with open(args.sample_list[0]) as f:
                 samples = [line.strip() for line in f.readlines()]
+            # remove non-listed samples
+            sample_bams = {s: sample_bams[s] for s in samples if s in sample_bams}
         else:
             # read samples from bam headers
-            samples = list(extract_sample_ids(bams, id=args.read_group_field[0]).keys())
+            samples = list(sample_bams.keys())
         if len(samples) != len(set(samples)):
             raise IOError("Duplicate input samples")
 
@@ -537,8 +541,8 @@ class program(object):
             bed=args.targets[0],
             vcf=args.variants[0],
             ref=args.reference[0],
-            bams=bams,
             samples=samples,
+            sample_bams=sample_bams,
             sample_ploidy=sample_ploidy,
             sample_inbreeding=sample_inbreeding,
             read_group_field=args.read_group_field[0],
@@ -1085,7 +1089,7 @@ class program(object):
         # total read count
         data.info_RCOUNT = np.nansum(list(data.sample_RCOUNT.values()))
 
-    def assemble_locus(self, sample_bams, locus):
+    def assemble_locus(self, locus):
         """Assembles samples at a locus and formats resulting data
         into a VCF record line.
 
@@ -1111,7 +1115,7 @@ class program(object):
         data = LocusAssemblyData(
             locus=locus,
             samples=self.samples,
-            sample_bams=sample_bams,
+            sample_bams=self.sample_bams,
             sample_ploidy=self.sample_ploidy,
             sample_inbreeding=self.sample_inbreeding,
         )
@@ -1129,9 +1133,9 @@ class program(object):
         self.get_record_fields(data)
         return data.format_vcf_record()
 
-    def _assemble_locus_wrapped(self, sample_bams, locus):
+    def _assemble_locus_wrapped(self, locus):
         try:
-            result = self.assemble_locus(sample_bams, locus)
+            result = self.assemble_locus(locus)
         except Exception as e:
             message = _LOCUS_ASSEMBLY_ERROR.format(
                 name=locus.name, contig=locus.contig, start=locus.start, stop=locus.stop
@@ -1141,14 +1145,13 @@ class program(object):
 
     def run(self):
         header = self.header()
-        sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
         pool = mp.Pool(self.n_cores)
-        jobs = ((sample_bams, locus) for locus in self.loci())
+        jobs = ((locus,) for locus in self.loci())
         records = pool.starmap(self._assemble_locus_wrapped, jobs)
         return header + records
 
-    def _worker(self, sample_bams, locus, queue):
-        line = str(self._assemble_locus_wrapped(sample_bams, locus))
+    def _worker(self, locus, queue):
+        line = str(self._assemble_locus_wrapped(locus))
         queue.put(line)
         return line
 
@@ -1162,17 +1165,15 @@ class program(object):
 
     def _run_stdout_single_core(self):
         header = self.header()
-        sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
         for line in header:
             sys.stdout.write(line + "\n")
         for locus in self.loci():
-            line = self._assemble_locus_wrapped(sample_bams, locus)
+            line = self._assemble_locus_wrapped(locus)
             sys.stdout.write(line + "\n")
 
     def _run_stdout_multi_core(self):
 
         header = self.header()
-        sample_bams = extract_sample_ids(self.bams, id=self.read_group_field)
 
         for line in header:
             sys.stdout.write(line + "\n")
@@ -1187,7 +1188,7 @@ class program(object):
 
         jobs = []
         for locus in self.loci():
-            job = pool.apply_async(self._worker, (sample_bams, locus, queue))
+            job = pool.apply_async(self._worker, (locus, queue))
             jobs.append(job)
 
         for job in jobs:

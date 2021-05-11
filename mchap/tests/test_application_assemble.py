@@ -85,6 +85,11 @@ def test_Program__cli_lists():
         str(path / "simple.sample3.deep.bam"),
     ]
 
+    sample_bams = {
+        "SAMPLE1": str(path / "simple.sample1.deep.bam"),
+        "SAMPLE3": str(path / "simple.sample3.deep.bam"),
+    }
+
     # write some files to use in io
     dirpath = tempfile.mkdtemp()
 
@@ -149,7 +154,7 @@ def test_Program__cli_lists():
     assert prog.cli_command == command
 
     assert prog.samples == samples
-    assert prog.bams == bams
+    assert prog.sample_bams == sample_bams
 
     for k, v in zip(samples, [2, 4, 6]):
         assert prog.sample_ploidy[k] == v
