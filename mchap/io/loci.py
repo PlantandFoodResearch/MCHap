@@ -102,6 +102,19 @@ class Locus:
         """Format integer encoded alleles as a haplotype string"""
         return integer.as_characters(array, gap=gap, alleles=self.alleles)
 
+    @classmethod
+    def from_region_string(cls, string, name=None):
+        contig, interval = string.strip().split(":")
+        start, stop = interval.strip().split("-")
+        return cls(
+            contig=contig,
+            start=int(start),
+            stop=int(stop),
+            name=name,
+            sequence=None,
+            variants=None,
+        )
+
 
 def _parse_bed4_line(line):
     line = line.split()

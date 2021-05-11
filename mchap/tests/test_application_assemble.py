@@ -414,6 +414,101 @@ def test_Program__run_stdout(bams, cli_extra, output_vcf, n_cores):
     os.remove(out_filename)
 
 
+@pytest.mark.parametrize(
+    "region,region_id",
+    [
+        ("CHR1:5-25", "CHR1_05_25"),
+        ("CHR1:30-50", "CHR1_30_50"),
+        ("CHR2:10-30", "CHR2_10_30"),
+        ("CHR3:20-40", "CHR3_20_40"),
+    ],
+)
+def test_Program__run_stdout__region(region, region_id):
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / "test_io/data"
+
+    bams = ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"]
+    output_vcf = "simple.output.mixed_depth.vcf"
+
+    REF = str(path / "simple.fasta")
+    VCF = str(path / "simple.vcf.gz")
+    BAMS = [str(path / bam) for bam in bams]
+
+    # first part of VCF record line to match to
+    contig, interval = region.split(":")
+    start, _ = interval.split("-")
+    record_start = "{}\t{}".format(contig, int(start) + 1)
+
+    command = (
+        [
+            "mchap",
+            "assemble",
+            "--bam",
+        ]
+        + BAMS
+        + [
+            "--ploidy",
+            "4",
+            "--region",
+            region,
+            "--region-id",
+            region_id,
+            "--variants",
+            VCF,
+            "--reference",
+            REF,
+            "--mcmc-steps",
+            "500",
+            "--mcmc-burn",
+            "100",
+            "--mcmc-seed",
+            "11",
+        ]
+    )
+
+    prog = program.cli(command)
+
+    # capture stdout in file
+    _, out_filename = tempfile.mkstemp()
+    stdout = sys.stdout
+    sys.stdout = open(out_filename, "w")
+    prog.run_stdout()
+    sys.stdout.close()
+
+    # replace stdout
+    sys.stdout = stdout
+
+    # compare output to expected
+    with open(out_filename, "r") as f:
+        actual = f.readlines()
+    with open(str(path / output_vcf), "r") as f:
+        expected = f.readlines()
+    # filter vcf down to the header and single expected record
+    expected = [
+        line
+        for line in expected
+        if (line.startswith("#") or line.startswith(record_start))
+    ]
+
+    # assert a single non-header line in actual and same number of lines as expect
+    assert len([line for line in actual if (not line.startswith("#"))]) == 1
+    assert len(actual) == len(expected)
+
+    for act, exp in zip(actual, expected):
+        # file paths will make full line differ
+        if act.startswith("##commandline"):
+            assert exp.startswith("##commandline")
+        elif act.startswith("##fileDate"):
+            # new date should be greater than test vcf date
+            assert exp.startswith("##fileDate")
+            assert act > exp
+        else:
+            assert act == exp
+
+    # cleanup
+    os.remove(out_filename)
+
+
 def test_Program__output_pysam():
     """Test that program output can be parsed by pysam and that the
     parsed output matches the initial output.

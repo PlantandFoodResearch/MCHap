@@ -1,6 +1,8 @@
-usage: MCMC haplotype assembly [-h] [--targets TARGETS] [--variants VARIANTS]
+usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
+                               [--targets TARGETS] [--variants VARIANTS]
                                [--reference REFERENCE] [--bam [BAM [BAM ...]]]
-                               [--bam-list BAM_LIST] [--ploidy PLOIDY]
+                               [--bam-list BAM_LIST] [--sample-bam SAMPLE_BAM]
+                               [--ploidy PLOIDY]
                                [--sample-ploidy SAMPLE_PLOIDY]
                                [--sample-list SAMPLE_LIST]
                                [--inbreeding INBREEDING]
@@ -29,10 +31,20 @@ usage: MCMC haplotype assembly [-h] [--targets TARGETS] [--variants VARIANTS]
 
 optional arguments:
   -h, --help            show this help message and exit
-  --targets TARGETS     Bed file containing genomic intervals for haplotype
-                        assembly. First three columns (contig, start, stop)
-                        are mandatory. If present, the fourth column (id) will
-                        be used as the variant id in the output VCF.
+  --region REGION       Specify a single target region with the format
+                        contig:start-stop. This region will be a single
+                        variant in the output VCF. This argument can not be
+                        combined with the --targets argument.
+  --region-id REGION_ID
+                        Specify an identifier for the locus specified with the
+                        --region argument. This id will be reported in the
+                        output VCF.
+  --targets TARGETS     Bed file containing multiple genomic intervals for
+                        haplotype assembly. First three columns (contig,
+                        start, stop) are mandatory. If present, the fourth
+                        column (id) will be used as the variant id in the
+                        output VCF.This argument can not be combined with the
+                        --region argument.
   --variants VARIANTS   Tabix indexed VCF file containing SNP variants to be
                         used in assembly. Assembled haplotypes will only
                         contain the reference and alternate alleles specified
@@ -46,6 +58,11 @@ optional arguments:
   --bam-list BAM_LIST   A file containing a list of bam file paths (one per
                         line). This can optionally be used in place of or
                         combined with the --bam parameter.
+  --sample-bam SAMPLE_BAM
+                        A file containing a list of samples with bam file
+                        paths. This can optionally be used in place the --bam
+                        and --bam-list parameters. This is faster than using
+                        those parameters when running many small jobs.
   --ploidy PLOIDY       Default ploidy for all samples (default = 2). This
                         value is used for all samples which are not specified
                         using the --sample-ploidy parameter

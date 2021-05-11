@@ -21,6 +21,7 @@ from mchap.assemble.util import (
 )
 from mchap.encoding import character, integer
 from mchap.io import (
+    Locus,
     read_bed4,
     extract_sample_ids,
     extract_read_variants,
@@ -60,6 +61,8 @@ class program(object):
     sample_bams: dict
     sample_ploidy: dict
     sample_inbreeding: dict
+    region: str = None
+    region_id: str = None
     read_group_field: str = "SM"
     base_error_rate: float = 0.0
     ignore_base_phred_scores: bool = False
@@ -96,15 +99,39 @@ class program(object):
         parser = argparse.ArgumentParser("MCMC haplotype assembly")
 
         parser.add_argument(
+            "--region",
+            type=str,
+            nargs=1,
+            default=[None],
+            help=(
+                "Specify a single target region with the format contig:start-stop. "
+                "This region will be a single variant in the output VCF. "
+                "This argument can not be combined with the --targets argument."
+            ),
+        )
+
+        parser.add_argument(
+            "--region-id",
+            type=str,
+            nargs=1,
+            default=[None],
+            help=(
+                "Specify an identifier for the locus specified with the "
+                "--region argument. This id will be reported in the output VCF."
+            ),
+        )
+
+        parser.add_argument(
             "--targets",
             type=str,
             nargs=1,
             default=[None],
             help=(
-                "Bed file containing genomic intervals for haplotype assembly. "
+                "Bed file containing multiple genomic intervals for haplotype assembly. "
                 "First three columns (contig, start, stop) are mandatory. "
                 "If present, the fourth column (id) will be used as the variant id in "
                 "the output VCF."
+                "This argument can not be combined with the --region argument."
             ),
         )
 
@@ -149,6 +176,19 @@ class program(object):
                 "A file containing a list of bam file paths (one per line). "
                 "This can optionally be used in place of or combined with the --bam "
                 "parameter."
+            ),
+        )
+
+        parser.add_argument(
+            "--sample-bam",
+            type=str,
+            nargs=1,
+            default=[None],
+            help=(
+                "A file containing a list of samples with bam file paths. "
+                "This can optionally be used in place the --bam and --bam-list "
+                "parameters. This is faster than using those parameters when running "
+                "many small jobs."
             ),
         )
 
@@ -470,6 +510,10 @@ class program(object):
             sys.exit(1)
         args = parser.parse_args(command[2:])
 
+        # target regions
+        if (args.targets[0] is not None) and (args.region[0] is not None):
+            raise ValueError("Cannot combine --targets and --region arguments.")
+
         # bam paths
         bams = args.bam
         if args.bam_list[0]:
@@ -477,8 +521,20 @@ class program(object):
                 bams += [line.strip() for line in f.readlines()]
         if len(bams) != len(set(bams)):
             raise IOError("Duplicate input bams")
+        if bams:
+            sample_bams = extract_sample_ids(bams, id=args.read_group_field[0])
 
-        sample_bams = extract_sample_ids(bams, id=args.read_group_field[0])
+        # sample-bam file
+        if args.sample_bam[0]:
+            if bams:
+                raise IOError(
+                    "The --sample-bam argument cannot be combined with --bam or --bam-list."
+                )
+            sample_bams = dict()
+            with open(args.sample_bam[0]) as f:
+                for line in f.readlines():
+                    sample, bam = line.strip().split("\t")
+                    sample_bams[sample] = bam
 
         # samples
         if args.sample_list[0]:
@@ -545,6 +601,8 @@ class program(object):
             sample_bams=sample_bams,
             sample_ploidy=sample_ploidy,
             sample_inbreeding=sample_inbreeding,
+            region=args.region[0],
+            region_id=args.region_id,
             read_group_field=args.read_group_field[0],
             base_error_rate=args.base_error_rate[0],
             ignore_base_phred_scores=args.ignore_base_phred_scores,
@@ -577,9 +635,15 @@ class program(object):
         )
 
     def loci(self):
-        bed = read_bed4(self.bed)
-        for b in bed:
-            yield b.set_sequence(self.ref).set_variants(self.vcf)
+        if (self.bed is None) and (self.region is None):
+            raise ValueError("No region or targets bedfile is specified.")
+        elif self.bed is not None:
+            bed = read_bed4(self.bed)
+            for b in bed:
+                yield b.set_sequence(self.ref).set_variants(self.vcf)
+        else:
+            locus = Locus.from_region_string(self.region, self.region_id)
+            yield locus.set_sequence(self.ref).set_variants(self.vcf)
 
     def _header_contigs(self):
         with pysam.Fastafile(self.ref) as fasta:
