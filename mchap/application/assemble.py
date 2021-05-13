@@ -13,6 +13,7 @@ from mchap.assemble import (
     genotype_posteriors,
     call_posterior_haplotypes,
     alternate_dosage_posteriors,
+    call_posterior_mode,
 )
 from mchap.assemble.util import (
     natural_log_to_log10,
@@ -964,8 +965,8 @@ class program(object):
         Returns
         -------
         data : LocusAssemblyData
-            With `sample_genotype`, `sample_alleles`, `sample_GQ`, `sample_GPM`,
-            `sample_PHPM`, `sample_DOSEXP`, `sample_PHQ`.
+            With `sample_genotype`, `sample_alleles`, `sample_GQ`, `sample_PHQ`,
+            `sample_GPM`, `sample_PHPM`.
         """
         # map of VCF haplotype bytes to allele number
         haplotype_labels = {h.tobytes(): i for i, h in enumerate(data.vcf_haplotypes)}
@@ -1004,8 +1005,8 @@ class program(object):
         Returns
         -------
         data : LocusAssemblyData
-            With `sample_genotype`, `sample_alleles`, `sample_GQ`, `sample_GPM`,
-            `sample_PHPM` and `sample_PHQ`.
+            With `sample_genotype`, `sample_alleles`, `sample_GQ`, `sample_PHQ`,
+            `sample_GPM`, `sample_PHPM`.
         """
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
@@ -1030,6 +1031,51 @@ class program(object):
                     phenotype_probs.sum(), self.precision
                 )
                 data.sample_PHQ[sample] = qual_of_prob(phenotype_probs.sum())
+            except Exception as e:
+                path = data.sample_bams.get(sample)
+                message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
+                raise SampleAssemblyError(message) from e
+        return data
+
+    def call_sample_posterior_genotype_low_memory(self, data):
+        """Call sample genotype alleles and phenotype probs based on
+        its posterior distribution over called haplotypes.
+
+        This method avoids using likelihood and posterior arrays calculated
+        across all possible haplotypes.
+
+        Parameters
+        ----------
+        data : LocusAssemblyData
+            With `vcf_haplotypes`, `samples`, `sample_ploidy`, `sample_inbreeding`,
+            `sample_read_dists_unique`, `sample_read_dist_counts`,
+
+        Returns
+        -------
+        data : LocusAssemblyData
+            With `sample_genotype`, `sample_alleles`, `sample_GQ`, `sample_PHQ`,
+            `sample_GPM`, `sample_PHPM`.
+        """
+        for sample in data.samples:
+            # wrap in try clause to pass sample info back with any exception
+            try:
+                # find mode
+                alleles, _, genotype_prob, phenotype_prob = call_posterior_mode(
+                    reads=data.sample_read_dists_unique[sample],
+                    ploidy=data.sample_ploidy[sample],
+                    haplotypes=data.vcf_haplotypes,
+                    read_counts=data.sample_read_dist_counts[sample],
+                    inbreeding=data.sample_inbreeding[sample],
+                )
+                genotype = data.vcf_haplotypes[alleles]
+                # genotype results
+                data.sample_genotype[sample] = genotype
+                data.sample_alleles[sample] = alleles
+                data.sample_GQ[sample] = qual_of_prob(genotype_prob)
+                data.sample_GPM[sample] = np.round(genotype_prob, self.precision)
+                # phenotype stats
+                data.sample_PHQ[sample] = qual_of_prob(phenotype_prob)
+                data.sample_PHPM[sample] = np.round(phenotype_prob, self.precision)
             except Exception as e:
                 path = data.sample_bams.get(sample)
                 message = _SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
@@ -1154,6 +1200,7 @@ class program(object):
             data.info_AD = np.nansum(list(data.sample_AD.values()), axis=0)
         # total read count
         data.info_RCOUNT = np.nansum(list(data.sample_RCOUNT.values()))
+        return data
 
     def assemble_locus(self, locus):
         """Assembles samples at a locus and formats resulting data
@@ -1191,9 +1238,11 @@ class program(object):
         if self.use_assembly_posteriors:
             self.encode_sample_assembly_posterior(data)
             self.call_sample_assembly_genotype(data)
-        else:
+        elif self.report_genotype_likelihoods or self.report_genotype_posterior:
             self.call_sample_posteriors(data)
             self.call_sample_posterior_genotype(data)
+        else:
+            self.call_sample_posterior_genotype_low_memory(data)
         self.compute_genotype_read_comparative_stats(data)
         self.encode_sample_genotype_string(data)
         self.get_record_fields(data)
