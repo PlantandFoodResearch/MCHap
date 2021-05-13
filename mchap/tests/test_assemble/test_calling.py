@@ -1,10 +1,10 @@
 import numpy as np
 
 from mchap.assemble import calling
-
+from mchap import mset
 from mchap.testing import simulate_reads
 from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
-from mchap.assemble.util import normalise_log_probs
+from mchap.assemble.util import genotype_alleles_as_index, normalise_log_probs
 from mchap.assemble.classes import PosteriorGenotypeDistribution
 
 
@@ -215,6 +215,56 @@ def test_alternate_dosage_posteriors():
     )
     np.testing.assert_array_equal(actual_genotypes, expect_genotypes)
     np.testing.assert_array_equal(actual_probs, expect_probs)
+
+
+def test_call_posterior_mode():
+
+    ploidy = 4
+    inbreeding = 0.01
+    haplotypes = np.array(
+        [
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 1, 1, 0],
+            [0, 0, 1, 1, 1, 1],
+        ]
+    )
+    genotype = np.array([0, 0, 0, 2])
+    idx_0 = genotype_alleles_as_index(genotype)
+    idx_1 = genotype_alleles_as_index(np.array([0, 0, 2, 2]))
+    idx_2 = genotype_alleles_as_index(np.array([0, 2, 2, 2]))
+
+    reads = simulate_reads(
+        haplotypes[genotype],
+        qual=(10, 10),
+        uniform_sample=True,
+        errors=False,
+        n_reads=8,
+        error_rate=0,
+    )
+    reads, counts = mset.unique_counts(reads)
+
+    llks = calling.genotype_likelihoods(reads, ploidy, haplotypes, read_counts=counts)
+    probs = calling.genotype_posteriors(
+        llks, ploidy, len(haplotypes), inbreeding=inbreeding
+    )
+    _, phen_probs = calling.alternate_dosage_posteriors(genotype, probs)
+
+    (
+        mode_genotype,
+        mode_llk,
+        mode_genotype_prob,
+        mode_phenotype_prob,
+    ) = calling.call_posterior_mode(
+        reads, 4, haplotypes, read_counts=counts, inbreeding=inbreeding
+    )
+
+    np.testing.assert_array_equal(genotype, mode_genotype)
+    np.testing.assert_almost_equal(llks[idx_0], mode_llk, 5)
+    np.testing.assert_almost_equal(probs[idx_0], mode_genotype_prob, 5)
+    np.testing.assert_almost_equal(phen_probs.sum(), mode_phenotype_prob, 5)
+    np.testing.assert_almost_equal(
+        np.sum(probs[[idx_0, idx_1, idx_2]]), mode_phenotype_prob, 5
+    )
 
 
 def test_call_posterior_haplotypes():
