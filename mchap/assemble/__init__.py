@@ -5,6 +5,7 @@ from .calling import (
     genotype_posteriors,
     call_posterior_haplotypes,
     alternate_dosage_posteriors,
+    call_posterior_mode,
 )
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "genotype_likelihoods",
     "genotype_posteriors",
     "call_posterior_haplotypes",
+    "call_posterior_mode",
     "alternate_dosage_posteriors",
 ]

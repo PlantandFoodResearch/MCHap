@@ -8,6 +8,8 @@ from mchap.assemble.util import (
     get_dosage,
     normalise_log_probs,
     genotype_alleles_as_index,
+    index_as_genotype_alleles,
+    add_log_prob,
 )
 
 
@@ -16,6 +18,7 @@ __all__ = [
     "genotype_posteriors",
     "call_posterior_haplotypes",
     "alternate_dosage_posteriors",
+    "call_posterior_mode",
 ]
 
 
@@ -53,6 +56,147 @@ def increment_genotype(genotype):
     # all alleles are equal
     genotype[-1] += 1
     genotype[0:-1] = 0
+
+
+@njit(cache=True)
+def _call_posterior_mode(
+    reads, ploidy, haplotypes, n_genotypes, read_counts=None, inbreeding=0
+):
+    """Call posterior mode genotype from a set of known haplotypes."""
+    n_alleles = len(haplotypes)
+    genotype = np.zeros(ploidy, np.int64)
+    dosage = np.zeros(ploidy, np.int8)
+
+    mode_idx = 0
+    mode_llk = -np.inf
+    mode_ljoint = -np.inf
+    total_ljoint = -np.inf
+
+    for i in range(n_genotypes):
+        # log likelihood
+        llk = log_likelihood(
+            reads=reads,
+            genotype=haplotypes[genotype],
+            read_counts=read_counts,
+        )
+        # log prior
+        get_dosage(dosage, genotype.reshape(ploidy, 1))
+        lpr = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
+        # scaled log posterior
+        ljoint = llk + lpr
+        if ljoint > mode_ljoint:
+            # new posterior mode found
+            mode_idx = i
+            mode_llk = llk
+            mode_ljoint = ljoint
+        # normalising constant
+        total_ljoint = add_log_prob(total_ljoint, ljoint)
+        increment_genotype(genotype)
+
+    mode_genotype = index_as_genotype_alleles(mode_idx, ploidy)
+    return mode_genotype, mode_llk, mode_ljoint, total_ljoint
+
+
+def _phenotype_log_joint(genotype, reads, haplotypes, read_counts=None, inbreeding=0):
+    """Calculate phenotype posterior probability from a genotype and a set of known haplotypes."""
+    ploidy = len(genotype)
+    # unique alleles
+    phenotype = np.unique(genotype)
+    n_genotype_alleles = len(phenotype)
+    remainder = ploidy - n_genotype_alleles
+    # possible dosage configurations
+    options = list(combinations_with_replacement(phenotype, remainder))
+
+    array = np.zeros(ploidy, dtype=genotype.dtype)
+    dosage = np.zeros(ploidy, np.int8)
+
+    phenotype_ljoint = -np.inf
+    for opt in options:
+        # get sorted genotype alleles
+        array[0:n_genotype_alleles] = phenotype
+        array[n_genotype_alleles:ploidy] = opt
+        array = np.sort(array)
+        # log likelihood
+        llk = log_likelihood(
+            reads=reads,
+            genotype=haplotypes[array],
+            read_counts=read_counts,
+        )
+        # log prior
+        get_dosage(dosage, array.reshape(ploidy, 1))
+        lpr = log_genotype_prior(dosage, len(haplotypes), inbreeding=inbreeding)
+        # scaled log posterior
+        ljoint = llk + lpr
+
+        # phenotype posterior is sum of its genotype posteriors
+        phenotype_ljoint = add_log_prob(phenotype_ljoint, ljoint)
+    return phenotype_ljoint
+
+
+def call_posterior_mode(
+    reads,
+    ploidy,
+    haplotypes,
+    read_counts=None,
+    inbreeding=0,
+    return_phenotype_prob=True,
+):
+    """Call posterior mode genotype with statistics from a set of known haplotypes.
+
+    Parameters
+    ----------
+    reads : ndarray, float, shape (n_reads, n_pos, n_nucl)
+        A set of probabalistically encoded reads.
+    ploidy : int
+        Ploidy of organism.
+    haplotypes : ndarray, int, shape (n_haplotypes, n_pos)
+        Integer encoded haplotypes in VCF allele order.
+    read_counts : ndarray, int, shape (n_reads, )
+        Counts of each (unique) read.
+    inbreeding : float
+        Expected inbreeding coefficient of genotype.
+    return_phenotype_prob : bool
+        Return the mode_phenotype_probability (default = true).
+
+    Returns
+    -------
+    mode_alleles : ndarray, int, shape (ploidy, )
+        The alleles (indices of input haplotypes) of the mode genotype.
+    mode_llk : float
+        Log likelihood of the mode genotype.
+    mode_probability : float
+        Posterior probability of the mode genotype.
+    mode_phenotype_probability : float
+        Sum posterior probability of all genotypes within the mode phenotype.
+
+    Notes
+    -----
+    This method avoids storing values for all possible genotypes in memory.
+    """
+    n_haplotypes = len(haplotypes)
+    n_genotypes = count_unique_genotypes(n_haplotypes, ploidy)
+    mode_genotype, mode_llk, mode_ljoint, total_ljoint = _call_posterior_mode(
+        reads=reads,
+        ploidy=ploidy,
+        haplotypes=haplotypes,
+        n_genotypes=n_genotypes,
+        read_counts=read_counts,
+        inbreeding=inbreeding,
+    )
+    mode_genotype_prob = np.exp(mode_ljoint - total_ljoint)
+
+    if not return_phenotype_prob:
+        return mode_genotype, mode_llk, mode_genotype_prob
+
+    phenotype_ljoint = _phenotype_log_joint(
+        genotype=mode_genotype,
+        reads=reads,
+        haplotypes=haplotypes,
+        read_counts=read_counts,
+        inbreeding=inbreeding,
+    )
+    mode_phenotype_prob = np.exp(phenotype_ljoint - total_ljoint)
+    return mode_genotype, mode_llk, mode_genotype_prob, mode_phenotype_prob
 
 
 @njit(cache=True)
