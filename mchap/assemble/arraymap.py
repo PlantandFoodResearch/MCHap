@@ -1,0 +1,133 @@
+from numba import njit
+import numpy as np
+
+
+@njit(cache=True)
+def new(array_length, node_branches, initial_size=32):
+    """Initialise a new array map for 1-dimensional integer arrays of fixed length.
+
+    Parameters
+    ----------
+    array_length : int
+        Length of arrays stored in this map.
+    node_branches : int
+        Number of possible branches from each node.
+    initial_size : int
+        Initial array size for nodes and values.
+
+    Returns
+    -------
+    tree : np.array, int, shape (initial_size, node_branches)
+        Array of array_map nodes in which -1 in a null value.
+    values : nd.array, float, shape (initial_size, )
+        Array of values stored in array_map.
+    array_length : int
+        Fixed size of arrays stored in this array_map.
+    empty_node : int
+        Index of the first empty node slot excluding 0.
+    empty_value : int
+        Index of the first empty values slot.
+
+    Notes
+    -----
+    Returned values are not meant to be interacted with individually and should be
+    treated as a single object.
+
+    """
+    tree = np.full((initial_size, node_branches), -1, np.int64)
+    values = np.full(initial_size, np.nan, np.float64)
+    return (tree, values, array_length, 1, 0)
+
+
+@njit(cache=True)
+def set(array_map, array, value):
+    """Set the value stored for a given array in an array_map.
+
+    Parameters
+    ----------
+    array_map : tuple
+        An array_map tuple.
+    array : ndarray, int shape (array_length, )
+        Integer 1-d array.
+    value : float
+        Value to store in array_map.
+
+    Returns
+    -------
+    array_map : tuple
+        An updated array_map tuple.
+
+    Notes
+    -----
+    Elements of the array_map may be updated in place or replaced
+    hence existing references to the array_map should not be reused.
+    """
+    tree, values, array_length, empty_node, empty_values = array_map
+    _, n_branches = tree.shape
+    assert len(array) == array_length
+    node = 0
+    for i in range(len(array)):
+        j = array[i]
+        assert j < n_branches
+        next_node = tree[node, j]
+        if next_node < 0:
+            # add a new node to the tree
+            next_node = empty_node
+            tree[node, j] = next_node
+            empty_node += 1
+            # expand tree array size if full
+            if (empty_node + 1) == len(tree):
+                # tree is full so double size
+                n_nodes, n_node_options = tree.shape
+                new_tree = np.full((n_nodes * 2, n_node_options), -1, tree.dtype)
+                new_tree[0:n_nodes] = tree
+                tree = new_tree
+        node = next_node
+    # final node points to values
+    value_idx = tree[node, 0]
+    if value_idx < 0:
+        value_idx = empty_values
+        tree[node, 0] = value_idx
+        empty_values += 1
+        # expand values array size if full
+        if (empty_values + 1) == len(values):
+            # values is full so double size
+            n_values = len(values)
+            new_values = np.full((n_values * 2), np.nan, values.dtype)
+            new_values[0:n_values] = values
+            values = new_values
+    values[value_idx] = value
+    return (tree, values, array_length, empty_node, empty_values)
+
+
+@njit(cache=True)
+def get(array_map, array):
+    """Retrive the value stored for a given array in an array_map.
+
+    Parameters
+    ----------
+    array_map : tuple
+        An array_map tuple.
+    array : ndarray, int shape (array_length, )
+        Integer 1-d array.
+
+    Returns
+    -------
+    value : float
+        Value stored in array_map.
+    """
+    tree, values, array_length, _, empty_values = array_map
+    assert len(array) == array_length
+    node = 0
+    for i in range(len(array)):
+        j = array[i]
+        next_node = tree[node, j]
+        if next_node < 0:
+            # no entry for this array
+            return values[empty_values]
+        node = next_node
+    # final node points to values
+    value_idx = tree[node, 0]
+    if value_idx < 0:
+        return values[empty_values]
+    return values[value_idx]
