@@ -5,6 +5,7 @@ import numba
 from math import lgamma
 
 from mchap.assemble import util
+from mchap.assemble import arraymap
 
 __all__ = [
     "log_likelihood",
@@ -145,6 +146,84 @@ def log_likelihood_structural_change(
         llk += log_read_prob
 
     return llk
+
+
+@numba.njit(cache=True)
+def new_log_likelihood_cache(ploidy, n_base, max_alleles):
+    """Create an array_map forcaching log-likelihoods.
+
+    Parameters
+    ----------
+    ploidy : int
+        Ploidy of genotype.
+    n_base : int
+        Number of base postions in genotype.
+    max_alleles : int
+        Maximumnumber of alleles at any given postion in genotype.
+
+    Returns
+    -------
+    tree : np.array, int, shape (initial_size, node_branches)
+        Array of array_map nodes in which -1 in a null value.
+    values : nd.array, float, shape (initial_size, )
+        Array of values stored in array_map.
+    array_length : int
+        Fixed size of arrays stored in this array_map.
+    empty_node : int
+        Index of the first empty node slot excluding 0.
+    empty_value : int
+        Index of the first empty values slot.
+
+    Notes
+    -----
+    Returned values are not meant to be interacted with individually and should be
+    treated as a single object.
+
+    """
+    return arraymap.new(ploidy * n_base, max_alleles, initial_size=64)
+
+
+@numba.njit(cache=True)
+def log_likelihood_cached(reads, genotype, cache, read_counts=None, use_cache=True):
+    """Log likelihood of observed reads given a genotype with caching.
+
+    Parameters
+    ----------
+    reads : ndarray, float, shape (n_reads, n_base, n_nucl)
+        Observed reads encoded as an array of
+        probabilistic matrices.
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded
+        as simple integers from 0 to n_nucl.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache`.
+    read_counts : ndarray, int, shape (n_reads, )
+        Optionally specify the number of observations of
+        each read.
+
+    Returns
+    -------
+    llk : float
+        Log-likelihood of the observed reads given the genotype.
+    cache : tuple
+        An updated array_map tuple.
+
+    Notes
+    -----
+    Elements of the cache array_map may be updated in place or replaced
+    hence existing references to the array_map should not be reused.
+    """
+    if not use_cache:
+        llk = log_likelihood(reads, genotype, read_counts=read_counts)
+        return llk, cache
+
+    # try retrive from cache
+    llk = arraymap.get(cache, genotype.ravel())
+    if np.isnan(llk):
+        # calculate and update cache
+        llk = log_likelihood(reads, genotype, read_counts=read_counts)
+        cache = arraymap.set(cache, genotype.ravel(), llk)
+    return llk, cache
 
 
 @numba.njit(cache=True)
