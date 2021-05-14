@@ -34,6 +34,7 @@ def new(array_length, node_branches, initial_size=32):
     treated as a single object.
 
     """
+    assert initial_size >= 2
     tree = np.full((initial_size, node_branches), -1, np.int64)
     values = np.full(initial_size, np.nan, np.float64)
     return (tree, values, array_length, 1, 0)
@@ -76,7 +77,7 @@ def set(array_map, array, value):
             tree[node, j] = next_node
             empty_node += 1
             # expand tree array size if full
-            if (empty_node + 1) == len(tree):
+            if (empty_node + 1) >= len(tree):
                 # tree is full so double size
                 n_nodes, n_node_options = tree.shape
                 new_tree = np.full((n_nodes * 2, n_node_options), -1, tree.dtype)
@@ -90,7 +91,7 @@ def set(array_map, array, value):
         tree[node, 0] = value_idx
         empty_values += 1
         # expand values array size if full
-        if (empty_values + 1) == len(values):
+        if (empty_values + 1) >= len(values):
             # values is full so double size
             n_values = len(values)
             new_values = np.full((n_values * 2), np.nan, values.dtype)
