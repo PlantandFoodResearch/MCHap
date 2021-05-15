@@ -236,6 +236,46 @@ def log_likelihood_cached(reads, genotype, cache, read_counts=None, use_cache=Tr
 
 
 @numba.njit(cache=True)
+def log_likelihood_structural_change_cached(
+    reads,
+    genotype,
+    haplotype_indices,
+    cache,
+    interval=None,
+    read_counts=None,
+    use_cache=True,
+):
+    if not use_cache:
+        llk = log_likelihood_structural_change(
+            reads=reads,
+            genotype=genotype,
+            haplotype_indices=haplotype_indices,
+            interval=interval,
+            read_counts=read_counts,
+        )
+        return llk, cache
+
+    # try retrive from cache
+    genotype_new = genotype.copy()
+    util.structural_change(
+        genotype_new, haplotype_indices=haplotype_indices, interval=interval
+    )
+    llk = arraymap.get(cache, genotype_new.ravel())
+    if np.isnan(llk):
+        # calculate and update cache
+        llk = log_likelihood_structural_change(
+            reads=reads,
+            genotype=genotype,
+            haplotype_indices=haplotype_indices,
+            interval=interval,
+            read_counts=read_counts,
+        )
+        # the cache will emptied if it is full
+        cache = arraymap.set(cache, genotype_new.ravel(), llk, empty_if_full=True)
+    return llk, cache
+
+
+@numba.njit(cache=True)
 def log_genotype_null_prior(dosage, unique_haplotypes):
     """Prior probability of a dosage for a non-inbred individual
     assuming all haplotypes are equally probable.

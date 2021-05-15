@@ -465,3 +465,47 @@ def index_as_genotype_alleles(index, ploidy):
         remainder -= prev
         out[p - 1] = n
     return out
+
+
+@numba.njit(cache=True)
+def structural_change(genotype, haplotype_indices, interval=None):
+    """Mutate genotype by re-arranging haplotypes
+    within a given interval.
+
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as
+        simple integers from 0 to n_allele.
+    haplotype_indices : ndarray, int, shape (ploidy)
+        Indicies of haplotypes to update alleles from.
+    interval : tuple, int, optional
+        If set then base-positions copies/swaps between
+        haplotype is constrained to the specified
+        half open interval (defaults = None).
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Variable `genotype` is updated in place.
+
+    """
+
+    ploidy, n_base = genotype.shape
+
+    cache = np.empty(ploidy, dtype=np.int8)
+
+    r = interval_as_range(interval, n_base)
+
+    for j in r:
+
+        # copy to cache
+        for h in range(ploidy):
+            cache[h] = genotype[h, j]
+
+        # copy new bases back to genotype
+        for h in range(ploidy):
+            genotype[h, j] = cache[haplotype_indices[h]]

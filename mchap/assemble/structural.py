@@ -5,7 +5,7 @@ import numba
 
 from mchap.assemble import util
 from mchap.assemble.likelihood import (
-    log_likelihood_structural_change,
+    log_likelihood_structural_change_cached,
     log_genotype_prior,
 )
 
@@ -66,50 +66,6 @@ def random_breaks(breaks, n):
         intervals[i, 0] = points[i]
         intervals[i, 1] = points[i + 1]
     return intervals
-
-
-@numba.njit(cache=True)
-def structural_change(genotype, haplotype_indices, interval=None):
-    """Mutate genotype by re-arranging haplotypes
-    within a given interval.
-
-    Parameters
-    ----------
-    genotype : ndarray, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as
-        simple integers from 0 to n_allele.
-    haplotype_indices : ndarray, int, shape (ploidy)
-        Indicies of haplotypes to update alleles from.
-    interval : tuple, int, optional
-        If set then base-positions copies/swaps between
-        haplotype is constrained to the specified
-        half open interval (defaults = None).
-
-    Returns
-    -------
-    None
-
-    Notes
-    -----
-    Variable `genotype` is updated in place.
-
-    """
-
-    ploidy, n_base = genotype.shape
-
-    cache = np.empty(ploidy, dtype=np.int8)
-
-    r = util.interval_as_range(interval, n_base)
-
-    for j in r:
-
-        # copy to cache
-        for h in range(ploidy):
-            cache[h] = genotype[h, j]
-
-        # copy new bases back to genotype
-        for h in range(ploidy):
-            genotype[h, j] = cache[haplotype_indices[h]]
 
 
 @numba.njit(cache=True)
@@ -474,6 +430,7 @@ def interval_step(
     reads,
     llk,
     unique_haplotypes,
+    cache,
     inbreeding=0,
     interval=None,
     step_type=0,
@@ -535,7 +492,7 @@ def interval_step(
 
     n_options = len(option_labels)
     if n_options == 0:
-        return llk
+        return llk, cache
     log_proposal_prob = np.log(1 / n_options)
 
     # ratio of prior probabilities
@@ -553,10 +510,11 @@ def interval_step(
     for i in range(n_options):
 
         # log likelihood ratio
-        llk_i = log_likelihood_structural_change(
-            reads,
-            genotype,
-            option_labels[i, :, 0],
+        llk_i, cache = log_likelihood_structural_change_cached(
+            reads=reads,
+            genotype=genotype,
+            cache=cache,
+            haplotype_indices=option_labels[i, :, 0],
             interval=interval,
             read_counts=read_counts,
         )
@@ -594,14 +552,14 @@ def interval_step(
 
     if choice < n_options:
         # update genotype
-        structural_change(genotype, option_labels[choice, :, 0], interval)
+        util.structural_change(genotype, option_labels[choice, :, 0], interval)
         llk = llks[choice]
     else:
         # all options rejected
         pass
 
     # return llk of new genotype
-    return llk
+    return llk, cache
 
 
 @numba.njit(cache=True)
@@ -610,6 +568,7 @@ def compound_step(
     reads,
     llk,
     intervals,
+    cache,
     n_alleles=None,
     inbreeding=0,
     step_type=0,
@@ -676,10 +635,11 @@ def compound_step(
 
     # step through every iterval
     for i in range(n_intervals):
-        llk = interval_step(
-            genotype,
-            reads,
-            llk,
+        llk, cache = interval_step(
+            genotype=genotype,
+            reads=reads,
+            llk=llk,
+            cache=cache,
             unique_haplotypes=unique_haplotypes,
             inbreeding=inbreeding,
             interval=intervals[i],
@@ -687,4 +647,4 @@ def compound_step(
             temp=temp,
             read_counts=read_counts,
         )
-    return llk
+    return llk, cache

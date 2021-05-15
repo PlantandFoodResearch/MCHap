@@ -323,7 +323,7 @@ def _denovo_gibbs_sampler(
             if np.random.rand() <= recombination_step_probability:
                 n_breaks = util.random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
-                llk = structural.compound_step(
+                llk, cache = structural.compound_step(
                     genotype=genotype,
                     inbreeding=inbreeding,
                     reads=reads,
@@ -333,13 +333,14 @@ def _denovo_gibbs_sampler(
                     step_type=0,
                     temp=temp,
                     read_counts=read_counts,
+                    cache=cache,
                 )
 
             # interval dosage step
             if np.random.rand() <= partial_dosage_step_probability:
                 n_breaks = util.random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
-                llk = structural.compound_step(
+                llk, cache = structural.compound_step(
                     genotype=genotype,
                     inbreeding=inbreeding,
                     reads=reads,
@@ -349,11 +350,12 @@ def _denovo_gibbs_sampler(
                     step_type=1,
                     temp=temp,
                     read_counts=read_counts,
+                    cache=cache,
                 )
 
             # final full length dosage swap
             if np.random.rand() <= dosage_step_probability:
-                llk = structural.compound_step(
+                llk, cache = structural.compound_step(
                     genotype=genotype,
                     inbreeding=inbreeding,
                     reads=reads,
@@ -363,6 +365,7 @@ def _denovo_gibbs_sampler(
                     step_type=1,
                     temp=temp,
                     read_counts=read_counts,
+                    cache=cache,
                 )
 
             # chain swap step if not the highest temp
