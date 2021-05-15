@@ -7,7 +7,7 @@ from mchap.assemble.util import normalise_log_probs
 __all__ = ["snp_posterior"]
 
 
-def snp_posterior(reads, position, n_alleles, ploidy, inbreeding=0):
+def snp_posterior(reads, position, n_alleles, ploidy, inbreeding=0, read_counts=None):
     """Brute-force the posterior probability across all possible
     genotypes for a single SNP position.
 
@@ -23,6 +23,8 @@ def snp_posterior(reads, position, n_alleles, ploidy, inbreeding=0):
         Ploidy of organism.
     inbreeding : float
         Expected inbreeding coefficient of organism.
+    read_counts : ndarray, int, shape (n_reads, )
+        Count of each read.
 
     Returns
     -------
@@ -51,7 +53,11 @@ def snp_posterior(reads, position, n_alleles, ploidy, inbreeding=0):
         _, dosage = np.unique(genotype, return_counts=True)
         lprior = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
         # treat as haplotypes with single position
-        llk = log_likelihood(reads[:, position : position + 1, :], genotype[..., None])
+        llk = log_likelihood(
+            reads[:, position : position + 1, :],
+            genotype[..., None],
+            read_counts=read_counts,
+        )
 
         log_probabilities[j] = lprior + llk
 
