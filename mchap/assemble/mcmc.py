@@ -157,7 +157,11 @@ class DenovoMCMC(Assembler):
         # to be homozygous
         # these can be 'fixed' to reduce computational complexity
         hom_probs = _homozygosity_probabilities(
-            reads, self.n_alleles, self.ploidy, self.inbreeding
+            reads,
+            self.n_alleles,
+            self.ploidy,
+            inbreeding=self.inbreeding,
+            read_counts=read_counts,
         )
         fixed = hom_probs >= self.fix_homozygous
         homozygous = np.any(fixed, axis=-1)
@@ -474,7 +478,9 @@ def _read_mean_dist(reads):
     return dist
 
 
-def _homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=0):
+def _homozygosity_probabilities(
+    reads, n_alleles, ploidy, inbreeding=0, read_counts=None
+):
     """Calculate posterior probabilities at each single SNP position to determine
     if an individual is homozygous for a single allele.
 
@@ -488,6 +494,8 @@ def _homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=0):
         Ploidy of organism.
     inbreeding : float
         Expected inbreeding coefficient of organism.
+    read_counts : ndarray, int, shape (n_reads, )
+        Count of each read.
 
     Returns
     -------
@@ -506,7 +514,9 @@ def _homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=0):
         n = n_alleles[i]
 
         # calculate posterior distribution
-        genotypes, probs = snp_posterior(reads, i, n, ploidy, inbreeding)
+        genotypes, probs = snp_posterior(
+            reads, i, n, ploidy, inbreeding, read_counts=read_counts
+        )
 
         # look at homozygous genotypes
         homozygous = np.all(genotypes[:, 0:1] == genotypes, axis=-1)
