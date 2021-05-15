@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from mchap.assemble import mutation, structural
 from mchap.assemble.tempering import chain_swap_step
-from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble.likelihood import log_likelihood, new_log_likelihood_cache
 from mchap.assemble import util
 from mchap.assemble.classes import Assembler, GenotypeMultiTrace
 from mchap.assemble.snpcalling import snp_posterior
@@ -283,6 +283,9 @@ def _denovo_gibbs_sampler(
     llks = np.empty(n_temps)
     llks[:] = log_likelihood(reads, genotype, read_counts=read_counts)
 
+    # llk cache
+    cache = new_log_likelihood_cache(ploidy, n_base, max_alleles=np.max(n_alleles))
+
     if return_heated_trace:
         # trace for each chain
         genotype_trace = np.empty((n_temps, steps) + genotype.shape, np.int8)
@@ -305,7 +308,7 @@ def _denovo_gibbs_sampler(
                 raise ValueError("Encountered log likelihood of nan")
 
             # mutation step
-            llk = mutation.compound_step(
+            llk, cache = mutation.compound_step(
                 genotype=genotype,
                 inbreeding=inbreeding,
                 reads=reads,
@@ -313,6 +316,7 @@ def _denovo_gibbs_sampler(
                 n_alleles=n_alleles,
                 temp=temp,
                 read_counts=read_counts,
+                cache=cache,
             )
 
             # recombinations step

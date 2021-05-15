@@ -4,7 +4,7 @@ import numpy as np
 import numba
 
 from mchap.assemble import util
-from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
+from mchap.assemble.likelihood import log_likelihood_cached, log_genotype_prior
 
 
 __all__ = ["base_step", "compound_step"]
@@ -18,6 +18,7 @@ def base_step(
     h,
     j,
     unique_haplotypes,
+    cache,
     inbreeding=0,
     n_alleles=None,
     temp=1,
@@ -101,7 +102,9 @@ def base_step(
             genotype[h, j] = i
 
             # calculate and store log-likelihood: P(G'|R)
-            llk_i = log_likelihood(reads, genotype, read_counts=read_counts)
+            llk_i, cache = log_likelihood_cached(
+                reads, genotype, cache=cache, read_counts=read_counts
+            )
             llks[i] = llk_i
 
             # calculate log likelihood ratio: ln(P(G'|R)/P(G|R))
@@ -136,7 +139,7 @@ def base_step(
     genotype[h, j] = choice
 
     # return final log liklihood
-    return llks[choice]
+    return llks[choice], cache
 
 
 @numba.njit(cache=True)
@@ -144,6 +147,7 @@ def compound_step(
     genotype,
     reads,
     llk,
+    cache,
     inbreeding=0,
     n_alleles=None,
     temp=1,
@@ -207,16 +211,17 @@ def compound_step(
 
     for i in range(ploidy * n_base):
         h, j = substeps[i]
-        llk = base_step(
+        llk, cache = base_step(
             genotype=genotype,
             reads=reads,
             llk=llk,
             h=h,
             j=j,
+            cache=cache,
             unique_haplotypes=unique_haplotypes,
             inbreeding=inbreeding,
             n_alleles=n_alleles[j],
             temp=temp,
             read_counts=read_counts,
         )
-    return llk
+    return llk, cache
