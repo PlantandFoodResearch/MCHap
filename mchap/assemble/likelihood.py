@@ -149,7 +149,7 @@ def log_likelihood_structural_change(
 
 
 @numba.njit(cache=True)
-def new_log_likelihood_cache(ploidy, n_base, max_alleles):
+def new_log_likelihood_cache(ploidy, n_base, max_alleles, max_size=2 ** 16):
     """Create an array_map forcaching log-likelihoods.
 
     Parameters
@@ -159,7 +159,10 @@ def new_log_likelihood_cache(ploidy, n_base, max_alleles):
     n_base : int
         Number of base postions in genotype.
     max_alleles : int
-        Maximumnumber of alleles at any given postion in genotype.
+        Maximum number of alleles at any given postion in genotype.
+    max_size : int
+        Maximum array length for nodes and values at which point storing
+        new values will raise an error.
 
     Returns
     -------
@@ -173,6 +176,9 @@ def new_log_likelihood_cache(ploidy, n_base, max_alleles):
         Index of the first empty node slot excluding 0.
     empty_value : int
         Index of the first empty values slot.
+    max_size : int
+        Maximum array length for nodes and values at which point storing
+        new values will raise an error.
 
     Notes
     -----
@@ -180,7 +186,9 @@ def new_log_likelihood_cache(ploidy, n_base, max_alleles):
     treated as a single object.
 
     """
-    return arraymap.new(ploidy * n_base, max_alleles, initial_size=64)
+    return arraymap.new(
+        ploidy * n_base, max_alleles, initial_size=64, max_size=max_size
+    )
 
 
 @numba.njit(cache=True)
@@ -222,7 +230,8 @@ def log_likelihood_cached(reads, genotype, cache, read_counts=None, use_cache=Tr
     if np.isnan(llk):
         # calculate and update cache
         llk = log_likelihood(reads, genotype, read_counts=read_counts)
-        cache = arraymap.set(cache, genotype.ravel(), llk)
+        # the cache will emptied if it is full
+        cache = arraymap.set(cache, genotype.ravel(), llk, empty_if_full=True)
     return llk, cache
 
 

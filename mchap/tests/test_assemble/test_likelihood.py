@@ -128,15 +128,17 @@ def test_log_likelihood__fuzz(ploidy, n_base, n_reps):
         [2, 5, 10],
         [4, 3, 10],
         [4, 8, 1000],
+        [4, 40, 1000],  # beyond max cache size
     ],
 )
 def test_log_likelihood_cache__fuzz(ploidy, n_base, n_reps):
     np.random.seed(0)
-    cache = new_log_likelihood_cache(ploidy, n_base, max_alleles=2)
+    cache = new_log_likelihood_cache(ploidy, n_base, max_alleles=2, max_size=2 ** 16)
     haplotypes = np.random.randint(2, size=(ploidy, n_base))
     reads = simulate_reads(haplotypes)
     for _ in range(n_reps):
         # 'proposed' genotype
+        print(_, cache[0].shape, cache[-1], cache[0][-2])
         proposed = np.random.randint(2, size=(ploidy, n_base))
         expect = log_likelihood(reads, proposed)
         actual_1, cache = log_likelihood_cached(reads, proposed, cache, use_cache=False)

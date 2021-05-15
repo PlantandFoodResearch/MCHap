@@ -3,7 +3,7 @@ import numpy as np
 
 
 @njit(cache=True)
-def new(array_length, node_branches, initial_size=32):
+def new(array_length, node_branches, initial_size=32, max_size=2 ** 16):
     """Initialise a new array map for 1-dimensional integer arrays of fixed length.
 
     Parameters
@@ -13,7 +13,10 @@ def new(array_length, node_branches, initial_size=32):
     node_branches : int
         Number of possible branches from each node.
     initial_size : int
-        Initial array size for nodes and values.
+        Initial array length for nodes and values.
+    max_size : int
+        Maximum array length for nodes and values at which point storing
+        new values will raise an error.
 
     Returns
     -------
@@ -27,6 +30,9 @@ def new(array_length, node_branches, initial_size=32):
         Index of the first empty node slot excluding 0.
     empty_value : int
         Index of the first empty values slot.
+    max_size : int
+        Maximum array length for nodes and values at which point storing
+        new values will raise an error.
 
     Notes
     -----
@@ -37,11 +43,11 @@ def new(array_length, node_branches, initial_size=32):
     assert initial_size >= 2
     tree = np.full((initial_size, node_branches), -1, np.int64)
     values = np.full(initial_size, np.nan, np.float64)
-    return (tree, values, array_length, 1, 0)
+    return (tree, values, array_length, 1, 0, max_size)
 
 
 @njit(cache=True)
-def set(array_map, array, value):
+def set(array_map, array, value, empty_if_full=False):
     """Set the value stored for a given array in an array_map.
 
     Parameters
@@ -52,6 +58,11 @@ def set(array_map, array, value):
         Integer 1-d array.
     value : float
         Value to store in array_map.
+    empty_if_full : bool
+        If true then the input array_map will be returned
+        with all nodes and values removed instead of raising an
+        error when trying to expand the array_map beyond
+        its maximum size.
 
     Returns
     -------
@@ -63,7 +74,7 @@ def set(array_map, array, value):
     Elements of the array_map may be updated in place or replaced
     hence existing references to the array_map should not be reused.
     """
-    tree, values, array_length, empty_node, empty_values = array_map
+    tree, values, array_length, empty_node, empty_values, max_size = array_map
     _, n_branches = tree.shape
     assert len(array) == array_length
     node = 0
@@ -80,9 +91,20 @@ def set(array_map, array, value):
             if (empty_node + 1) >= len(tree):
                 # tree is full so double size
                 n_nodes, n_node_options = tree.shape
+                if (n_nodes * 2) > max_size:
+                    if empty_if_full:
+                        # remove all nodes and values
+                        tree[:] = -1
+                        values[:] = np.nan
+                        return (tree, values, array_length, 1, 0, max_size)
+                    else:
+                        raise ValueError(
+                            "cannot expand array_map beyond its maximum size."
+                        )
                 new_tree = np.full((n_nodes * 2, n_node_options), -1, tree.dtype)
                 new_tree[0:n_nodes] = tree
                 tree = new_tree
+        assert node < next_node < empty_node < len(tree)
         node = next_node
     # final node points to values
     value_idx = tree[node, 0]
@@ -94,11 +116,19 @@ def set(array_map, array, value):
         if (empty_values + 1) >= len(values):
             # values is full so double size
             n_values = len(values)
+            if (n_values * 2) > max_size:
+                if empty_if_full:
+                    # remove all nodes and values
+                    tree[:] = -1
+                    values[:] = np.nan
+                    return (tree, values, array_length, 1, 0, max_size)
+                else:
+                    raise ValueError("cannot expand array_map beyond its maximum size.")
             new_values = np.full((n_values * 2), np.nan, values.dtype)
             new_values[0:n_values] = values
             values = new_values
     values[value_idx] = value
-    return (tree, values, array_length, empty_node, empty_values)
+    return (tree, values, array_length, empty_node, empty_values, max_size)
 
 
 @njit(cache=True)
@@ -117,7 +147,7 @@ def get(array_map, array):
     value : float
         Value stored in array_map.
     """
-    tree, values, array_length, _, empty_values = array_map
+    tree, values, array_length, _, empty_values, _ = array_map
     assert len(array) == array_length
     node = 0
     for i in range(len(array)):
