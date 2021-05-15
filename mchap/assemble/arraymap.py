@@ -74,6 +74,8 @@ def set(array_map, array, value, empty_if_full=False):
     Elements of the array_map may be updated in place or replaced
     hence existing references to the array_map should not be reused.
     """
+    if array_map is None:
+        return array_map
     tree, values, array_length, empty_node, empty_values, max_size = array_map
     _, n_branches = tree.shape
     assert len(array) == array_length
@@ -147,6 +149,8 @@ def get(array_map, array):
     value : float
         Value stored in array_map.
     """
+    if array_map is None:
+        return np.nan
     tree, values, array_length, _, empty_values, _ = array_map
     assert len(array) == array_length
     node = 0

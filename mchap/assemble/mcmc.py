@@ -33,6 +33,7 @@ class DenovoMCMC(Assembler):
     dosage_step_probability: float = 1.0
     temperatures: tuple = (1.0,)
     random_seed: int = None
+    llk_cache_threshold: int = 100
     """De novo haplotype assembly using Markov chain Monte Carlo
     for probabilistically encoded variable positions of NGS reads.
 
@@ -225,6 +226,7 @@ class DenovoMCMC(Assembler):
             dosage_step_probability=self.dosage_step_probability,
             temperatures=temperatures,
             return_heated_trace=False,
+            llk_cache_threshold=self.llk_cache_threshold,
         )
 
         # drop the first dimension of each trace component
@@ -265,6 +267,7 @@ def _denovo_gibbs_sampler(
     dosage_step_probability,
     temperatures,
     return_heated_trace=False,
+    llk_cache_threshold=100,
 ):
     """Gibbs sampler with parallele temporing"""
     # assert temperatures[-1] == 1.0
@@ -284,7 +287,11 @@ def _denovo_gibbs_sampler(
     llks[:] = log_likelihood(reads, genotype, read_counts=read_counts)
 
     # llk cache
-    cache = new_log_likelihood_cache(ploidy, n_base, max_alleles=np.max(n_alleles))
+    u_reads = len(reads)
+    if ploidy * n_base * u_reads > llk_cache_threshold:
+        cache = new_log_likelihood_cache(ploidy, n_base, max_alleles=np.max(n_alleles))
+    else:
+        cache = None
 
     if return_heated_trace:
         # trace for each chain

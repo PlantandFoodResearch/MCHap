@@ -141,8 +141,8 @@ def test_log_likelihood_cache__fuzz(ploidy, n_base, n_reps):
         print(_, cache[0].shape, cache[-1], cache[0][-2])
         proposed = np.random.randint(2, size=(ploidy, n_base))
         expect = log_likelihood(reads, proposed)
-        actual_1, cache = log_likelihood_cached(reads, proposed, cache, use_cache=False)
-        actual_2, cache = log_likelihood_cached(reads, proposed, cache, use_cache=True)
+        actual_1, _ = log_likelihood_cached(reads, proposed, cache=None)
+        actual_2, cache = log_likelihood_cached(reads, proposed, cache=cache)
         assert expect == actual_1
         assert expect == actual_2
 

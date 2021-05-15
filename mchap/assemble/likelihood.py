@@ -192,7 +192,7 @@ def new_log_likelihood_cache(ploidy, n_base, max_alleles, max_size=2 ** 16):
 
 
 @numba.njit(cache=True)
-def log_likelihood_cached(reads, genotype, cache, read_counts=None, use_cache=True):
+def log_likelihood_cached(reads, genotype, cache, read_counts=None):
     """Log likelihood of observed reads given a genotype with caching.
 
     Parameters
@@ -221,7 +221,7 @@ def log_likelihood_cached(reads, genotype, cache, read_counts=None, use_cache=Tr
     Elements of the cache array_map may be updated in place or replaced
     hence existing references to the array_map should not be reused.
     """
-    if not use_cache:
+    if cache is None:
         llk = log_likelihood(reads, genotype, read_counts=read_counts)
         return llk, cache
 
@@ -243,9 +243,8 @@ def log_likelihood_structural_change_cached(
     cache,
     interval=None,
     read_counts=None,
-    use_cache=True,
 ):
-    if not use_cache:
+    if cache is None:
         llk = log_likelihood_structural_change(
             reads=reads,
             genotype=genotype,

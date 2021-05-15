@@ -82,6 +82,7 @@ class program(object):
     mcmc_partial_dosage_step_probability: float = 0.5
     mcmc_dosage_step_probability: bool = 1.0
     mcmc_incongruence_threshold: float = 0.60
+    mcmc_llk_cache_threshold: int = 100
     haplotype_posterior_threshold: float = 0.2
     use_assembly_posteriors: bool = False
     report_genotype_likelihoods: bool = False
@@ -489,6 +490,18 @@ class program(object):
         )
 
         parser.add_argument(
+            "--mcmc-llk-cache-threshold",
+            type=int,
+            nargs=1,
+            default=[100],
+            help=(
+                "Threshold for determining whether to cache log-likelihoods "
+                "during MCMC to improve performance. This value is computed as "
+                "ploidy * variants * unique-reads (default = 100)."
+            ),
+        )
+
+        parser.add_argument(
             "--read-group-field",
             nargs=1,
             type=str,
@@ -628,6 +641,7 @@ class program(object):
             ],
             mcmc_dosage_step_probability=args.mcmc_dosage_step_probability[0],
             mcmc_incongruence_threshold=args.mcmc_chain_incongruence_threshold[0],
+            mcmc_llk_cache_threshold=args.mcmc_llk_cache_threshold[0],
             use_assembly_posteriors=args.use_assembly_posteriors,
             haplotype_posterior_threshold=args.haplotype_posterior_threshold[0],
             report_genotype_likelihoods=args.genotype_likelihoods,
@@ -808,6 +822,7 @@ class program(object):
                         dosage_step_probability=self.mcmc_dosage_step_probability,
                         temperatures=self.mcmc_temperatures,
                         random_seed=self.random_seed,
+                        llk_cache_threshold=self.mcmc_llk_cache_threshold,
                     )
                     .fit(
                         data.sample_read_dists_unique[sample],
