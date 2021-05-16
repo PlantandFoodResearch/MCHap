@@ -83,7 +83,7 @@ def metropolis_hastings_transitions(transitions, llks, priors):
     llk : array_like
         Log-likelihood of each state.
     priors : array_like
-        Relative prior=probability of each state.
+        Prior probability of each state.
 
     Returns
     -------

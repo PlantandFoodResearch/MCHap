@@ -192,7 +192,7 @@ def new_log_likelihood_cache(ploidy, n_base, max_alleles, max_size=2 ** 16):
 
 
 @numba.njit(cache=True)
-def log_likelihood_cached(reads, genotype, cache, read_counts=None):
+def log_likelihood_cached(reads, genotype, read_counts=None, cache=None):
     """Log likelihood of observed reads given a genotype with caching.
 
     Parameters
@@ -203,11 +203,11 @@ def log_likelihood_cached(reads, genotype, cache, read_counts=None):
     genotype : ndarray, int, shape (ploidy, n_base)
         Set of haplotypes with base positions encoded
         as simple integers from 0 to n_nucl.
-    cache : tuple
-        An array_map tuple created with `new_log_likelihood_cache`.
     read_counts : ndarray, int, shape (n_reads, )
         Optionally specify the number of observations of
         each read.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache`.
 
     Returns
     -------
@@ -240,10 +240,41 @@ def log_likelihood_structural_change_cached(
     reads,
     genotype,
     haplotype_indices,
-    cache,
     interval=None,
     read_counts=None,
+    cache=None,
 ):
+    """Log likelihood of observed reads given a genotype given a structural change.
+
+    Parameters
+    ----------
+    reads : ndarray, float, shape (n_reads, n_base, n_nucl)
+        Observed reads encoded as an array of
+        probabilistic matrices.
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as
+        simple integers from 0 to n_nucl.
+    haplotype_indices : ndarray, int, shape (ploidy)
+        Indicies of haplotypes to use within the
+        changed interval.
+    interval : tuple, int, shape (2, ), optional
+        Interval of base-positions to swap (defaults to
+        all base positions).
+    read_counts : ndarray, int, shape (n_reads, )
+        Optionally specify the number of observations of
+        each read.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache`.
+
+    Returns
+    -------
+    llk : float
+        Log-likelihood of the observed reads given the proposed
+        structural change to the genotype.
+    cache : tuple
+        An updated array_map tuple.
+
+    """
     if cache is None:
         llk = log_likelihood_structural_change(
             reads=reads,

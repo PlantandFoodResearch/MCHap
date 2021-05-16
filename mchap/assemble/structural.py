@@ -430,12 +430,12 @@ def interval_step(
     reads,
     llk,
     unique_haplotypes,
-    cache,
     inbreeding=0,
     interval=None,
     step_type=0,
     temp=1,
     read_counts=None,
+    cache=None,
 ):
     """A structural step of an MCMC simulation consisting of
     multiple sub-steps each of which are  constrained to a single
@@ -466,12 +466,16 @@ def interval_step(
     read_counts : ndarray, int, shape (n_reads, )
         Optionally specify the number of observations of
         each read.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache` or None.
 
     Returns
     -------
     llk : float
         The log-likelihood of the genotype state after the step
         has been made.
+    cache_updated : tuple
+        Updated cache or None.
 
     Notes
     -----
@@ -568,13 +572,13 @@ def compound_step(
     reads,
     llk,
     intervals,
-    cache,
     n_alleles=None,
     inbreeding=0,
     step_type=0,
     randomise=True,
     temp=1,
     read_counts=None,
+    cache=None,
 ):
     """A structural step of an MCMC simulation consisting of
     multiple sub-steps each of which are  constrained to a single
@@ -609,12 +613,16 @@ def compound_step(
     read_counts : ndarray, int, shape (n_reads, )
         Optionally specify the number of observations of
         each read.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache` or None.
 
     Returns
     -------
     llk : float
         The log-likelihood of the genotype state after the step
         has been made.
+    cache_updated : tuple
+        Updated cache or None.
 
     Notes
     -----
