@@ -18,11 +18,11 @@ def base_step(
     h,
     j,
     unique_haplotypes,
-    cache,
     inbreeding=0,
     n_alleles=None,
     temp=1,
     read_counts=None,
+    cache=None,
 ):
     """Mutation Gibbs sampler step for the jth base position
     of the hth haplotype.
@@ -54,12 +54,16 @@ def base_step(
     read_counts : ndarray, int, shape (n_reads, )
         Optionally specify the number of observations of
         each read.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache` or None.
 
     Returns
     -------
     llk : float
         New log-likelihood of observed reads given
         the updated genotype.
+    cache_updated : tuple
+        Updated cache or None.
 
     Notes
     -----
@@ -147,11 +151,11 @@ def compound_step(
     genotype,
     reads,
     llk,
-    cache,
     inbreeding=0,
     n_alleles=None,
     temp=1,
     read_counts=None,
+    cache=None,
 ):
     """Mutation compound Gibbs sampler step for all base positions
     of all haplotypes in a genotype.
@@ -176,11 +180,15 @@ def compound_step(
     read_counts : ndarray, int, shape (n_reads, )
         Optionally specify the number of observations of
         each read.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache` or None.
 
     Returns
     -------
     llk : float
         New log-likelihood of observed reads given the updated genotype.
+    cache_updated : tuple
+        Updated cache or None.
 
     Notes
     -----
