@@ -497,7 +497,12 @@ class program(object):
             help=(
                 "Threshold for determining whether to cache log-likelihoods "
                 "during MCMC to improve performance. This value is computed as "
-                "ploidy * variants * unique-reads (default = 100)."
+                "ploidy * variants * unique-reads (default = 100). "
+                "If set to 0 then log-likelihoods will be cached for all samples "
+                "including those with few observed reads which is inefficient and "
+                "can slow the MCMC. "
+                "If set to -1 then log-likelihood caching will be disabled for all "
+                "samples."
             ),
         )
 

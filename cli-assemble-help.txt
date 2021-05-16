@@ -26,6 +26,7 @@ usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
                                [--mcmc-partial-dosage-step-probability MCMC_PARTIAL_DOSAGE_STEP_PROBABILITY]
                                [--mcmc-dosage-step-probability MCMC_DOSAGE_STEP_PROBABILITY]
                                [--mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD]
+                               [--mcmc-llk-cache-threshold MCMC_LLK_CACHE_THRESHOLD]
                                [--read-group-field READ_GROUP_FIELD]
                                [--cores CORES]
 
@@ -185,6 +186,15 @@ optional arguments:
                         Posterior phenotype probability threshold for
                         identification of incongruent posterior modes (default
                         = 0.60).
+  --mcmc-llk-cache-threshold MCMC_LLK_CACHE_THRESHOLD
+                        Threshold for determining whether to cache log-
+                        likelihoods during MCMC to improve performance. This
+                        value is computed as ploidy * variants * unique-reads
+                        (default = 100). If set to 0 then log-likelihoods will
+                        be cached for all samples including those with few
+                        observed reads which is inefficient and can slow the
+                        MCMC. If set to -1 then log-likelihood caching will be
+                        disabled for all samples.
   --read-group-field READ_GROUP_FIELD
                         Read group field to use as sample id (default = "SM").
                         The chosen field determines tha sample ids required in

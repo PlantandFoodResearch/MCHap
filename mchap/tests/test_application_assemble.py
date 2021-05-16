@@ -336,8 +336,9 @@ def test_Program__run(cli_extra, output_vcf):
         ),
     ],
 )
+@pytest.mark.parametrize("cache_threshold", [-1, 10])
 @pytest.mark.parametrize("n_cores", [1, 2])
-def test_Program__run_stdout(bams, cli_extra, output_vcf, n_cores):
+def test_Program__run_stdout(bams, cli_extra, output_vcf, cache_threshold, n_cores):
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
@@ -368,6 +369,8 @@ def test_Program__run_stdout(bams, cli_extra, output_vcf, n_cores):
             "100",
             "--mcmc-seed",
             "11",
+            "--mcmc-llk-cache-threshold",
+            str(cache_threshold),
             "--cores",
             str(n_cores),
         ]
@@ -423,7 +426,8 @@ def test_Program__run_stdout(bams, cli_extra, output_vcf, n_cores):
         ("CHR3:20-40", "CHR3_20_40"),
     ],
 )
-def test_Program__run_stdout__region(region, region_id):
+@pytest.mark.parametrize("cache_threshold", [-1, 10])
+def test_Program__run_stdout__region(region, region_id, cache_threshold):
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
@@ -471,6 +475,8 @@ def test_Program__run_stdout__region(region, region_id):
         "100",
         "--mcmc-seed",
         "11",
+        "--mcmc-llk-cache-threshold",
+        str(cache_threshold),
     ]
 
     prog = program.cli(command)

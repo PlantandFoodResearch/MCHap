@@ -88,6 +88,10 @@ class DenovoMCMC(Assembler):
     random_seed: int, optional
         Seed the random seed for numpy and numba RNG
         (default = None).
+    llk_cache_threshold : int, optional
+        Threshold for caching log-likelihoods calculated as
+        ploidy * n_variants * n_unique_reads (default = 100).
+        If set to -1 then caching will be disabled.
 
     """
 
@@ -292,7 +296,10 @@ def _denovo_gibbs_sampler(
 
     # llk cache
     u_reads = len(reads)
-    if ploidy * n_base * u_reads > llk_cache_threshold:
+    if llk_cache_threshold < 0:
+        # disable cache for all cases
+        cache = None
+    elif ploidy * n_base * u_reads > llk_cache_threshold:
         cache = new_log_likelihood_cache(ploidy, n_base, max_alleles=np.max(n_alleles))
     else:
         cache = None
