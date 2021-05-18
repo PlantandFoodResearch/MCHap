@@ -4,13 +4,13 @@ import numpy as np
 import numba
 
 from mchap.assemble import util
-from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
+from mchap.assemble.likelihood import log_likelihood_cached, log_genotype_prior
 
 
 __all__ = ["base_step", "compound_step"]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def base_step(
     genotype,
     reads,
@@ -22,6 +22,7 @@ def base_step(
     n_alleles=None,
     temp=1,
     read_counts=None,
+    cache=None,
 ):
     """Mutation Gibbs sampler step for the jth base position
     of the hth haplotype.
@@ -53,12 +54,16 @@ def base_step(
     read_counts : ndarray, int, shape (n_reads, )
         Optionally specify the number of observations of
         each read.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache` or None.
 
     Returns
     -------
     llk : float
         New log-likelihood of observed reads given
         the updated genotype.
+    cache_updated : tuple
+        Updated cache or None.
 
     Notes
     -----
@@ -101,7 +106,9 @@ def base_step(
             genotype[h, j] = i
 
             # calculate and store log-likelihood: P(G'|R)
-            llk_i = log_likelihood(reads, genotype, read_counts=read_counts)
+            llk_i, cache = log_likelihood_cached(
+                reads, genotype, cache=cache, read_counts=read_counts
+            )
             llks[i] = llk_i
 
             # calculate log likelihood ratio: ln(P(G'|R)/P(G|R))
@@ -136,10 +143,10 @@ def base_step(
     genotype[h, j] = choice
 
     # return final log liklihood
-    return llks[choice]
+    return llks[choice], cache
 
 
-@numba.njit
+@numba.njit(cache=True)
 def compound_step(
     genotype,
     reads,
@@ -148,6 +155,7 @@ def compound_step(
     n_alleles=None,
     temp=1,
     read_counts=None,
+    cache=None,
 ):
     """Mutation compound Gibbs sampler step for all base positions
     of all haplotypes in a genotype.
@@ -172,11 +180,15 @@ def compound_step(
     read_counts : ndarray, int, shape (n_reads, )
         Optionally specify the number of observations of
         each read.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache` or None.
 
     Returns
     -------
     llk : float
         New log-likelihood of observed reads given the updated genotype.
+    cache_updated : tuple
+        Updated cache or None.
 
     Notes
     -----
@@ -207,16 +219,17 @@ def compound_step(
 
     for i in range(ploidy * n_base):
         h, j = substeps[i]
-        llk = base_step(
+        llk, cache = base_step(
             genotype=genotype,
             reads=reads,
             llk=llk,
             h=h,
             j=j,
+            cache=cache,
             unique_haplotypes=unique_haplotypes,
             inbreeding=inbreeding,
             n_alleles=n_alleles[j],
             temp=temp,
             read_counts=read_counts,
         )
-    return llk
+    return llk, cache

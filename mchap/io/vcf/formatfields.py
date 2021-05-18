@@ -64,6 +64,27 @@ AD = FormatField(
     descr="Number of reads unambiguously assigned to each allele based on MEC",
 )
 GL = FormatField(id="GL", number="G", type="Float", descr="Genotype likelihoods")
+GP = FormatField(
+    id="GP", number="G", type="Float", descr="Genotype posterior probabilities"
+)
+MCI = FormatField(
+    id="MCI",
+    number=1,
+    type="Integer",
+    descr="Replicate Markov-chain incongruence, 0 = none, 1 = incongruence, 2 = putative CNV",
+)
+KMERCOV = FormatField(
+    id="KMERCOV",
+    number=3,
+    type="Float",
+    descr="Minimum proportion of read-SNV 1-, 2-, and 3-mers found in genotype at any position.",
+)
+MCAP = FormatField(
+    id="MCAP",
+    number="R",
+    type="Float",
+    descr="Posterior probability of allele-presence from assembly MCMC",
+)
 
 
 def haplotype_depth(variant_depths):

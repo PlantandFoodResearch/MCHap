@@ -7,6 +7,8 @@ from mchap.testing import simulate_reads
 from mchap.assemble.likelihood import (
     log_likelihood,
     log_likelihood_structural_change,
+    log_likelihood_cached,
+    new_log_likelihood_cache,
     _log_dirichlet_multinomial_pmf,
     log_genotype_prior,
 )
@@ -117,6 +119,32 @@ def test_log_likelihood__fuzz(ploidy, n_base, n_reps):
         actual = log_likelihood(reads, proposed)
         expect = np.log(reference_likelihood(reads, proposed))
         np.testing.assert_almost_equal(actual, expect, decimal=10)
+
+
+@pytest.mark.parametrize(
+    "ploidy,n_base,n_reps",
+    [
+        [2, 3, 10],
+        [2, 5, 10],
+        [4, 3, 10],
+        [4, 8, 1000],
+        [4, 40, 1000],  # beyond max cache size
+    ],
+)
+def test_log_likelihood_cache__fuzz(ploidy, n_base, n_reps):
+    np.random.seed(0)
+    cache = new_log_likelihood_cache(ploidy, n_base, max_alleles=2, max_size=2 ** 16)
+    haplotypes = np.random.randint(2, size=(ploidy, n_base))
+    reads = simulate_reads(haplotypes)
+    for _ in range(n_reps):
+        # 'proposed' genotype
+        print(_, cache[0].shape, cache[-1], cache[0][-2])
+        proposed = np.random.randint(2, size=(ploidy, n_base))
+        expect = log_likelihood(reads, proposed)
+        actual_1, _ = log_likelihood_cached(reads, proposed, cache=None)
+        actual_2, cache = log_likelihood_cached(reads, proposed, cache=cache)
+        assert expect == actual_1
+        assert expect == actual_2
 
 
 @pytest.mark.parametrize(

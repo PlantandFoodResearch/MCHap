@@ -127,6 +127,44 @@ class PosteriorGenotypeDistribution(object):
         idx = labels == mode
         return PhenotypeDistribution(self.genotypes[idx], self.probabilities[idx])
 
+    # TODO: Speed this up for large distributions
+    def haplotype_probabilities(self, return_weighted=False):
+        """Calculate posterior probability of haplotype occurrence.
+
+        Parameters
+        ----------
+        return_weighted : bool
+            If true a second array will be returned containing the
+            occurrence probability weighted by the haplotype dosage.
+
+        Returns
+        -------
+        haplotypes : ndarray, int, shape (n_haplotypes, n_base)
+            Unique haplotypes.
+        probabilities : ndarray, float, shape (n_haplotypes, )
+            Posterior probability of haplotype occurrence.
+        """
+        n_gen, ploidy, n_base = self.genotypes.shape
+        haps = self.genotypes.reshape(n_gen * ploidy, n_base)
+        uhaps = mset.unique(haps)
+        uprobs = np.zeros(len(uhaps), float)
+        uweighted = np.zeros(len(uhaps), float)
+        for i in range(len(uhaps)):
+            hap = uhaps[i]
+            for j in range(len(self.genotypes)):
+                gen = self.genotypes[j]
+                p = self.probabilities[j]
+                haploid = hap[None, ...]
+                count = mset.count(gen, haploid)[0]
+                if count > 0:
+                    uprobs[i] += p
+                if return_weighted:
+                    uweighted[i] += p * (count / ploidy)
+        if return_weighted:
+            return uhaps, uprobs, uweighted
+        else:
+            return uhaps, uprobs
+
 
 @dataclass
 class PhenotypeDistribution(object):
@@ -306,3 +344,39 @@ class GenotypeMultiTrace(object):
             posterior = PosteriorGenotypeDistribution(states[idx], probs[idx])
             posteriors[chain] = posterior
         return posteriors
+
+    def replicate_incongruence(self, threshold=0.6):
+        """Identifies incongruence between replicate Markov chains.
+
+        Parameters
+        ----------
+        threshold : float
+            Posterior probability required for a chain to be compaired to others.
+
+        Returns
+        -------
+        Incongruence : int
+            0, 1 or 2 indicating no incongruence, incongruence, or incongruence
+            potentially caused by copy-number variation.
+
+        Notes
+        -----
+        A non-replicated MCMC will always return 0.
+        """
+        out = 0
+        chain_modes = [dist.mode_phenotype() for dist in self.chain_posteriors()]
+        alleles = [
+            mode.alleles()
+            for mode in chain_modes
+            if mode.probabilities.sum() >= threshold
+        ]
+        # check for more than one mode
+        mode_count = len({array.tobytes() for array in alleles})
+        if mode_count > 1:
+            out = 1
+            # check for more than ploidy alleles
+            ploidy = len(alleles[0])
+            allele_count = len(reduce(mset.union, alleles))
+            if allele_count > ploidy:
+                out = 2
+        return out

@@ -1,14 +1,11 @@
 import numpy as np
 import math
 import numba
-import ctypes
-
-from numba.extending import get_cython_function_address
 
 _FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=np.int64)
 
 
-@numba.njit
+@numba.njit(cache=True)
 def factorial_20(x):
     """Returns the factorial of integers in the range [0, 20] (inclusive)
 
@@ -29,35 +26,7 @@ def factorial_20(x):
         raise ValueError("factorial functuion is only supported for values 0 to 20")
 
 
-# modified from https://stackoverflow.com/questions/54850985/fast-algorithm-for-log-gamma-function/54855769#54855769
-# wich in turn was based on https://github.com/numba/numba/issues/3086
-_PTR = ctypes.POINTER
-_dble = ctypes.c_double
-_ptr_dble = _PTR(_dble)
-_gammaln_addr = get_cython_function_address("scipy.special.cython_special", "gammaln")
-_functype = ctypes.CFUNCTYPE(_dble, _dble)
-_gammaln_float64 = _functype(_gammaln_addr)
-
-
-@numba.njit
-def log_gamma(x):
-    """Returns the natural log of gamma of x.
-
-    Parameters
-    ----------
-    x : float
-        A float.
-
-    Returns
-    -------
-    gammaln : float
-        Natural log of gamma of x
-
-    """
-    return _gammaln_float64(x)
-
-
-@numba.njit
+@numba.njit(cache=True)
 def interval_as_range(interval, max_range):
     # TODO: inline this into the callers and remove
     if interval is None:
@@ -69,7 +38,7 @@ def interval_as_range(interval, max_range):
             raise ValueError("Interval must be `None` or array of length 2")
 
 
-@numba.njit
+@numba.njit(cache=True)
 def add_log_prob(x, y):
     """Sum of two probabilities in log space.
 
@@ -90,7 +59,7 @@ def add_log_prob(x, y):
         return y + np.log1p(np.exp(x - y))
 
 
-@numba.njit
+@numba.njit(cache=True)
 def sum_log_probs(array):
     """Sum of values in log space.
 
@@ -111,7 +80,7 @@ def sum_log_probs(array):
     return acumulate
 
 
-@numba.njit
+@numba.njit(cache=True)
 def normalise_log_probs(llks):
     """Returns normalised probabilities of
     an array of log-transformed probabilities.
@@ -138,7 +107,7 @@ def normalise_log_probs(llks):
     return normalised
 
 
-@numba.njit
+@numba.njit(cache=True)
 def random_choice(probabilities):
     """Random choice of options given a set of probabilities.
 
@@ -156,7 +125,7 @@ def random_choice(probabilities):
     return np.searchsorted(np.cumsum(probabilities), np.random.random(), side="right")
 
 
-@numba.njit
+@numba.njit(cache=True)
 def greedy_choice(probabilities):
     """Greedy choice of options given a set of probabilities.
 
@@ -174,7 +143,7 @@ def greedy_choice(probabilities):
     return np.argmax(probabilities)
 
 
-@numba.njit
+@numba.njit(cache=True)
 def array_equal(x, y, interval=None):
     """Check if two one-dimentional integer arrays are equal.
 
@@ -200,7 +169,7 @@ def array_equal(x, y, interval=None):
     return True
 
 
-@numba.njit
+@numba.njit(cache=True)
 def count_haplotype_copies(genotype, h):
     ploidy = len(genotype)
     count = 1
@@ -213,7 +182,7 @@ def count_haplotype_copies(genotype, h):
     return count
 
 
-@numba.njit
+@numba.njit(cache=True)
 def get_dosage(dosage, genotype, interval=None):
     """Calculates the dosage of a set of integer encoded haplotypes by
     checking for array equality.
@@ -260,7 +229,7 @@ def get_dosage(dosage, genotype, interval=None):
                         dosage[p] = 0
 
 
-@numba.njit
+@numba.njit(cache=True)
 def set_dosage(genotype, dosage):
     """Set a genotype to a new dosage.
 
@@ -303,7 +272,7 @@ def set_dosage(genotype, dosage):
                     dosage[h_y] += 1
 
 
-@numba.njit
+@numba.njit(cache=True)
 def n_choose_k(n, k):
     """Calculate n choose k for values of n and k < 20.
     Parameters
@@ -327,7 +296,7 @@ def n_choose_k(n, k):
     return factorial_20(n) // (factorial_20(k) * factorial_20(n - k))
 
 
-@numba.njit
+@numba.njit(cache=True)
 def count_equivalent_permutations(dosage):
     """Counts the total number of equivilent genotype perterbations
     based on the genotypes dosage.
@@ -352,7 +321,7 @@ def count_equivalent_permutations(dosage):
     return numerator // denominator
 
 
-@numba.njit
+@numba.njit(cache=True)
 def sample_alleles(array, dtype=np.int8):
     """Sample a random set of alleles from probabilities.
 
@@ -389,7 +358,154 @@ def sample_alleles(array, dtype=np.int8):
     return alleles.reshape(shape)
 
 
-@numba.njit
+@numba.njit(cache=True)
+def natural_log_to_log10(x):
+    e = np.exp(1)
+    return x * np.log10(e)
+
+
+@numba.njit(cache=True)
 def seed_numba(seed):
     """Set numba random seed"""
     np.random.seed(seed)
+
+
+@numba.njit(cache=True)
+def _greatest_common_denominatior(x: int, y: int) -> int:
+    while y != 0:
+        t = x % y
+        x = y
+        y = t
+    return x
+
+
+@numba.njit(cache=True)
+def _comb(n: int, k: int) -> int:
+    if k > n:
+        return 0
+    r = 1
+    for d in range(1, k + 1):
+        gcd = _greatest_common_denominatior(r, d)
+        r //= gcd
+        r *= n
+        r //= d // gcd
+        n -= 1
+    return r
+
+
+@numba.njit(cache=True)
+def _comb_with_replacement(n: int, k: int) -> int:
+    n = n + k - 1
+    return _comb(n, k)
+
+
+@numba.njit(cache=True)
+def genotype_alleles_as_index(alleles):
+    """Convert genotypes to the index of their array position
+    following the VCF specification for fields of length G.
+
+    Parameters
+    ----------
+    alleles
+        Integer alleles of the genotype.
+
+    Returns
+    -------
+    index
+        Index of genotype following the sort order described in the
+        VCF spec.
+    """
+    index = 0
+    for i in range(len(alleles)):
+        a = alleles[i]
+        if a >= 0:
+            index += _comb_with_replacement(a, i + 1)
+        elif a < 0:
+            raise ValueError("Allele numbers must be >= 0.")
+    return index
+
+
+@numba.njit(cache=True)
+def index_as_genotype_alleles(index, ploidy):
+    """Convert the index of a genotype sort position to the
+    genotype call indicated by that index following the VCF
+    specification for fields of length G.
+
+    Parameters
+    ----------
+    index
+        Index of genotype following the sort order described in the
+        VCF spec. An index less than 0 is invalid and will return an
+        uncalled genotype.
+    ploidy
+        Ploidy of the genotype.
+
+    Returns
+    -------
+    alleles
+        Integer alleles of the genotype.
+    """
+    out = np.full(ploidy, -2, np.int64)
+    if index < 0:
+        # handle non-call
+        out[:ploidy] = -1
+        return
+    remainder = index
+    for index in range(ploidy):
+        # find allele n for position k
+        p = ploidy - index
+        n = -1
+        new = 0
+        prev = 0
+        while new <= remainder:
+            n += 1
+            prev = new
+            new = _comb_with_replacement(n, p)
+        n -= 1
+        remainder -= prev
+        out[p - 1] = n
+    return out
+
+
+@numba.njit(cache=True)
+def structural_change(genotype, haplotype_indices, interval=None):
+    """Mutate genotype by re-arranging haplotypes
+    within a given interval.
+
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, n_base)
+        Set of haplotypes with base positions encoded as
+        simple integers from 0 to n_allele.
+    haplotype_indices : ndarray, int, shape (ploidy)
+        Indicies of haplotypes to update alleles from.
+    interval : tuple, int, optional
+        If set then base-positions copies/swaps between
+        haplotype is constrained to the specified
+        half open interval (defaults = None).
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Variable `genotype` is updated in place.
+
+    """
+
+    ploidy, n_base = genotype.shape
+
+    cache = np.empty(ploidy, dtype=np.int8)
+
+    r = interval_as_range(interval, n_base)
+
+    for j in r:
+
+        # copy to cache
+        for h in range(ploidy):
+            cache[h] = genotype[h, j]
+
+        # copy new bases back to genotype
+        for h in range(ploidy):
+            genotype[h, j] = cache[haplotype_indices[h]]

@@ -33,6 +33,12 @@ AN = InfoField(
 AF = InfoField(id="AF", number="A", type="Float", descr="Allele Frequency")
 AA = InfoField(id="AA", number=1, type="String", descr="Ancestral allele")
 END = InfoField(id="END", number=1, type="Integer", descr="End position on CHROM")
+NVAR = InfoField(
+    id="NVAR",
+    number=1,
+    type="Integer",
+    descr="Number of input variants within assembly locus",
+)
 SNVPOS = InfoField(
     id="SNVPOS",
     number=".",
@@ -44,4 +50,11 @@ AD = InfoField(
     number="R",
     type="Integer",
     descr="Total number of reads unambiguously assigned to each allele based on MEC",
+)
+DP = InfoField(id="DP", number=1, type="Integer", descr="Combined depth across samples")
+RCOUNT = InfoField(
+    id="RCOUNT",
+    number=1,
+    type="Integer",
+    descr="Total number of observed reads across all samples",
 )

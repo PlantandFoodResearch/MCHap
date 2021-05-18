@@ -35,7 +35,7 @@ def test_PosteriorGenotypeDistribution():
     np.testing.assert_array_equal(expect_probs, actual_probs)
 
 
-def test_GenotypeTrace():
+def test_GenotypeMultiTrace():
 
     genotypes = np.array(
         [
@@ -72,6 +72,57 @@ def test_GenotypeTrace():
     np.testing.assert_array_equal(posterior.probabilities, counts / counts.sum())
 
 
+@pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 1)])
+def test_GenotypeMultiTrace__replicate_incongruence(threshold, expect):
+    haplotypes = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+    g0 = haplotypes[[0, 0, 1, 2]]  # phenotype 1
+    g1 = haplotypes[[0, 1, 1, 2]]  # phenotype 1
+    g2 = haplotypes[[0, 1, 2, 2]]  # phenotype 1
+    g3 = haplotypes[[0, 0, 2, 2]]  # phenotype 2
+    genotypes = np.array([g0, g1, g2, g3])
+
+    t0 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
+    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t2 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
+    t3 = genotypes[[3, 3, 3, 3, 3, 3, 3, 2, 1, 2]]  # 3:7
+    trace = classes.GenotypeMultiTrace(
+        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10))
+    )
+
+    actual = trace.replicate_incongruence(threshold)
+    assert actual == expect
+
+
+@pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 2)])
+def test_GenotypeMultiTrace__replicate_incongruence__cnv(threshold, expect):
+    haplotypes = np.array(
+        [
+            [0, 0],
+            [0, 1],
+            [1, 0],
+            [1, 1],
+            [1, 2],
+        ]
+    )
+
+    g0 = haplotypes[[0, 0, 1, 2]]  # phenotype 1
+    g1 = haplotypes[[0, 1, 1, 2]]  # phenotype 1
+    g2 = haplotypes[[0, 1, 2, 2]]  # phenotype 1
+    g3 = haplotypes[[0, 0, 2, 3]]  # phenotype 2
+    g4 = haplotypes[[0, 2, 3, 4]]  # phenotype 3
+    genotypes = np.array([g0, g1, g2, g3, g4])
+
+    t0 = genotypes[[3, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t2 = genotypes[[0, 3, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t3 = genotypes[[3, 3, 4, 4, 4, 3, 4, 4, 4, 4]]  # 3:7
+    trace = classes.GenotypeMultiTrace(
+        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10))
+    )
+    actual = trace.replicate_incongruence(threshold)
+    assert actual == expect
+
+
 def test_PhenotypeDistribution___mode_genotype():
     array = np.array(
         [
@@ -87,6 +138,83 @@ def test_PhenotypeDistribution___mode_genotype():
     actual = dist.mode_genotype()
     np.testing.assert_array_equal(expect[0], actual[0])
     assert expect[1] == actual[1]
+
+
+def test_PosteriorGenotypeDistribution__haplotype_probabilities():
+    array = np.array(
+        [
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 1, 1]],
+            [[0, 0, 0], [0, 0, 0], [1, 0, 1], [1, 1, 1]],
+            [[0, 0, 0], [1, 0, 1], [0, 1, 0], [1, 1, 1]],
+        ],
+        dtype=np.int8,
+    )
+    probs = np.array([0.05, 0.65, 0.2, 0.1])
+    dist = classes.PosteriorGenotypeDistribution(array, probs)
+    expect_haps = np.array(
+        [
+            [0, 0, 0],
+            [1, 1, 1],
+            [1, 0, 1],
+            [0, 1, 0],
+        ]
+    )
+    expect_probs = np.array(
+        [
+            0.05 + 0.65 + 0.2 + 0.1,
+            0.65 + 0.2 + 0.1,
+            0.2 + 0.1,
+            0.1,
+        ]
+    )
+    actual_haps, actual_probs = dist.haplotype_probabilities()
+    np.testing.assert_array_equal(actual_haps, expect_haps)
+    np.testing.assert_array_almost_equal(actual_probs, expect_probs)
+
+
+def test_PosteriorGenotypeDistribution__haplotype_probabilities__weights():
+    array = np.array(
+        [
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 1, 1]],
+            [[0, 0, 0], [0, 0, 0], [1, 0, 1], [1, 1, 1]],
+            [[0, 0, 0], [1, 0, 1], [0, 1, 0], [1, 1, 1]],
+        ],
+        dtype=np.int8,
+    )
+    probs = np.array([0.05, 0.65, 0.2, 0.1])
+    dist = classes.PosteriorGenotypeDistribution(array, probs)
+    expect_haps = np.array(
+        [
+            [0, 0, 0],
+            [1, 1, 1],
+            [1, 0, 1],
+            [0, 1, 0],
+        ]
+    )
+    expect_probs = np.array(
+        [
+            0.05 + 0.65 + 0.2 + 0.1,
+            0.65 + 0.2 + 0.1,
+            0.2 + 0.1,
+            0.1,
+        ]
+    )
+    expect_weights = np.array(
+        [
+            0.05 * 1 + 0.65 * (3 / 4) + 0.2 * (2 / 4) + 0.1 * (1 / 4),
+            0.65 * (1 / 4) + 0.2 * (1 / 4) + 0.1 * (1 / 4),
+            0.2 * (1 / 4) + 0.1 * (1 / 4),
+            0.1 * (1 / 4),
+        ]
+    )
+    actual_haps, actual_probs, actual_weights = dist.haplotype_probabilities(
+        return_weighted=True
+    )
+    np.testing.assert_array_equal(actual_haps, expect_haps)
+    np.testing.assert_array_almost_equal(actual_probs, expect_probs)
+    np.testing.assert_array_almost_equal(actual_weights, expect_weights)
 
 
 @pytest.mark.parametrize(

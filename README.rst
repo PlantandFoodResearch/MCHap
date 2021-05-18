@@ -13,7 +13,7 @@ From the root directory of this repository run:
 
     pip install -r requirements.txt
     python setup.py sdist
-    pip install mchap-*.tar.gz
+    pip install dist/mchap-*.tar.gz
 
 
 Usage
@@ -67,6 +67,15 @@ Generally speaking assembles will be slower for higher ploidy organisms,
 with higher read-depths or with more SNPs falling within each locus in the
 BED file.
 
+Jit compilation
+~~~~~~~~~~~~~~~
+
+MCHap heavily utilizes the numba JIT compiler to speed up MCMC simulations.
+However, the first time you run MCHap on a new system it will have to
+compile the functions that make use of the numba JIT compiler and the 
+compiled functions are then cached for reuse.
+This means that MCHap may run a bit slower the first time it's run on a
+new system.
 
 Running on multiple threads
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

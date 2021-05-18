@@ -1,8 +1,6 @@
 import numpy as np
 from dataclasses import dataclass
-from functools import reduce
 
-from mchap import mset
 from mchap.encoding import integer
 
 
@@ -118,11 +116,11 @@ class SampleDepthFilter(SampleFilter):
         template = "Sample has mean read depth less than {}"
         return template.format(self.threshold)
 
-    def __call__(self, depths, gap="-"):
-        if np.prod(depths.shape) == 0:
-            # can't apply depth filter across 0 variants
+    def __call__(self, depth, gap="-"):
+        if np.isnan(depth):
+            # can't apply
             return FilterCall(self.id, None, applied=False)
-        fail = np.mean(depths) < self.threshold
+        fail = depth < self.threshold
         return FilterCall(self.id, fail)
 
 
@@ -159,55 +157,4 @@ class SamplePhenotypeProbabilityFilter(SampleFilter):
 
     def __call__(self, p):
         fails = p < self.threshold
-        return FilterCall(self.id, fails)
-
-
-@dataclass(frozen=True)
-class SampleChainPhenotypeIncongruenceFilter(SampleFilter):
-    threshold: float = 0.60
-
-    @property
-    def id(self):
-        return "mci{}".format(int(self.threshold * 100))
-
-    @property
-    def descr(self):
-        template = "Replicate Markov chains found incongruent phenotypes with posterior probability greater than {}"
-        return template.format(self.threshold)
-
-    def __call__(self, chain_modes):
-        alleles = [
-            mode.alleles()
-            for mode in chain_modes
-            if mode.probabilities.sum() >= self.threshold
-        ]
-        count = len({array.tobytes() for array in alleles})
-        fails = count > 1
-        return FilterCall(self.id, fails)
-
-
-@dataclass(frozen=True)
-class SampleChainPhenotypeCNVFilter(SampleFilter):
-    threshold: float = 0.60
-
-    @property
-    def id(self):
-        return "cnv{}".format(int(self.threshold * 100))
-
-    @property
-    def descr(self):
-        template = "Combined chains found more haplotypes than ploidy with posterior probability greater than {}"
-        return template.format(self.threshold)
-
-    def __call__(self, chain_modes):
-        alleles = [
-            mode.alleles()
-            for mode in chain_modes
-            if mode.probabilities.sum() >= self.threshold
-        ]
-        if len(alleles) == 0:
-            return FilterCall(self.id, failed=False, applied=False)
-        ploidy = len(alleles[0])
-        count = len(reduce(mset.union, alleles))
-        fails = count > ploidy
         return FilterCall(self.id, fails)

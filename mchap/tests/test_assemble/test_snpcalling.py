@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from mchap.assemble.snpcalling import snp_posterior
 
@@ -132,7 +133,14 @@ def test_snp_posterior__novel_allele():
     np.testing.assert_almost_equal(expect_probs, actual_probs)
 
 
-def test_snp_posterior__homozygous_deep():
+@pytest.mark.parametrize(
+    "use_read_counts",
+    [
+        False,
+        True,
+    ],
+)
+def test_snp_posterior__homozygous_deep(use_read_counts):
 
     read = np.array(
         [
@@ -143,7 +151,12 @@ def test_snp_posterior__homozygous_deep():
         ],
         dtype=float,
     )
-    reads = np.tile(read, (100, 1, 1))
+    if use_read_counts:
+        read_counts = np.array([100])
+        reads = np.tile(read, (1, 1, 1))
+    else:
+        read_counts = None
+        reads = np.tile(read, (100, 1, 1))
 
     expect_genotypes = np.array(
         [[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 1], [0, 1, 1, 1], [1, 1, 1, 1]],
@@ -154,14 +167,26 @@ def test_snp_posterior__homozygous_deep():
     expect_probs = np.array([1.0, 0.0, 0.0, 0.0, 0.0])
 
     actual_genotypes, actual_probs = snp_posterior(
-        reads, position=0, n_alleles=2, ploidy=4, inbreeding=0.0
+        reads,
+        position=0,
+        n_alleles=2,
+        ploidy=4,
+        inbreeding=0.0,
+        read_counts=read_counts,
     )
 
     np.testing.assert_almost_equal(expect_genotypes, actual_genotypes)
     np.testing.assert_almost_equal(expect_probs, actual_probs, decimal=10)
 
 
-def test_snp_posterior__homozygous_shallow():
+@pytest.mark.parametrize(
+    "use_read_counts",
+    [
+        False,
+        True,
+    ],
+)
+def test_snp_posterior__homozygous_shallow(use_read_counts):
 
     read = np.array(
         [
@@ -172,7 +197,12 @@ def test_snp_posterior__homozygous_shallow():
         ],
         dtype=float,
     )
-    reads = np.tile(read, (2, 1, 1))
+    if use_read_counts:
+        read_counts = np.array([2])
+        reads = np.tile(read, (1, 1, 1))
+    else:
+        read_counts = None
+        reads = np.tile(read, (2, 1, 1))
 
     expect_genotypes = np.array(
         [[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 1], [0, 1, 1, 1], [1, 1, 1, 1]],
@@ -185,7 +215,12 @@ def test_snp_posterior__homozygous_shallow():
     )
 
     actual_genotypes, actual_probs = snp_posterior(
-        reads, position=0, n_alleles=2, ploidy=4, inbreeding=0.0
+        reads,
+        position=0,
+        n_alleles=2,
+        ploidy=4,
+        inbreeding=0.0,
+        read_counts=read_counts,
     )
 
     np.testing.assert_almost_equal(expect_genotypes, actual_genotypes)

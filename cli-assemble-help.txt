@@ -1,16 +1,22 @@
-usage: MCMC haplotype assembly [-h] [--targets TARGETS] [--variants VARIANTS]
+usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
+                               [--targets TARGETS] [--variants VARIANTS]
                                [--reference REFERENCE] [--bam [BAM [BAM ...]]]
-                               [--bam-list BAM_LIST] [--ploidy PLOIDY]
+                               [--bam-list BAM_LIST] [--sample-bam SAMPLE_BAM]
+                               [--ploidy PLOIDY]
                                [--sample-ploidy SAMPLE_PLOIDY]
                                [--sample-list SAMPLE_LIST]
                                [--inbreeding INBREEDING]
                                [--sample-inbreeding SAMPLE_INBREEDING]
                                [--base-error-rate BASE_ERROR_RATE]
                                [--ignore-base-phred-scores]
+                               [--haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD]
+                               [--use-assembly-posteriors]
+                               [--genotype-likelihoods]
+                               [--genotype-posteriors]
                                [--mapping-quality MAPPING_QUALITY]
                                [--keep-duplicate-reads] [--keep-qcfail-reads]
-                               [--keep-supplementary-reads] [--best-genotype]
-                               [--call-filtered] [--mcmc-chains MCMC_CHAINS]
+                               [--keep-supplementary-reads]
+                               [--mcmc-chains MCMC_CHAINS]
                                [--mcmc-temperatures [MCMC_TEMPERATURES [MCMC_TEMPERATURES ...]]]
                                [--mcmc-steps MCMC_STEPS]
                                [--mcmc-burn MCMC_BURN]
@@ -19,22 +25,27 @@ usage: MCMC haplotype assembly [-h] [--targets TARGETS] [--variants VARIANTS]
                                [--mcmc-recombination-step-probability MCMC_RECOMBINATION_STEP_PROBABILITY]
                                [--mcmc-partial-dosage-step-probability MCMC_PARTIAL_DOSAGE_STEP_PROBABILITY]
                                [--mcmc-dosage-step-probability MCMC_DOSAGE_STEP_PROBABILITY]
-                               [--filter-depth FILTER_DEPTH]
-                               [--filter-read-count FILTER_READ_COUNT]
-                               [--filter-probability FILTER_PROBABILITY]
-                               [--filter-kmer-k FILTER_KMER_K]
-                               [--filter-kmer FILTER_KMER]
-                               [--filter-chain-incongruence FILTER_CHAIN_INCONGRUENCE]
-                               [--genotype-likelihoods]
+                               [--mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD]
+                               [--mcmc-llk-cache-threshold MCMC_LLK_CACHE_THRESHOLD]
                                [--read-group-field READ_GROUP_FIELD]
                                [--cores CORES]
 
 optional arguments:
   -h, --help            show this help message and exit
-  --targets TARGETS     Bed file containing genomic intervals for haplotype
-                        assembly. First three columns (contig, start, stop)
-                        are mandatory. If present, the fourth column (id) will
-                        be used as the variant id in the output VCF.
+  --region REGION       Specify a single target region with the format
+                        contig:start-stop. This region will be a single
+                        variant in the output VCF. This argument can not be
+                        combined with the --targets argument.
+  --region-id REGION_ID
+                        Specify an identifier for the locus specified with the
+                        --region argument. This id will be reported in the
+                        output VCF.
+  --targets TARGETS     Bed file containing multiple genomic intervals for
+                        haplotype assembly. First three columns (contig,
+                        start, stop) are mandatory. If present, the fourth
+                        column (id) will be used as the variant id in the
+                        output VCF.This argument can not be combined with the
+                        --region argument.
   --variants VARIANTS   Tabix indexed VCF file containing SNP variants to be
                         used in assembly. Assembled haplotypes will only
                         contain the reference and alternate alleles specified
@@ -48,6 +59,13 @@ optional arguments:
   --bam-list BAM_LIST   A file containing a list of bam file paths (one per
                         line). This can optionally be used in place of or
                         combined with the --bam parameter.
+  --sample-bam SAMPLE_BAM
+                        A file containing a list of samples with bam file
+                        paths. This can optionally be used in place the --bam
+                        and --bam-list parameters. This is faster than using
+                        those parameters when running many small jobs. An
+                        error will be thrown if a sample is not found within
+                        its specified bam file.
   --ploidy PLOIDY       Default ploidy for all samples (default = 2). This
                         value is used for all samples which are not specified
                         using the --sample-ploidy parameter
@@ -67,14 +85,14 @@ optional arguments:
                         Default inbreeding coefficient for all samples
                         (default = 0.0). This value is used for all samples
                         which are not specified using the --sample-inbreeding
-                        parameter
+                        parameter.
   --sample-inbreeding SAMPLE_INBREEDING
                         A file containing a list of samples with an inbreeding
                         coefficient used to indicate where their expected
                         inbreeding coefficient default value. Each line should
                         contain a sample identifier followed by a tab and then
                         a inbreeding coefficient value within the interval [0,
-                        1]
+                        1].
   --base-error-rate BASE_ERROR_RATE
                         Expected base error rate of read sequences (default =
                         0.0). This is used in addition to base phred-scores by
@@ -86,6 +104,38 @@ optional arguments:
                         for greater de-duplication of reads however an error
                         rate > 0.0 must be specified with the --base-error-
                         rate argument.
+  --haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD
+                        Posterior probability required for a haplotype to be
+                        included in the output VCF as an alternative allele.
+                        The posterior probability of each haplotype is
+                        assessed per individual and calculated as the
+                        probability of that haplotype being present with one
+                        or more copies in that individual.A haplotype is
+                        included as an alternate allele if it meets this
+                        posterior probability threshold in at least one
+                        individual. This parameter is the main mechanism to
+                        control the number of alternate alleles in ech VCF
+                        record and hence the number of genotypes assessed when
+                        recalculating likelihoods and posterior distributions
+                        (default = 0.20).
+  --use-assembly-posteriors
+                        Flag: Use posterior probabilities from each
+                        individuals assembly rather than recomputing
+                        posteriors based on the observed alleles across all
+                        samples. These posterior probabilities will be used to
+                        call genotypes , metrics related to the genotype, and
+                        the posterior distribution (GP field) if specified.
+                        This may lead to less robust genotype calls in the
+                        presence of multi-modality and hence it is recommended
+                        to run the simulation for longer or using parallel-
+                        tempering when using this option. This option may be
+                        more suitable than the default when calling haplotypes
+                        in unrelated individuals.
+  --genotype-likelihoods
+                        Flag: Report genotype likelihoods in the GL VCF field.
+  --genotype-posteriors
+                        Flag: Report genotype posterior probabilities in the
+                        GP VCF field.
   --mapping-quality MAPPING_QUALITY
                         Minimum mapping quality of reads used in assembly
                         (default = 20).
@@ -97,16 +147,6 @@ optional arguments:
   --keep-supplementary-reads
                         Flag: Use reads marked as supplementary in the
                         assembly (these are skipped by default).
-  --best-genotype       Flag: allways call the best supported complete
-                        genotype within a called phenotype. This may result in
-                        calling genotypes with a posterior probability less
-                        than --filter-probability however a phenotype
-                        probability of >= --filter-probability is still
-                        required.
-  --call-filtered       Flag: include genotype calls for filtered samples.
-                        Sample filter tags will still indicate samples that
-                        have been filtered. WARNING: this can result in a
-                        large VCF file with un-informative genotype calls.
   --mcmc-chains MCMC_CHAINS
                         Number of independent MCMC chains per assembly
                         (default = 2).
@@ -142,33 +182,19 @@ optional arguments:
   --mcmc-dosage-step-probability MCMC_DOSAGE_STEP_PROBABILITY
                         Probability of performing a dosage sub-step during
                         each step of the MCMC. (default = 1.0).
-  --filter-depth FILTER_DEPTH
-                        Minimum sample read depth required to include an
-                        assembly result (default = 5.0). Read depth is
-                        measured as the mean of read depth across each
-                        variable position.
-  --filter-read-count FILTER_READ_COUNT
-                        Minimum number of read (pairs) required within a
-                        target interval in order to include an assembly result
-                        (default = 5).
-  --filter-probability FILTER_PROBABILITY
-                        Minimum sample assembly posterior probability required
-                        to call a phenotype i.e. a set of unique haplotypes of
-                        unknown dosage (default = 0.95). Genotype dosage will
-                        be called or partially called if it also exceeds this
-                        threshold. See also the --best-genotype flag.
-  --filter-kmer-k FILTER_KMER_K
-                        Size of variant kmer used to filter assembly results
-                        (default = 3).
-  --filter-kmer FILTER_KMER
-                        Minimum kmer representation required at each position
-                        in assembly results (default = 0.90).
-  --filter-chain-incongruence FILTER_CHAIN_INCONGRUENCE
+  --mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD
                         Posterior phenotype probability threshold for
                         identification of incongruent posterior modes (default
                         = 0.60).
-  --genotype-likelihoods
-                        Flag: report genotype likelihoods in the GL VCF field.
+  --mcmc-llk-cache-threshold MCMC_LLK_CACHE_THRESHOLD
+                        Threshold for determining whether to cache log-
+                        likelihoods during MCMC to improve performance. This
+                        value is computed as ploidy * variants * unique-reads
+                        (default = 100). If set to 0 then log-likelihoods will
+                        be cached for all samples including those with few
+                        observed reads which is inefficient and can slow the
+                        MCMC. If set to -1 then log-likelihood caching will be
+                        disabled for all samples.
   --read-group-field READ_GROUP_FIELD
                         Read group field to use as sample id (default = "SM").
                         The chosen field determines tha sample ids required in

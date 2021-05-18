@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from mchap.assemble import mutation, structural
 from mchap.assemble.tempering import chain_swap_step
-from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble.likelihood import log_likelihood, new_log_likelihood_cache
 from mchap.assemble import util
 from mchap.assemble.classes import Assembler, GenotypeMultiTrace
 from mchap.assemble.snpcalling import snp_posterior
@@ -33,6 +33,7 @@ class DenovoMCMC(Assembler):
     dosage_step_probability: float = 1.0
     temperatures: tuple = (1.0,)
     random_seed: int = None
+    llk_cache_threshold: int = 100
     """De novo haplotype assembly using Markov chain Monte Carlo
     for probabilistically encoded variable positions of NGS reads.
 
@@ -87,6 +88,10 @@ class DenovoMCMC(Assembler):
     random_seed: int, optional
         Seed the random seed for numpy and numba RNG
         (default = None).
+    llk_cache_threshold : int, optional
+        Threshold for caching log-likelihoods calculated as
+        ploidy * n_variants * n_unique_reads (default = 100).
+        If set to -1 then caching will be disabled.
 
     """
 
@@ -156,7 +161,11 @@ class DenovoMCMC(Assembler):
         # to be homozygous
         # these can be 'fixed' to reduce computational complexity
         hom_probs = _homozygosity_probabilities(
-            reads, self.n_alleles, self.ploidy, self.inbreeding
+            reads,
+            self.n_alleles,
+            self.ploidy,
+            inbreeding=self.inbreeding,
+            read_counts=read_counts,
         )
         fixed = hom_probs >= self.fix_homozygous
         homozygous = np.any(fixed, axis=-1)
@@ -225,6 +234,7 @@ class DenovoMCMC(Assembler):
             dosage_step_probability=self.dosage_step_probability,
             temperatures=temperatures,
             return_heated_trace=False,
+            llk_cache_threshold=self.llk_cache_threshold,
         )
 
         # drop the first dimension of each trace component
@@ -250,7 +260,7 @@ class DenovoMCMC(Assembler):
             return template, llks
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _denovo_gibbs_sampler(
     *,
     genotype,
@@ -265,6 +275,7 @@ def _denovo_gibbs_sampler(
     dosage_step_probability,
     temperatures,
     return_heated_trace=False,
+    llk_cache_threshold=100,
 ):
     """Gibbs sampler with parallele temporing"""
     # assert temperatures[-1] == 1.0
@@ -282,6 +293,16 @@ def _denovo_gibbs_sampler(
     # likelihood for each genotype at each temp
     llks = np.empty(n_temps)
     llks[:] = log_likelihood(reads, genotype, read_counts=read_counts)
+
+    # llk cache
+    u_reads = len(reads)
+    if llk_cache_threshold < 0:
+        # disable cache for all cases
+        cache = None
+    elif ploidy * n_base * u_reads > llk_cache_threshold:
+        cache = new_log_likelihood_cache(ploidy, n_base, max_alleles=np.max(n_alleles))
+    else:
+        cache = None
 
     if return_heated_trace:
         # trace for each chain
@@ -305,7 +326,7 @@ def _denovo_gibbs_sampler(
                 raise ValueError("Encountered log likelihood of nan")
 
             # mutation step
-            llk = mutation.compound_step(
+            llk, cache = mutation.compound_step(
                 genotype=genotype,
                 inbreeding=inbreeding,
                 reads=reads,
@@ -313,13 +334,14 @@ def _denovo_gibbs_sampler(
                 n_alleles=n_alleles,
                 temp=temp,
                 read_counts=read_counts,
+                cache=cache,
             )
 
             # recombinations step
             if np.random.rand() <= recombination_step_probability:
                 n_breaks = util.random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
-                llk = structural.compound_step(
+                llk, cache = structural.compound_step(
                     genotype=genotype,
                     inbreeding=inbreeding,
                     reads=reads,
@@ -329,13 +351,14 @@ def _denovo_gibbs_sampler(
                     step_type=0,
                     temp=temp,
                     read_counts=read_counts,
+                    cache=cache,
                 )
 
             # interval dosage step
             if np.random.rand() <= partial_dosage_step_probability:
                 n_breaks = util.random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
-                llk = structural.compound_step(
+                llk, cache = structural.compound_step(
                     genotype=genotype,
                     inbreeding=inbreeding,
                     reads=reads,
@@ -345,11 +368,12 @@ def _denovo_gibbs_sampler(
                     step_type=1,
                     temp=temp,
                     read_counts=read_counts,
+                    cache=cache,
                 )
 
             # final full length dosage swap
             if np.random.rand() <= dosage_step_probability:
-                llk = structural.compound_step(
+                llk, cache = structural.compound_step(
                     genotype=genotype,
                     inbreeding=inbreeding,
                     reads=reads,
@@ -359,6 +383,7 @@ def _denovo_gibbs_sampler(
                     step_type=1,
                     temp=temp,
                     read_counts=read_counts,
+                    cache=cache,
                 )
 
             # chain swap step if not the highest temp
@@ -460,7 +485,9 @@ def _read_mean_dist(reads):
     return dist
 
 
-def _homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=0):
+def _homozygosity_probabilities(
+    reads, n_alleles, ploidy, inbreeding=0, read_counts=None
+):
     """Calculate posterior probabilities at each single SNP position to determine
     if an individual is homozygous for a single allele.
 
@@ -474,6 +501,8 @@ def _homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=0):
         Ploidy of organism.
     inbreeding : float
         Expected inbreeding coefficient of organism.
+    read_counts : ndarray, int, shape (n_reads, )
+        Count of each read.
 
     Returns
     -------
@@ -492,7 +521,9 @@ def _homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=0):
         n = n_alleles[i]
 
         # calculate posterior distribution
-        genotypes, probs = snp_posterior(reads, i, n, ploidy, inbreeding)
+        genotypes, probs = snp_posterior(
+            reads, i, n, ploidy, inbreeding, read_counts=read_counts
+        )
 
         # look at homozygous genotypes
         homozygous = np.all(genotypes[:, 0:1] == genotypes, axis=-1)

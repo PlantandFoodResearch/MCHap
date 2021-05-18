@@ -5,10 +5,11 @@ import sys
 import shutil
 import pysam
 import pytest
+import numpy as np
 
 from mchap.version import __version__
 from mchap.io.vcf.headermeta import filedate, columns
-from mchap.application.assemble import program
+from mchap.application.assemble import program, _genotype_as_alleles
 
 
 def test_Program__cli():
@@ -84,6 +85,11 @@ def test_Program__cli_lists():
         str(path / "simple.sample3.deep.bam"),
     ]
 
+    sample_bams = {
+        "SAMPLE1": str(path / "simple.sample1.deep.bam"),
+        "SAMPLE3": str(path / "simple.sample3.deep.bam"),
+    }
+
     # write some files to use in io
     dirpath = tempfile.mkdtemp()
 
@@ -148,7 +154,7 @@ def test_Program__cli_lists():
     assert prog.cli_command == command
 
     assert prog.samples == samples
-    assert prog.bams == bams
+    assert prog.sample_bams == sample_bams
 
     for k, v in zip(samples, [2, 4, 6]):
         assert prog.sample_ploidy[k] == v
@@ -218,12 +224,6 @@ def test_Program__header():
 
     filters_expect = [
         '##FILTER=<ID=PASS,Description="All filters passed">',
-        '##FILTER=<ID=3m90,Description="Less than 90.0 percent of read-variant 3-mers represented in haplotypes">',
-        '##FILTER=<ID=dp5,Description="Sample has mean read depth less than 5.0">',
-        '##FILTER=<ID=rc5,Description="Sample has read (pair) count of less than 5.0">',
-        '##FILTER=<ID=pp95,Description="Samples phenotype posterior probability less than 0.95">',
-        '##FILTER=<ID=mci60,Description="Replicate Markov chains found incongruent phenotypes with posterior probability greater than 0.6">',
-        '##FILTER=<ID=cnv60,Description="Combined chains found more haplotypes than ploidy with posterior probability greater than 0.6">',
     ]
     filters_actual = [line for line in header if line.startswith("##FILTER")]
     assert filters_actual == filters_expect
@@ -234,7 +234,22 @@ def test_Program__header():
     assert columns_actual == columns_expect
 
 
-def test_Program__run():
+@pytest.mark.parametrize(
+    "cli_extra,output_vcf",
+    [
+        (["--use-assembly-posteriors"], "simple.output.deep.old.vcf"),
+        (
+            [
+                "--use-assembly-posteriors",
+                "--base-error-rate",
+                "0.001",
+                "--ignore-base-phred-scores",
+            ],
+            "simple.output.deep.old.vcf",
+        ),
+    ],
+)
+def test_Program__run(cli_extra, output_vcf):
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
@@ -268,69 +283,13 @@ def test_Program__run():
         "100",
         "--mcmc-seed",
         "11",
-    ]
+    ] + cli_extra
 
     prog = program.cli(command)
     result = prog.run()
 
     # compare to expected VCF
-    with open(str(path / "simple.output.deep.vcf"), "r") as f:
-        for i, line in enumerate(f):
-            line = line.strip()
-            if line.startswith("##commandline"):
-                # file paths will differ
-                pass
-            elif line.startswith("##fileDate"):
-                # new date should be greater than test vcf date
-                assert result[i] > line
-            else:
-                assert result[i] == line
-
-
-def test_Program__run__no_base_phreds():
-    path = pathlib.Path(__file__).parent.absolute()
-    path = path / "test_io/data"
-
-    BED = str(path / "simple.bed.gz")
-    VCF = str(path / "simple.vcf.gz")
-    REF = str(path / "simple.fasta")
-    BAMS = [
-        str(path / "simple.sample1.deep.bam"),
-        str(path / "simple.sample2.deep.bam"),
-        str(path / "simple.sample3.deep.bam"),
-    ]
-
-    command = [
-        "mchap",
-        "assemble",
-        "--bam",
-        BAMS[0],
-        BAMS[1],
-        BAMS[2],
-        "--ploidy",
-        "4",
-        "--targets",
-        BED,
-        "--variants",
-        VCF,
-        "--reference",
-        REF,
-        "--base-error-rate",
-        "0.001",
-        "--ignore-base-phred-scores",
-        "--mcmc-steps",
-        "500",
-        "--mcmc-burn",
-        "100",
-        "--mcmc-seed",
-        "11",
-    ]
-
-    prog = program.cli(command)
-    result = prog.run()
-
-    # compare to expected VCF
-    with open(str(path / "simple.output.deep.vcf"), "r") as f:
+    with open(str(path / output_vcf), "r") as f:
         for i, line in enumerate(f):
             line = line.strip()
             if line.startswith("##commandline"):
@@ -352,8 +311,13 @@ def test_Program__run__no_base_phreds():
                 "simple.sample2.deep.bam",
                 "simple.sample3.deep.bam",
             ],
-            [],
-            "simple.output.deep.vcf",
+            ["--use-assembly-posteriors"],
+            "simple.output.deep.old.vcf",
+        ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--use-assembly-posteriors"],
+            "simple.output.mixed_depth.old.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
@@ -365,10 +329,16 @@ def test_Program__run__no_base_phreds():
             ["--genotype-likelihoods"],
             "simple.output.mixed_depth.likelihoods.vcf",
         ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--genotype-posteriors"],
+            "simple.output.mixed_depth.posteriors.vcf",
+        ),
     ],
 )
+@pytest.mark.parametrize("cache_threshold", [-1, 10])
 @pytest.mark.parametrize("n_cores", [1, 2])
-def test_Program__run_stdout(bams, cli_extra, output_vcf, n_cores):
+def test_Program__run_stdout(bams, cli_extra, output_vcf, cache_threshold, n_cores):
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
@@ -399,6 +369,8 @@ def test_Program__run_stdout(bams, cli_extra, output_vcf, n_cores):
             "100",
             "--mcmc-seed",
             "11",
+            "--mcmc-llk-cache-threshold",
+            str(cache_threshold),
             "--cores",
             str(n_cores),
         ]
@@ -445,6 +417,112 @@ def test_Program__run_stdout(bams, cli_extra, output_vcf, n_cores):
     os.remove(out_filename)
 
 
+@pytest.mark.parametrize(
+    "region,region_id",
+    [
+        ("CHR1:5-25", "CHR1_05_25"),
+        ("CHR1:30-50", "CHR1_30_50"),
+        ("CHR2:10-30", "CHR2_10_30"),
+        ("CHR3:20-40", "CHR3_20_40"),
+    ],
+)
+@pytest.mark.parametrize("cache_threshold", [-1, 10])
+def test_Program__run_stdout__region(region, region_id, cache_threshold):
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / "test_io/data"
+
+    output_vcf = "simple.output.mixed_depth.vcf"
+
+    REF = str(path / "simple.fasta")
+    VCF = str(path / "simple.vcf.gz")
+
+    # match sample to bam
+    sample_bam_pairs = [
+        "SAMPLE1" + "\t" + str(path / "simple.sample1.bam"),
+        "SAMPLE2" + "\t" + str(path / "simple.sample2.deep.bam"),
+        "SAMPLE3" + "\t" + str(path / "simple.sample3.bam"),
+    ]
+
+    # create a tmp file with sample bam pairs
+    dirpath = tempfile.mkdtemp()
+    tmp_sample_bams = dirpath + "/sample-bams.txt"
+    with open(tmp_sample_bams, "w") as f:
+        f.write("\n".join(sample_bam_pairs))
+
+    # first part of VCF record line to match to
+    contig, interval = region.split(":")
+    start, _ = interval.split("-")
+    record_start = "{}\t{}".format(contig, int(start) + 1)
+
+    command = [
+        "mchap",
+        "assemble",
+        "--sample-bam",
+        tmp_sample_bams,
+        "--ploidy",
+        "4",
+        "--region",
+        region,
+        "--region-id",
+        region_id,
+        "--variants",
+        VCF,
+        "--reference",
+        REF,
+        "--mcmc-steps",
+        "500",
+        "--mcmc-burn",
+        "100",
+        "--mcmc-seed",
+        "11",
+        "--mcmc-llk-cache-threshold",
+        str(cache_threshold),
+    ]
+
+    prog = program.cli(command)
+
+    # capture stdout in file
+    _, out_filename = tempfile.mkstemp()
+    stdout = sys.stdout
+    sys.stdout = open(out_filename, "w")
+    prog.run_stdout()
+    sys.stdout.close()
+
+    # replace stdout
+    sys.stdout = stdout
+
+    # compare output to expected
+    with open(out_filename, "r") as f:
+        actual = f.readlines()
+    with open(str(path / output_vcf), "r") as f:
+        expected = f.readlines()
+    # filter vcf down to the header and single expected record
+    expected = [
+        line
+        for line in expected
+        if (line.startswith("#") or line.startswith(record_start))
+    ]
+
+    # assert a single non-header line in actual and same number of lines as expect
+    assert len([line for line in actual if (not line.startswith("#"))]) == 1
+    assert len(actual) == len(expected)
+
+    for act, exp in zip(actual, expected):
+        # file paths will make full line differ
+        if act.startswith("##commandline"):
+            assert exp.startswith("##commandline")
+        elif act.startswith("##fileDate"):
+            # new date should be greater than test vcf date
+            assert exp.startswith("##fileDate")
+            assert act > exp
+        else:
+            assert act == exp
+
+    # cleanup
+    shutil.rmtree(dirpath)
+    os.remove(out_filename)
+
+
 def test_Program__output_pysam():
     """Test that program output can be parsed by pysam and that the
     parsed output matches the initial output.
@@ -452,7 +530,7 @@ def test_Program__output_pysam():
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
-    OUTFILE = str(path / "simple.output.deep.vcf")
+    OUTFILE = str(path / "simple.output.deep.old.vcf")
 
     with open(OUTFILE, "r") as f:
         expect = set(line.strip() for line in f.readlines())
@@ -479,7 +557,7 @@ def test_Program__output_bed_positions():
     path = path / "test_io/data"
 
     BEDFILE = str(path / "simple.bed")
-    OUTFILE = str(path / "simple.output.deep.vcf")
+    OUTFILE = str(path / "simple.output.deep.old.vcf")
 
     # map of named intervals from bed4 file
     with open(BEDFILE) as bed:
@@ -509,7 +587,7 @@ def test_Program__output_reference_positions():
     path = path / "test_io/data"
 
     REFFILE = str(path / "simple.fasta")
-    OUTFILE = str(path / "simple.output.deep.vcf")
+    OUTFILE = str(path / "simple.output.deep.old.vcf")
 
     reference = pysam.FastaFile(REFFILE)
     with pysam.VariantFile(OUTFILE) as vcf:
@@ -518,3 +596,28 @@ def test_Program__output_reference_positions():
             ref_allele = reference.fetch(variant.contig, variant.start, variant.stop)
             assert ref_allele == variant.ref
     reference.close()
+
+
+def test_genotype_as_alleles():
+    haplotypes = np.array(
+        [
+            [0, 0, 0],
+            [1, 0, 1],
+            [0, 1, 1],
+        ],
+        dtype=np.int8,
+    )
+    genotype = np.array(
+        [
+            [0, 1, 1],
+            [0, 0, 0],
+            [-1, -1, -1],
+            [0, 1, 1],
+        ],
+        dtype=np.int8,
+    )
+    haplotype_labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
+
+    expect = np.array([0, 2, 2, -1])
+    actual = _genotype_as_alleles(genotype, haplotype_labels)
+    np.testing.assert_array_equal(actual, expect)

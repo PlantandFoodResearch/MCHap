@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 
 from mchap.io.vcf import filters
-from mchap.assemble.classes import GenotypeMultiTrace
 
 
 @pytest.mark.parametrize(
@@ -79,18 +78,18 @@ def test_SampleKmerFilter(obj, expect):
     [
         pytest.param(
             filters.SampleDepthFilter(threshold=5),
-            np.array([5, 6, 6, 5]),
+            5.5,
             "PASS",
             id="pass",
         ),
         pytest.param(
             filters.SampleDepthFilter(threshold=6),
-            np.array([5, 6, 6, 5]),
+            5.5,
             "dp6",
             id="fail",
         ),
         pytest.param(
-            filters.SampleDepthFilter(threshold=6), np.array([]), ".", id="not-applied"
+            filters.SampleDepthFilter(threshold=6), np.nan, ".", id="not-applied"
         ),
     ],
 )
@@ -126,84 +125,4 @@ def test_SampleReadCountFilter(obj, expect):
 def test_SamplePhenotypeProbabilityFilter(obj, expect):
     prob = 0.9773
     actual = str(obj(prob))
-    assert actual == expect
-
-
-@pytest.mark.parametrize(
-    "obj,expect",
-    [
-        pytest.param(
-            filters.SampleChainPhenotypeIncongruenceFilter(threshold=0.8),
-            "PASS",
-            id="pass",
-        ),
-        pytest.param(
-            filters.SampleChainPhenotypeIncongruenceFilter(threshold=0.6),
-            "mci60",
-            id="fail",
-        ),
-    ],
-)
-def test_SampleChainPhenotypeIncongruenceFilter(obj, expect):
-    haplotypes = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
-
-    g0 = haplotypes[[0, 0, 1, 2]]  # phenotype 1
-    g1 = haplotypes[[0, 1, 1, 2]]  # phenotype 1
-    g2 = haplotypes[[0, 1, 2, 2]]  # phenotype 1
-    g3 = haplotypes[[0, 0, 2, 2]]  # phenotype 2
-    genotypes = np.array([g0, g1, g2, g3])
-
-    t0 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
-    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
-    t2 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
-    t3 = genotypes[[3, 3, 3, 3, 3, 3, 3, 2, 1, 2]]  # 3:7
-    trace = GenotypeMultiTrace(
-        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10))
-    )
-    chain_modes = [dist.mode_phenotype() for dist in trace.chain_posteriors()]
-    actual = str(obj(chain_modes))
-    assert actual == expect
-
-
-@pytest.mark.parametrize(
-    "obj,expect",
-    [
-        pytest.param(
-            filters.SampleChainPhenotypeCNVFilter(threshold=0.99), ".", id="NA"
-        ),
-        pytest.param(
-            filters.SampleChainPhenotypeCNVFilter(threshold=0.8), "PASS", id="pass"
-        ),
-        pytest.param(
-            filters.SampleChainPhenotypeCNVFilter(threshold=0.6), "cnv60", id="fail"
-        ),
-    ],
-)
-def test_SampleChainPhenotypeCNVFilter(obj, expect):
-    haplotypes = np.array(
-        [
-            [0, 0],
-            [0, 1],
-            [1, 0],
-            [1, 1],
-            [1, 2],
-        ]
-    )
-
-    g0 = haplotypes[[0, 0, 1, 2]]  # phenotype 1
-    g1 = haplotypes[[0, 1, 1, 2]]  # phenotype 1
-    g2 = haplotypes[[0, 1, 2, 2]]  # phenotype 1
-    g3 = haplotypes[[0, 0, 2, 3]]  # phenotype 2
-    g4 = haplotypes[[0, 2, 3, 4]]  # phenotype 3
-    genotypes = np.array([g0, g1, g2, g3, g4])
-
-    t0 = genotypes[[3, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
-    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
-    t2 = genotypes[[0, 3, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
-    t3 = genotypes[[3, 3, 4, 4, 4, 3, 4, 4, 4, 4]]  # 3:7
-    trace = GenotypeMultiTrace(
-        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10))
-    )
-    chain_modes = [dist.mode_phenotype() for dist in trace.chain_posteriors()]
-    actual = str(obj(chain_modes))
     assert actual == expect

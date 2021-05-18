@@ -3,9 +3,14 @@ import pytest
 
 from mchap.testing import simulate_reads, metropolis_hastings_transitions
 from mchap.encoding import integer
-from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble.likelihood import (
+    log_likelihood,
+    log_genotype_prior,
+    new_log_likelihood_cache,
+)
 from mchap.assemble import structural
-from mchap.assemble.util import seed_numba
+from mchap.assemble import util
+from mchap import mset
 
 
 @pytest.mark.parametrize(
@@ -161,7 +166,7 @@ def test_structural_change(genotype, haplotype_indices, interval, answer):
     haplotype_indices = np.array(haplotype_indices, dtype=np.int8)
     answer = np.array(answer, dtype=int)
 
-    structural.structural_change(genotype, haplotype_indices, interval=interval)
+    util.structural_change(genotype, haplotype_indices, interval=interval)
 
     np.testing.assert_array_equal(genotype, answer)
 
@@ -343,9 +348,30 @@ def test_dosage_step_options(labels, answer):
     np.testing.assert_array_equal(query, answer)
 
 
-def test_interval_step__recombination():
+@pytest.mark.parametrize(
+    "use_cache",
+    [
+        False,
+        True,
+    ],
+)
+@pytest.mark.parametrize(
+    "use_read_counts",
+    [
+        False,
+        True,
+    ],
+)
+@pytest.mark.parametrize(
+    "inbreeding",
+    [
+        0.0,
+        0.25,
+    ],
+)
+def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
     np.random.seed(42)
-    seed_numba(42)
+    util.seed_numba(42)
 
     # true haplotypes
     haplotypes = np.array(
@@ -356,6 +382,8 @@ def test_interval_step__recombination():
             [1, 1, 1, 1],
         ]
     )
+    ploidy, n_base = haplotypes.shape
+    unique_haplotypes = 2 ** n_base
 
     reads = simulate_reads(
         haplotypes,
@@ -369,8 +397,15 @@ def test_interval_step__recombination():
     # interval includes first 2 bases
     interval = (0, 2)
 
-    # all unique re-arrangements
-    # worst to best match
+    # All unique re-arrangements reachable by recombination
+    # from worst to best match.
+    # Not all genotypes can be reached by recombination alone
+    # however we still calculate their priors as though all
+    # can be reached to be consistent with the prior calculation
+    # within the `interval_step` function.
+    # By calculating the exact posterior for only the genotypes
+    # that can be reached we ensure that the exact and simulated
+    # posteriors are equivalent.
     genotypes = np.array(
         [
             # [[0, 2][0, 2][2, 0][2, 1]], 2:1:1
@@ -388,19 +423,27 @@ def test_interval_step__recombination():
         ]
     )
 
-    # calculate exact posteriors
-    # llk of each genotype
-    llks = np.array([log_likelihood(reads, g) for g in genotypes])
+    # calculate exact posteriors for reachable genotypes
+    log_expect = np.empty(len(genotypes))
+    dosage = np.empty(ploidy, int)
+    for i, g in enumerate(genotypes):
+        util.get_dosage(dosage, g)
+        llk = log_likelihood(reads, g)
+        lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
+        log_expect[i] = llk + lprior
+    expect = util.normalise_log_probs(log_expect)
 
-    # prior probability of each genotype based on dosage
-    priors = np.array([12, 24, 12, 24])
-    priors = priors / priors.sum()
+    # mcmc simulation
+    # additional parameters
+    if use_cache:
+        cache = new_log_likelihood_cache(ploidy, n_base, 2)
+    else:
+        cache = None
+    if use_read_counts:
+        reads, read_counts = mset.unique_counts(reads)
+    else:
+        read_counts = None
 
-    # posterior probabilities from priors and likelihoods
-    exact_posteriors = np.exp(llks + np.log(priors))
-    exact_posteriors = exact_posteriors / exact_posteriors.sum()
-
-    # now run MCMC simulation
     # initial genotype
     genotype = np.array(
         [
@@ -416,14 +459,18 @@ def test_interval_step__recombination():
     for g in genotypes:
         counts[g.tobytes()] = 0
     # simulation
-    for _ in range(100000):
-        llk = structural.interval_step(
+
+    for _ in range(25_000):
+        llk, cache = structural.interval_step(
             genotype,
             reads,
             llk,
-            unique_haplotypes=2 ** 4,
+            unique_haplotypes=unique_haplotypes,
             interval=interval,
             step_type=0,
+            inbreeding=inbreeding,
+            cache=cache,
+            read_counts=read_counts,
         )
         genotype = integer.sort(genotype)
         counts[genotype.tobytes()] += 1
@@ -431,25 +478,46 @@ def test_interval_step__recombination():
     for i, g in enumerate(genotypes):
         totals[i] = counts[g.tobytes()]
 
-    simulation_posteriors = totals / totals.sum()
+    actual = totals / totals.sum()
 
     # simulation posteriors should be almost equal
-    # but there will be some auto-correlation present
+    # but there may be some auto-correlation present
     # in the simulation
     np.testing.assert_array_almost_equal(
-        exact_posteriors,
-        simulation_posteriors,
+        expect,
+        actual,
         decimal=2,
     )
 
 
-def test_interval_step__dosage_swap():
+@pytest.mark.parametrize(
+    "use_cache",
+    [
+        False,
+        True,
+    ],
+)
+@pytest.mark.parametrize(
+    "use_read_counts",
+    [
+        False,
+        True,
+    ],
+)
+@pytest.mark.parametrize(
+    "inbreeding",
+    [
+        0.0,
+        0.25,
+    ],
+)
+def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
     """Test posterior probabilities of a small dosage swap only
     MCMC compared to posterior probabilites calculated from all
     possible genotypes with and without MH acceptance probability.
     """
     np.random.seed(42)
-    seed_numba(42)
+    util.seed_numba(42)
 
     # true haplotypes
     haplotypes = np.array(
@@ -460,6 +528,8 @@ def test_interval_step__dosage_swap():
             [1, 1, 1, 1],
         ]
     )
+    ploidy, n_base = haplotypes.shape
+    unique_haplotypes = 2 ** n_base
 
     reads = simulate_reads(
         haplotypes,
@@ -473,7 +543,14 @@ def test_interval_step__dosage_swap():
     # interval includes first 2 bases
     interval = (0, 2)
 
-    # all unique re-arrangements
+    # All unique re-arrangements reachable by dosage-swap
+    # Not all genotypes can be reached by dosage-swap alone
+    # however we still calculate their priors as though all
+    # can be reached to be consistent with the prior calculation
+    # within the `interval_step` function.
+    # By calculating the exact posterior for only the genotypes
+    # that can be reached we ensure that the exact and simulated
+    # posteriors are equivalent.
     genotypes = np.array(
         [
             [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 1, 1], [1, 1, 1, 1]],  # 0  2:1:1
@@ -482,7 +559,7 @@ def test_interval_step__dosage_swap():
             [[0, 0, 0, 0], [0, 0, 1, 1], [1, 1, 0, 0], [1, 1, 1, 1]],  # 3  1:1:1:1
             [[0, 0, 1, 1], [0, 0, 1, 1], [1, 1, 0, 0], [1, 1, 0, 0]],  # 4  2:2
             [
-                [0, 0, 0, 0],  # 5  2:1:1 (true genotype)
+                [0, 0, 0, 0],  # 5  2:1:1
                 [1, 1, 0, 0],
                 [1, 1, 1, 1],
                 [1, 1, 1, 1],
@@ -491,19 +568,20 @@ def test_interval_step__dosage_swap():
         ]
     )
 
-    # llk of each genotype
-    llks = np.array([log_likelihood(reads, g) for g in genotypes])
-
-    # prior probability of each genotype based on dosage
-    priors = np.array([12, 12, 6, 24, 6, 12, 12])
-    priors = priors / priors.sum()
-
-    # posterior probabilities from priors and likelihoods
-    exact_posteriors = np.exp(llks + np.log(priors))
-    exact_posteriors = exact_posteriors / exact_posteriors.sum()
+    # calculate exact posteriors for reachable genotypes
+    llks = np.empty(len(genotypes))
+    lpriors = np.empty(len(genotypes))
+    dosage = np.empty(ploidy, int)
+    for i, g in enumerate(genotypes):
+        util.get_dosage(dosage, g)
+        llks[i] = log_likelihood(reads, g)
+        lpriors[i] = log_genotype_prior(
+            dosage, unique_haplotypes, inbreeding=inbreeding
+        )
+    exact_posteriors = util.normalise_log_probs(llks + lpriors)
 
     # now calculate posteriors using a full transition matrix
-    # possable dosage swap transitions between genotypes
+    # of legal dosage swap transitions between genotypes
     legal_transitions = np.array(
         [
             [0, 0, 1, 1, 0, 0, 0],
@@ -515,18 +593,21 @@ def test_interval_step__dosage_swap():
             [0, 0, 0, 1, 1, 0, 0],
         ]
     )
-
     # MH-transiton probs
-    mh_probs = metropolis_hastings_transitions(legal_transitions, llks, priors)
-
+    mh_probs = metropolis_hastings_transitions(legal_transitions, llks, np.exp(lpriors))
     # posterior probs based on long run behavior
     matrix_posteriors = np.linalg.matrix_power(mh_probs, 1000)[0]
 
-    # now calculate the same values using MCMC simulation
-    # counts of each genotype
-    counts = {}
-    for g in genotypes:
-        counts[g.tobytes()] = 0
+    # mcmc simulation
+    # additional parameters
+    if use_cache:
+        cache = new_log_likelihood_cache(ploidy, n_base, 2)
+    else:
+        cache = None
+    if use_read_counts:
+        reads, read_counts = mset.unique_counts(reads)
+    else:
+        read_counts = None
 
     # initial genotype for simulation
     genotype = np.array(
@@ -539,16 +620,21 @@ def test_interval_step__dosage_swap():
     )
     llk = log_likelihood(reads, genotype)
 
-    # MCMC simulation
-    for i in range(100000):
-        # llk = log_likelihood(reads, choice)
-        llk = structural.interval_step(
+    # mcmc simulation
+    counts = {}
+    for g in genotypes:
+        counts[g.tobytes()] = 0
+    for i in range(25_000):
+        llk, cache = structural.interval_step(
             genotype,
             reads,
             llk,
-            unique_haplotypes=2 ** 4,
+            unique_haplotypes=unique_haplotypes,
             interval=interval,
             step_type=1,
+            inbreeding=inbreeding,
+            read_counts=read_counts,
+            cache=cache,
         )
         genotype = integer.sort(genotype)
         counts[genotype.tobytes()] += 1
@@ -563,7 +649,7 @@ def test_interval_step__dosage_swap():
     np.testing.assert_array_almost_equal(exact_posteriors, matrix_posteriors, decimal=6)
 
     # simulation posteriors should be almost equal
-    # but there will be some auto-correlation present
+    # but there may be some auto-correlation present
     # in the simulation
     np.testing.assert_array_almost_equal(
         exact_posteriors,

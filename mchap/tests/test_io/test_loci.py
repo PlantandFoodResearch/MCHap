@@ -101,6 +101,19 @@ def test_read_bed4__region():
     assert actual == expect
 
 
+def test_Locus__from_region_string():
+    locus = loci.Locus.from_region_string("chrom1:123-100123")
+    assert locus.name is None
+    assert locus.contig == "chrom1"
+    assert locus.start == 123
+    assert locus.stop == 100123
+    locus = loci.Locus.from_region_string("zrgf32.2:105-1001221343", name="ident105")
+    assert locus.name == "ident105"
+    assert locus.contig == "zrgf32.2"
+    assert locus.start == 105
+    assert locus.stop == 1001221343
+
+
 def test_Locus__set_sequence():
     path = pathlib.Path(__file__).parent.absolute()
     ref = str(path / "data/simple.fasta")

@@ -5,7 +5,7 @@ import numba
 
 from mchap.assemble import util
 from mchap.assemble.likelihood import (
-    log_likelihood_structural_change,
+    log_likelihood_structural_change_cached,
     log_genotype_prior,
 )
 
@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def random_breaks(breaks, n):
     """Return a set of randomly selected non-overlapping
     intervals which cover a sequence of length n.
@@ -68,51 +68,7 @@ def random_breaks(breaks, n):
     return intervals
 
 
-@numba.njit
-def structural_change(genotype, haplotype_indices, interval=None):
-    """Mutate genotype by re-arranging haplotypes
-    within a given interval.
-
-    Parameters
-    ----------
-    genotype : ndarray, int, shape (ploidy, n_base)
-        Set of haplotypes with base positions encoded as
-        simple integers from 0 to n_allele.
-    haplotype_indices : ndarray, int, shape (ploidy)
-        Indicies of haplotypes to update alleles from.
-    interval : tuple, int, optional
-        If set then base-positions copies/swaps between
-        haplotype is constrained to the specified
-        half open interval (defaults = None).
-
-    Returns
-    -------
-    None
-
-    Notes
-    -----
-    Variable `genotype` is updated in place.
-
-    """
-
-    ploidy, n_base = genotype.shape
-
-    cache = np.empty(ploidy, dtype=np.int8)
-
-    r = util.interval_as_range(interval, n_base)
-
-    for j in r:
-
-        # copy to cache
-        for h in range(ploidy):
-            cache[h] = genotype[h, j]
-
-        # copy new bases back to genotype
-        for h in range(ploidy):
-            genotype[h, j] = cache[haplotype_indices[h]]
-
-
-@numba.njit
+@numba.njit(cache=True)
 def recombination_step_n_options(labels):
     """Calculate number of unique haplotype recombination options.
 
@@ -159,7 +115,7 @@ def recombination_step_n_options(labels):
     return n
 
 
-@numba.njit
+@numba.njit(cache=True)
 def recombination_step_options(labels):
     """Calculate number of unique haplotype recombination options.
 
@@ -219,7 +175,7 @@ def recombination_step_options(labels):
     return options[0:opt]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def dosage_step_n_options(labels):
     """Calculate the number of alternative dosages within
     one steps distance.
@@ -278,7 +234,7 @@ def dosage_step_n_options(labels):
     return n
 
 
-@numba.njit
+@numba.njit(cache=True)
 def dosage_step_options(labels):
     """Calculate the number of alternative dosages within
     one steps distance.
@@ -348,7 +304,7 @@ def dosage_step_options(labels):
     return options[0:opt]
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _label_haplotypes(labels, genotype, interval=None):
     """Label each haplotype in a genotype with
     the index of its first occurance.
@@ -398,7 +354,7 @@ def _label_haplotypes(labels, genotype, interval=None):
                         labels[k] = j
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _interval_inverse_mask(interval, n):
     """Return a boolean vector of True values outside
     of the specified interval.
@@ -428,7 +384,7 @@ def _interval_inverse_mask(interval, n):
     return mask
 
 
-@numba.njit
+@numba.njit(cache=True)
 def haplotype_segment_labels(genotype, interval=None):
     """Create a labels matrix in whihe the first coloumn contains
     labels for haplotype segments within the specified range and
@@ -468,7 +424,7 @@ def haplotype_segment_labels(genotype, interval=None):
     return labels
 
 
-@numba.njit
+@numba.njit(cache=True)
 def interval_step(
     genotype,
     reads,
@@ -479,6 +435,7 @@ def interval_step(
     step_type=0,
     temp=1,
     read_counts=None,
+    cache=None,
 ):
     """A structural step of an MCMC simulation consisting of
     multiple sub-steps each of which are  constrained to a single
@@ -509,12 +466,16 @@ def interval_step(
     read_counts : ndarray, int, shape (n_reads, )
         Optionally specify the number of observations of
         each read.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache` or None.
 
     Returns
     -------
     llk : float
         The log-likelihood of the genotype state after the step
         has been made.
+    cache_updated : tuple
+        Updated cache or None.
 
     Notes
     -----
@@ -535,7 +496,7 @@ def interval_step(
 
     n_options = len(option_labels)
     if n_options == 0:
-        return llk
+        return llk, cache
     log_proposal_prob = np.log(1 / n_options)
 
     # ratio of prior probabilities
@@ -553,10 +514,11 @@ def interval_step(
     for i in range(n_options):
 
         # log likelihood ratio
-        llk_i = log_likelihood_structural_change(
-            reads,
-            genotype,
-            option_labels[i, :, 0],
+        llk_i, cache = log_likelihood_structural_change_cached(
+            reads=reads,
+            genotype=genotype,
+            cache=cache,
+            haplotype_indices=option_labels[i, :, 0],
             interval=interval,
             read_counts=read_counts,
         )
@@ -594,17 +556,17 @@ def interval_step(
 
     if choice < n_options:
         # update genotype
-        structural_change(genotype, option_labels[choice, :, 0], interval)
+        util.structural_change(genotype, option_labels[choice, :, 0], interval)
         llk = llks[choice]
     else:
         # all options rejected
         pass
 
     # return llk of new genotype
-    return llk
+    return llk, cache
 
 
-@numba.njit
+@numba.njit(cache=True)
 def compound_step(
     genotype,
     reads,
@@ -616,6 +578,7 @@ def compound_step(
     randomise=True,
     temp=1,
     read_counts=None,
+    cache=None,
 ):
     """A structural step of an MCMC simulation consisting of
     multiple sub-steps each of which are  constrained to a single
@@ -650,12 +613,16 @@ def compound_step(
     read_counts : ndarray, int, shape (n_reads, )
         Optionally specify the number of observations of
         each read.
+    cache : tuple
+        An array_map tuple created with `new_log_likelihood_cache` or None.
 
     Returns
     -------
     llk : float
         The log-likelihood of the genotype state after the step
         has been made.
+    cache_updated : tuple
+        Updated cache or None.
 
     Notes
     -----
@@ -676,10 +643,11 @@ def compound_step(
 
     # step through every iterval
     for i in range(n_intervals):
-        llk = interval_step(
-            genotype,
-            reads,
-            llk,
+        llk, cache = interval_step(
+            genotype=genotype,
+            reads=reads,
+            llk=llk,
+            cache=cache,
             unique_haplotypes=unique_haplotypes,
             inbreeding=inbreeding,
             interval=intervals[i],
@@ -687,4 +655,4 @@ def compound_step(
             temp=temp,
             read_counts=read_counts,
         )
-    return llk
+    return llk, cache
