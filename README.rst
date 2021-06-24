@@ -51,7 +51,7 @@ A simple example of running ``mchap assemble`` may look like this:
 Note that the input VCF should be indexed with tabix and the bam files
 and reference genome should be indexed with samtools.
 
-The `full list of arguments`_ for ``assemble`` can accessed with:
+The `full list of arguments`_ for ``assemble`` can be accessed with:
 
 ::
 
@@ -64,7 +64,7 @@ Performance
 The performance of ``mchap assemble`` will depend largely on your data set
 but can be tuned using the available parameters.
 Generally speaking assembles will be slower for higher ploidy organisms,
-with higher read-depths or with more SNPs falling within each locus in the
+with higher read-depths, or with more SNPs falling within each locus in the
 BED file.
 
 Jit compilation
@@ -74,8 +74,8 @@ MCHap heavily utilizes the numba JIT compiler to speed up MCMC simulations.
 However, the first time you run MCHap on a new system it will have to
 compile the functions that make use of the numba JIT compiler and the 
 compiled functions are then cached for reuse.
-This means that MCHap may run a bit slower the first time it's run on a
-new system.
+This means that MCHap may run a bit slower the first time it's run after
+installation.
 
 Running on multiple threads
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -96,8 +96,8 @@ input BAM files to encode read error-rates.
 This is a logical default but the variable error-rates limit the ability of 
 MCHap to efficiently calculate likelihoods. 
 If you know what the expected error-rate for your data is then you can input
-this value using the ``--base-error-rate`` and ignore the use of phred scores
-with the ``--ignore-base-phred-scores`` flag.
+this value using the ``--base-error-rate`` argument and ignore the use of phred
+scores with the ``--ignore-base-phred-scores`` flag.
 This combination of arguments can significantly improve assembly speed,
 especially with higher read depths.
 
@@ -119,7 +119,7 @@ and ``--mcmc-partial-dosage-step-probability`` arguments.
 These arguments represent the probability that a structural sub-step of
 that type will be performed as part of a step in the MCMC simulation.
 These sub-steps can be important for convergence so it is not recommended
-to reduce their probability any lower than ``0.25``.
+to reduce their probability much lower than ``0.25``.
 
 There is also an additional parameter called ``--mcmc-dosage-step-probability``
 which is used to configure the probability of a "full" dosage-swap sub-step.
@@ -136,7 +136,7 @@ impact on the assembly speed.
 The ``--mcmc-fix-homozygous`` argument can be used to identify SNPs that
 have a high probability of being homozygous and 'fixing' them so that they
 do not vary during the assemble process.
-This is applied on a per sample bases and so can 'fix' SNPs in one sample
+This is applied on a per sample bases and will 'fix' SNPs in one sample
 even if they vary in others.
 The default value for this argument is ``0.999`` and so it will only 'fix'
 SNPs that are extremely unlikely to be heterozygous.
