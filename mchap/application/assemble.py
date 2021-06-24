@@ -702,7 +702,6 @@ class program(object):
             vcf.infofields.END,
             vcf.infofields.NVAR,
             vcf.infofields.SNVPOS,
-            vcf.infofields.AD,
         ]
 
         format_fields = [
@@ -714,11 +713,9 @@ class program(object):
             vcf.formatfields.RCALLS,
             vcf.formatfields.MEC,
             vcf.formatfields.KMERCOV,
-            vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PHPM,
             vcf.formatfields.MCI,
-            vcf.formatfields.AD,
             vcf.formatfields.GL,
             vcf.formatfields.GP,
         ]
@@ -1114,22 +1111,13 @@ class program(object):
         Returns
         -------
         data : LocusAssemblyData
-            With `sample_AD`, `sample_MEC` and `sample_KMERCOV`.
+            With `sample_MEC` and `sample_KMERCOV`.
         """
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
             try:
                 genotype = data.sample_genotype[sample]
                 read_calls = data.sample_read_calls[sample]
-                # if there are no variants then return nan
-                if len(data.locus.variants) == 0:
-                    allele_depth = np.nan
-                else:
-                    allele_depth = np.sum(
-                        integer.read_assignment(read_calls, data.vcf_haplotypes) == 1,
-                        axis=0,
-                    )
-                data.sample_AD[sample] = allele_depth
                 data.sample_MEC[sample] = np.sum(
                     integer.minimum_error_correction(read_calls, genotype)
                 )
@@ -1179,13 +1167,13 @@ class program(object):
         ----------
         data : LocusAssemblyData
             With `locus`, `vcf_haplotypes`, `sample_alleles`,
-            `sample_DP`, `sample_RCOUNT` and `sample_AD`.
+            `sample_DP` and `sample_RCOUNT`.
 
         Returns
         -------
         data : LocusAssemblyData
             With `vcf_REF`, `vcf_ALTS`, `info_END`, `info_NVAR`, `info_SNVPOS`,
-            `info_AC`, `info_AN`, `info_NS`, `info_DP`, `info_RCOUNT` and `info_AD`.
+            `info_AC`, `info_AN`, `info_NS`, `info_DP` and `info_RCOUNT`.
         """
         # postions
         data.info_END = data.locus.stop
@@ -1214,10 +1202,8 @@ class program(object):
         if len(data.locus.variants) == 0:
             # it will be misleading to return a depth of 0 in this case
             data.info_DP = np.nan
-            data.info_AD = np.nan
         else:
             data.info_DP = np.nansum(list(data.sample_DP.values()))
-            data.info_AD = np.nansum(list(data.sample_AD.values()), axis=0)
         # total read count
         data.info_RCOUNT = np.nansum(list(data.sample_RCOUNT.values()))
         return data
@@ -1386,7 +1372,6 @@ class LocusAssemblyData(object):
         self.sample_GP = dict()
         self.sample_GT = dict()
         self.sample_DOSEXP = dict()
-        self.sample_AD = dict()
         self.sample_MCI = dict()
 
         # vcf record data
@@ -1401,7 +1386,6 @@ class LocusAssemblyData(object):
         self.info_END = None
         self.info_NVAR = None
         self.info_SNVPOS = None
-        self.info_AD = None
 
     def _sample_dict_as_list(self, d):
         return [d.get(s) for s in self.samples]
@@ -1416,7 +1400,6 @@ class LocusAssemblyData(object):
             END=self.info_END,
             NVAR=self.info_NVAR,
             SNVPOS=self.info_SNVPOS,
-            AD=self.info_AD,
         )
         vcf_FORMAT = vcf.format_sample_field(
             GT=self._sample_dict_as_list(self.sample_GT),
@@ -1430,7 +1413,6 @@ class LocusAssemblyData(object):
             GPM=self._sample_dict_as_list(self.sample_GPM),
             PHPM=self._sample_dict_as_list(self.sample_PHPM),
             MCI=self._sample_dict_as_list(self.sample_MCI),
-            AD=self._sample_dict_as_list(self.sample_AD),
             GL=self._sample_dict_as_list(self.sample_GL),
             GP=self._sample_dict_as_list(self.sample_GP),
         )
