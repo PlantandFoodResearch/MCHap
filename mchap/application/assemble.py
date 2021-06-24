@@ -4,6 +4,7 @@ import numpy as np
 from dataclasses import dataclass
 import pysam
 import multiprocessing as mp
+from collections import OrderedDict
 
 from mchap import mset
 from mchap import combinatorics
@@ -716,9 +717,11 @@ class program(object):
             vcf.formatfields.GPM,
             vcf.formatfields.PHPM,
             vcf.formatfields.MCI,
-            vcf.formatfields.GL,
-            vcf.formatfields.GP,
         ]
+        if self.report_genotype_likelihoods:
+            format_fields += [vcf.formatfields.GL]
+        if self.report_genotype_posterior:
+            format_fields += [vcf.formatfields.GP]
 
         columns = [vcf.headermeta.columns(self.samples)]
 
@@ -1237,6 +1240,8 @@ class program(object):
             sample_bams=self.sample_bams,
             sample_ploidy=self.sample_ploidy,
             sample_inbreeding=self.sample_inbreeding,
+            report_genotype_likelihoods=self.report_genotype_likelihoods,
+            report_genotype_posterior=self.report_genotype_posterior,
         )
         self.encode_sample_reads(data)
         self.assemble_sample_haplotypes(data)
@@ -1327,12 +1332,23 @@ class program(object):
 
 
 class LocusAssemblyData(object):
-    def __init__(self, locus, samples, sample_bams, sample_ploidy, sample_inbreeding):
+    def __init__(
+        self,
+        locus,
+        samples,
+        sample_bams,
+        sample_ploidy,
+        sample_inbreeding,
+        report_genotype_likelihoods=False,
+        report_genotype_posterior=False,
+    ):
         self.locus = locus
         self.samples = samples  # list[str]
         self.sample_bams = sample_bams  # dict[str, str]
         self.sample_ploidy = sample_ploidy  # dict[str, int]
         self.sample_inbreeding = sample_inbreeding  # dict[str, float]
+        self.report_genotype_likelihoods = report_genotype_likelihoods
+        self.report_genotype_posterior = report_genotype_posterior
 
         # sample data
         # integer encoded reads
@@ -1401,21 +1417,23 @@ class LocusAssemblyData(object):
             NVAR=self.info_NVAR,
             SNVPOS=self.info_SNVPOS,
         )
-        vcf_FORMAT = vcf.format_sample_field(
-            GT=self._sample_dict_as_list(self.sample_GT),
-            GQ=self._sample_dict_as_list(self.sample_GQ),
-            PHQ=self._sample_dict_as_list(self.sample_PHQ),
-            DP=self._sample_dict_as_list(self.sample_DP),
-            RCOUNT=self._sample_dict_as_list(self.sample_RCOUNT),
-            RCALLS=self._sample_dict_as_list(self.sample_RCALLS),
-            MEC=self._sample_dict_as_list(self.sample_MEC),
-            KMERCOV=self._sample_dict_as_list(self.sample_KMERCOV),
-            GPM=self._sample_dict_as_list(self.sample_GPM),
-            PHPM=self._sample_dict_as_list(self.sample_PHPM),
-            MCI=self._sample_dict_as_list(self.sample_MCI),
-            GL=self._sample_dict_as_list(self.sample_GL),
-            GP=self._sample_dict_as_list(self.sample_GP),
-        )
+        format_fields = OrderedDict()
+        format_fields["GT"] = self._sample_dict_as_list(self.sample_GT)
+        format_fields["GQ"] = self._sample_dict_as_list(self.sample_GQ)
+        format_fields["PHQ"] = self._sample_dict_as_list(self.sample_PHQ)
+        format_fields["DP"] = self._sample_dict_as_list(self.sample_DP)
+        format_fields["RCOUNT"] = self._sample_dict_as_list(self.sample_RCOUNT)
+        format_fields["RCALLS"] = self._sample_dict_as_list(self.sample_RCALLS)
+        format_fields["MEC"] = self._sample_dict_as_list(self.sample_MEC)
+        format_fields["KMERCOV"] = self._sample_dict_as_list(self.sample_KMERCOV)
+        format_fields["GPM"] = self._sample_dict_as_list(self.sample_GPM)
+        format_fields["PHPM"] = self._sample_dict_as_list(self.sample_PHPM)
+        format_fields["MCI"] = self._sample_dict_as_list(self.sample_MCI)
+        if self.report_genotype_likelihoods:
+            format_fields["GL"] = self._sample_dict_as_list(self.sample_GL)
+        if self.report_genotype_posterior:
+            format_fields["GP"] = self._sample_dict_as_list(self.sample_GP)
+        vcf_FORMAT = vcf.format_sample_field(**format_fields)
         return vcf.format_record(
             chrom=self.locus.contig,
             pos=self.locus.start + 1,  # 0-based BED to 1-based VCF
