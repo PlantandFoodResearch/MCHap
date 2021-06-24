@@ -4,6 +4,7 @@ import numpy as np
 from dataclasses import dataclass
 import pysam
 import multiprocessing as mp
+from collections import OrderedDict
 
 from mchap import mset
 from mchap import combinatorics
@@ -702,7 +703,6 @@ class program(object):
             vcf.infofields.END,
             vcf.infofields.NVAR,
             vcf.infofields.SNVPOS,
-            vcf.infofields.AD,
         ]
 
         format_fields = [
@@ -714,14 +714,14 @@ class program(object):
             vcf.formatfields.RCALLS,
             vcf.formatfields.MEC,
             vcf.formatfields.KMERCOV,
-            vcf.formatfields.FT,
             vcf.formatfields.GPM,
             vcf.formatfields.PHPM,
             vcf.formatfields.MCI,
-            vcf.formatfields.AD,
-            vcf.formatfields.GL,
-            vcf.formatfields.GP,
         ]
+        if self.report_genotype_likelihoods:
+            format_fields += [vcf.formatfields.GL]
+        if self.report_genotype_posterior:
+            format_fields += [vcf.formatfields.GP]
 
         columns = [vcf.headermeta.columns(self.samples)]
 
@@ -1114,22 +1114,13 @@ class program(object):
         Returns
         -------
         data : LocusAssemblyData
-            With `sample_AD`, `sample_MEC` and `sample_KMERCOV`.
+            With `sample_MEC` and `sample_KMERCOV`.
         """
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
             try:
                 genotype = data.sample_genotype[sample]
                 read_calls = data.sample_read_calls[sample]
-                # if there are no variants then return nan
-                if len(data.locus.variants) == 0:
-                    allele_depth = np.nan
-                else:
-                    allele_depth = np.sum(
-                        integer.read_assignment(read_calls, data.vcf_haplotypes) == 1,
-                        axis=0,
-                    )
-                data.sample_AD[sample] = allele_depth
                 data.sample_MEC[sample] = np.sum(
                     integer.minimum_error_correction(read_calls, genotype)
                 )
@@ -1179,13 +1170,13 @@ class program(object):
         ----------
         data : LocusAssemblyData
             With `locus`, `vcf_haplotypes`, `sample_alleles`,
-            `sample_DP`, `sample_RCOUNT` and `sample_AD`.
+            `sample_DP` and `sample_RCOUNT`.
 
         Returns
         -------
         data : LocusAssemblyData
             With `vcf_REF`, `vcf_ALTS`, `info_END`, `info_NVAR`, `info_SNVPOS`,
-            `info_AC`, `info_AN`, `info_NS`, `info_DP`, `info_RCOUNT` and `info_AD`.
+            `info_AC`, `info_AN`, `info_NS`, `info_DP` and `info_RCOUNT`.
         """
         # postions
         data.info_END = data.locus.stop
@@ -1214,10 +1205,8 @@ class program(object):
         if len(data.locus.variants) == 0:
             # it will be misleading to return a depth of 0 in this case
             data.info_DP = np.nan
-            data.info_AD = np.nan
         else:
             data.info_DP = np.nansum(list(data.sample_DP.values()))
-            data.info_AD = np.nansum(list(data.sample_AD.values()), axis=0)
         # total read count
         data.info_RCOUNT = np.nansum(list(data.sample_RCOUNT.values()))
         return data
@@ -1251,6 +1240,8 @@ class program(object):
             sample_bams=self.sample_bams,
             sample_ploidy=self.sample_ploidy,
             sample_inbreeding=self.sample_inbreeding,
+            report_genotype_likelihoods=self.report_genotype_likelihoods,
+            report_genotype_posterior=self.report_genotype_posterior,
         )
         self.encode_sample_reads(data)
         self.assemble_sample_haplotypes(data)
@@ -1341,12 +1332,23 @@ class program(object):
 
 
 class LocusAssemblyData(object):
-    def __init__(self, locus, samples, sample_bams, sample_ploidy, sample_inbreeding):
+    def __init__(
+        self,
+        locus,
+        samples,
+        sample_bams,
+        sample_ploidy,
+        sample_inbreeding,
+        report_genotype_likelihoods=False,
+        report_genotype_posterior=False,
+    ):
         self.locus = locus
         self.samples = samples  # list[str]
         self.sample_bams = sample_bams  # dict[str, str]
         self.sample_ploidy = sample_ploidy  # dict[str, int]
         self.sample_inbreeding = sample_inbreeding  # dict[str, float]
+        self.report_genotype_likelihoods = report_genotype_likelihoods
+        self.report_genotype_posterior = report_genotype_posterior
 
         # sample data
         # integer encoded reads
@@ -1386,7 +1388,6 @@ class LocusAssemblyData(object):
         self.sample_GP = dict()
         self.sample_GT = dict()
         self.sample_DOSEXP = dict()
-        self.sample_AD = dict()
         self.sample_MCI = dict()
 
         # vcf record data
@@ -1401,7 +1402,6 @@ class LocusAssemblyData(object):
         self.info_END = None
         self.info_NVAR = None
         self.info_SNVPOS = None
-        self.info_AD = None
 
     def _sample_dict_as_list(self, d):
         return [d.get(s) for s in self.samples]
@@ -1416,24 +1416,24 @@ class LocusAssemblyData(object):
             END=self.info_END,
             NVAR=self.info_NVAR,
             SNVPOS=self.info_SNVPOS,
-            AD=self.info_AD,
         )
-        vcf_FORMAT = vcf.format_sample_field(
-            GT=self._sample_dict_as_list(self.sample_GT),
-            GQ=self._sample_dict_as_list(self.sample_GQ),
-            PHQ=self._sample_dict_as_list(self.sample_PHQ),
-            DP=self._sample_dict_as_list(self.sample_DP),
-            RCOUNT=self._sample_dict_as_list(self.sample_RCOUNT),
-            RCALLS=self._sample_dict_as_list(self.sample_RCALLS),
-            MEC=self._sample_dict_as_list(self.sample_MEC),
-            KMERCOV=self._sample_dict_as_list(self.sample_KMERCOV),
-            GPM=self._sample_dict_as_list(self.sample_GPM),
-            PHPM=self._sample_dict_as_list(self.sample_PHPM),
-            MCI=self._sample_dict_as_list(self.sample_MCI),
-            AD=self._sample_dict_as_list(self.sample_AD),
-            GL=self._sample_dict_as_list(self.sample_GL),
-            GP=self._sample_dict_as_list(self.sample_GP),
-        )
+        format_fields = OrderedDict()
+        format_fields["GT"] = self._sample_dict_as_list(self.sample_GT)
+        format_fields["GQ"] = self._sample_dict_as_list(self.sample_GQ)
+        format_fields["PHQ"] = self._sample_dict_as_list(self.sample_PHQ)
+        format_fields["DP"] = self._sample_dict_as_list(self.sample_DP)
+        format_fields["RCOUNT"] = self._sample_dict_as_list(self.sample_RCOUNT)
+        format_fields["RCALLS"] = self._sample_dict_as_list(self.sample_RCALLS)
+        format_fields["MEC"] = self._sample_dict_as_list(self.sample_MEC)
+        format_fields["KMERCOV"] = self._sample_dict_as_list(self.sample_KMERCOV)
+        format_fields["GPM"] = self._sample_dict_as_list(self.sample_GPM)
+        format_fields["PHPM"] = self._sample_dict_as_list(self.sample_PHPM)
+        format_fields["MCI"] = self._sample_dict_as_list(self.sample_MCI)
+        if self.report_genotype_likelihoods:
+            format_fields["GL"] = self._sample_dict_as_list(self.sample_GL)
+        if self.report_genotype_posterior:
+            format_fields["GP"] = self._sample_dict_as_list(self.sample_GP)
+        vcf_FORMAT = vcf.format_sample_field(**format_fields)
         return vcf.format_record(
             chrom=self.locus.contig,
             pos=self.locus.start + 1,  # 0-based BED to 1-based VCF
