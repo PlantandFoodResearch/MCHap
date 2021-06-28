@@ -9,7 +9,7 @@ Installation
 MCHap and it's dependencies can be installed from source using pip.
 From the root directory of this repository run:
 
-::
+.. code:: bash
 
     pip install -r requirements.txt
     python setup.py sdist
@@ -33,14 +33,14 @@ At minimum this tool requires the following inputs:
 The ``assemble`` sub-tool writes out an uncompressed VCF file to standard output.
 This should generally be compressed and written to a file:
 
-::
+.. code:: bash
 
     mchap assemble ... | bgzip > haplotypes.vcf.gz
 
 
 A simple example of running ``mchap assemble`` may look like this:
 
-::
+.. code:: bash
 
     $ mchap assemble \
         --bam file1.bam file2.bam file3.bam \
