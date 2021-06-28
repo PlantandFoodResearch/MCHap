@@ -19,6 +19,9 @@ From the root directory of this repository run:
 Usage
 -----
 
+Basic example
+~~~~~~~~~~~~~
+
 The wrapper CLI tool is ``mchap`` and assembly sub-tool is ``assemble``.
 At minimum this tool requires the following inputs:
 
@@ -56,6 +59,57 @@ The `full list of arguments`_ for ``assemble`` can be accessed with:
 ::
 
     mchap assemble -h
+
+
+Job array example
+~~~~~~~~~~~~~~~~~
+
+The ``assemble`` sub-tool can make use of multiple cores using ``--cores``
+argument which uses Pythons build in multiprocessing library.
+However this method of parallel processing can be difficult and inefficient
+fow large scale assembles in a shared HPC environment.
+In such a case it may be more efficient to submit many individual assemblies
+each producing a separate output VCF file and then merging the resulting
+VCFs.
+The following is an example of using the `asub`_ script for array submission
+using the ``--region`` and ``--region-id`` parameters to specify each
+individual locus as a sub-job:
+
+::
+
+    JOBNAME='myjob'
+    VCFDIR="./$JOBNAME.vcf"
+    mkdir $VCFDIR
+    while read line; do
+    contig=$(echo "$line" | cut -f 1)
+    start=$(echo "$line" | cut -f 2)
+    stop=$(echo "$line" | cut -f 3)
+    name=$(echo "$line" | cut -f 4)
+    region="$contig:$start-$stop"
+    cat << EOF
+    mchap assemble \
+        --region "$region" \
+        --region-id "$name" \
+        --variants "$VARIANTS" \
+        --reference "$REFERENCE" \
+        --sample-bam "$SAMPLE_BAMS" \
+        | bgzip > $VCFDIR/$name.vcf.gz
+    EOF
+    done <"$BEDFILE" | asub -c 100 -j "$JOBNAME"
+
+
+The above example will iterate though a 4 column bed file (``$BEDFILE``) of
+target loci and create a job array with one sub-job per entry in the bed file.
+Each sub-job will output a VCF file with a single record in a directory called
+"myjob.vcf" (from the ``$VCFDIR`` variable).
+Each VCF file will be named based on the locus name in column 4 of the bed file
+(hence these names must be unique).
+In this example we use the  ``--sample-bam`` option to specify the bam file for
+each sample explicitly as this is more efficient when running many small
+(sub-) jobs.
+Note that the ``--region-id`` argument is only used to set the id of each
+variant record in the VCF output and may be omitted in which case the the
+variant records will be un-named.
 
 
 Performance
@@ -161,3 +215,4 @@ parallel-tempering for all of the progeny derived from those founders.
 
 
 .. _`full list of arguments`: cli-assemble-help.txt
+.. _`asub`: https://github.com/lh3/asub
