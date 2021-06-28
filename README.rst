@@ -56,7 +56,7 @@ and reference genome should be indexed with samtools.
 
 The `full list of arguments`_ for ``assemble`` can be accessed with:
 
-::
+.. code:: bash
 
     mchap assemble -h
 
@@ -75,7 +75,7 @@ The following is an example of using the `asub`_ script for array submission
 using the ``--region`` and ``--region-id`` parameters to specify each
 individual locus as a sub-job:
 
-::
+.. code:: bash
 
     JOBNAME='myjob'
     VCFDIR="./$JOBNAME.vcf"
