@@ -113,6 +113,12 @@ def test_Program__cli_lists():
         f.write("SAMPLE1\t0.2\n")
         # SAMPLE4 uses default
 
+    tmp_sample_mcmc_temperatures = dirpath + "/sample-mcmc-temperatures.txt"
+    with open(tmp_sample_mcmc_temperatures, "w") as f:
+        f.write("SAMPLE3\t0.8\t0.1\t1\t0.2\n")  # out of order
+        f.write("SAMPLE1\t0.2\n")  # missing cold chain
+        # SAMPLE4 uses default
+
     command = [
         "mchap",
         "assemble",
@@ -126,6 +132,8 @@ def test_Program__cli_lists():
         "4",
         "--sample-inbreeding",
         tmp_sample_inbreeding,
+        "--sample-mcmc-temperatures",
+        tmp_sample_mcmc_temperatures,
         "--targets",
         BED,
         "--variants",
@@ -161,6 +169,14 @@ def test_Program__cli_lists():
 
     for k, v in zip(samples, [0.1, 0.0, 0.2]):
         assert prog.sample_inbreeding[k] == v
+
+    temps = [
+        [0.1, 0.2, 0.8, 1.0],  # sample 3
+        [1.0],  # sample 4
+        [0.2, 1.0],  # sample 1
+    ]
+    for k, v in zip(samples, temps):
+        assert prog.sample_mcmc_temperatures[k] == v
 
 
 def test_Program__header():

@@ -18,6 +18,7 @@ usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
                                [--keep-supplementary-reads]
                                [--mcmc-chains MCMC_CHAINS]
                                [--mcmc-temperatures [MCMC_TEMPERATURES [MCMC_TEMPERATURES ...]]]
+                               [--sample-mcmc-temperatures SAMPLE_MCMC_TEMPERATURES]
                                [--mcmc-steps MCMC_STEPS]
                                [--mcmc-burn MCMC_BURN]
                                [--mcmc-fix-homozygous MCMC_FIX_HOMOZYGOUS]
@@ -156,6 +157,15 @@ optional arguments:
                         and will automatically be sorted in ascending order.
                         The cold chain value of 1.0 will be added
                         automatically if it is not specified.
+  --sample-mcmc-temperatures SAMPLE_MCMC_TEMPERATURES
+                        A file containing a list of samples with mcmc
+                        (inverse) temperatures. Each line of the file should
+                        start with a sample identifier followed by tab
+                        seperated numeric values between 0 and 1. The number
+                        of temperatures specified may vary between samples.
+                        Samples not listed in this file will use the default
+                        values specified with the --mcmc-temperatures
+                        argument.
   --mcmc-steps MCMC_STEPS
                         Number of steps to simulate in each MCMC chain
                         (default = 1500).

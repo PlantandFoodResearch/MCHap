@@ -144,6 +144,20 @@ Reducing this value to ``0.99`` could speed up the assembly process but
 lowering it too much may result in incorrectly called haplotypes especially
 in higher ploidy organisms.
 
+Parallel-tempering
+~~~~~~~~~~~~~~~~~~
+
+The ``mchap assemble`` program can use parallel-tempering to reduce the
+risk of multi-modality and thereby reduce the chance of incorrectly
+assembled haplotypes.
+However, parallel-tempering is computationally intensive as an additional
+MCMC simulation is run for each additional temperature.
+To balance this trade-off it's possible to specify parallel-temperature
+on a per-sample basis using the ``--sample-mcmc-temperatures`` parameter.
+For example, when assembling haplotypes for samples of a pedigree it may
+be desirable to specify multiple temperatures for founding individuals
+to ensure that the founding alleles are identified without using
+parallel-tempering for all of the progeny derived from those founders.
 
 
 .. _`full list of arguments`: cli-assemble-help.txt

@@ -63,6 +63,7 @@ class program(object):
     sample_bams: dict
     sample_ploidy: dict
     sample_inbreeding: dict
+    sample_mcmc_temperatures: dict
     region: str = None
     region_id: str = None
     read_group_field: str = "SM"
@@ -72,7 +73,6 @@ class program(object):
     skip_duplicates: bool = True
     skip_qcfail: bool = True
     skip_supplementary: bool = True
-    mcmc_temperatures: tuple = (1.0,)
     mcmc_chains: int = 1
     mcmc_steps: int = 1000
     mcmc_burn: int = 500
@@ -408,6 +408,21 @@ class program(object):
         )
 
         parser.add_argument(
+            "--sample-mcmc-temperatures",
+            type=str,
+            nargs=1,
+            default=[None],
+            help=(
+                "A file containing a list of samples with mcmc (inverse) temperatures. "
+                "Each line of the file should start with a sample identifier followed by "
+                "tab seperated numeric values between 0 and 1. "
+                "The number of temperatures specified may vary between samples. "
+                "Samples not listed in this file will use the default values specified "
+                "with the --mcmc-temperatures argument."
+            ),
+        )
+
+        parser.add_argument(
             "--mcmc-steps",
             type=int,
             nargs=1,
@@ -600,13 +615,33 @@ class program(object):
             else:
                 sample_inbreeding[sample] = args.inbreeding[0]
 
-        # add cold chain temperature if not present and sort
-        temperatures = args.mcmc_temperatures
-        temperatures.sort()
-        assert temperatures[0] >= 0.0
-        assert temperatures[-1] <= 1.0
-        if temperatures[-1] != 1.0:
-            temperatures.append(1.0)
+        # per sample mcmc temperatures
+        sample_mcmc_temperatures = dict()
+        if args.sample_mcmc_temperatures[0]:
+            with open(args.sample_mcmc_temperatures[0]) as f:
+                for line in f.readlines():
+                    values = line.strip().split("\t")
+                    sample = values[0]
+                    temps = [float(v) for v in values[1:]]
+                    temps.sort()
+                    assert temps[0] > 0.0
+                    assert temps[-1] <= 1.0
+                    if temps[-1] != 1.0:
+                        temps.append(1.0)
+                    sample_mcmc_temperatures[sample] = temps
+
+        # default mcmc temperatures
+        temps = args.mcmc_temperatures
+        temps.sort()
+        assert temps[0] > 0.0
+        assert temps[-1] <= 1.0
+        if temps[-1] != 1.0:
+            temps.append(1.0)
+        for sample in samples:
+            if sample in sample_mcmc_temperatures:
+                pass
+            else:
+                sample_mcmc_temperatures[sample] = temps
 
         # must have some source of error in reads
         if args.ignore_base_phred_scores:
@@ -623,6 +658,7 @@ class program(object):
             sample_bams=sample_bams,
             sample_ploidy=sample_ploidy,
             sample_inbreeding=sample_inbreeding,
+            sample_mcmc_temperatures=sample_mcmc_temperatures,
             region=args.region[0],
             region_id=args.region_id,
             read_group_field=args.read_group_field[0],
@@ -633,7 +669,6 @@ class program(object):
             skip_qcfail=args.skip_qcfail,
             skip_supplementary=args.skip_supplementary,
             mcmc_chains=args.mcmc_chains[0],
-            mcmc_temperatures=tuple(temperatures),
             mcmc_steps=args.mcmc_steps[0],
             mcmc_burn=args.mcmc_burn[0],
             # mcmc_alpha,
@@ -825,7 +860,7 @@ class program(object):
                         recombination_step_probability=self.mcmc_recombination_step_probability,
                         partial_dosage_step_probability=self.mcmc_partial_dosage_step_probability,
                         dosage_step_probability=self.mcmc_dosage_step_probability,
-                        temperatures=self.mcmc_temperatures,
+                        temperatures=self.sample_mcmc_temperatures[sample],
                         random_seed=self.random_seed,
                         llk_cache_threshold=self.mcmc_llk_cache_threshold,
                     )
