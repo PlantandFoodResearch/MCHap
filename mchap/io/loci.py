@@ -142,7 +142,10 @@ class Locus:
             sequences += record.alts
         haplotypes = np.array([list(var) for var in sequences])
         if use_snvpos:
-            positions = np.array(record.info["SNVPOS"]) - 1  # 1-based index in VCF
+            snvpos = record.info["SNVPOS"]
+            if snvpos == (None,):
+                snvpos = ()
+            positions = np.array(snvpos, int) - 1  # 1-based index in VCF
         else:
             positions = np.where((haplotypes != haplotypes[0:1]).any(axis=0))[0]
         snp_alleles = haplotypes[:, positions].T
