@@ -2,6 +2,7 @@
 
 import gzip
 import pysam
+import numpy as np
 from dataclasses import dataclass
 
 from mchap.encoding import integer
@@ -113,6 +114,50 @@ class Locus:
             name=name,
             sequence=None,
             variants=None,
+        )
+
+    @classmethod
+    def from_variant_record(cls, record, use_snvpos=False):
+        """Generate a locus object with reference and variants from
+        a known MNP.
+
+        Paramters
+        ---------
+        record : VariantRecord.
+            A pysam VariantRecord object for an MNP variant.
+        use_snvpos : bool
+            If true then the "SNVPOS" info tag will be used to
+            identify psotions of SNV variants rather than identifying
+            them directly from the ref and alt sequences.
+
+        Returns
+        -------
+        locus : Locus
+            A locus object with populated sequence and variants fields.
+        """
+        ref_length = len(record.ref)
+        sequences = (record.ref,)
+        if record.alts:
+            assert all(ref_length == len(alt) for alt in record.alts)
+            sequences += record.alts
+        haplotypes = np.array([list(var) for var in sequences])
+        if use_snvpos:
+            positions = np.array(record.info["SNVPOS"]) - 1  # 1-based index in VCF
+        else:
+            positions = np.where((haplotypes != haplotypes[0:1]).any(axis=0))[0]
+        snp_alleles = haplotypes[:, positions].T
+        snps = []
+        for offset, alleles in zip(positions, snp_alleles):
+            alleles = tuple(np.unique(alleles))
+            pos = offset + record.start
+            snps.append(SNP(record.chrom, pos, pos + 1, ".", alleles=alleles))
+        return cls(
+            contig=record.chrom,
+            start=record.start,
+            stop=record.stop,
+            name=record.id if record.id else ".",
+            sequence=record.ref,
+            variants=tuple(snps),
         )
 
 
