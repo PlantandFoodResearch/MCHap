@@ -12,7 +12,7 @@ from .prior import log_genotype_allele_prior
 
 @njit(cache=True)
 def compound_mh_step(
-    genotype_alleles, haplotypes, reads, read_counts, inbreeding, llk_cache
+    genotype_alleles, haplotypes, reads, read_counts, inbreeding, llk_cache=None
 ):
     """Metropolis-Hastings MCMC compound step for calling sample alleles from a set of known genotypes.
 
@@ -131,7 +131,15 @@ def compound_mh_step(
 
 
 @njit(cache=True)
-def mh_mcmc(genotype_alleles, haplotypes, reads, read_counts, inbreeding, n_steps=1000):
+def mh_mcmc(
+    genotype_alleles,
+    haplotypes,
+    reads,
+    read_counts,
+    inbreeding,
+    n_steps=1000,
+    cache=False,
+):
     """MCMC simulation for calling sample alleles from a set of known genotypes.
 
     Parameters
@@ -161,8 +169,11 @@ def mh_mcmc(genotype_alleles, haplotypes, reads, read_counts, inbreeding, n_step
     ploidy = len(genotype_alleles)
     genotype_trace = np.empty((n_steps, ploidy), genotype_alleles.dtype)
     llk_trace = np.empty(n_steps, np.float64)
-    llk_cache = {}
-    llk_cache[-1] = np.nan
+    if cache:
+        llk_cache = {}
+        llk_cache[-1] = np.nan
+    else:
+        llk_cache = None
     for i in range(n_steps):
         llk = compound_mh_step(
             genotype_alleles=genotype_alleles,
@@ -179,7 +190,12 @@ def mh_mcmc(genotype_alleles, haplotypes, reads, read_counts, inbreeding, n_step
 
 @njit(cache=True)
 def compound_gibbs_step(
-    genotype_alleles, haplotypes, reads, read_counts, inbreeding, llk_cache
+    genotype_alleles,
+    haplotypes,
+    reads,
+    read_counts,
+    inbreeding,
+    llk_cache=None,
 ):
     """Gibbs sampler step for calling sample alleles from a set of known genotypes.
 
@@ -265,7 +281,13 @@ def compound_gibbs_step(
 
 @njit(cache=True)
 def gibbs_mcmc(
-    genotype_alleles, haplotypes, reads, read_counts, inbreeding, n_steps=1000
+    genotype_alleles,
+    haplotypes,
+    reads,
+    read_counts,
+    inbreeding,
+    n_steps=1000,
+    cache=False,
 ):
     """Gibbs sampler MCMC simulation for calling sample alleles from a set of known genotypes.
 
@@ -296,8 +318,11 @@ def gibbs_mcmc(
     ploidy = len(genotype_alleles)
     genotype_trace = np.empty((n_steps, ploidy), genotype_alleles.dtype)
     llk_trace = np.empty(n_steps, np.float64)
-    llk_cache = {}
-    llk_cache[-1] = np.nan
+    if cache:
+        llk_cache = {}
+        llk_cache[-1] = np.nan
+    else:
+        llk_cache = None
     for i in range(n_steps):
         llk = compound_gibbs_step(
             genotype_alleles=genotype_alleles,

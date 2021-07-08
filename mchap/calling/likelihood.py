@@ -35,7 +35,7 @@ def log_likelihood_alleles(reads, read_counts, haplotypes, genotype_alleles):
 
 @njit(cache=True)
 def log_likelihood_alleles_cached(
-    reads, read_counts, haplotypes, genotype_alleles, cache
+    reads, read_counts, haplotypes, genotype_alleles, cache=None
 ):
     """
     Cached log-likelihood function for genotype alleles indexing a
@@ -56,15 +56,23 @@ def log_likelihood_alleles_cached(
     llk : float
         Log-likelihood.
     """
-    key = genotype_alleles_as_index(np.sort(genotype_alleles))
-    if key in cache:
-        llk = cache[key]
-    else:
+    if cache is None:
         llk = log_likelihood_alleles(
             reads=reads,
             read_counts=read_counts,
             haplotypes=haplotypes,
             genotype_alleles=genotype_alleles,
         )
-        cache[key] = llk
+    else:
+        key = genotype_alleles_as_index(np.sort(genotype_alleles))
+        if key in cache:
+            llk = cache[key]
+        else:
+            llk = log_likelihood_alleles(
+                reads=reads,
+                read_counts=read_counts,
+                haplotypes=haplotypes,
+                genotype_alleles=genotype_alleles,
+            )
+            cache[key] = llk
     return llk
