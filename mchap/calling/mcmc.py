@@ -2,11 +2,10 @@ import numpy as np
 from numba import njit
 
 from mchap.assemble.likelihood import log_genotype_prior
-from mchap.assemble.util import genotype_alleles_as_index, index_as_genotype_alleles
 from mchap.assemble.util import random_choice, normalise_log_probs
 
 from .utils import allelic_dosage, count_allele
-from .likelihood import log_likelihood_alleles_cached
+from .likelihood import log_likelihood_alleles, log_likelihood_alleles_cached
 from .prior import log_genotype_allele_prior
 
 
@@ -338,61 +337,59 @@ def gibbs_mcmc(
 
 
 @njit(cache=True)
-def mcmc_posterior_phenotype_mode(genotype_alleles_trace):
-    """Identify the mode genotype of the posterior mode allelic-phenotype.
+def greedy_caller(haplotypes, ploidy, reads, read_counts, inbreeding=0.0):
+    """Greedy method for calling genotype from known haplotypes.
 
     Parameters
     ----------
-    genotype_alleles_trace : ndarray, int, shape (n_steps, ploidy)
-        Genotype alleles trace.
+    haplotypes : ndarray, int, shape (n_haplotypes, n_pos)
+        Integer encoded haplotypes.
+    ploidy : int
+        Ploidy of organism locus.
+    reads : ndarray, float, shape (n_reads, n_pos, n_nucl)
+        Probabilistic reads.
+    read_counts : ndarray, int, shape (n_reads, )
+        Count of each read.
+    inbreeding : float
+        Expected inbreeding coefficient of sample.
 
     Returns
     -------
     genotype_alleles : ndarray, int, shape (ploidy, )
-        Alleles of the mode genotype of the posterior mode phenotype.
-    genotype_probability
-        Posterior probability of `genotype_alleles`.
-    phenotype_probability
-        Posterior probability of the mode phenotype.
+        Index of each haplotype in the genotype.
+
     """
-    n_steps, ploidy = genotype_alleles_trace.shape
+    n_alleles = len(haplotypes)
+    previous_genotype = np.zeros(0, np.int8)
+    for i in range(ploidy):
+        # add new allele slot to genotype
+        k = i + 1
+        genotype = np.zeros(k, np.int8)
+        # copy alleles from previous loop
+        genotype[0:i] = previous_genotype[0:i]
 
-    # mode phenotype
-    phenotype_counts = {}
-    for i in range(n_steps):
-        gen = genotype_alleles_trace[i]
-        phen = np.unique(gen)
-        n = len(phen)
-        idx = genotype_alleles_as_index(phen)
-        key = (n, idx)
-        if key not in phenotype_counts:
-            phenotype_counts[key] = 1
-        else:
-            phenotype_counts[key] += 1
-    mode_phen_key, mode_phen_count = (1, 0), 0
-    for phen, count in phenotype_counts.items():
-        if count > mode_phen_count:
-            mode_phen_key, mode_phen_count = phen, count
-    phenotype_prob = mode_phen_count / n_steps
-
-    # mode genotype of phenotype
-    genotype_counts = {}
-    for i in range(n_steps):
-        gen = genotype_alleles_trace[i]
-        phen = np.unique(gen)
-        n = len(phen)
-        phen_idx = genotype_alleles_as_index(phen)
-        if (n, phen_idx) == mode_phen_key:
-            gen_idx = genotype_alleles_as_index(gen)
-            if gen_idx in genotype_counts:
-                genotype_counts[gen_idx] += 1
-            else:
-                genotype_counts[gen_idx] = 1
-    mode_gen_idx, mode_gen_count = -1, 0
-    for gen, count in genotype_counts.items():
-        if count > mode_gen_count:
-            mode_gen_idx, mode_gen_count = gen, count
-    genotype = index_as_genotype_alleles(mode_gen_idx, ploidy)
-    genotype_prob = mode_gen_count / n_steps
-
-    return genotype, genotype_prob, phenotype_prob
+        best_lprob = -np.inf
+        best_allele = -1
+        for a in range(n_alleles):
+            genotype[i] = a
+            llk = log_likelihood_alleles(
+                reads=reads,
+                read_counts=read_counts,
+                haplotypes=haplotypes,
+                genotype_alleles=genotype,
+            )
+            lprior = log_genotype_prior(
+                dosage=allelic_dosage(genotype),
+                unique_haplotypes=len(haplotypes),
+                inbreeding=inbreeding,
+            )
+            lprob = llk + lprior
+            if lprob > best_lprob:
+                # update best
+                best_lprob = lprob
+                best_allele = a
+        # greedy choice
+        genotype[i] = best_allele
+        previous_genotype = genotype
+    genotype.sort()
+    return genotype
