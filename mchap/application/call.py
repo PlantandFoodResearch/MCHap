@@ -107,6 +107,10 @@ class program(baseclass.program):
                 data.sampledata["PHQ"][sample] = qual_of_prob(phenotype_prob)
                 data.sampledata["MCI"][sample] = incongruence
 
+                # genotype posteriors if requested
+                if "GP" in data.formatfields:
+                    data.sampledata["GP"][sample] = posterior.as_array(len(haplotypes))
+
                 # genotype likelihoods if requested
                 if "GL" in data.formatfields:
                     llks = genotype_likelihoods(

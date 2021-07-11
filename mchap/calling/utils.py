@@ -1,6 +1,8 @@
 import numpy as np
 from numba import njit
 
+from mchap.assemble.util import genotype_alleles_as_index
+
 
 @njit(cache=True)
 def allelic_dosage(genotype_alleles):
@@ -53,3 +55,32 @@ def count_allele(genotype_alleles, allele):
         if genotype_alleles[i] == allele:
             count += 1
     return count
+
+
+@njit(cache=True)
+def posterior_as_array(observed_genotypes, observed_probabilities, unique_genotypes):
+    """Convert observed genotypes and their probabilities to an array of
+    probabilities over all possible genotypes.
+
+    Parameters
+    ----------
+    observed_genotypes : ndarray, int, shape (n_observed, ploidy)
+        Alleles of observed genotypes.
+    observed_probabilities : ndarray, float, shape (n_observed, )
+        Probabilities associated with observed genotypes.
+    unique_genotypes : int
+        Number of total possible genotypes.
+
+    Returns
+    -------
+    probabilities : ndarray, float, shape (unique_genotypes, )
+        Probability of each possible genotype.
+    """
+    n_observed, _ = observed_genotypes.shape
+    probabilities = np.zeros(unique_genotypes, np.float64)
+    for i in range(n_observed):
+        genotype = observed_genotypes[i]
+        prob = observed_probabilities[i]
+        idx = genotype_alleles_as_index(genotype)
+        probabilities[idx] = prob
+    return probabilities

@@ -1,11 +1,13 @@
 import numpy as np
 from dataclasses import dataclass
 from mchap.assemble.classes import Assembler
+from mchap.combinatorics import count_unique_genotypes
 
 from mchap.assemble.util import seed_numba
 from mchap import mset
 
 from .mcmc import mh_mcmc, gibbs_mcmc, greedy_caller
+from .utils import posterior_as_array
 
 
 @dataclass
@@ -294,3 +296,8 @@ class PosteriorGenotypeAllelesDistribution(object):
             probs = self.probabilities[idx]
             idx = np.argmax(probs)
             return genotypes[idx], probs[idx], probs.sum()
+
+    def as_array(self, n_alleles):
+        _, ploidy = self.genotypes.shape
+        u_genotypes = count_unique_genotypes(n_alleles, ploidy)
+        return posterior_as_array(self.genotypes, self.probabilities, u_genotypes)
