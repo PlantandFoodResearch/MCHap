@@ -318,8 +318,8 @@ class program(object):
         data.infodata["RCOUNT"] = np.nansum(list(data.sampledata["RCOUNT"].values()))
         return data
 
-    def assemble_locus(self, locus):
-        """Assembles samples at a locus and formats resulting data
+    def call_locus(self, locus):
+        """Call samples at a locus and formats resulting data
         into a VCF record line.
 
         Parameters
@@ -350,7 +350,7 @@ class program(object):
 
     def _assemble_locus_wrapped(self, locus):
         try:
-            result = self.assemble_locus(locus)
+            result = self.call_locus(locus)
         except Exception as e:
             message = LOCUS_ASSEMBLY_ERROR.format(
                 name=locus.name, contig=locus.contig, start=locus.start, stop=locus.stop

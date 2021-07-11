@@ -10,6 +10,9 @@ from mchap.application.arguments import (
     collect_call_mcmc_program_arguments,
 )
 from mchap.calling.classes import CallingMCMC
+from mchap.assemble import genotype_likelihoods
+from mchap.assemble.util import natural_log_to_log10
+
 from mchap.io import qual_of_prob
 
 
@@ -50,14 +53,27 @@ class program(baseclass.program):
         Returns
         -------
         data : LocusAssemblyData
-            With sampledata fields: "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI".
+            With sampledata fields: "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
+            and "GL", "GP" if specified.
         """
-        for field in ["alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"]:
+        for field in [
+            "alleles",
+            "haplotypes",
+            "GQ",
+            "GPM",
+            "PHPM",
+            "PHQ",
+            "MCI",
+            "GL",
+            "GP",
+        ]:
             data.sampledata[field] = dict()
         haplotypes = data.locus.encode_haplotypes()
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
             try:
+                reads = data.sampledata["read_dists_unique"][sample]
+                read_counts = read_counts = data.sampledata["read_dist_counts"][sample]
                 # call haplotypes
                 trace = (
                     CallingMCMC(
@@ -69,8 +85,8 @@ class program(baseclass.program):
                         random_seed=self.random_seed,
                     )
                     .fit(
-                        reads=data.sampledata["read_dists_unique"][sample],
-                        read_counts=data.sampledata["read_dist_counts"][sample],
+                        reads=reads,
+                        read_counts=read_counts,
                     )
                     .burn(self.mcmc_burn)
                 )
@@ -90,6 +106,18 @@ class program(baseclass.program):
                 )
                 data.sampledata["PHQ"][sample] = qual_of_prob(phenotype_prob)
                 data.sampledata["MCI"][sample] = incongruence
+
+                # genotype likelihoods if requested
+                if "GL" in data.formatfields:
+                    llks = genotype_likelihoods(
+                        reads=reads,
+                        read_counts=read_counts,
+                        ploidy=data.sample_ploidy[sample],
+                        haplotypes=haplotypes,
+                    )
+                    data.sampledata["GL"][sample] = np.round(
+                        natural_log_to_log10(llks), self.precision
+                    )
 
             # end of try clause for specific sample
             except Exception as e:
