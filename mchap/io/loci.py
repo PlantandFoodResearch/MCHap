@@ -5,7 +5,7 @@ import pysam
 import numpy as np
 from dataclasses import dataclass
 
-from mchap.encoding import integer
+from mchap.encoding import integer, character
 
 
 __all__ = [
@@ -33,6 +33,7 @@ class Locus:
     name: str
     sequence: str
     variants: tuple
+    alts: tuple = None
 
     @property
     def positions(self):
@@ -93,6 +94,14 @@ class Locus:
         # join and return
         return "".join(chars)
 
+    def encode_haplotypes(self):
+        strings = (self.sequence,) + self.alts
+        chars = np.array([list(string) for string in strings])
+        idx = np.array(self.positions) - self.start
+        if len(idx) == 0:
+            return np.zeros((len(strings), 0), dtype=int)
+        return character.as_allelic(chars[:, idx], self.alleles)
+
     def format_haplotypes(self, array, gap="-"):
         """Format integer encoded alleles as a haplotype string"""
         variants = integer.as_characters(array, gap=gap, alleles=self.alleles)
@@ -139,7 +148,10 @@ class Locus:
         sequences = (record.ref,)
         if record.alts:
             assert all(ref_length == len(alt) for alt in record.alts)
-            sequences += record.alts
+            alts = record.alts
+            sequences += alts
+        else:
+            alts = ()
         haplotypes = np.array([list(var) for var in sequences])
         if use_snvpos:
             snvpos = record.info["SNVPOS"]
@@ -161,6 +173,7 @@ class Locus:
             name=record.id if record.id else ".",
             sequence=record.ref,
             variants=tuple(snps),
+            alts=alts,
         )
 
 
