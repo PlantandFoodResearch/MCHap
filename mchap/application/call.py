@@ -17,6 +17,8 @@ from mchap.io import (
     qual_of_prob,
     vcf,
 )
+from mchap.io.vcf.infofields import HEADER_INFO_FIELDS
+from mchap.io.vcf.formatfields import HEADER_FORMAT_FIELDS
 
 from .arguments import CALL_MCMC_PARSER_ARGUMENTS, collect_call_mcmc_program_arguments
 
@@ -85,75 +87,7 @@ class program(object):
         arguments = collect_call_mcmc_program_arguments(args)
         return cls(cli_command=command, **arguments)
 
-    def loci(self):
-        with pysam.VariantFile(self.vcf) as f:
-            for record in f.fetch():
-                locus = Locus.from_variant_record(record)
-                yield locus
-
-    def _header_meta(self):
-        return [
-            vcf.headermeta.fileformat("v4.3"),
-            vcf.headermeta.filedate(),
-            vcf.headermeta.source(),
-            vcf.headermeta.phasing("None"),
-            vcf.headermeta.commandline(self.cli_command),
-            vcf.headermeta.randomseed(self.random_seed),
-        ]
-
-    def _header_contigs(self):
-        with pysam.VariantFile(self.vcf) as f:
-            contigs = f.header.contigs.values()
-        return [vcf.headermeta.ContigHeader(c.name, c.length) for c in contigs]
-
-    def _header_info_fields(self):
-        return [
-            vcf.infofields.AN,
-            vcf.infofields.AC,
-            vcf.infofields.NS,
-            vcf.infofields.DP,
-            vcf.infofields.RCOUNT,
-            vcf.infofields.END,
-            vcf.infofields.NVAR,
-            vcf.infofields.SNVPOS,
-        ]
-
-    def _header_format_fields(self):
-        format_fields = [
-            vcf.formatfields.GT,
-            vcf.formatfields.GQ,
-            vcf.formatfields.PHQ,
-            vcf.formatfields.DP,
-            vcf.formatfields.RCOUNT,
-            vcf.formatfields.RCALLS,
-            vcf.formatfields.MEC,
-            vcf.formatfields.KMERCOV,
-            vcf.formatfields.GPM,
-            vcf.formatfields.PHPM,
-            vcf.formatfields.MCI,
-        ]
-        if self.report_genotype_likelihoods:
-            format_fields += [vcf.formatfields.GL]
-        if self.report_genotype_posterior:
-            format_fields += [vcf.formatfields.GP]
-        return format_fields
-
-    def header(self):
-        meta_fields = self._header_meta()
-        contigs = self._header_contigs()
-        filters = [
-            vcf.filters.SamplePassFilter(),
-        ]
-        info_fields = self._header_info_fields()
-        format_fields = self._header_format_fields()
-        columns = [vcf.headermeta.columns(self.samples)]
-        header = meta_fields + contigs + filters + info_fields + format_fields + columns
-        return [str(line) for line in header]
-
-    def _locus_data(self, locus):
-        """Generate a LocusAssemblyData object for a given locus
-        to be populated with data relating to a single vcf record.
-        """
+    def info_fields(self):
         infofields = [
             "AN",
             "AC",
@@ -164,6 +98,9 @@ class program(object):
             "NVAR",
             "SNVPOS",
         ]
+        return infofields
+
+    def format_fields(self):
         formatfields = [
             "GT",
             "GQ",
@@ -181,6 +118,44 @@ class program(object):
             formatfields += ["GL"]
         if self.report_genotype_posterior:
             formatfields += ["GP"]
+        return formatfields
+
+    def loci(self):
+        with pysam.VariantFile(self.vcf) as f:
+            for record in f.fetch():
+                locus = Locus.from_variant_record(record)
+                yield locus
+
+    def header_contigs(self):
+        with pysam.VariantFile(self.vcf) as f:
+            contigs = f.header.contigs.values()
+        return [vcf.headermeta.ContigHeader(c.name, c.length) for c in contigs]
+
+    def header(self):
+        meta_fields = [
+            vcf.headermeta.fileformat("v4.3"),
+            vcf.headermeta.filedate(),
+            vcf.headermeta.source(),
+            vcf.headermeta.phasing("None"),
+            vcf.headermeta.commandline(self.cli_command),
+            vcf.headermeta.randomseed(self.random_seed),
+        ]
+        contigs = self.header_contigs()
+        filters = [
+            vcf.filters.SamplePassFilter(),
+        ]
+        info_fields = [HEADER_INFO_FIELDS[field] for field in self.info_fields()]
+        format_fields = [HEADER_FORMAT_FIELDS[field] for field in self.format_fields()]
+        columns = [vcf.headermeta.columns(self.samples)]
+        header = meta_fields + contigs + filters + info_fields + format_fields + columns
+        return [str(line) for line in header]
+
+    def _locus_data(self, locus):
+        """Generate a LocusAssemblyData object for a given locus
+        to be populated with data relating to a single vcf record.
+        """
+        infofields = self.info_fields()
+        formatfields = self.format_fields()
         return LocusAssemblyData(
             locus=locus,
             samples=self.samples,
