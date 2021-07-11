@@ -71,6 +71,14 @@ class CallingMCMC(Assembler):
         haplotypes from the mean allele probabilities
         among all reads.
         """
+        # handle case of no variants
+        if reads.shape[1] == 0:
+            # must only have reference allele
+            assert len(self.haplotypes) == 1
+            genotypes = np.zeros((self.chains, self.steps, self.ploidy), dtype=np.int8)
+            llks = np.full((self.chains, self.steps), np.nan)
+            return GenotypeAllelesMultiTrace(genotypes, llks)
+
         # set random seed once for all chains
         if self.random_seed is not None:
             np.random.seed(self.random_seed)
