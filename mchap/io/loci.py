@@ -58,6 +58,7 @@ class Locus:
             name=self.name,
             sequence=self.sequence,
             variants=self.variants,
+            alts=self.alts,
         )
 
     def set(self, **kwargs):

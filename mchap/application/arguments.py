@@ -567,8 +567,7 @@ cores = Parameter(
     ),
 )
 
-
-DEFAULT_MCMC_PARSER_ARGUMENTS = [
+DEFAULT_PARSER_ARGUMENTS = [
     bam,
     bam_list,
     sample_bam,
@@ -584,14 +583,21 @@ DEFAULT_MCMC_PARSER_ARGUMENTS = [
     skip_qcfail,
     skip_supplementary,
     read_group_field,
+    genotype_likelihoods,
+    genotype_posteriors,
+    cores,
+]
+
+CALL_EXACT_PARSER_ARGUMENTS = [
+    haplotypes,
+] + DEFAULT_PARSER_ARGUMENTS
+
+DEFAULT_MCMC_PARSER_ARGUMENTS = DEFAULT_PARSER_ARGUMENTS + [
     mcmc_chains,
     mcmc_steps,
     mcmc_burn,
     mcmc_seed,
     mcmc_chain_incongruence_threshold,
-    genotype_likelihoods,
-    genotype_posteriors,
-    cores,
 ]
 
 CALL_MCMC_PARSER_ARGUMENTS = [
@@ -609,7 +615,6 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
     + DEFAULT_MCMC_PARSER_ARGUMENTS
     + [
         haplotype_posterior_threshold,
-        use_assembly_posteriors,
         mcmc_fix_homozygous,
         mcmc_llk_cache_threshold,
         mcmc_recombination_step_probability,
@@ -779,7 +784,7 @@ def parse_sample_temperatures(arguments, samples):
     return sample_mcmc_temperatures
 
 
-def collect_default_mcmc_program_arguments(arguments):
+def collect_default_program_arguments(arguments):
     # must have some source of error in reads
     if arguments.ignore_base_phred_scores:
         if arguments.base_error_rate[0] == 0.0:
@@ -814,15 +819,30 @@ def collect_default_mcmc_program_arguments(arguments):
         skip_duplicates=arguments.skip_duplicates,
         skip_qcfail=arguments.skip_qcfail,
         skip_supplementary=arguments.skip_supplementary,
-        mcmc_chains=arguments.mcmc_chains[0],
-        mcmc_steps=arguments.mcmc_steps[0],
-        mcmc_burn=arguments.mcmc_burn[0],
-        mcmc_incongruence_threshold=arguments.mcmc_chain_incongruence_threshold[0],
         report_genotype_likelihoods=arguments.genotype_likelihoods,
         report_genotype_posterior=arguments.genotype_posteriors,
         n_cores=arguments.cores[0],
-        random_seed=arguments.mcmc_seed[0],
     )
+
+
+def collect_call_exact_program_arguments(arguments):
+    data = collect_default_program_arguments(arguments)
+    data["vcf"] = arguments.haplotypes[0]
+    return data
+
+
+def collect_default_mcmc_program_arguments(arguments):
+    data = collect_default_program_arguments(arguments)
+    data.update(
+        dict(
+            mcmc_chains=arguments.mcmc_chains[0],
+            mcmc_steps=arguments.mcmc_steps[0],
+            mcmc_burn=arguments.mcmc_burn[0],
+            mcmc_incongruence_threshold=arguments.mcmc_chain_incongruence_threshold[0],
+            random_seed=arguments.mcmc_seed[0],
+        )
+    )
+    return data
 
 
 def collect_call_mcmc_program_arguments(arguments):
@@ -858,7 +878,6 @@ def collect_assemble_mcmc_program_arguments(arguments):
             ],
             mcmc_dosage_step_probability=arguments.mcmc_dosage_step_probability[0],
             mcmc_llk_cache_threshold=arguments.mcmc_llk_cache_threshold[0],
-            use_assembly_posteriors=arguments.use_assembly_posteriors,
             haplotype_posterior_threshold=arguments.haplotype_posterior_threshold[0],
         )
     )
