@@ -1,3 +1,4 @@
+import copy
 from dataclasses import dataclass
 
 
@@ -17,9 +18,10 @@ class Argument(object):
 class Parameter(Argument):
     def add_to(self, parser):
         """Add parameter to a parser object."""
+        kwargs = copy.deepcopy(self.kwargs)
         parser.add_argument(
             self.cli,
-            **self.kwargs,
+            **kwargs,
         )
         return parser
 
@@ -614,7 +616,6 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
     ]
     + DEFAULT_MCMC_PARSER_ARGUMENTS
     + [
-        haplotype_posterior_threshold,
         mcmc_fix_homozygous,
         mcmc_llk_cache_threshold,
         mcmc_recombination_step_probability,
@@ -622,6 +623,7 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
         mcmc_partial_dosage_step_probability,
         mcmc_temperatures,
         sample_mcmc_temperatures,
+        haplotype_posterior_threshold,
     ]
 )
 
@@ -643,7 +645,7 @@ def parse_sample_bam_paths(arguments):
     sample_bam : dict
         Dict mapping samples to bam paths.
     """
-    sample_bams = {}
+    sample_bams = dict()
 
     # bam paths
     bams = []
@@ -805,7 +807,7 @@ def collect_default_program_arguments(arguments):
         samples,
         default="inbreeding",
         sample_map="sample_inbreeding",
-        type=int,
+        type=float,
     )
     return dict(
         samples=samples,
@@ -828,6 +830,7 @@ def collect_default_program_arguments(arguments):
 def collect_call_exact_program_arguments(arguments):
     data = collect_default_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
+    data["random_seed"] = None
     return data
 
 

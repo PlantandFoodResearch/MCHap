@@ -1,7 +1,7 @@
 import sys
 import argparse
 
-from mchap.application import assemble2
+from mchap.application import assemble
 from mchap.application import call
 from mchap.application import call_exact
 from mchap.application import pedigraph
@@ -23,7 +23,7 @@ def main():
         args = parser.parse_args(sys.argv[1:2])
         prog = args.program[0]
         if prog == "assemble":
-            prog = assemble2.program
+            prog = assemble.program
             prog.cli(sys.argv).run_stdout()
         elif prog == "call":
             prog = call.program
