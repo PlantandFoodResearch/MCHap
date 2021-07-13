@@ -5,8 +5,28 @@ from mchap.assemble.util import factorial_20
 from mchap.assemble.likelihood import lgamma
 
 
-@numba.njit
-def _log_dirichlet_multinomial_pmf(allele_counts, dispersion):
+@numba.njit(cache=True)
+def inbreeding_as_dispersion(inbreeding, unique_haplotypes):
+    """Calculate dispersion parameter of a Dirichlet-multinomial
+    distribution assuming equal population frequency of each haplotype.
+
+    Parameters
+    ----------
+    inbreeding : float
+        Expected inbreeding coefficient of the sample.
+    unique_haplotypes : int
+        Number of possible haplotype alleles at this locus.
+
+    Returns
+    -------
+    dispersion : float
+        Dispersion parameter for all haplotypes.
+    """
+    return (1 / unique_haplotypes) * ((1 - inbreeding) / inbreeding)
+
+
+@numba.njit(cache=True)
+def log_dirichlet_multinomial_pmf(allele_counts, dispersion):
     """Dirichlet-Multinomial probability mass function.
 
     Parameters
@@ -45,7 +65,7 @@ def _log_dirichlet_multinomial_pmf(allele_counts, dispersion):
     return left + prod
 
 
-@numba.njit
+@numba.njit(cache=True)
 def log_genotype_allele_prior(
     genotype, variable_allele, unique_haplotypes, inbreeding=0
 ):
@@ -81,7 +101,7 @@ def log_genotype_allele_prior(
     # calculate the dispersion parameters for the PMF
     # this is the default value based on the inbreeding coefficient
     # which is then updated base on the observed 'constant' alleles
-    default_dispersion = (1 / unique_haplotypes) * ((1 - inbreeding) / inbreeding)
+    default_dispersion = inbreeding_as_dispersion(inbreeding, unique_haplotypes)
     dispersion = np.full(unique_haplotypes, default_dispersion)
     for i in range(len(genotype)):
         if i != variable_allele:
@@ -94,4 +114,4 @@ def log_genotype_allele_prior(
     allele_counts[a] += 1
 
     # calculate log-prior from Dirichlet-Multinomial PMF
-    return _log_dirichlet_multinomial_pmf(allele_counts, dispersion)
+    return log_dirichlet_multinomial_pmf(allele_counts, dispersion)
