@@ -4,6 +4,7 @@ import pytest
 from mchap.calling.prior import (
     inbreeding_as_dispersion,
     log_dirichlet_multinomial_pmf,
+    log_genotype_allele_prior,
 )
 
 
@@ -124,4 +125,32 @@ def test_log_dirichlet_multinomial_pmf(allele_counts, dispersion, expect):
     allele_counts = np.array(allele_counts, int)
     dispersion = np.array(dispersion, float)
     actual = log_dirichlet_multinomial_pmf(allele_counts, dispersion)
+    np.testing.assert_almost_equal(actual, expect)
+
+
+@pytest.mark.parametrize(
+    "genotype,variable_allele,unique_haplotypes,inbreeding,expect",
+    [
+        [[0, 0, 0, 0], 0, 4, 0.0, np.log(1 / 4)],
+        [[0, 1, 2, 3], 0, 4, 0.0, np.log(1 / 4)],
+        [[0, 0, 0, 0], 0, 4, 0.1, np.log(0.4375)],
+        [[0, 0, 0, 0], 1, 4, 0.1, np.log(0.4375)],
+        [[0, 0, 0, 0], 0, 4, 0.5, np.log(0.8125)],
+        [[0, 0, 0, 0], 1, 4, 0.5, np.log(0.8125)],
+        [[0, 0, 0, 1], 3, 4, 0.5, np.log(0.0625)],
+        [[2, 2, 3, 2], 2, 4, 0.5, np.log(0.0625)],
+        [[0, 0, 3, 3], 3, 4, 0.5, np.log(0.3125)],
+        [[0, 0, 0, 0], 0, 16, 0.0, np.log(1 / 16)],
+        [[0, 1, 2, 3], 0, 16, 0.0, np.log(1 / 16)],
+        [[0, 0, 3, 3], 3, 16, 0.1, np.log(0.13020833333333315)],
+        [[0, 3, 3, 3], 0, 16, 0.5, np.log(0.015625)],
+    ],
+)
+def test_log_genotype_allele_prior(
+    genotype, variable_allele, unique_haplotypes, inbreeding, expect
+):
+    genotype = np.array(genotype)
+    actual = log_genotype_allele_prior(
+        genotype, variable_allele, unique_haplotypes, inbreeding
+    )
     np.testing.assert_almost_equal(actual, expect)
