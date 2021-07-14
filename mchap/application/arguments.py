@@ -135,8 +135,8 @@ bam = Parameter(
         default=[],
         help=(
             "A list of 0 or more bam files. "
-            "Haplotypes will be assembled for all samples found within all "
-            "listed bam files unless the --sample-list parameter is used."
+            "All samples found within the listed bam files will be genotypes "
+            "unless the --sample-list parameter is used."
         ),
     ),
 )
@@ -163,6 +163,8 @@ sample_bam = Parameter(
         default=[None],
         help=(
             "A file containing a list of samples with bam file paths. "
+            "Each line of the file should be a sample identifier followed "
+            "by a tab and then a bam file path. "
             "This can optionally be used in place the --bam and --bam-list "
             "parameters. This is faster than using those parameters when running "
             "many small jobs. "
@@ -209,10 +211,10 @@ sample_list = Parameter(
         default=[None],
         help=(
             "Optionally specify a file containing a list of samples to "
-            "haplotype (one sample id per line). "
+            "genotype (one sample id per line). "
             "This file also specifies the sample order in the output. "
             "If not specified, all samples in the input bam files will "
-            "be haplotyped."
+            "be genotyped."
         ),
     ),
 )

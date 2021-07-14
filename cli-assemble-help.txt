@@ -2,34 +2,30 @@ usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
                                [--targets TARGETS] [--variants VARIANTS]
                                [--reference REFERENCE] [--bam [BAM [BAM ...]]]
                                [--bam-list BAM_LIST] [--sample-bam SAMPLE_BAM]
-                               [--ploidy PLOIDY]
+                               [--sample-list SAMPLE_LIST] [--ploidy PLOIDY]
                                [--sample-ploidy SAMPLE_PLOIDY]
-                               [--sample-list SAMPLE_LIST]
                                [--inbreeding INBREEDING]
                                [--sample-inbreeding SAMPLE_INBREEDING]
                                [--base-error-rate BASE_ERROR_RATE]
                                [--ignore-base-phred-scores]
-                               [--haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD]
-                               [--use-assembly-posteriors]
-                               [--genotype-likelihoods]
-                               [--genotype-posteriors]
                                [--mapping-quality MAPPING_QUALITY]
                                [--keep-duplicate-reads] [--keep-qcfail-reads]
                                [--keep-supplementary-reads]
+                               [--read-group-field READ_GROUP_FIELD]
+                               [--genotype-likelihoods]
+                               [--genotype-posteriors] [--cores CORES]
                                [--mcmc-chains MCMC_CHAINS]
+                               [--mcmc-steps MCMC_STEPS]
+                               [--mcmc-burn MCMC_BURN] [--mcmc-seed MCMC_SEED]
+                               [--mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD]
+                               [--mcmc-fix-homozygous MCMC_FIX_HOMOZYGOUS]
+                               [--mcmc-llk-cache-threshold MCMC_LLK_CACHE_THRESHOLD]
+                               [--mcmc-recombination-step-probability MCMC_RECOMBINATION_STEP_PROBABILITY]
+                               [--mcmc-dosage-step-probability MCMC_DOSAGE_STEP_PROBABILITY]
+                               [--mcmc-partial-dosage-step-probability MCMC_PARTIAL_DOSAGE_STEP_PROBABILITY]
                                [--mcmc-temperatures [MCMC_TEMPERATURES [MCMC_TEMPERATURES ...]]]
                                [--sample-mcmc-temperatures SAMPLE_MCMC_TEMPERATURES]
-                               [--mcmc-steps MCMC_STEPS]
-                               [--mcmc-burn MCMC_BURN]
-                               [--mcmc-fix-homozygous MCMC_FIX_HOMOZYGOUS]
-                               [--mcmc-seed MCMC_SEED]
-                               [--mcmc-recombination-step-probability MCMC_RECOMBINATION_STEP_PROBABILITY]
-                               [--mcmc-partial-dosage-step-probability MCMC_PARTIAL_DOSAGE_STEP_PROBABILITY]
-                               [--mcmc-dosage-step-probability MCMC_DOSAGE_STEP_PROBABILITY]
-                               [--mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD]
-                               [--mcmc-llk-cache-threshold MCMC_LLK_CACHE_THRESHOLD]
-                               [--read-group-field READ_GROUP_FIELD]
-                               [--cores CORES]
+                               [--haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -54,19 +50,27 @@ optional arguments:
   --reference REFERENCE
                         Indexed fasta file containing the reference genome.
   --bam [BAM [BAM ...]]
-                        A list of 0 or more bam files. Haplotypes will be
-                        assembled for all samples found within all listed bam
-                        files unless the --sample-list parameter is used.
+                        A list of 0 or more bam files. All samples found
+                        within the listed bam files will be genotypes unless
+                        the --sample-list parameter is used.
   --bam-list BAM_LIST   A file containing a list of bam file paths (one per
                         line). This can optionally be used in place of or
                         combined with the --bam parameter.
   --sample-bam SAMPLE_BAM
                         A file containing a list of samples with bam file
-                        paths. This can optionally be used in place the --bam
-                        and --bam-list parameters. This is faster than using
-                        those parameters when running many small jobs. An
-                        error will be thrown if a sample is not found within
-                        its specified bam file.
+                        paths. Each line of the file should be a sample
+                        identifier followed by a tab and then a bam file path.
+                        This can optionally be used in place the --bam and
+                        --bam-list parameters. This is faster than using those
+                        parameters when running many small jobs. An error will
+                        be thrown if a sample is not found within its
+                        specified bam file.
+  --sample-list SAMPLE_LIST
+                        Optionally specify a file containing a list of samples
+                        to genotype (one sample id per line). This file also
+                        specifies the sample order in the output. If not
+                        specified, all samples in the input bam files will be
+                        genotyped.
   --ploidy PLOIDY       Default ploidy for all samples (default = 2). This
                         value is used for all samples which are not specified
                         using the --sample-ploidy parameter
@@ -76,12 +80,6 @@ optional arguments:
                         the default value. Each line should contain a sample
                         identifier followed by a tab and then an integer
                         ploidy value.
-  --sample-list SAMPLE_LIST
-                        Optionally specify a file containing a list of samples
-                        to haplotype (one sample id per line). This file also
-                        specifies the sample order in the output. If not
-                        specified, all samples in the input bam files will be
-                        haplotyped.
   --inbreeding INBREEDING
                         Default inbreeding coefficient for all samples
                         (default = 0.0). This value is used for all samples
@@ -105,38 +103,6 @@ optional arguments:
                         for greater de-duplication of reads however an error
                         rate > 0.0 must be specified with the --base-error-
                         rate argument.
-  --haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD
-                        Posterior probability required for a haplotype to be
-                        included in the output VCF as an alternative allele.
-                        The posterior probability of each haplotype is
-                        assessed per individual and calculated as the
-                        probability of that haplotype being present with one
-                        or more copies in that individual.A haplotype is
-                        included as an alternate allele if it meets this
-                        posterior probability threshold in at least one
-                        individual. This parameter is the main mechanism to
-                        control the number of alternate alleles in ech VCF
-                        record and hence the number of genotypes assessed when
-                        recalculating likelihoods and posterior distributions
-                        (default = 0.20).
-  --use-assembly-posteriors
-                        Flag: Use posterior probabilities from each
-                        individuals assembly rather than recomputing
-                        posteriors based on the observed alleles across all
-                        samples. These posterior probabilities will be used to
-                        call genotypes , metrics related to the genotype, and
-                        the posterior distribution (GP field) if specified.
-                        This may lead to less robust genotype calls in the
-                        presence of multi-modality and hence it is recommended
-                        to run the simulation for longer or using parallel-
-                        tempering when using this option. This option may be
-                        more suitable than the default when calling haplotypes
-                        in unrelated individuals.
-  --genotype-likelihoods
-                        Flag: Report genotype likelihoods in the GL VCF field.
-  --genotype-posteriors
-                        Flag: Report genotype posterior probabilities in the
-                        GP VCF field.
   --mapping-quality MAPPING_QUALITY
                         Minimum mapping quality of reads used in assembly
                         (default = 20).
@@ -148,9 +114,58 @@ optional arguments:
   --keep-supplementary-reads
                         Flag: Use reads marked as supplementary in the
                         assembly (these are skipped by default).
+  --read-group-field READ_GROUP_FIELD
+                        Read group field to use as sample id (default = "SM").
+                        The chosen field determines tha sample ids required in
+                        other input files e.g. the --sample-list argument.
+  --genotype-likelihoods
+                        Flag: Report genotype likelihoods in the GL VCF field.
+  --genotype-posteriors
+                        Flag: Report genotype posterior probabilities in the
+                        GP VCF field.
+  --cores CORES         Number of cpu cores to use (default = 1).
   --mcmc-chains MCMC_CHAINS
                         Number of independent MCMC chains per assembly
                         (default = 2).
+  --mcmc-steps MCMC_STEPS
+                        Number of steps to simulate in each MCMC chain
+                        (default = 1500).
+  --mcmc-burn MCMC_BURN
+                        Number of initial steps to discard from each MCMC
+                        chain (default = 500).
+  --mcmc-seed MCMC_SEED
+                        Random seed for MCMC (default = 42).
+  --mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD
+                        Posterior phenotype probability threshold for
+                        identification of incongruent posterior modes (default
+                        = 0.60).
+  --mcmc-fix-homozygous MCMC_FIX_HOMOZYGOUS
+                        Fix alleles that are homozygous with a probability
+                        greater than or equal to the specified value (default
+                        = 0.999). The probability of that a variant is
+                        homozygous in a sample is assessed independently for
+                        each variant prior to MCMC simulation. If an allele is
+                        "fixed" it is not allowed vary within the MCMC thereby
+                        reducing computational complexity.
+  --mcmc-llk-cache-threshold MCMC_LLK_CACHE_THRESHOLD
+                        Threshold for determining whether to cache log-
+                        likelihoods during MCMC to improve performance. This
+                        value is computed as ploidy * variants * unique-reads
+                        (default = 100). If set to 0 then log-likelihoods will
+                        be cached for all samples including those with few
+                        observed reads which is inefficient and can slow the
+                        MCMC. If set to -1 then log-likelihood caching will be
+                        disabled for all samples.
+  --mcmc-recombination-step-probability MCMC_RECOMBINATION_STEP_PROBABILITY
+                        Probability of performing a recombination sub-step
+                        during each step of the MCMC. (default = 0.5).
+  --mcmc-dosage-step-probability MCMC_DOSAGE_STEP_PROBABILITY
+                        Probability of performing a dosage sub-step during
+                        each step of the MCMC. (default = 1.0).
+  --mcmc-partial-dosage-step-probability MCMC_PARTIAL_DOSAGE_STEP_PROBABILITY
+                        Probability of performing a within-interval dosage
+                        sub-step during each step of the MCMC. (default =
+                        0.5).
   --mcmc-temperatures [MCMC_TEMPERATURES [MCMC_TEMPERATURES ...]]
                         A list of inverse-temperatures to use for parallel
                         tempered chains. These values must be between 0 and 1
@@ -166,47 +181,17 @@ optional arguments:
                         Samples not listed in this file will use the default
                         values specified with the --mcmc-temperatures
                         argument.
-  --mcmc-steps MCMC_STEPS
-                        Number of steps to simulate in each MCMC chain
-                        (default = 1500).
-  --mcmc-burn MCMC_BURN
-                        Number of initial steps to discard from each MCMC
-                        chain (default = 500).
-  --mcmc-fix-homozygous MCMC_FIX_HOMOZYGOUS
-                        Fix alleles that are homozygous with a probability
-                        greater than or equal to the specified value (default
-                        = 0.999). The probability of that a variant is
-                        homozygous in a sample is assessed independently for
-                        each variant prior to MCMC simulation. If an allele is
-                        "fixed" it is not allowed vary within the MCMC thereby
-                        reducing computational complexity.
-  --mcmc-seed MCMC_SEED
-                        Random seed for MCMC (default = 42).
-  --mcmc-recombination-step-probability MCMC_RECOMBINATION_STEP_PROBABILITY
-                        Probability of performing a recombination sub-step
-                        during each step of the MCMC. (default = 0.5).
-  --mcmc-partial-dosage-step-probability MCMC_PARTIAL_DOSAGE_STEP_PROBABILITY
-                        Probability of performing a within-interval dosage
-                        sub-step during each step of the MCMC. (default =
-                        0.5).
-  --mcmc-dosage-step-probability MCMC_DOSAGE_STEP_PROBABILITY
-                        Probability of performing a dosage sub-step during
-                        each step of the MCMC. (default = 1.0).
-  --mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD
-                        Posterior phenotype probability threshold for
-                        identification of incongruent posterior modes (default
-                        = 0.60).
-  --mcmc-llk-cache-threshold MCMC_LLK_CACHE_THRESHOLD
-                        Threshold for determining whether to cache log-
-                        likelihoods during MCMC to improve performance. This
-                        value is computed as ploidy * variants * unique-reads
-                        (default = 100). If set to 0 then log-likelihoods will
-                        be cached for all samples including those with few
-                        observed reads which is inefficient and can slow the
-                        MCMC. If set to -1 then log-likelihood caching will be
-                        disabled for all samples.
-  --read-group-field READ_GROUP_FIELD
-                        Read group field to use as sample id (default = "SM").
-                        The chosen field determines tha sample ids required in
-                        other input files e.g. the --sample-list argument.
-  --cores CORES         Number of cpu cores to use (default = 1).
+  --haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD
+                        Posterior probability required for a haplotype to be
+                        included in the output VCF as an alternative allele.
+                        The posterior probability of each haplotype is
+                        assessed per individual and calculated as the
+                        probability of that haplotype being present with one
+                        or more copies in that individual.A haplotype is
+                        included as an alternate allele if it meets this
+                        posterior probability threshold in at least one
+                        individual. This parameter is the main mechanism to
+                        control the number of alternate alleles in ech VCF
+                        record and hence the number of genotypes assessed when
+                        recalculating likelihoods and posterior distributions
+                        (default = 0.20).
