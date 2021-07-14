@@ -11,7 +11,7 @@ from mchap.jitutils import (
     normalise_log_probs,
     index_as_genotype_alleles,
     seed_numba,
-    get_dosage,
+    get_haplotype_dosage,
 )
 from mchap.encoding import integer
 from mchap import combinatorics
@@ -212,7 +212,7 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
     log_expect = np.empty(u_gens, float)
     dosage = np.empty(ploidy, int)
     for i, g in enumerate(genotypes):
-        get_dosage(dosage, g)
+        get_haplotype_dosage(dosage, g)
         llk = log_likelihood(reads, g)
         lprior = log_genotype_prior(dosage, u_haps, inbreeding=inbreeding)
         log_expect[i] = llk + lprior

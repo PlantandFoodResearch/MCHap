@@ -6,7 +6,7 @@ from mchap.encoding import integer
 from mchap.jitutils import (
     seed_numba,
     normalise_log_probs,
-    get_dosage,
+    get_haplotype_dosage,
     structural_change,
 )
 from mchap.assemble.likelihood import (
@@ -432,7 +432,7 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
     log_expect = np.empty(len(genotypes))
     dosage = np.empty(ploidy, int)
     for i, g in enumerate(genotypes):
-        get_dosage(dosage, g)
+        get_haplotype_dosage(dosage, g)
         llk = log_likelihood(reads, g)
         lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
         log_expect[i] = llk + lprior
@@ -578,7 +578,7 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
     lpriors = np.empty(len(genotypes))
     dosage = np.empty(ploidy, int)
     for i, g in enumerate(genotypes):
-        get_dosage(dosage, g)
+        get_haplotype_dosage(dosage, g)
         llks[i] = log_likelihood(reads, g)
         lpriors[i] = log_genotype_prior(
             dosage, unique_haplotypes, inbreeding=inbreeding

@@ -2,7 +2,7 @@ import numpy as np
 
 from mchap.encoding.integer import as_probabilistic
 from mchap.io.util import prob_of_qual, PFEIFFER_ERROR
-from mchap.jitutils import sample_alleles
+from mchap.jitutils import sample_snv_alleles
 
 
 def simulate_reads(
@@ -66,7 +66,7 @@ def simulate_reads(
 
     # re-sample haplotypes from reads to introduce errors
     if errors:
-        read_haps = sample_alleles(reads)
+        read_haps = sample_snv_alleles(reads)
         reads = as_probabilistic(read_haps, n_alleles, p=probs)
 
     return reads

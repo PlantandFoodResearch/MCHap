@@ -365,6 +365,21 @@ def array_equal(x, y, interval=None):
 
 @numba.njit(cache=True)
 def count_haplotype_copies(genotype, h):
+    """Count the number of copies of the specified haplotype
+    within a genotype.
+
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, n_base)
+        A genotype of haplotype alleles encoded as integers.
+    h : int
+        Index of the haplotype to count.
+
+    Returns
+    -------
+    count : int
+        The number of haplotype copies.
+    """
     ploidy = len(genotype)
     count = 1
     for i in range(ploidy):
@@ -377,7 +392,7 @@ def count_haplotype_copies(genotype, h):
 
 
 @numba.njit(cache=True)
-def get_dosage(dosage, genotype, interval=None):
+def get_haplotype_dosage(dosage, genotype, interval=None):
     """Calculates the dosage of a set of integer encoded haplotypes by
     checking for array equality.
 
@@ -424,8 +439,8 @@ def get_dosage(dosage, genotype, interval=None):
 
 
 @numba.njit(cache=True)
-def set_dosage(genotype, dosage):
-    """Set a genotype to a new dosage.
+def set_haplotype_dosage(genotype, dosage):
+    """Set a genotype of haplotype arrays to a new dosage.
 
     Parameters
     ----------
@@ -467,8 +482,8 @@ def set_dosage(genotype, dosage):
 
 
 @numba.njit(cache=True)
-def sample_alleles(array, dtype=np.int8):
-    """Sample a random set of alleles from probabilities.
+def sample_snv_alleles(array, dtype=np.int8):
+    """Sample a random set of SNV alleles from probabilities.
 
     Parameters
     ----------

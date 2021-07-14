@@ -5,7 +5,7 @@ from itertools import combinations_with_replacement
 from mchap.combinatorics import count_unique_genotypes
 from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
 from mchap.jitutils import (
-    get_dosage,
+    get_haplotype_dosage,
     increment_genotype,
     normalise_log_probs,
     genotype_alleles_as_index,
@@ -45,7 +45,7 @@ def _call_posterior_mode(
             read_counts=read_counts,
         )
         # log prior
-        get_dosage(dosage, genotype.reshape(ploidy, 1))
+        get_haplotype_dosage(dosage, genotype.reshape(ploidy, 1))
         lpr = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
         # scaled log posterior
         ljoint = llk + lpr
@@ -88,7 +88,7 @@ def _phenotype_log_joint(genotype, reads, haplotypes, read_counts=None, inbreedi
             read_counts=read_counts,
         )
         # log prior
-        get_dosage(dosage, array.reshape(ploidy, 1))
+        get_haplotype_dosage(dosage, array.reshape(ploidy, 1))
         lpr = log_genotype_prior(dosage, len(haplotypes), inbreeding=inbreeding)
         # scaled log posterior
         ljoint = llk + lpr
@@ -234,7 +234,7 @@ def genotype_posteriors(log_likelihoods, ploidy, n_alleles, inbreeding=0):
     genotype = np.zeros(ploidy, np.int64)
     dosage = np.zeros(ploidy, np.int8)
     for i in range(n_genotypes):
-        get_dosage(dosage, genotype.reshape(ploidy, 1))
+        get_haplotype_dosage(dosage, genotype.reshape(ploidy, 1))
         llk = log_likelihoods[i]
         lpr = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
         posteriors[i] = llk + lpr

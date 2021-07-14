@@ -3,7 +3,7 @@
 import numpy as np
 import numba
 
-from mchap.jitutils import random_choice, count_haplotype_copies, get_dosage
+from mchap.jitutils import random_choice, count_haplotype_copies, get_haplotype_dosage
 from mchap.assemble.likelihood import log_likelihood_cached, log_genotype_prior
 
 
@@ -88,7 +88,7 @@ def base_step(
 
     # ratio of prior probabilities
     dosage = np.empty(ploidy, dtype=np.int8)
-    get_dosage(dosage, genotype)
+    get_haplotype_dosage(dosage, genotype)
     lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
 
     current_nucleotide = genotype[h, j]
@@ -115,7 +115,7 @@ def base_step(
             llk_ratio = llk_i - llk
 
             # calculate ratio of priors: ln(P(G')/P(G))
-            get_dosage(dosage, genotype)
+            get_haplotype_dosage(dosage, genotype)
             lprior_i = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
             lprior_ratio = lprior_i - lprior
 

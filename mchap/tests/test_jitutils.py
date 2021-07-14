@@ -130,7 +130,7 @@ def test_array_equal(x, y, interval, answer):
         ),
     ],
 )
-def test_get_dosage(genotype, interval, answer):
+def test_get_haplotype_dosage(genotype, interval, answer):
 
     genotype = np.array(genotype, dtype=np.int8)
     answer = np.array(answer)
@@ -138,12 +138,12 @@ def test_get_dosage(genotype, interval, answer):
     ploidy = len(genotype)
     dosage = np.ones(ploidy, dtype=int)
 
-    jitutils.get_dosage(dosage, genotype, interval=interval)
+    jitutils.get_haplotype_dosage(dosage, genotype, interval=interval)
 
     np.testing.assert_almost_equal(dosage, answer)
 
 
-def test_set_dosage():
+def test_set_haplotype_dosage():
 
     # initial dosage = [1, 2, 0, 1]
     genotype = np.array(
@@ -153,7 +153,7 @@ def test_set_dosage():
     # target dosage
     dosage = np.array([3, 1, 0, 0], dtype=int)
 
-    jitutils.set_dosage(genotype, dosage)
+    jitutils.set_haplotype_dosage(genotype, dosage)
 
     # note first haplotypes in same order
     answer = np.array(
@@ -189,7 +189,7 @@ def test_count_equivalent_permutations(dosage, answer):
     assert query == answer
 
 
-def test_sample_alleles():
+def test_sample_snv_alleles():
 
     array = np.array(
         [[[0.7, 0.3, 0.0], [0.5, 0.5, 0.0]], [[0.9, 0.1, 0.0], [0.4, 0.3, 0.3]]]
@@ -198,7 +198,7 @@ def test_sample_alleles():
     accumulate = np.zeros(array.shape, dtype=float)
     for _ in range(10000):
         accumulate += integer.as_probabilistic(
-            jitutils.sample_alleles(array), 3, dtype=float
+            jitutils.sample_snv_alleles(array), 3, dtype=float
         )
 
     # should be no samples from zero probability alleles
