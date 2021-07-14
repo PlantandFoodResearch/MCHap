@@ -5,8 +5,8 @@ from mchap.assemble import mutation
 from mchap.assemble.likelihood import (
     log_likelihood,
     new_log_likelihood_cache,
-    log_genotype_prior,
 )
+from mchap.assemble.prior import log_genotype_prior
 from mchap.jitutils import (
     normalise_log_probs,
     index_as_genotype_alleles,

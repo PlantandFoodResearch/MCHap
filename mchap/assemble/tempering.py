@@ -2,7 +2,7 @@ import numpy as np
 import numba
 
 from mchap.jitutils import get_haplotype_dosage
-from mchap.assemble.likelihood import log_genotype_prior
+from mchap.assemble.prior import log_genotype_prior
 
 __all__ = ["chain_swap_step"]
 

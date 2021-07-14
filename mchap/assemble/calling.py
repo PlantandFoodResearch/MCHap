@@ -3,7 +3,8 @@ from numba import njit
 from itertools import combinations_with_replacement
 
 from mchap.combinatorics import count_unique_genotypes
-from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
+from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble.prior import log_genotype_prior
 from mchap.jitutils import (
     get_haplotype_dosage,
     increment_genotype,

@@ -3,7 +3,8 @@ import numpy as np
 from mchap.assemble import calling
 from mchap import mset
 from mchap.testing import simulate_reads
-from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
+from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble.prior import log_genotype_prior
 from mchap.jitutils import genotype_alleles_as_index, normalise_log_probs
 from mchap.assemble.classes import PosteriorGenotypeDistribution
 

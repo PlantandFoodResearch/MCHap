@@ -9,10 +9,8 @@ from mchap.jitutils import (
     structural_change,
     get_haplotype_dosage,
 )
-from mchap.assemble.likelihood import (
-    log_likelihood_structural_change_cached,
-    log_genotype_prior,
-)
+from mchap.assemble.likelihood import log_likelihood_structural_change_cached
+from mchap.assemble.prior import log_genotype_prior
 
 __all__ = [
     "interval_step",

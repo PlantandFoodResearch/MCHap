@@ -4,7 +4,8 @@ import numpy as np
 import numba
 
 from mchap.jitutils import random_choice, count_haplotype_copies, get_haplotype_dosage
-from mchap.assemble.likelihood import log_likelihood_cached, log_genotype_prior
+from mchap.assemble.likelihood import log_likelihood_cached
+from mchap.assemble.prior import log_genotype_prior
 
 
 __all__ = ["base_step", "compound_step"]

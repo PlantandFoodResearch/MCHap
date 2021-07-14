@@ -1,8 +1,8 @@
 import numpy as np
 import numba
+from math import lgamma
 
 from mchap.jitutils import factorial_20
-from mchap.assemble.likelihood import lgamma
 
 
 @numba.njit(cache=True)

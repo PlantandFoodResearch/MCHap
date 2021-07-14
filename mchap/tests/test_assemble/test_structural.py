@@ -11,9 +11,9 @@ from mchap.jitutils import (
 )
 from mchap.assemble.likelihood import (
     log_likelihood,
-    log_genotype_prior,
     new_log_likelihood_cache,
 )
+from mchap.assemble.prior import log_genotype_prior
 from mchap.assemble import structural
 from mchap import mset
 
