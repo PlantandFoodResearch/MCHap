@@ -4,9 +4,15 @@ from itertools import permutations
 from itertools import combinations_with_replacement
 
 from mchap.assemble import DenovoMCMC
-from mchap.calling.classes import CallingMCMC
+from mchap.calling.classes import (
+    CallingMCMC,
+    PosteriorGenotypeAllelesDistribution,
+    GenotypeAllelesMultiTrace,
+)
 from mchap.testing import simulate_reads
 from mchap.assemble.util import seed_numba
+from mchap.combinatorics import count_unique_genotypes
+from mchap.assemble.util import genotype_alleles_as_index
 
 
 @pytest.mark.parametrize(
@@ -217,3 +223,96 @@ def test_CallingMCMC__zero_snps():
     assert np.all(np.isnan(trace.llks))
     assert call_genotype_prob == 1
     assert call_phenotype_prob == 1
+
+
+def test_PosteriorGenotypeAllelesDistribution__as_array():
+    ploidy = 4
+    n_haps = 4
+    unique_genotypes = count_unique_genotypes(n_haps, ploidy)
+    observed_genotypes = np.array(
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 2],
+            [0, 0, 2, 2],
+            [0, 2, 2, 2],
+            [0, 0, 1, 2],
+            [0, 1, 2, 2],
+        ]
+    )
+    observed_probabilities = np.array([0.05, 0.08, 0.22, 0.45, 0.05, 0.15])
+    posterior = PosteriorGenotypeAllelesDistribution(
+        observed_genotypes, observed_probabilities
+    )
+    result = posterior.as_array(n_haps)
+    assert result.sum() == observed_probabilities.sum() == 1
+    assert len(result) == unique_genotypes == 35
+    for g, p in zip(observed_genotypes, observed_probabilities):
+        idx = genotype_alleles_as_index(g)
+        assert result[idx] == p
+
+
+def test_PosteriorGenotypeAllelesDistribution__mode():
+    observed_genotypes = np.array(
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 2],
+            [0, 0, 2, 2],
+            [0, 2, 2, 2],
+            [0, 0, 1, 2],
+            [0, 1, 2, 2],
+        ]
+    )
+    observed_probabilities = np.array([0.05, 0.08, 0.22, 0.45, 0.05, 0.15])
+    posterior = PosteriorGenotypeAllelesDistribution(
+        observed_genotypes, observed_probabilities
+    )
+
+    genotype, genotype_prob = posterior.mode()
+    np.testing.assert_array_equal(genotype, observed_genotypes[3])
+    assert genotype_prob == observed_probabilities[3]
+
+    genotype, genotype_prob, phenotype_prob = posterior.mode(phenotype=True)
+    np.testing.assert_array_equal(genotype, observed_genotypes[3])
+    assert genotype_prob == observed_probabilities[3]
+    assert phenotype_prob == observed_probabilities[1:4].sum()
+
+
+@pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 1)])
+def test_GenotypeAllelesMultiTrace__replicate_incongruence_1(threshold, expect):
+    g0 = [0, 0, 1, 2]  # phenotype 1
+    g1 = [0, 1, 1, 2]  # phenotype 1
+    g2 = [0, 1, 2, 2]  # phenotype 1
+    g3 = [0, 0, 2, 2]  # phenotype 2
+    genotypes = np.array([g0, g1, g2, g3])
+
+    t0 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
+    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t2 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
+    t3 = genotypes[[3, 3, 3, 3, 3, 3, 3, 2, 1, 2]]  # 3:7
+    trace = GenotypeAllelesMultiTrace(
+        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10))
+    )
+
+    actual = trace.replicate_incongruence(threshold)
+    assert actual == expect
+
+
+@pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 2)])
+def test_GenotypeAllelesMultiTrace__replicate_incongruence_2(threshold, expect):
+
+    g0 = [0, 0, 1, 2]  # phenotype 1
+    g1 = [0, 1, 1, 2]  # phenotype 1
+    g2 = [0, 1, 2, 2]  # phenotype 1
+    g3 = [0, 0, 2, 3]  # phenotype 2
+    g4 = [0, 2, 3, 4]  # phenotype 3
+    genotypes = np.array([g0, g1, g2, g3, g4])
+
+    t0 = genotypes[[3, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t2 = genotypes[[0, 3, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t3 = genotypes[[3, 3, 4, 4, 4, 3, 4, 4, 4, 4]]  # 3:7
+    trace = GenotypeAllelesMultiTrace(
+        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10))
+    )
+    actual = trace.replicate_incongruence(threshold)
+    assert actual == expect
