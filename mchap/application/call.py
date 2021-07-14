@@ -11,7 +11,7 @@ from mchap.application.arguments import (
 )
 from mchap.calling.classes import CallingMCMC
 from mchap.assemble.calling import genotype_likelihoods
-from mchap.assemble.util import natural_log_to_log10
+from mchap.jitutils import natural_log_to_log10
 
 from mchap.io import qual_of_prob
 

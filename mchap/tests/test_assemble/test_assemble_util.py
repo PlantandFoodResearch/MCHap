@@ -2,7 +2,8 @@ import numpy as np
 import math
 import pytest
 
-from mchap.assemble import util
+from mchap import jitutils
+from mchap.assemble import utils
 from mchap.encoding import integer
 
 
@@ -15,7 +16,7 @@ def test_add_log_prob():
         log_p1 = np.log(p1)
         log_p2 = np.log(p2)
 
-        query = util.add_log_prob(log_p1, log_p2)
+        query = jitutils.add_log_prob(log_p1, log_p2)
         answer = np.log(p1 + p2)
 
         assert np.round(query, 10) == np.round(answer, 10)
@@ -29,7 +30,7 @@ def test_sum_log_probs():
         answer = np.log(np.sum(p))
 
         log_p = np.log(p)
-        query = util.sum_log_probs(log_p)
+        query = jitutils.sum_log_probs(log_p)
 
         assert np.round(query, 10) == np.round(answer, 10)
 
@@ -47,7 +48,7 @@ def test_normalise_log_probs():
 
         # now in log space
         llks = np.log(lks)
-        query = util.normalise_log_probs(llks)
+        query = jitutils.normalise_log_probs(llks)
 
         np.testing.assert_almost_equal(query, answer)
 
@@ -69,7 +70,7 @@ def test_normalise_log_probs_zeros():
     with np.errstate(divide="ignore"):
         llks = np.log(lks)
 
-    query = util.normalise_log_probs(llks)
+    query = jitutils.normalise_log_probs(llks)
 
     np.testing.assert_almost_equal(query, answer)
 
@@ -99,7 +100,7 @@ def test_array_equal(x, y, interval, answer):
     x = np.array(x, dtype=int)
     y = np.array(y, dtype=int)
 
-    query = util.array_equal(x, y, interval=interval)
+    query = utils.array_equal(x, y, interval=interval)
 
     assert query is answer
 
@@ -138,7 +139,7 @@ def test_get_dosage(genotype, interval, answer):
     ploidy = len(genotype)
     dosage = np.ones(ploidy, dtype=int)
 
-    util.get_dosage(dosage, genotype, interval=interval)
+    utils.get_dosage(dosage, genotype, interval=interval)
 
     np.testing.assert_almost_equal(dosage, answer)
 
@@ -153,7 +154,7 @@ def set_dosage():
     # target dosage
     dosage = np.array([3, 1, 0, 0], dtype=int)
 
-    util.set_dosage(genotype, dosage)
+    utils.set_dosage(genotype, dosage)
 
     # note first haplotypes in same order
     answer = np.array(
@@ -166,7 +167,7 @@ def set_dosage():
 def test_factorial_20():
 
     for i in range(0, 21):
-        assert util.factorial_20(i) == math.factorial(i)
+        assert jitutils.factorial_20(i) == math.factorial(i)
 
 
 @pytest.mark.parametrize(
@@ -185,7 +186,7 @@ def test_factorial_20():
 )
 def test_count_equivalent_permutations(dosage, answer):
     dosage = np.array(dosage, dtype=int)
-    query = util.count_equivalent_permutations(dosage)
+    query = jitutils.count_equivalent_permutations(dosage)
     assert query == answer
 
 
@@ -198,7 +199,7 @@ def test_sample_alleles():
     accumulate = np.zeros(array.shape, dtype=float)
     for _ in range(10000):
         accumulate += integer.as_probabilistic(
-            util.sample_alleles(array), 3, dtype=float
+            utils.sample_alleles(array), 3, dtype=float
         )
 
     # should be no samples from zero probability alleles
@@ -252,7 +253,7 @@ def test_genotype_alleles_as_index():
     n_genotype = len(genotypes)
     actual = np.zeros(n_genotype, dtype=int) - 1
     for i in range(n_genotype):
-        actual[i] = util.genotype_alleles_as_index(genotypes[i])
+        actual[i] = jitutils.genotype_alleles_as_index(genotypes[i])
     expect = np.arange(n_genotype, dtype=int)
     np.testing.assert_array_equal(actual, expect)
 
@@ -299,5 +300,5 @@ def test_index_as_genotype_alleles():
     )
     actual = np.zeros(expect.shape, dtype=int)
     for i in range(len(actual)):
-        actual[i] = util.index_as_genotype_alleles(i, ploidy=4)
+        actual[i] = jitutils.index_as_genotype_alleles(i, ploidy=4)
     np.testing.assert_array_equal(actual, expect)

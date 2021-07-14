@@ -5,10 +5,11 @@ import numba
 from scipy import stats as _stats
 from dataclasses import dataclass
 
+from mchap.jitutils import random_choice, seed_numba
 from mchap.assemble import mutation, structural
 from mchap.assemble.tempering import chain_swap_step
 from mchap.assemble.likelihood import log_likelihood, new_log_likelihood_cache
-from mchap.assemble import util
+from mchap.assemble import utils
 from mchap.assemble.classes import Assembler, GenotypeMultiTrace
 from mchap.assemble.snpcalling import snp_posterior
 
@@ -134,7 +135,7 @@ class DenovoMCMC(Assembler):
         # set random seed once for all chains
         if self.random_seed is not None:
             np.random.seed(self.random_seed)
-            util.seed_numba(self.random_seed)
+            seed_numba(self.random_seed)
 
         if initial is None:
             initial = [None for _ in range(self.chains)]
@@ -195,7 +196,9 @@ class DenovoMCMC(Assembler):
         # set the initial genotype
         if initial is None:
             dist = _read_mean_dist(reads_het)
-            genotype = np.array([util.sample_alleles(dist) for _ in range(self.ploidy)])
+            genotype = np.array(
+                [utils.sample_alleles(dist) for _ in range(self.ploidy)]
+            )
         else:
             # use the provided array
             assert initial.shape == (self.ploidy, n_het_base)
@@ -339,7 +342,7 @@ def _denovo_gibbs_sampler(
 
             # recombinations step
             if np.random.rand() <= recombination_step_probability:
-                n_breaks = util.random_choice(break_dist)
+                n_breaks = random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
                 llk, cache = structural.compound_step(
                     genotype=genotype,
@@ -356,7 +359,7 @@ def _denovo_gibbs_sampler(
 
             # interval dosage step
             if np.random.rand() <= partial_dosage_step_probability:
-                n_breaks = util.random_choice(break_dist)
+                n_breaks = random_choice(break_dist)
                 intervals = structural.random_breaks(n_breaks, n_base)
                 llk, cache = structural.compound_step(
                     genotype=genotype,

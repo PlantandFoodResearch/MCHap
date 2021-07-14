@@ -15,7 +15,7 @@ from mchap.assemble.calling import (
     alternate_dosage_posteriors,
     call_posterior_mode,
 )
-from mchap.assemble.util import natural_log_to_log10, index_as_genotype_alleles
+from mchap.jitutils import natural_log_to_log10, index_as_genotype_alleles
 
 from mchap.io import qual_of_prob
 

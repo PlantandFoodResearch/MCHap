@@ -4,8 +4,9 @@ from itertools import combinations_with_replacement
 
 from mchap.combinatorics import count_unique_genotypes
 from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
-from mchap.assemble.util import (
-    get_dosage,
+from mchap.assemble.utils import get_dosage
+from mchap.jitutils import (
+    increment_genotype,
     normalise_log_probs,
     genotype_alleles_as_index,
     index_as_genotype_alleles,
@@ -20,42 +21,6 @@ __all__ = [
     "alternate_dosage_posteriors",
     "call_posterior_mode",
 ]
-
-
-@njit(cache=True)
-def increment_genotype(genotype):
-    """Increment a genotype of allele numbers to the next genotype
-    in VCF sort order.
-
-    Parameters
-    ----------
-    genotype : ndarray, int, shape (ploidy,)
-        Array of allele numbers in the genotype.
-
-    Notes
-    -----
-    Mutates genotype array in place.
-    """
-    ploidy = len(genotype)
-    if ploidy == 1:
-        # haploid case
-        genotype[0] += 1
-        return
-    previous = genotype[0]
-    for i in range(1, ploidy):
-        allele = genotype[i]
-        if allele == previous:
-            pass
-        elif allele > previous:
-            i -= 1
-            genotype[i] += 1
-            genotype[0:i] = 0
-            return
-        else:
-            raise ValueError("genotype alleles are not in ascending order")
-    # all alleles are equal
-    genotype[-1] += 1
-    genotype[0:-1] = 0
 
 
 @njit(cache=True)

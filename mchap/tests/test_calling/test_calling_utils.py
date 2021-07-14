@@ -3,7 +3,7 @@ import pytest
 
 from mchap.calling import utils
 from mchap.combinatorics import count_unique_genotypes
-from mchap.assemble.util import genotype_alleles_as_index
+from mchap.jitutils import genotype_alleles_as_index
 
 
 @pytest.mark.parametrize(

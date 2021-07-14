@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 
 from mchap.assemble.likelihood import log_genotype_prior
-from mchap.assemble.util import random_choice, normalise_log_probs
+from mchap.jitutils import random_choice, normalise_log_probs
 
 from .utils import allelic_dosage, count_allele
 from .likelihood import log_likelihood_alleles, log_likelihood_alleles_cached

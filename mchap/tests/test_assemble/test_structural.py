@@ -3,13 +3,14 @@ import pytest
 
 from mchap.testing import simulate_reads, metropolis_hastings_transitions
 from mchap.encoding import integer
+from mchap.jitutils import seed_numba, normalise_log_probs
 from mchap.assemble.likelihood import (
     log_likelihood,
     log_genotype_prior,
     new_log_likelihood_cache,
 )
 from mchap.assemble import structural
-from mchap.assemble import util
+from mchap.assemble import utils
 from mchap import mset
 
 
@@ -166,7 +167,7 @@ def test_structural_change(genotype, haplotype_indices, interval, answer):
     haplotype_indices = np.array(haplotype_indices, dtype=np.int8)
     answer = np.array(answer, dtype=int)
 
-    util.structural_change(genotype, haplotype_indices, interval=interval)
+    utils.structural_change(genotype, haplotype_indices, interval=interval)
 
     np.testing.assert_array_equal(genotype, answer)
 
@@ -371,7 +372,7 @@ def test_dosage_step_options(labels, answer):
 )
 def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
     np.random.seed(42)
-    util.seed_numba(42)
+    seed_numba(42)
 
     # true haplotypes
     haplotypes = np.array(
@@ -427,11 +428,11 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
     log_expect = np.empty(len(genotypes))
     dosage = np.empty(ploidy, int)
     for i, g in enumerate(genotypes):
-        util.get_dosage(dosage, g)
+        utils.get_dosage(dosage, g)
         llk = log_likelihood(reads, g)
         lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
         log_expect[i] = llk + lprior
-    expect = util.normalise_log_probs(log_expect)
+    expect = normalise_log_probs(log_expect)
 
     # mcmc simulation
     # additional parameters
@@ -517,7 +518,7 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
     possible genotypes with and without MH acceptance probability.
     """
     np.random.seed(42)
-    util.seed_numba(42)
+    seed_numba(42)
 
     # true haplotypes
     haplotypes = np.array(
@@ -573,12 +574,12 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
     lpriors = np.empty(len(genotypes))
     dosage = np.empty(ploidy, int)
     for i, g in enumerate(genotypes):
-        util.get_dosage(dosage, g)
+        utils.get_dosage(dosage, g)
         llks[i] = log_likelihood(reads, g)
         lpriors[i] = log_genotype_prior(
             dosage, unique_haplotypes, inbreeding=inbreeding
         )
-    exact_posteriors = util.normalise_log_probs(llks + lpriors)
+    exact_posteriors = normalise_log_probs(llks + lpriors)
 
     # now calculate posteriors using a full transition matrix
     # of legal dosage swap transitions between genotypes

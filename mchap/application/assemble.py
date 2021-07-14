@@ -13,7 +13,7 @@ from mchap.assemble import (
     genotype_likelihoods,
     call_posterior_haplotypes,
 )
-from mchap.assemble.util import (
+from mchap.jitutils import (
     natural_log_to_log10,
     genotype_alleles_as_index,
 )

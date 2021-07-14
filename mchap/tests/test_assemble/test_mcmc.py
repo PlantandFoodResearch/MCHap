@@ -3,7 +3,7 @@ import pytest
 
 from mchap.assemble.likelihood import log_likelihood
 from mchap.assemble import mcmc
-from mchap.assemble.util import seed_numba
+from mchap.jitutils import seed_numba
 from mchap.testing import simulate_reads
 from mchap.encoding import integer
 from mchap import mset

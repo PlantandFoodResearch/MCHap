@@ -10,9 +10,8 @@ from mchap.calling.classes import (
     GenotypeAllelesMultiTrace,
 )
 from mchap.testing import simulate_reads
-from mchap.assemble.util import seed_numba
+from mchap.jitutils import seed_numba, genotype_alleles_as_index
 from mchap.combinatorics import count_unique_genotypes
-from mchap.assemble.util import genotype_alleles_as_index
 
 
 @pytest.mark.parametrize(

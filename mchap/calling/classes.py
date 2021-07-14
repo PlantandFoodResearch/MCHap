@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from mchap.assemble.classes import Assembler
 from mchap.combinatorics import count_unique_genotypes
 
-from mchap.assemble.util import seed_numba
+from mchap.jitutils import seed_numba
 from mchap import mset
 
 from .mcmc import mcmc_sampler, greedy_caller

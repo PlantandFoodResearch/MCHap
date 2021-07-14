@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit
 
-from mchap.assemble.util import genotype_alleles_as_index
+from mchap.jitutils import genotype_alleles_as_index
 
 
 @njit(cache=True)

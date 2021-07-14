@@ -2,7 +2,7 @@ import numpy as np
 
 from mchap.encoding.integer import as_probabilistic
 from mchap.io.util import prob_of_qual, PFEIFFER_ERROR
-from mchap.assemble.util import sample_alleles
+from mchap.assemble.utils import sample_alleles
 
 
 def simulate_reads(

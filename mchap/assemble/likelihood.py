@@ -4,7 +4,8 @@ import numpy as np
 import numba
 from math import lgamma
 
-from mchap.assemble import util
+from mchap.assemble import utils
+from mchap.jitutils import count_equivalent_permutations, factorial_20
 from mchap.assemble import arraymap
 
 __all__ = [
@@ -105,7 +106,7 @@ def log_likelihood_structural_change(
     ploidy, n_base = genotype.shape
     n_reads = len(reads)
 
-    intvl = util.interval_as_range(interval, n_base)
+    intvl = utils.interval_as_range(interval, n_base)
 
     llk = 0.0
 
@@ -287,7 +288,7 @@ def log_likelihood_structural_change_cached(
 
     # try retrive from cache
     genotype_new = genotype.copy()
-    util.structural_change(
+    utils.structural_change(
         genotype_new, haplotype_indices=haplotype_indices, interval=interval
     )
     llk = arraymap.get(cache, genotype_new.ravel())
@@ -324,7 +325,7 @@ def log_genotype_null_prior(dosage, unique_haplotypes):
 
     """
     ploidy = dosage.sum()
-    genotype_perms = util.count_equivalent_permutations(dosage)
+    genotype_perms = count_equivalent_permutations(dosage)
     log_total_perms = ploidy * np.log(unique_haplotypes)
     return np.log(genotype_perms) - log_total_perms
 
@@ -353,7 +354,7 @@ def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
     sum_dispersion = dispersion * unique_haplotypes
 
     # left side of equation in log space
-    num = np.log(util.factorial_20(ploidy)) + lgamma(sum_dispersion)
+    num = np.log(factorial_20(ploidy)) + lgamma(sum_dispersion)
     denom = lgamma(ploidy + sum_dispersion)
     left = num - denom
 
@@ -363,7 +364,7 @@ def _log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
         dose = dosage[i]
         if dose > 0:
             num = lgamma(dose + dispersion)
-            denom = np.log(util.factorial_20(dose)) + lgamma(dispersion)
+            denom = np.log(factorial_20(dose)) + lgamma(dispersion)
             prod += num - denom
 
     # return as log probability

@@ -1,7 +1,7 @@
 import numpy as np
 import numba
 
-from mchap.assemble.util import factorial_20
+from mchap.jitutils import factorial_20
 from mchap.assemble.likelihood import lgamma
 
 

@@ -2,14 +2,13 @@ import numpy as np
 import pytest
 
 from mchap.assemble import mutation
-from mchap.assemble import util
+from mchap.assemble import utils
 from mchap.assemble.likelihood import (
     log_likelihood,
     new_log_likelihood_cache,
     log_genotype_prior,
 )
-from mchap.assemble.util import normalise_log_probs
-from mchap.assemble.util import seed_numba
+from mchap.jitutils import normalise_log_probs, index_as_genotype_alleles, seed_numba
 from mchap.encoding import integer
 from mchap import combinatorics
 
@@ -203,17 +202,17 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
     # calculate all possible genotypes
     genotypes = np.zeros((u_gens, ploidy, n_base), dtype=int)
     for i in np.arange(u_gens):
-        genotypes[i] = haplotypes[util.index_as_genotype_alleles(i, ploidy)]
+        genotypes[i] = haplotypes[index_as_genotype_alleles(i, ploidy)]
 
     # calculate expected posterior distribution over all genotypes
     log_expect = np.empty(u_gens, float)
     dosage = np.empty(ploidy, int)
     for i, g in enumerate(genotypes):
-        util.get_dosage(dosage, g)
+        utils.get_dosage(dosage, g)
         llk = log_likelihood(reads, g)
         lprior = log_genotype_prior(dosage, u_haps, inbreeding=inbreeding)
         log_expect[i] = llk + lprior
-    expect = util.normalise_log_probs(log_expect)
+    expect = normalise_log_probs(log_expect)
 
     # additional parameters
     if use_cache:
