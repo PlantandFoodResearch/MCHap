@@ -1,6 +1,6 @@
 from .mcmc import DenovoMCMC
 from .snpcalling import snp_posterior
-from .calling import (
+from .haplotype_calling import (
     call_posterior_haplotypes,
 )
 
