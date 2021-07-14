@@ -3,8 +3,7 @@
 import numpy as np
 import numba
 
-from mchap.jitutils import random_choice
-from mchap.assemble import utils
+from mchap.jitutils import random_choice, count_haplotype_copies, get_dosage
 from mchap.assemble.likelihood import log_likelihood_cached, log_genotype_prior
 
 
@@ -85,11 +84,11 @@ def base_step(
 
     # use differences in count of haplotype h to calculate
     # ratio of proposal probabilities
-    lhapcount = np.log(utils.count_haplotype_copies(genotype, h))
+    lhapcount = np.log(count_haplotype_copies(genotype, h))
 
     # ratio of prior probabilities
     dosage = np.empty(ploidy, dtype=np.int8)
-    utils.get_dosage(dosage, genotype)
+    get_dosage(dosage, genotype)
     lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
 
     current_nucleotide = genotype[h, j]
@@ -116,12 +115,12 @@ def base_step(
             llk_ratio = llk_i - llk
 
             # calculate ratio of priors: ln(P(G')/P(G))
-            utils.get_dosage(dosage, genotype)
+            get_dosage(dosage, genotype)
             lprior_i = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
             lprior_ratio = lprior_i - lprior
 
             # calculate proposal ratio for detailed balance: ln(g(G|G')/g(G'|G))
-            lhapcount_i = np.log(utils.count_haplotype_copies(genotype, h))
+            lhapcount_i = np.log(count_haplotype_copies(genotype, h))
             lproposal_ratio = lhapcount_i - lhapcount
 
             # calculate Metropolis-Hastings acceptance probability

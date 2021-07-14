@@ -4,8 +4,8 @@ from itertools import combinations_with_replacement
 
 from mchap.combinatorics import count_unique_genotypes
 from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
-from mchap.assemble.utils import get_dosage
 from mchap.jitutils import (
+    get_dosage,
     increment_genotype,
     normalise_log_probs,
     genotype_alleles_as_index,

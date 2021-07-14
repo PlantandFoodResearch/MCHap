@@ -3,14 +3,18 @@ import pytest
 
 from mchap.testing import simulate_reads, metropolis_hastings_transitions
 from mchap.encoding import integer
-from mchap.jitutils import seed_numba, normalise_log_probs
+from mchap.jitutils import (
+    seed_numba,
+    normalise_log_probs,
+    get_dosage,
+    structural_change,
+)
 from mchap.assemble.likelihood import (
     log_likelihood,
     log_genotype_prior,
     new_log_likelihood_cache,
 )
 from mchap.assemble import structural
-from mchap.assemble import utils
 from mchap import mset
 
 
@@ -167,7 +171,7 @@ def test_structural_change(genotype, haplotype_indices, interval, answer):
     haplotype_indices = np.array(haplotype_indices, dtype=np.int8)
     answer = np.array(answer, dtype=int)
 
-    utils.structural_change(genotype, haplotype_indices, interval=interval)
+    structural_change(genotype, haplotype_indices, interval=interval)
 
     np.testing.assert_array_equal(genotype, answer)
 
@@ -428,7 +432,7 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
     log_expect = np.empty(len(genotypes))
     dosage = np.empty(ploidy, int)
     for i, g in enumerate(genotypes):
-        utils.get_dosage(dosage, g)
+        get_dosage(dosage, g)
         llk = log_likelihood(reads, g)
         lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
         log_expect[i] = llk + lprior
@@ -574,7 +578,7 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
     lpriors = np.empty(len(genotypes))
     dosage = np.empty(ploidy, int)
     for i, g in enumerate(genotypes):
-        utils.get_dosage(dosage, g)
+        get_dosage(dosage, g)
         llks[i] = log_likelihood(reads, g)
         lpriors[i] = log_genotype_prior(
             dosage, unique_haplotypes, inbreeding=inbreeding

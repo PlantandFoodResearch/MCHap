@@ -4,8 +4,12 @@ import numpy as np
 import numba
 from math import lgamma
 
-from mchap.assemble import utils
-from mchap.jitutils import count_equivalent_permutations, factorial_20
+from mchap.jitutils import (
+    count_equivalent_permutations,
+    factorial_20,
+    interval_as_range,
+    structural_change,
+)
 from mchap.assemble import arraymap
 
 __all__ = [
@@ -106,7 +110,7 @@ def log_likelihood_structural_change(
     ploidy, n_base = genotype.shape
     n_reads = len(reads)
 
-    intvl = utils.interval_as_range(interval, n_base)
+    intvl = interval_as_range(interval, n_base)
 
     llk = 0.0
 
@@ -288,7 +292,7 @@ def log_likelihood_structural_change_cached(
 
     # try retrive from cache
     genotype_new = genotype.copy()
-    utils.structural_change(
+    structural_change(
         genotype_new, haplotype_indices=haplotype_indices, interval=interval
     )
     llk = arraymap.get(cache, genotype_new.ravel())

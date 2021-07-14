@@ -3,8 +3,13 @@
 import numpy as np
 import numba
 
-from mchap.jitutils import random_choice, n_choose_k
-from mchap.assemble import utils
+from mchap.jitutils import (
+    random_choice,
+    n_choose_k,
+    structural_change,
+    get_dosage,
+    interval_as_range,
+)
 from mchap.assemble.likelihood import (
     log_likelihood_structural_change_cached,
     log_genotype_prior,
@@ -94,7 +99,7 @@ def recombination_step_n_options(labels):
     # the dosage is used as a simple way to skip
     # compleately duplicated haplotypes
     dosage = np.empty(ploidy, np.int8)
-    utils.get_dosage(dosage, labels)
+    get_dosage(dosage, labels)
 
     n = 0
     for h_0 in range(ploidy):
@@ -139,7 +144,7 @@ def recombination_step_options(labels):
     ploidy = len(labels)
     # the dosage is used as a simple way to skip compleately duplicated haplotypes
     dosage = np.empty(ploidy, np.int8)
-    utils.get_dosage(dosage, labels)
+    get_dosage(dosage, labels)
 
     # calculate number of options
     # n_options = recombination_step_n_options(labels)
@@ -202,11 +207,11 @@ def dosage_step_n_options(labels):
 
     # dosage of full haplotypes
     haplotype_dosage = np.empty(ploidy, np.int8)
-    utils.get_dosage(haplotype_dosage, labels)
+    get_dosage(haplotype_dosage, labels)
 
     # dosage of the segment of interest
     segment_dosage = np.empty(ploidy, np.int8)
-    utils.get_dosage(segment_dosage, labels[:, 0:1])
+    get_dosage(segment_dosage, labels[:, 0:1])
 
     # number of options
     n = 0
@@ -260,11 +265,11 @@ def dosage_step_options(labels):
 
     # dosage of full haplotypes
     haplotype_dosage = np.empty(ploidy, np.int8)
-    utils.get_dosage(haplotype_dosage, labels)
+    get_dosage(haplotype_dosage, labels)
 
     # dosage of the segment of interest
     segment_dosage = np.empty(ploidy, np.int8)
-    utils.get_dosage(segment_dosage, labels[:, 0:1])
+    get_dosage(segment_dosage, labels[:, 0:1])
 
     # number of options
     max_recievers = np.sum(segment_dosage[segment_dosage > 1])
@@ -335,7 +340,7 @@ def _label_haplotypes(labels, genotype, interval=None):
     ploidy, n_base = genotype.shape
     labels[:] = 0
 
-    r = utils.interval_as_range(interval, n_base)
+    r = interval_as_range(interval, n_base)
 
     for i in r:
         for j in range(1, ploidy):
@@ -503,7 +508,7 @@ def interval_step(
     # ratio of prior probabilities
     ploidy = len(genotype)
     dosage = np.empty(ploidy, dtype=np.int8)
-    utils.get_dosage(dosage, genotype)
+    get_dosage(dosage, genotype)
     lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
 
     # store values for all options and current genotype
@@ -527,7 +532,7 @@ def interval_step(
         llk_ratio = llk_i - llk
 
         # calculate ratio of priors: ln(P(G')/P(G))
-        utils.get_dosage(dosage, option_labels[i])
+        get_dosage(dosage, option_labels[i])
         lprior_i = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
         lprior_ratio = lprior_i - lprior
 
@@ -557,7 +562,7 @@ def interval_step(
 
     if choice < n_options:
         # update genotype
-        utils.structural_change(genotype, option_labels[choice, :, 0], interval)
+        structural_change(genotype, option_labels[choice, :, 0], interval)
         llk = llks[choice]
     else:
         # all options rejected

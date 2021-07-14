@@ -3,7 +3,6 @@ import math
 import pytest
 
 from mchap import jitutils
-from mchap.assemble import utils
 from mchap.encoding import integer
 
 
@@ -100,7 +99,7 @@ def test_array_equal(x, y, interval, answer):
     x = np.array(x, dtype=int)
     y = np.array(y, dtype=int)
 
-    query = utils.array_equal(x, y, interval=interval)
+    query = jitutils.array_equal(x, y, interval=interval)
 
     assert query is answer
 
@@ -139,12 +138,12 @@ def test_get_dosage(genotype, interval, answer):
     ploidy = len(genotype)
     dosage = np.ones(ploidy, dtype=int)
 
-    utils.get_dosage(dosage, genotype, interval=interval)
+    jitutils.get_dosage(dosage, genotype, interval=interval)
 
     np.testing.assert_almost_equal(dosage, answer)
 
 
-def set_dosage():
+def test_set_dosage():
 
     # initial dosage = [1, 2, 0, 1]
     genotype = np.array(
@@ -154,7 +153,7 @@ def set_dosage():
     # target dosage
     dosage = np.array([3, 1, 0, 0], dtype=int)
 
-    utils.set_dosage(genotype, dosage)
+    jitutils.set_dosage(genotype, dosage)
 
     # note first haplotypes in same order
     answer = np.array(
@@ -199,7 +198,7 @@ def test_sample_alleles():
     accumulate = np.zeros(array.shape, dtype=float)
     for _ in range(10000):
         accumulate += integer.as_probabilistic(
-            utils.sample_alleles(array), 3, dtype=float
+            jitutils.sample_alleles(array), 3, dtype=float
         )
 
     # should be no samples from zero probability alleles

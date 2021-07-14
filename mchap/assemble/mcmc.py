@@ -5,11 +5,10 @@ import numba
 from scipy import stats as _stats
 from dataclasses import dataclass
 
-from mchap.jitutils import random_choice, seed_numba
+from mchap.jitutils import random_choice, seed_numba, sample_alleles
 from mchap.assemble import mutation, structural
 from mchap.assemble.tempering import chain_swap_step
 from mchap.assemble.likelihood import log_likelihood, new_log_likelihood_cache
-from mchap.assemble import utils
 from mchap.assemble.classes import Assembler, GenotypeMultiTrace
 from mchap.assemble.snpcalling import snp_posterior
 
@@ -196,9 +195,7 @@ class DenovoMCMC(Assembler):
         # set the initial genotype
         if initial is None:
             dist = _read_mean_dist(reads_het)
-            genotype = np.array(
-                [utils.sample_alleles(dist) for _ in range(self.ploidy)]
-            )
+            genotype = np.array([sample_alleles(dist) for _ in range(self.ploidy)])
         else:
             # use the provided array
             assert initial.shape == (self.ploidy, n_het_base)
