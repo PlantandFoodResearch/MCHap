@@ -6,7 +6,7 @@ from mchap.combinatorics import count_unique_genotypes
 from mchap.assemble.util import seed_numba
 from mchap import mset
 
-from .mcmc import mh_mcmc, gibbs_mcmc, greedy_caller
+from .mcmc import mcmc_sampler, greedy_caller
 from .utils import posterior_as_array
 
 
@@ -98,16 +98,16 @@ class CallingMCMC(Assembler):
 
         # step type
         if self.step_type == "Gibbs":
-            _mcmc = gibbs_mcmc
+            step_type = 0
         elif self.step_type == "Metropolis-Hastings":
-            _mcmc = mh_mcmc
+            step_type = 1
         else:
             raise ValueError('MCMC step type must be "Gibbs" or "Metropolis-Hastings"')
 
         genotype_traces = []
         llk_traces = []
         for _ in range(self.chains):
-            genotypes, llks = _mcmc(
+            genotypes, llks = mcmc_sampler(
                 genotype_alleles=initial,
                 haplotypes=self.haplotypes,
                 reads=reads,
@@ -115,6 +115,7 @@ class CallingMCMC(Assembler):
                 inbreeding=self.inbreeding,
                 n_steps=self.steps,
                 cache=True,
+                step_type=step_type,
             )
             genotype_traces.append(genotypes)
             llk_traces.append(llks)
