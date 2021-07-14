@@ -326,18 +326,6 @@ def index_as_genotype_alleles(index, ploidy):
 
 
 @numba.njit(cache=True)
-def interval_as_range(interval, max_range):
-    # TODO: inline this into the callers and remove
-    if interval is None:
-        return range(max_range)
-    else:
-        if len(interval) == 2:
-            return range(interval[0], interval[1])
-        else:
-            raise ValueError("Interval must be `None` or array of length 2")
-
-
-@numba.njit(cache=True)
 def array_equal(x, y, interval=None):
     """Check if two one-dimentional integer arrays are equal.
 
@@ -355,7 +343,10 @@ def array_equal(x, y, interval=None):
         if specified).
 
     """
-    r = interval_as_range(interval, len(x))
+    if interval is None:
+        r = range(len(x))
+    else:
+        r = range(interval[0], interval[1])
 
     for i in r:
         if x[i] != y[i]:
@@ -549,7 +540,10 @@ def structural_change(genotype, haplotype_indices, interval=None):
 
     cache = np.empty(ploidy, dtype=np.int8)
 
-    r = interval_as_range(interval, n_base)
+    if interval is None:
+        r = range(n_base)
+    else:
+        r = range(interval[0], interval[1])
 
     for j in r:
 

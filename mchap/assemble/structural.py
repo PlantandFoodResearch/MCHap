@@ -8,7 +8,6 @@ from mchap.jitutils import (
     n_choose_k,
     structural_change,
     get_haplotype_dosage,
-    interval_as_range,
 )
 from mchap.assemble.likelihood import (
     log_likelihood_structural_change_cached,
@@ -340,7 +339,10 @@ def _label_haplotypes(labels, genotype, interval=None):
     ploidy, n_base = genotype.shape
     labels[:] = 0
 
-    r = interval_as_range(interval, n_base)
+    if interval is None:
+        r = range(n_base)
+    else:
+        r = range(interval[0], interval[1])
 
     for i in r:
         for j in range(1, ploidy):

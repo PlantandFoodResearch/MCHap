@@ -7,7 +7,6 @@ from math import lgamma
 from mchap.jitutils import (
     count_equivalent_permutations,
     factorial_20,
-    interval_as_range,
     structural_change,
 )
 from mchap.assemble import arraymap
@@ -110,7 +109,10 @@ def log_likelihood_structural_change(
     ploidy, n_base = genotype.shape
     n_reads = len(reads)
 
-    intvl = interval_as_range(interval, n_base)
+    if interval is None:
+        intvl = range(n_base)
+    else:
+        intvl = range(interval[0], interval[1])
 
     llk = 0.0
 
