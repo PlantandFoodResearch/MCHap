@@ -13,7 +13,7 @@ from mchap.assemble.util import seed_numba
     "seed",
     [0, 42, 36],  # these numbers can be finicky
 )
-def test_mcmc_gibbs_mh_equivalence(seed):
+def test_CallingMCMC__gibbs_mh_equivalence(seed):
     seed_numba(seed)
     np.random.seed(seed)
     # ensure no duplicate haplotypes
@@ -79,7 +79,7 @@ def test_mcmc_gibbs_mh_equivalence(seed):
     "seed",
     [0, 13, 36],  # these numbers can be finicky
 )
-def test_mcmc_calling_assemble_equivalence(seed):
+def test_CallingMCMC__DenovoMCMC_equivalence(seed):
     ploidy = 4
     inbreeding = 0.015
     n_pos = 4
@@ -141,3 +141,79 @@ def test_mcmc_calling_assemble_equivalence(seed):
     np.testing.assert_array_equal(call_alleles, denovo_alleles)
     np.testing.assert_allclose(call_genotype_prob, denovo_gen_prob, atol=0.01)
     np.testing.assert_allclose(call_phenotype_prob, denovo_phen_prob, atol=0.01)
+
+
+def test_CallingMCMC__zero_reads():
+    haplotypes = np.array(
+        [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+            [0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
+            [0, 0, 0, 0, 0, 1, 1, 1, 0, 1],
+            [0, 0, 0, 0, 1, 1, 0, 1, 0, 0],
+            [0, 0, 1, 0, 1, 0, 1, 1, 1, 0],
+            [0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 1, 1, 0, 1, 0, 1],
+            [0, 1, 1, 0, 1, 1, 0, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+        ]
+    )
+    n_chains = 2
+    n_steps = 10500
+    n_burn = 500
+    ploidy = 4
+    inbreeding = 0.01
+    n_haps, n_pos = haplotypes.shape
+    reads = np.empty((0, n_pos, 2))
+    read_counts = np.array([], int)
+
+    model = CallingMCMC(
+        ploidy=ploidy,
+        haplotypes=haplotypes,
+        inbreeding=inbreeding,
+        steps=n_steps,
+        chains=n_chains,
+    )
+    trace = model.fit(reads, read_counts)
+    _, call_genotype_prob, call_phenotype_prob = (
+        trace.burn(n_burn).posterior().mode(phenotype=True)
+    )
+
+    assert trace.genotypes.shape == (n_chains, n_steps, ploidy)
+    assert trace.genotypes.max() < n_haps
+    assert call_genotype_prob < 0.05
+    assert call_phenotype_prob < 0.05
+
+
+def test_CallingMCMC__zero_snps():
+    haplotypes = np.array(
+        [
+            [],
+        ]
+    )
+    n_chains = 2
+    n_steps = 10500
+    n_burn = 500
+    ploidy = 4
+    inbreeding = 0.01
+    _, n_pos = haplotypes.shape
+    reads = np.empty((0, n_pos, 2))
+    read_counts = np.array([], int)
+
+    model = CallingMCMC(
+        ploidy=ploidy,
+        haplotypes=haplotypes,
+        inbreeding=inbreeding,
+        steps=n_steps,
+        chains=n_chains,
+    )
+    trace = model.fit(reads, read_counts)
+    _, call_genotype_prob, call_phenotype_prob = (
+        trace.burn(n_burn).posterior().mode(phenotype=True)
+    )
+
+    assert trace.genotypes.shape == (n_chains, n_steps, ploidy)
+    assert np.all(trace.genotypes == 0)
+    assert np.all(np.isnan(trace.llks))
+    assert call_genotype_prob == 1
+    assert call_phenotype_prob == 1
