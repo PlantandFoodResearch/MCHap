@@ -9,11 +9,11 @@ from mchap.application.arguments import (
     CALL_EXACT_PARSER_ARGUMENTS,
     collect_call_exact_program_arguments,
 )
-from mchap.assemble.calling import (
+from mchap.calling.exact import (
+    call_posterior_mode,
     genotype_likelihoods,
     genotype_posteriors,
     alternate_dosage_posteriors,
-    call_posterior_mode,
 )
 from mchap.jitutils import natural_log_to_log10, index_as_genotype_alleles
 

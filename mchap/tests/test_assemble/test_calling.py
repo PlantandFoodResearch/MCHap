@@ -1,5 +1,7 @@
 import numpy as np
 
+from mchap.calling import exact
+
 from mchap.assemble import calling
 from mchap import mset
 from mchap.testing import simulate_reads
@@ -80,7 +82,7 @@ def test_genotype_likelihoods():
     expect = np.empty(len(genotypes), dtype=np.float32)
     for i in range(len(expect)):
         expect[i] = log_likelihood(reads, haplotypes[genotypes[i]])
-    actual = calling.genotype_likelihoods(reads, ploidy, haplotypes)
+    actual = exact.genotype_likelihoods(reads, ploidy, haplotypes)
     np.testing.assert_almost_equal(expect, actual)
 
 
@@ -142,7 +144,7 @@ def test_genotype_posteriors():
         errors=False,
         qual=(60, 60),
     )
-    log_likelihoods = calling.genotype_likelihoods(reads, ploidy, haplotypes)
+    log_likelihoods = exact.genotype_likelihoods(reads, ploidy, haplotypes)
     inbreeding = 0.3
     n_alleles = len(haplotypes)
     expect = np.empty(len(genotypes), dtype=np.float32)
@@ -152,7 +154,7 @@ def test_genotype_posteriors():
         log_prior = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
         expect[i] = log_likelihoods[i] + log_prior
     expect = normalise_log_probs(expect)
-    actual = calling.genotype_posteriors(
+    actual = exact.genotype_posteriors(
         log_likelihoods, ploidy, n_alleles, inbreeding=inbreeding
     )
     np.testing.assert_almost_equal(expect, actual)
@@ -210,7 +212,7 @@ def test_alternate_dosage_posteriors():
 
     expect_genotypes = genotypes[[6, 7, 10]]
     expect_probs = np.array([0.1, 0.5, 0.2])
-    actual_genotypes, actual_probs = calling.alternate_dosage_posteriors(
+    actual_genotypes, actual_probs = exact.alternate_dosage_posteriors(
         genotype,
         probabilities,
     )
@@ -244,18 +246,18 @@ def test_call_posterior_mode():
     )
     reads, counts = mset.unique_counts(reads)
 
-    llks = calling.genotype_likelihoods(reads, ploidy, haplotypes, read_counts=counts)
-    probs = calling.genotype_posteriors(
+    llks = exact.genotype_likelihoods(reads, ploidy, haplotypes, read_counts=counts)
+    probs = exact.genotype_posteriors(
         llks, ploidy, len(haplotypes), inbreeding=inbreeding
     )
-    _, phen_probs = calling.alternate_dosage_posteriors(genotype, probs)
+    _, phen_probs = exact.alternate_dosage_posteriors(genotype, probs)
 
     (
         mode_genotype,
         mode_llk,
         mode_genotype_prob,
         mode_phenotype_prob,
-    ) = calling.call_posterior_mode(
+    ) = exact.call_posterior_mode(
         reads, 4, haplotypes, read_counts=counts, inbreeding=inbreeding
     )
 

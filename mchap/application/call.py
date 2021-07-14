@@ -10,7 +10,7 @@ from mchap.application.arguments import (
     collect_call_mcmc_program_arguments,
 )
 from mchap.calling.classes import CallingMCMC
-from mchap.assemble.calling import genotype_likelihoods
+from mchap.calling.exact import genotype_likelihoods
 from mchap.jitutils import natural_log_to_log10
 
 from mchap.io import qual_of_prob

@@ -10,9 +10,9 @@ from mchap.application.baseclass import SampleAssemblyError, SAMPLE_ASSEMBLY_ERR
 from mchap import combinatorics
 from mchap.assemble import (
     DenovoMCMC,
-    genotype_likelihoods,
     call_posterior_haplotypes,
 )
+from mchap.calling.exact import genotype_likelihoods
 from mchap.jitutils import (
     natural_log_to_log10,
     genotype_alleles_as_index,
