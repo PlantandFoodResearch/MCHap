@@ -2,9 +2,10 @@
 
 import gzip
 import pysam
+import numpy as np
 from dataclasses import dataclass
 
-from mchap.encoding import integer
+from mchap.encoding import integer, character
 
 
 __all__ = [
@@ -32,6 +33,7 @@ class Locus:
     name: str
     sequence: str
     variants: tuple
+    alts: tuple = None
 
     @property
     def positions(self):
@@ -56,6 +58,7 @@ class Locus:
             name=self.name,
             sequence=self.sequence,
             variants=self.variants,
+            alts=self.alts,
         )
 
     def set(self, **kwargs):
@@ -92,6 +95,14 @@ class Locus:
         # join and return
         return "".join(chars)
 
+    def encode_haplotypes(self):
+        strings = (self.sequence,) + self.alts
+        chars = np.array([list(string) for string in strings])
+        idx = np.array(self.positions) - self.start
+        if len(idx) == 0:
+            return np.zeros((len(strings), 0), dtype=int)
+        return character.as_allelic(chars[:, idx], self.alleles)
+
     def format_haplotypes(self, array, gap="-"):
         """Format integer encoded alleles as a haplotype string"""
         variants = integer.as_characters(array, gap=gap, alleles=self.alleles)
@@ -113,6 +124,59 @@ class Locus:
             name=name,
             sequence=None,
             variants=None,
+        )
+
+    @classmethod
+    def from_variant_record(cls, record, use_snvpos=False):
+        """Generate a locus object with reference and variants from
+        a known MNP.
+
+        Paramters
+        ---------
+        record : VariantRecord.
+            A pysam VariantRecord object for an MNP variant.
+        use_snvpos : bool
+            If true then the "SNVPOS" info tag will be used to
+            identify psotions of SNV variants rather than identifying
+            them directly from the ref and alt sequences.
+
+        Returns
+        -------
+        locus : Locus
+            A locus object with populated sequence and variants fields.
+        """
+        ref_length = len(record.ref)
+        sequences = (record.ref,)
+        if record.alts:
+            assert all(ref_length == len(alt) for alt in record.alts)
+            alts = record.alts
+            sequences += alts
+        else:
+            alts = ()
+        haplotypes = np.array([list(var) for var in sequences])
+        if use_snvpos:
+            snvpos = record.info["SNVPOS"]
+            if snvpos == (None,):
+                snvpos = ()
+            positions = np.array(snvpos, int) - 1  # 1-based index in VCF
+        else:
+            positions = np.where((haplotypes != haplotypes[0:1]).any(axis=0))[0]
+        snp_alleles = haplotypes[:, positions].T
+        snps = []
+        for offset, alleles in zip(positions, snp_alleles):
+            _, idx = np.unique(alleles, return_index=True)
+            idx.sort()
+            alleles = tuple(alleles[idx])
+            pos = offset + record.start
+            snps.append(SNP(record.chrom, pos, pos + 1, ".", alleles=alleles))
+        return cls(
+            contig=record.chrom,
+            start=record.start,
+            stop=record.stop,
+            name=record.id if record.id else ".",
+            sequence=record.ref,
+            variants=tuple(snps),
+            alts=alts,
         )
 
 

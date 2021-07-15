@@ -44,9 +44,6 @@ RCALLS = FormatField(
     type="Integer",
     descr="Total count of read base calls matching a known variant",
 )
-GP = FormatField(
-    id="GP", number="G", type="Float", descr="Genotype posterior probabilities"
-)
 GPM = FormatField(
     id="GPM", number=1, type="Float", descr="Genotype posterior mode probability"
 )
@@ -84,6 +81,27 @@ MCAP = FormatField(
     number="R",
     type="Float",
     descr="Posterior probability of allele-presence from assembly MCMC",
+)
+
+HEADER_FORMAT_FIELDS = dict(
+    GT=GT,
+    GQ=GQ,
+    PHQ=PHQ,
+    DP=DP,
+    PS=PS,
+    FT=FT,
+    RCOUNT=RCOUNT,
+    RCALLS=RCALLS,
+    GPM=GPM,
+    PHPM=PHPM,
+    DOSEXP=DOSEXP,
+    MEC=MEC,
+    AD=AD,
+    GL=GL,
+    GP=GP,
+    MCI=MCI,
+    KMERCOV=KMERCOV,
+    MCAP=MCAP,
 )
 
 

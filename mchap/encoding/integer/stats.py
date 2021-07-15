@@ -4,7 +4,7 @@ from numba import njit
 from mchap import mset
 from mchap.encoding.integer.kmer import kmer_counts
 from mchap.encoding.integer.sequence import depth
-from mchap.assemble.util import array_equal
+from mchap.jitutils import array_equal
 
 
 __all__ = [

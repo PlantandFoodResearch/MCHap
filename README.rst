@@ -19,8 +19,8 @@ From the root directory of this repository run:
 Usage
 -----
 
-Basic example
-~~~~~~~~~~~~~
+Basic assemble example
+~~~~~~~~~~~~~~~~~~~~~~
 
 The wrapper CLI tool is ``mchap`` and assembly sub-tool is ``assemble``.
 At minimum this tool requires the following inputs:
@@ -30,7 +30,8 @@ At minimum this tool requires the following inputs:
 - An indexed VCF file containing a 'reference set' of SNPs
 - An indexed fasta file containing the reference genome
 
-The ``assemble`` sub-tool writes out an uncompressed VCF file to standard output.
+The ``assemble`` and ``call`` sub-tools write out an uncompressed VCF file
+to standard output.
 This should generally be compressed and written to a file:
 
 .. code:: bash

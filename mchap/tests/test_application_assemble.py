@@ -253,15 +253,14 @@ def test_Program__header():
 @pytest.mark.parametrize(
     "cli_extra,output_vcf",
     [
-        (["--use-assembly-posteriors"], "simple.output.deep.old.vcf"),
+        ([], "simple.output.deep.assemble.vcf"),
         (
             [
-                "--use-assembly-posteriors",
                 "--base-error-rate",
                 "0.001",
                 "--ignore-base-phred-scores",
             ],
-            "simple.output.deep.old.vcf",
+            "simple.output.deep.assemble.vcf",
         ),
     ],
 )
@@ -327,28 +326,13 @@ def test_Program__run(cli_extra, output_vcf):
                 "simple.sample2.deep.bam",
                 "simple.sample3.deep.bam",
             ],
-            ["--use-assembly-posteriors"],
-            "simple.output.deep.old.vcf",
-        ),
-        (
-            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--use-assembly-posteriors"],
-            "simple.output.mixed_depth.old.vcf",
+            [],
+            "simple.output.deep.assemble.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [],
-            "simple.output.mixed_depth.vcf",
-        ),
-        (
-            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--genotype-likelihoods"],
-            "simple.output.mixed_depth.likelihoods.vcf",
-        ),
-        (
-            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--genotype-posteriors"],
-            "simple.output.mixed_depth.posteriors.vcf",
+            "simple.output.mixed_depth.assemble.vcf",
         ),
     ],
 )
@@ -447,7 +431,7 @@ def test_Program__run_stdout__region(region, region_id, cache_threshold):
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
-    output_vcf = "simple.output.mixed_depth.vcf"
+    output_vcf = "simple.output.mixed_depth.assemble.vcf"
 
     REF = str(path / "simple.fasta")
     VCF = str(path / "simple.vcf.gz")
@@ -546,7 +530,7 @@ def test_Program__output_pysam():
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
-    OUTFILE = str(path / "simple.output.deep.old.vcf")
+    OUTFILE = str(path / "simple.output.deep.assemble.vcf")
 
     with open(OUTFILE, "r") as f:
         expect = set(line.strip() for line in f.readlines())
@@ -573,7 +557,7 @@ def test_Program__output_bed_positions():
     path = path / "test_io/data"
 
     BEDFILE = str(path / "simple.bed")
-    OUTFILE = str(path / "simple.output.deep.old.vcf")
+    OUTFILE = str(path / "simple.output.deep.assemble.vcf")
 
     # map of named intervals from bed4 file
     with open(BEDFILE) as bed:
@@ -603,7 +587,7 @@ def test_Program__output_reference_positions():
     path = path / "test_io/data"
 
     REFFILE = str(path / "simple.fasta")
-    OUTFILE = str(path / "simple.output.deep.old.vcf")
+    OUTFILE = str(path / "simple.output.deep.assemble.vcf")
 
     reference = pysam.FastaFile(REFFILE)
     with pysam.VariantFile(OUTFILE) as vcf:

@@ -1,8 +1,8 @@
 import numpy as np
 import numba
 
-from mchap.assemble import util
-from mchap.assemble.likelihood import log_genotype_prior
+from mchap.jitutils import get_haplotype_dosage
+from mchap.assemble.prior import log_genotype_prior
 
 __all__ = ["chain_swap_step"]
 
@@ -107,11 +107,11 @@ def chain_swap_step(
     dosage = np.zeros(ploidy, dtype=np.int8)
 
     # prior for genotype i dosage
-    util.get_dosage(dosage, genotype_i)
+    get_haplotype_dosage(dosage, genotype_i)
     prior_i = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
 
     # prior for genotype j dosage
-    util.get_dosage(dosage, genotype_j)
+    get_haplotype_dosage(dosage, genotype_j)
     prior_j = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
 
     acceptance = chain_swap_acceptance(

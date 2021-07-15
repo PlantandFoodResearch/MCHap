@@ -3,59 +3,16 @@ from numba import njit
 from itertools import combinations_with_replacement
 
 from mchap.combinatorics import count_unique_genotypes
-from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
-from mchap.assemble.util import (
-    get_dosage,
+from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble.prior import log_genotype_prior
+from mchap.jitutils import (
+    get_haplotype_dosage,
+    increment_genotype,
     normalise_log_probs,
     genotype_alleles_as_index,
     index_as_genotype_alleles,
     add_log_prob,
 )
-
-
-__all__ = [
-    "genotype_likelihoods",
-    "genotype_posteriors",
-    "call_posterior_haplotypes",
-    "alternate_dosage_posteriors",
-    "call_posterior_mode",
-]
-
-
-@njit(cache=True)
-def increment_genotype(genotype):
-    """Increment a genotype of allele numbers to the next genotype
-    in VCF sort order.
-
-    Parameters
-    ----------
-    genotype : ndarray, int, shape (ploidy,)
-        Array of allele numbers in the genotype.
-
-    Notes
-    -----
-    Mutates genotype array in place.
-    """
-    ploidy = len(genotype)
-    if ploidy == 1:
-        # haploid case
-        genotype[0] += 1
-        return
-    previous = genotype[0]
-    for i in range(1, ploidy):
-        allele = genotype[i]
-        if allele == previous:
-            pass
-        elif allele > previous:
-            i -= 1
-            genotype[i] += 1
-            genotype[0:i] = 0
-            return
-        else:
-            raise ValueError("genotype alleles are not in ascending order")
-    # all alleles are equal
-    genotype[-1] += 1
-    genotype[0:-1] = 0
 
 
 @njit(cache=True)
@@ -80,7 +37,7 @@ def _call_posterior_mode(
             read_counts=read_counts,
         )
         # log prior
-        get_dosage(dosage, genotype.reshape(ploidy, 1))
+        get_haplotype_dosage(dosage, genotype.reshape(ploidy, 1))
         lpr = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
         # scaled log posterior
         ljoint = llk + lpr
@@ -123,7 +80,7 @@ def _phenotype_log_joint(genotype, reads, haplotypes, read_counts=None, inbreedi
             read_counts=read_counts,
         )
         # log prior
-        get_dosage(dosage, array.reshape(ploidy, 1))
+        get_haplotype_dosage(dosage, array.reshape(ploidy, 1))
         lpr = log_genotype_prior(dosage, len(haplotypes), inbreeding=inbreeding)
         # scaled log posterior
         ljoint = llk + lpr
@@ -269,7 +226,7 @@ def genotype_posteriors(log_likelihoods, ploidy, n_alleles, inbreeding=0):
     genotype = np.zeros(ploidy, np.int64)
     dosage = np.zeros(ploidy, np.int8)
     for i in range(n_genotypes):
-        get_dosage(dosage, genotype.reshape(ploidy, 1))
+        get_haplotype_dosage(dosage, genotype.reshape(ploidy, 1))
         llk = log_likelihoods[i]
         lpr = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
         posteriors[i] = llk + lpr
@@ -313,61 +270,3 @@ def alternate_dosage_posteriors(genotype_alleles, probabilities):
         probs[i] = probabilities[idx]
     idx = np.argsort(indices)
     return genotypes[idx], probs[idx]
-
-
-def call_posterior_haplotypes(posteriors, threshold=0.01):
-    """Call haplotype alleles for VCF output from a population
-    of genotype posterior distributions.
-
-    Parameters
-    ----------
-    posteriors : list, PosteriorGenotypeDistribution
-        A list of individual genotype posteriors.
-    threshold : float
-        Minimum required posterior probability of occurrence
-        with in any individual for a haplotype to be included.
-
-    Returns
-    -------
-    haplotypes : ndarray, int, shape, (n_haplotypes, n_base)
-        VCF sorted haplotype arrays.
-    """
-    # maps of bytes to arrays and bytes to sum probs
-    haplotype_arrays = {}
-    haplotype_values = {}
-    # iterate through genotype posterors
-    for post in posteriors:
-        # include haps based on probability of occurrence
-        haps, probs, weights = post.haplotype_probabilities(return_weighted=True)
-        idx = probs >= threshold
-        # order haps based on weighted prob
-        haps = haps[idx]
-        weights = weights[idx]
-        for h, w in zip(haps, weights):
-            b = h.tobytes()
-            if b not in haplotype_arrays:
-                haplotype_arrays[b] = h
-                haplotype_values[b] = 0
-            haplotype_values[b] += w
-    # remove reference allele if present
-    refbytes = None
-    for b, h in haplotype_arrays.items():
-        if np.all(h == 0):
-            # ref allele
-            refbytes = b
-    if refbytes is not None:
-        haplotype_arrays.pop(refbytes)
-        haplotype_values.pop(refbytes)
-    # combine all called haplotypes into array
-    n_alleles = len(haplotype_arrays) + 1
-    n_base = posteriors[0].genotypes.shape[-1]
-    haplotypes = np.full((n_alleles, n_base), -1, np.int8)
-    values = np.full(n_alleles, -1, float)
-    for i, (b, h) in enumerate(haplotype_arrays.items()):
-        p = haplotype_values[b]
-        haplotypes[i] = h
-        values[i] = p
-    haplotypes[-1][:] = 0  # ref allele
-    values[-1] = values.max() + 1
-    order = np.flip(np.argsort(values))
-    return haplotypes[order]

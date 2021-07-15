@@ -1,11 +1,11 @@
 import numpy as np
 
-from mchap.assemble import calling
+from mchap.calling import exact
 from mchap import mset
 from mchap.testing import simulate_reads
-from mchap.assemble.likelihood import log_likelihood, log_genotype_prior
-from mchap.assemble.util import genotype_alleles_as_index, normalise_log_probs
-from mchap.assemble.classes import PosteriorGenotypeDistribution
+from mchap.assemble.likelihood import log_likelihood
+from mchap.assemble.prior import log_genotype_prior
+from mchap.jitutils import genotype_alleles_as_index, normalise_log_probs
 
 
 def test_genotype_likelihoods():
@@ -79,7 +79,7 @@ def test_genotype_likelihoods():
     expect = np.empty(len(genotypes), dtype=np.float32)
     for i in range(len(expect)):
         expect[i] = log_likelihood(reads, haplotypes[genotypes[i]])
-    actual = calling.genotype_likelihoods(reads, ploidy, haplotypes)
+    actual = exact.genotype_likelihoods(reads, ploidy, haplotypes)
     np.testing.assert_almost_equal(expect, actual)
 
 
@@ -141,7 +141,7 @@ def test_genotype_posteriors():
         errors=False,
         qual=(60, 60),
     )
-    log_likelihoods = calling.genotype_likelihoods(reads, ploidy, haplotypes)
+    log_likelihoods = exact.genotype_likelihoods(reads, ploidy, haplotypes)
     inbreeding = 0.3
     n_alleles = len(haplotypes)
     expect = np.empty(len(genotypes), dtype=np.float32)
@@ -151,7 +151,7 @@ def test_genotype_posteriors():
         log_prior = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
         expect[i] = log_likelihoods[i] + log_prior
     expect = normalise_log_probs(expect)
-    actual = calling.genotype_posteriors(
+    actual = exact.genotype_posteriors(
         log_likelihoods, ploidy, n_alleles, inbreeding=inbreeding
     )
     np.testing.assert_almost_equal(expect, actual)
@@ -209,7 +209,7 @@ def test_alternate_dosage_posteriors():
 
     expect_genotypes = genotypes[[6, 7, 10]]
     expect_probs = np.array([0.1, 0.5, 0.2])
-    actual_genotypes, actual_probs = calling.alternate_dosage_posteriors(
+    actual_genotypes, actual_probs = exact.alternate_dosage_posteriors(
         genotype,
         probabilities,
     )
@@ -243,18 +243,18 @@ def test_call_posterior_mode():
     )
     reads, counts = mset.unique_counts(reads)
 
-    llks = calling.genotype_likelihoods(reads, ploidy, haplotypes, read_counts=counts)
-    probs = calling.genotype_posteriors(
+    llks = exact.genotype_likelihoods(reads, ploidy, haplotypes, read_counts=counts)
+    probs = exact.genotype_posteriors(
         llks, ploidy, len(haplotypes), inbreeding=inbreeding
     )
-    _, phen_probs = calling.alternate_dosage_posteriors(genotype, probs)
+    _, phen_probs = exact.alternate_dosage_posteriors(genotype, probs)
 
     (
         mode_genotype,
         mode_llk,
         mode_genotype_prob,
         mode_phenotype_prob,
-    ) = calling.call_posterior_mode(
+    ) = exact.call_posterior_mode(
         reads, 4, haplotypes, read_counts=counts, inbreeding=inbreeding
     )
 
@@ -265,102 +265,3 @@ def test_call_posterior_mode():
     np.testing.assert_almost_equal(
         np.sum(probs[[idx_0, idx_1, idx_2]]), mode_phenotype_prob, 5
     )
-
-
-def test_call_posterior_haplotypes():
-    haplotypes = np.array(
-        [
-            [0, 0, 0, 0, 0, 0],  # 0
-            [0, 0, 0, 0, 1, 1],  # 1
-            [0, 1, 0, 1, 1, 1],  # 2
-            [1, 1, 1, 1, 1, 0],  # 3
-            [1, 1, 1, 1, 1, 1],  # 4
-        ]
-    )
-
-    dist1 = PosteriorGenotypeDistribution(
-        genotypes=np.array(
-            [
-                haplotypes[[0, 0, 1, 1]],
-                haplotypes[[0, 1, 1, 1]],
-                haplotypes[[0, 1, 1, 2]],
-                haplotypes[[0, 0, 0, 1]],
-            ]
-        ),
-        probabilities=np.array([0.2, 0.4, 0.3, 0.1]),
-    )
-    dist2 = PosteriorGenotypeDistribution(
-        genotypes=np.array(
-            [
-                haplotypes[[0, 0, 2, 2]],
-                haplotypes[[0, 2, 2, 2]],
-                haplotypes[[2, 2, 2, 3]],
-                haplotypes[[2, 2, 2, 4]],  # hap 4 at 10%
-            ]
-        ),
-        probabilities=np.array([0.2, 0.4, 0.3, 0.1]),
-    )
-    dist3 = PosteriorGenotypeDistribution(
-        genotypes=np.array(
-            [
-                haplotypes[[0, 2, 2, 2]],
-                haplotypes[[2, 2, 2, 2]],
-                haplotypes[[2, 2, 2, 3]],  # hap 3 at 20%
-                haplotypes[[1, 2, 2, 3]],
-            ]
-        ),
-        probabilities=np.array([0.2, 0.6, 0.1, 0.1]),
-    )
-    posteriors = [dist1, dist2, dist3]
-    actual = calling.call_posterior_haplotypes(posteriors, threshold=0.15)
-    expect = haplotypes[[0, 2, 1, 3]]  # ref then ordered
-    np.testing.assert_array_equal(actual, expect)
-
-
-def test_call_posterior_haplotypes__no_ref():
-    haplotypes = np.array(
-        [
-            [0, 0, 0, 0, 0, 0],  # 0
-            [0, 0, 0, 0, 1, 1],  # 1
-            [0, 1, 0, 1, 1, 1],  # 2
-            [1, 1, 1, 1, 1, 0],  # 3
-            [1, 1, 1, 1, 1, 1],  # 4
-        ]
-    )
-
-    dist1 = PosteriorGenotypeDistribution(
-        genotypes=np.array(
-            [
-                haplotypes[[1, 1, 3, 3]],
-                haplotypes[[1, 1, 1, 3]],
-                haplotypes[[1, 1, 3, 2]],
-            ]
-        ),
-        probabilities=np.array([0.2, 0.4, 0.4]),
-    )
-    dist2 = PosteriorGenotypeDistribution(
-        genotypes=np.array(
-            [
-                haplotypes[[2, 2, 2, 3]],
-                haplotypes[[2, 2, 3, 3]],
-                haplotypes[[2, 3, 3, 3]],
-                haplotypes[[2, 3, 3, 4]],  # hap 4 at 10%
-            ]
-        ),
-        probabilities=np.array([0.2, 0.4, 0.3, 0.1]),
-    )
-    dist3 = PosteriorGenotypeDistribution(
-        genotypes=np.array(
-            [
-                haplotypes[[1, 2, 2, 2]],
-                haplotypes[[2, 2, 2, 2]],
-                haplotypes[[2, 2, 2, 3]],
-                haplotypes[[1, 2, 2, 3]],
-            ]
-        ),
-        probabilities=np.array([0.2, 0.6, 0.1, 0.1]),
-    )
-    posteriors = [dist1, dist2, dist3]
-    actual = calling.call_posterior_haplotypes(posteriors, threshold=0.15)
-    expect = haplotypes[[0, 2, 3, 1]]  # ref added at front ordered
-    np.testing.assert_array_equal(actual, expect)

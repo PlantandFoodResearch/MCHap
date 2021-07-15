@@ -25,6 +25,7 @@ setup(
         "mchap",
         "mchap/application",
         "mchap/assemble",
+        "mchap/calling",
         "mchap/encoding",
         "mchap/encoding/integer",
         "mchap/encoding/character",
