@@ -326,24 +326,19 @@ class GenotypeMultiTrace(object):
 
         return PosteriorGenotypeDistribution(states[idx], probs[idx])
 
-    def chain_posteriors(self):
-        """Returns a posterior distribution over (phased) genotypes per chain.
+    def split(self):
+        """Split a multitrace into a trace for each component chain.
 
         Returns
         -------
-        posteriors : list[PosteriorGenotypeDistribution]
-            A distribution over unique genotypes recorded in the trace.
-
+        traces : iterable
+            An iterable of multitraces each containing a single chain.
         """
-        n_chain = len(self.genotypes)
-        posteriors = [None] * n_chain
-        for chain in range(n_chain):
-            states, counts = mset.unique_counts(self.genotypes[chain])
-            probs = counts / np.sum(counts)
-            idx = np.flip(np.argsort(probs))
-            posterior = PosteriorGenotypeDistribution(states[idx], probs[idx])
-            posteriors[chain] = posterior
-        return posteriors
+        for genotypes, llks in zip(self.genotypes, self.llks):
+            new = type(self)(None, None)
+            new.genotypes = genotypes[None, ...]
+            new.llks = llks[None, ...]
+            yield new
 
     def replicate_incongruence(self, threshold=0.6):
         """Identifies incongruence between replicate Markov chains.
@@ -364,7 +359,8 @@ class GenotypeMultiTrace(object):
         A non-replicated MCMC will always return 0.
         """
         out = 0
-        chain_modes = [dist.mode_phenotype() for dist in self.chain_posteriors()]
+        posteriors = [trace.posterior() for trace in self.split()]
+        chain_modes = [dist.mode_phenotype() for dist in posteriors]
         alleles = [
             mode.alleles()
             for mode in chain_modes
