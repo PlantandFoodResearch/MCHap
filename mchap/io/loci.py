@@ -164,7 +164,9 @@ class Locus:
         snp_alleles = haplotypes[:, positions].T
         snps = []
         for offset, alleles in zip(positions, snp_alleles):
-            alleles = tuple(np.unique(alleles))
+            _, idx = np.unique(alleles, return_index=True)
+            idx.sort()
+            alleles = tuple(alleles[idx])
             pos = offset + record.start
             snps.append(SNP(record.chrom, pos, pos + 1, ".", alleles=alleles))
         return cls(
