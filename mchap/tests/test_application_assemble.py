@@ -334,6 +334,11 @@ def test_Program__run(cli_extra, output_vcf):
             [],
             "simple.output.mixed_depth.assemble.vcf",
         ),
+        (
+            ["simple.sample1.bam", "simple.sample2.bam", "simple.sample3.bam"],
+            ["--haplotype-posterior-threshold", "1.0"],
+            "simple.output.nullallele.assemble.vcf",
+        ),
     ],
 )
 @pytest.mark.parametrize("cache_threshold", [-1, 10])
