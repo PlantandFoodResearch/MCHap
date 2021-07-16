@@ -401,11 +401,11 @@ def greedy_caller(haplotypes, ploidy, reads, read_counts, inbreeding=0.0):
 
     """
     n_alleles = len(haplotypes)
-    previous_genotype = np.zeros(0, np.int8)
+    previous_genotype = np.zeros(0, np.int32)
     for i in range(ploidy):
         # add new allele slot to genotype
         k = i + 1
-        genotype = np.zeros(k, np.int8)
+        genotype = np.zeros(k, np.int32)
         # copy alleles from previous loop
         genotype[0:i] = previous_genotype[0:i]
 

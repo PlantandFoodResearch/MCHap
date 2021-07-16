@@ -300,7 +300,9 @@ class program(object):
         allele_counts = np.zeros(len(data.columndata["ALTS"]) + 1, int)
         for array in data.sampledata["alleles"].values():
             for a in array:
-                allele_counts[a] += 1
+                # don't count null alleles
+                if a >= 0:
+                    allele_counts[a] += 1
         data.infodata["AC"] = allele_counts[1:]  # skip ref count
         # total number of alleles in called genotypes
         data.infodata["AN"] = np.sum(allele_counts > 0)

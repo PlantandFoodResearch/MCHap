@@ -224,6 +224,41 @@ def test_CallingMCMC__zero_snps():
     assert call_phenotype_prob == 1
 
 
+def test_CallingMCMC__many_haplotype():
+    """Test that the fit method does not overflow due to many haplotypes"""
+    np.random.seed(0)
+    n_haps, n_pos = 400, 35
+    haplotypes = np.random.randint(0, 2, size=(n_haps, n_pos))
+    n_chains = 2
+    n_steps = 1500
+    n_burn = 500
+    ploidy = 4
+    inbreeding = 0.01
+    true_alleles = np.array([0, 0, 1, 2])
+    genotype = haplotypes[true_alleles]
+    reads = simulate_reads(genotype, n_reads=64, errors=False)
+    read_counts = np.ones(len(reads), int)
+
+    model = CallingMCMC(
+        ploidy=ploidy,
+        haplotypes=haplotypes,
+        inbreeding=inbreeding,
+        steps=n_steps,
+        chains=n_chains,
+    )
+    trace = model.fit(reads, read_counts)
+    alleles, call_genotype_prob, call_phenotype_prob = (
+        trace.burn(n_burn).posterior().mode(phenotype=True)
+    )
+    # test dtype inherited from greedy_caller function
+    assert trace.genotypes.dtype == np.int32
+    assert np.all(trace.genotypes >= 0)
+    assert np.all(trace.genotypes < n_haps)
+    np.testing.assert_array_equal(true_alleles, alleles)
+    assert call_genotype_prob > 0.1
+    assert call_phenotype_prob > 0.1
+
+
 def test_PosteriorGenotypeAllelesDistribution__as_array():
     ploidy = 4
     n_haps = 4
