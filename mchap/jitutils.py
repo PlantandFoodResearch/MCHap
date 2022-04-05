@@ -2,29 +2,6 @@ import numpy as np
 import math
 import numba
 
-_FACTORIAL_LOOK_UP = np.fromiter((math.factorial(i) for i in range(21)), dtype=np.int64)
-
-
-@numba.njit(cache=True)
-def factorial_20(x):
-    """Returns the factorial of integers in the range [0, 20] (inclusive)
-
-    Parameters
-    ----------
-    x : int
-        An integer
-
-    Returns
-    -------
-    x_fac : int
-        Factorial of x
-
-    """
-    if x in range(0, 21):
-        return _FACTORIAL_LOOK_UP[x]
-    else:
-        raise ValueError("factorial functuion is only supported for values 0 to 20")
-
 
 @numba.njit(cache=True)
 def add_log_prob(x, y):
@@ -168,32 +145,8 @@ def increment_genotype(genotype):
 
 
 @numba.njit(cache=True)
-def n_choose_k(n, k):
-    """Calculate n choose k for values of n and k < 20.
-    Parameters
-    ----------
-    n : int
-        Number of elements to choose from.
-    k : int
-        Number of elements to be drawn.
-
-    Returns
-    -------
-    combinations : int
-        Number of possible combinations of size k drawn from
-        a set of size n.
-
-    Notes
-    -----
-    Formula: (n!) / (k!(n-k)!)
-
-    """
-    return factorial_20(n) // (factorial_20(k) * factorial_20(n - k))
-
-
-@numba.njit(cache=True)
-def count_equivalent_permutations(dosage):
-    """Counts the total number of equivilent genotype perterbations
+def ln_equivalent_permutations(dosage):
+    """Natural long of the total number of equivalent genotype permutations
     based on the genotypes dosage.
 
     Parameters
@@ -203,17 +156,17 @@ def count_equivalent_permutations(dosage):
 
     Notes
     -----
-    A genotype is an unsorted multi-set of haplotypes hence rearanging the
-    order of haplotypes in a (heterozygous) genotype can result in equivilent
+    A genotype is an unsorted multi-set of haplotypes hence rearranging the
+    order of haplotypes in a (heterozygous) genotype can result in equivalent
     permutations
 
     """
     ploidy = np.sum(dosage)
-    numerator = factorial_20(ploidy)
-    denominator = 1
+    ln_num = math.lgamma(ploidy + 1)
+    ln_denom = 0.0
     for i in range(len(dosage)):
-        denominator *= factorial_20(dosage[i])
-    return numerator // denominator
+        ln_denom += math.lgamma(dosage[i] + 1)
+    return ln_num - ln_denom
 
 
 @numba.njit(cache=True)
@@ -238,7 +191,7 @@ def _greatest_common_denominatior(x: int, y: int) -> int:
 
 
 @numba.njit(cache=True)
-def _comb(n: int, k: int) -> int:
+def comb(n: int, k: int) -> int:
     if k > n:
         return 0
     r = 1
@@ -252,9 +205,9 @@ def _comb(n: int, k: int) -> int:
 
 
 @numba.njit(cache=True)
-def _comb_with_replacement(n: int, k: int) -> int:
+def comb_with_replacement(n: int, k: int) -> int:
     n = n + k - 1
-    return _comb(n, k)
+    return comb(n, k)
 
 
 @numba.njit(cache=True)
@@ -277,7 +230,7 @@ def genotype_alleles_as_index(alleles):
     for i in range(len(alleles)):
         a = alleles[i]
         if a >= 0:
-            index += _comb_with_replacement(a, i + 1)
+            index += comb_with_replacement(a, i + 1)
         elif a < 0:
             raise ValueError("Allele numbers must be >= 0.")
     return index
@@ -318,7 +271,7 @@ def index_as_genotype_alleles(index, ploidy):
         while new <= remainder:
             n += 1
             prev = new
-            new = _comb_with_replacement(n, p)
+            new = comb_with_replacement(n, p)
         n -= 1
         remainder -= prev
         out[p - 1] = n

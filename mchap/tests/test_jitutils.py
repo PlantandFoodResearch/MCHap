@@ -1,9 +1,20 @@
 import numpy as np
-import math
 import pytest
+from scipy.special import comb
 
 from mchap import jitutils
 from mchap.encoding import integer
+
+
+@pytest.mark.parametrize(
+    "n,k",
+    [(0, 0), (20, 4), (100, 3), (30, 20), (1, 1), (2, 7), (7, 2), (87, 4)],
+)
+def test_comb(n, k):
+    assert jitutils.comb(n, k) == comb(n, k, exact=True)
+    assert jitutils.comb_with_replacement(n, k) == comb(
+        n, k, exact=True, repetition=True
+    )
 
 
 def test_add_log_prob():
@@ -163,12 +174,6 @@ def test_set_haplotype_dosage():
     np.testing.assert_array_equal(genotype, answer)
 
 
-def test_factorial_20():
-
-    for i in range(0, 21):
-        assert jitutils.factorial_20(i) == math.factorial(i)
-
-
 @pytest.mark.parametrize(
     "dosage,answer",
     [
@@ -183,10 +188,10 @@ def test_factorial_20():
         pytest.param([1, 1, 1, 1], 24),
     ],
 )
-def test_count_equivalent_permutations(dosage, answer):
+def test_ln_equivalent_permutations(dosage, answer):
     dosage = np.array(dosage, dtype=int)
-    query = jitutils.count_equivalent_permutations(dosage)
-    assert query == answer
+    query = jitutils.ln_equivalent_permutations(dosage)
+    np.testing.assert_almost_equal(np.exp(query), answer)
 
 
 def test_sample_snv_alleles():

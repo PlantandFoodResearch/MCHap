@@ -3,7 +3,7 @@ import numpy as np
 
 
 @njit(cache=True)
-def new(array_length, node_branches, initial_size=32, max_size=2 ** 16):
+def new(array_length, node_branches, initial_size=32, max_size=2**16):
     """Initialise a new array map for 1-dimensional integer arrays of fixed length.
 
     Parameters

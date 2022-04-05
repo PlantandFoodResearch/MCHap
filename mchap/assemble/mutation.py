@@ -202,7 +202,7 @@ def compound_step(
         max_allele = reads.shape[-1]
         n_alleles = np.empty(n_base, dtype=np.int8)
         n_alleles[:] = max_allele
-        unique_haplotypes = n_base ** max_allele
+        unique_haplotypes = n_base**max_allele
     else:
         unique_haplotypes = np.prod(n_alleles)
 

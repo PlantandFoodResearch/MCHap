@@ -5,7 +5,7 @@ import numba
 
 from mchap.jitutils import (
     random_choice,
-    n_choose_k,
+    comb,
     structural_change,
     get_haplotype_dosage,
 )
@@ -146,7 +146,7 @@ def recombination_step_options(labels):
     # calculate number of options
     # n_options = recombination_step_n_options(labels)
     # create options array and default to no change
-    max_options = n_choose_k(ploidy, 2)
+    max_options = comb(ploidy, 2)
     options = np.empty((max_options, ploidy, 2), np.int8)
     for i in range(max_options):
         for j in range(ploidy):
@@ -640,7 +640,7 @@ def compound_step(
 
     if n_alleles is None:
         _, n_base, max_allele = reads.shape
-        unique_haplotypes = max_allele ** n_base
+        unique_haplotypes = max_allele**n_base
     else:
         unique_haplotypes = np.prod(n_alleles)
 

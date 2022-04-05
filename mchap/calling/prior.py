@@ -2,7 +2,7 @@ import numpy as np
 import numba
 from math import lgamma
 
-from mchap.jitutils import factorial_20
+from mchap.calling.utils import allelic_dosage, count_allele
 
 
 @numba.njit(cache=True)
@@ -23,46 +23,6 @@ def inbreeding_as_dispersion(inbreeding, unique_haplotypes):
         Dispersion parameter for all haplotypes.
     """
     return (1 / unique_haplotypes) * ((1 - inbreeding) / inbreeding)
-
-
-@numba.njit(cache=True)
-def log_dirichlet_multinomial_pmf(allele_counts, dispersion):
-    """Dirichlet-Multinomial probability mass function.
-
-    Parameters
-    ----------
-    allele_counts : ndarray, int, shape (n_alleles, )
-        Counts of possible alleles.
-    dispersion : ndarray, float, shape (n_alleles, )
-        Dispersion parameters (alphas) for each possible allele.
-
-    Returns
-    -------
-    lprob : float
-        Log-probability.
-
-    """
-    assert allele_counts.shape == dispersion.shape
-    sum_counts = np.sum(allele_counts)
-    sum_dispersion = dispersion.sum()
-
-    # left side of equation in log space
-    num = np.log(factorial_20(sum_counts)) + lgamma(sum_dispersion)
-    denom = lgamma(sum_counts + sum_dispersion)
-    left = num - denom
-
-    # right side of equation
-    prod = 0.0  # log(1.0)
-    for i in range(len(allele_counts)):
-        count = allele_counts[i]
-        disp = dispersion[i]
-        if count > 0:
-            num = lgamma(count + disp)
-            denom = np.log(factorial_20(count)) + lgamma(disp)
-            prod += num - denom
-
-    # return as log probability
-    return left + prod
 
 
 @numba.njit(cache=True)
@@ -98,20 +58,19 @@ def log_genotype_allele_prior(
     if inbreeding == 0:
         return np.log(1 / unique_haplotypes)
 
-    # calculate the dispersion parameters for the PMF
-    # this is the default value based on the inbreeding coefficient
-    # which is then updated base on the observed 'constant' alleles
-    default_dispersion = inbreeding_as_dispersion(inbreeding, unique_haplotypes)
-    dispersion = np.full(unique_haplotypes, default_dispersion)
-    for i in range(len(genotype)):
-        if i != variable_allele:
-            a = genotype[i]
-            dispersion[a] += 1
+    # base alpha for flat prior
+    alpha = inbreeding_as_dispersion(inbreeding, unique_haplotypes)
 
-    # indicate the variable allele as a one-hot array
-    allele_counts = np.zeros(dispersion.shape, np.int64)
-    a = genotype[variable_allele]
-    allele_counts[a] += 1
+    # sum of alpha parameters accounting for constant alleles
+    constant = np.delete(genotype, variable_allele)
+    counts = allelic_dosage(constant)
+    sum_alpha = np.sum(counts) + alpha * unique_haplotypes
 
-    # calculate log-prior from Dirichlet-Multinomial PMF
-    return log_dirichlet_multinomial_pmf(allele_counts, dispersion)
+    # alpha parameter for variable allele
+    count = count_allele(genotype, genotype[variable_allele]) - 1
+    variable_alpha = alpha + count
+
+    # dirichlet-multinomial PMF
+    left = lgamma(sum_alpha) - lgamma(1 + sum_alpha)
+    right = lgamma(1 + variable_alpha) - lgamma(variable_alpha)
+    return left + right
