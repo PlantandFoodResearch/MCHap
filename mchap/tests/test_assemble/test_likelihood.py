@@ -130,7 +130,7 @@ def test_log_likelihood__fuzz(ploidy, n_base, n_reps):
 )
 def test_log_likelihood_cache__fuzz(ploidy, n_base, n_reps):
     np.random.seed(0)
-    cache = new_log_likelihood_cache(ploidy, n_base, max_alleles=2, max_size=2 ** 16)
+    cache = new_log_likelihood_cache(ploidy, n_base, max_alleles=2, max_size=2**16)
     haplotypes = np.random.randint(2, size=(ploidy, n_base))
     reads = simulate_reads(haplotypes)
     for _ in range(n_reps):

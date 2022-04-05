@@ -152,7 +152,7 @@ def log_likelihood_structural_change(
 
 
 @numba.njit(cache=True)
-def new_log_likelihood_cache(ploidy, n_base, max_alleles, max_size=2 ** 16):
+def new_log_likelihood_cache(ploidy, n_base, max_alleles, max_size=2**16):
     """Create an array_map forcaching log-likelihoods.
 
     Parameters

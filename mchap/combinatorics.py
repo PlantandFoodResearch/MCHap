@@ -73,7 +73,7 @@ def count_unique_genotype_permutations(u_haps, ploidy):
         equivilent permutations.
 
     """
-    return u_haps ** ploidy
+    return u_haps**ploidy
 
 
 def count_haplotype_universial_occurance(u_haps, ploidy):

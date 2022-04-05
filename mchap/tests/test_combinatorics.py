@@ -55,7 +55,7 @@ def test_count_unique_genotype_permutations():
     u_haps = 1024  # 10 biallelic SNPs
     ploidy = 4
 
-    answer = u_haps ** ploidy
+    answer = u_haps**ploidy
     query = combinatorics.count_unique_genotype_permutations(u_haps, ploidy)
 
     assert query == answer

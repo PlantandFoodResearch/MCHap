@@ -388,7 +388,7 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
         ]
     )
     ploidy, n_base = haplotypes.shape
-    unique_haplotypes = 2 ** n_base
+    unique_haplotypes = 2**n_base
 
     reads = simulate_reads(
         haplotypes,
@@ -534,7 +534,7 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
         ]
     )
     ploidy, n_base = haplotypes.shape
-    unique_haplotypes = 2 ** n_base
+    unique_haplotypes = 2**n_base
 
     reads = simulate_reads(
         haplotypes,
