@@ -2,8 +2,6 @@ import numpy as np
 import numba
 from math import lgamma
 
-from mchap.jitutils import factorial_20
-
 
 @numba.njit(cache=True)
 def inbreeding_as_dispersion(inbreeding, unique_haplotypes):
@@ -47,7 +45,7 @@ def log_dirichlet_multinomial_pmf(allele_counts, dispersion):
     sum_dispersion = dispersion.sum()
 
     # left side of equation in log space
-    num = np.log(factorial_20(sum_counts)) + lgamma(sum_dispersion)
+    num = lgamma(sum_counts + 1) + lgamma(sum_dispersion)
     denom = lgamma(sum_counts + sum_dispersion)
     left = num - denom
 
@@ -58,7 +56,7 @@ def log_dirichlet_multinomial_pmf(allele_counts, dispersion):
         disp = dispersion[i]
         if count > 0:
             num = lgamma(count + disp)
-            denom = np.log(factorial_20(count)) + lgamma(disp)
+            denom = lgamma(count + 1) + lgamma(disp)
             prod += num - denom
 
     # return as log probability

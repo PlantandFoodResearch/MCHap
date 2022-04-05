@@ -4,10 +4,7 @@ import numpy as np
 import numba
 from math import lgamma
 
-from mchap.jitutils import (
-    count_equivalent_permutations,
-    factorial_20,
-)
+from mchap.jitutils import ln_equivalent_permutations
 
 
 __all__ = [
@@ -34,9 +31,9 @@ def log_genotype_null_prior(dosage, unique_haplotypes):
 
     """
     ploidy = dosage.sum()
-    genotype_perms = count_equivalent_permutations(dosage)
-    log_total_perms = ploidy * np.log(unique_haplotypes)
-    return np.log(genotype_perms) - log_total_perms
+    ln_perms = ln_equivalent_permutations(dosage)
+    ln_total_perms = ploidy * np.log(unique_haplotypes)
+    return ln_perms - ln_total_perms
 
 
 @numba.njit(cache=True)
@@ -63,7 +60,7 @@ def log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
     sum_dispersion = dispersion * unique_haplotypes
 
     # left side of equation in log space
-    num = np.log(factorial_20(ploidy)) + lgamma(sum_dispersion)
+    num = lgamma(ploidy + 1) + lgamma(sum_dispersion)
     denom = lgamma(ploidy + sum_dispersion)
     left = num - denom
 
@@ -73,7 +70,7 @@ def log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
         dose = dosage[i]
         if dose > 0:
             num = lgamma(dose + dispersion)
-            denom = np.log(factorial_20(dose)) + lgamma(dispersion)
+            denom = lgamma(dose + 1) + lgamma(dispersion)
             prod += num - denom
 
     # return as log probability
