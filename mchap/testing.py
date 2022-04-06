@@ -1,7 +1,8 @@
 import numpy as np
 
 from mchap.encoding.integer import as_probabilistic
-from mchap.io.util import prob_of_qual, PFEIFFER_ERROR
+from mchap.constant import PFEIFFER_ERROR
+from mchap.io.util import prob_of_qual
 from mchap.jitutils import sample_snv_alleles
 
 

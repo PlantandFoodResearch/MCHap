@@ -258,7 +258,6 @@ def test_Program__header():
             [
                 "--base-error-rate",
                 "0.001",
-                "--ignore-base-phred-scores",
             ],
             "simple.output.deep.assemble.vcf",
         ),
@@ -336,7 +335,13 @@ def test_Program__run(cli_extra, output_vcf):
         ),
         (
             ["simple.sample1.bam", "simple.sample2.bam", "simple.sample3.bam"],
-            ["--haplotype-posterior-threshold", "1.0"],
+            [
+                "--haplotype-posterior-threshold",
+                "1.0",
+                "--base-error-rate",
+                "0.0",
+                "--use-base-phred-scores",
+            ],
             "simple.output.nullallele.assemble.vcf",
         ),
     ],
