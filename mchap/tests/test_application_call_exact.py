@@ -18,7 +18,8 @@ from mchap.application.call_exact import program
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
-                "--genotype-likelihoods",
+                "--report",
+                "GL",
                 "--base-error-rate",
                 "0.0",
                 "--use-base-phred-scores",
@@ -28,7 +29,8 @@ from mchap.application.call_exact import program
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
-                "--genotype-posteriors",
+                "--report",
+                "GP",
                 "--base-error-rate",
                 "0.0",
                 "--use-base-phred-scores",
