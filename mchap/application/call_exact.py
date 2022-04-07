@@ -79,11 +79,7 @@ class program(baseclass.program):
                 read_counts = read_counts = data.sampledata["read_dist_counts"][sample]
 
                 # call haplotypes
-                if (
-                    ("GL" in data.formatfields)
-                    or ("GP" in data.formatfields)
-                    or ("AFP" in data.formatfields)
-                ):
+                if ("GL" in data.formatfields) or ("GP" in data.formatfields):
                     # calculate full arrays
                     llks = genotype_likelihoods(
                         reads=reads,
@@ -122,14 +118,20 @@ class program(baseclass.program):
 
                 else:
                     # use low memory calculation
-                    alleles, _, genotype_prob, phenotype_prob = posterior_mode(
+                    mode_results = posterior_mode(
                         reads=reads,
                         read_counts=read_counts,
                         haplotypes=haplotypes,
                         ploidy=ploidy,
                         inbreeding=inbreeding,
                         return_phenotype_prob=True,
+                        return_posterior_frequencies="AFP" in data.formatfields,
                     )
+                    alleles, _, genotype_prob, phenotype_prob = mode_results[0:4]
+                    if "AFP" in data.formatfields:
+                        data.sampledata["AFP"][sample] = np.round(
+                            mode_results[-1], self.precision
+                        )
 
                 # store variables
                 data.sampledata["alleles"][sample] = alleles
