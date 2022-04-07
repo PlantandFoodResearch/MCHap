@@ -203,22 +203,6 @@ sample_ploidy = Parameter(
     ),
 )
 
-sample_list = Parameter(
-    "--sample-list",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "Optionally specify a file containing a list of samples to "
-            "genotype (one sample id per line). "
-            "This file also specifies the sample order in the output. "
-            "If not specified, all samples in the input bam files will "
-            "be genotyped."
-        ),
-    ),
-)
-
 inbreeding = Parameter(
     "--inbreeding",
     dict(
@@ -571,7 +555,6 @@ DEFAULT_PARSER_ARGUMENTS = [
     bam,
     bam_list,
     sample_bam,
-    sample_list,
     ploidy,
     sample_ploidy,
     inbreeding,
@@ -671,18 +654,7 @@ def parse_sample_bam_paths(arguments):
                     sample, bam = line.strip().split("\t")
                     sample_bams[sample] = bam
 
-    # samples list
-    if hasattr(arguments, "sample_list"):
-        path = arguments.sample_list[0]
-        if path:
-            with open(path) as f:
-                samples = [line.strip() for line in f.readlines()]
-            # remove non-listed samples
-            sample_bams = {s: sample_bams[s] for s in samples if s in sample_bams}
-        else:
-            samples = list(sample_bams.keys())
-    else:
-        samples = list(sample_bams.keys())
+    samples = list(sample_bams.keys())
     if len(samples) != len(set(samples)):
         raise IOError("Duplicate input samples")
 
