@@ -322,21 +322,17 @@ use_assembly_posteriors = BooleanFlag(
     ),
 )
 
-genotype_likelihoods = BooleanFlag(
-    "--genotype-likelihoods",
+report = Parameter(
+    "--report",
     dict(
-        dest="genotype_likelihoods",
-        action="store_true",
-        help=("Flag: Report genotype likelihoods in the GL VCF field."),
-    ),
-)
-
-genotype_posteriors = BooleanFlag(
-    "--genotype-posteriors",
-    dict(
-        dest="genotype_posteriors",
-        action="store_true",
-        help=("Flag: Report genotype posterior probabilities in the GP VCF field."),
+        type=str,
+        nargs="*",
+        default=[],
+        help=(
+            "Extra fields to report within the output VCF: "
+            "GP = genotype posterior probabilities; "
+            "GL = genotype likelihoods."
+        ),
     ),
 )
 
@@ -587,8 +583,7 @@ DEFAULT_PARSER_ARGUMENTS = [
     skip_qcfail,
     skip_supplementary,
     read_group_field,
-    genotype_likelihoods,
-    genotype_posteriors,
+    report,
     cores,
 ]
 
@@ -823,8 +818,7 @@ def collect_default_program_arguments(arguments):
         skip_duplicates=arguments.skip_duplicates,
         skip_qcfail=arguments.skip_qcfail,
         skip_supplementary=arguments.skip_supplementary,
-        report_genotype_likelihoods=arguments.genotype_likelihoods,
-        report_genotype_posterior=arguments.genotype_posteriors,
+        report_fields=arguments.report,
         n_cores=arguments.cores[0],
     )
 
