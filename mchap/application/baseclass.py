@@ -314,10 +314,16 @@ class program(object):
             data.infodata["DP"] = np.nansum(list(data.sampledata["DP"].values()))
         # total read count
         data.infodata["RCOUNT"] = np.nansum(list(data.sampledata["RCOUNT"].values()))
+        # population mean posterior allele frequencies
         if "AFP" in data.infofields:
-            data.infodata["AFP"] = np.mean(
-                list(data.sampledata["AFP"].values()), axis=0
-            ).round(self.precision)
+            # need to weight frequencies of each individual by ploidy
+            pop_ploidy = 0
+            pop_total = np.zeros(len(data.columndata["ALTS"]) + 1, float)
+            for sample, freqs in data.sampledata["AFP"].items():
+                ploidy = self.sample_ploidy[sample]
+                pop_ploidy += ploidy
+                pop_total += freqs * ploidy
+            data.infodata["AFP"] = (pop_total / pop_ploidy).round(self.precision)
         return data
 
     def call_locus(self, locus):
