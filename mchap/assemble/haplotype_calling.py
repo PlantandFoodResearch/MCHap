@@ -24,7 +24,11 @@ def call_posterior_haplotypes(posteriors, threshold=0.01):
     # iterate through genotype posterors
     for post in posteriors:
         # include haps based on probability of occurrence
-        haps, probs, weights = post.haplotype_probabilities(return_weighted=True)
+        (
+            haps,
+            probs,
+        ) = post.allele_occurrence()
+        _, weights = post.allele_frequencies(dosage=True)
         idx = probs >= threshold
         # order haps based on weighted prob
         haps = haps[idx]

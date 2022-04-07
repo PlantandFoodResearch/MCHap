@@ -127,44 +127,6 @@ class PosteriorGenotypeDistribution(object):
         idx = labels == mode
         return PhenotypeDistribution(self.genotypes[idx], self.probabilities[idx])
 
-    # TODO: Speed this up for large distributions
-    def haplotype_probabilities(self, return_weighted=False):
-        """Calculate posterior probability of haplotype occurrence.
-
-        Parameters
-        ----------
-        return_weighted : bool
-            If true a second array will be returned containing the
-            occurrence probability weighted by the haplotype dosage.
-
-        Returns
-        -------
-        haplotypes : ndarray, int, shape (n_haplotypes, n_base)
-            Unique haplotypes.
-        probabilities : ndarray, float, shape (n_haplotypes, )
-            Posterior probability of haplotype occurrence.
-        """
-        n_gen, ploidy, n_base = self.genotypes.shape
-        haps = self.genotypes.reshape(n_gen * ploidy, n_base)
-        uhaps = mset.unique(haps)
-        uprobs = np.zeros(len(uhaps), float)
-        uweighted = np.zeros(len(uhaps), float)
-        for i in range(len(uhaps)):
-            hap = uhaps[i]
-            for j in range(len(self.genotypes)):
-                gen = self.genotypes[j]
-                p = self.probabilities[j]
-                haploid = hap[None, ...]
-                count = mset.count(gen, haploid)[0]
-                if count > 0:
-                    uprobs[i] += p
-                if return_weighted:
-                    uweighted[i] += p * (count / ploidy)
-        if return_weighted:
-            return uhaps, uprobs, uweighted
-        else:
-            return uhaps, uprobs
-
     def allele_frequencies(self, dosage=False):
         """Calculate posterior frequency of haplotype alleles.
 
@@ -193,6 +155,35 @@ class PosteriorGenotypeDistribution(object):
             ufreqs[i] = freqs[hap.tobytes()]
         if dosage is False:
             ufreqs /= ploidy
+        return uhaps, ufreqs
+
+    def allele_occurrence(self):
+        """Calculate posterior probability of haplotype occurrence.
+
+        Parameters
+        ----------
+        dosage : bool
+            If true then frequencies will be multiplied by ploidy
+            resulting in the posterior allele dosage.
+
+        Returns
+        -------
+        haplotypes : ndarray, int, shape (n_haplotypes, n_base)
+            Unique haplotypes.
+        occurrence : ndarray, float, shape (n_haplotypes, )
+            Posterior probabilities of haplotype occurrence.
+        """
+        n_gen, ploidy, n_base = self.genotypes.shape
+        haps = self.genotypes.reshape(n_gen * ploidy, n_base)
+        uhaps = mset.unique(haps)
+        ufreqs = np.zeros(len(uhaps), float)
+        freqs = {h.tobytes(): 0.0 for h in uhaps}
+        for gen, prob in zip(self.genotypes, self.probabilities):
+            phen = set([hap.tobytes() for hap in gen])
+            for hap in phen:
+                freqs[hap] += prob
+        for i, hap in enumerate(uhaps):
+            ufreqs[i] = freqs[hap.tobytes()]
         return uhaps, ufreqs
 
 
