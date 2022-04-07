@@ -1,7 +1,7 @@
 import copy
 from dataclasses import dataclass
 
-
+from mchap.constant import PFEIFFER_ERROR
 from mchap.io import extract_sample_ids
 
 
@@ -254,26 +254,26 @@ base_error_rate = Parameter(
     dict(
         nargs=1,
         type=float,
-        default=[0.0],
+        default=[PFEIFFER_ERROR],
         help=(
-            "Expected base error rate of read sequences (default = 0.0). "
-            "This is used in addition to base phred-scores by default "
-            "however base phred-scores can be ignored using the "
-            "--ignore-base-phred-scores flag."
-        ),
+            "Expected base error rate of read sequences (default = {}). "
+            "The default value comes from Pfeiffer et al 2018 "
+            "and is a general estimate for Illumina short reads."
+        ).format(PFEIFFER_ERROR),
     ),
 )
 
 ignore_base_phred_scores = BooleanFlag(
-    "--ignore-base-phred-scores",
+    "--use-base-phred-scores",
     dict(
         dest="ignore_base_phred_scores",
-        action="store_true",
+        action="store_false",
         help=(
-            "Flag: Ignore base phred-scores as a source of base error rate. "
-            "This can improve MCMC speed by allowing for greater de-duplication "
-            "of reads however an error rate > 0.0 must be specified with the "
-            "--base-error-rate argument."
+            "Flag: use base phred-scores as a source of base error rate. "
+            "This will use the phred-encoded per base scores in addition "
+            "to the general error rate specified by the "
+            "--base-error-rate argument. "
+            "Using this option can slow down assembly speed."
         ),
     ),
 )
