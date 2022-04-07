@@ -17,12 +17,22 @@ from mchap.application.call_exact import program
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--genotype-likelihoods"],
+            [
+                "--genotype-likelihoods",
+                "--base-error-rate",
+                "0.0",
+                "--use-base-phred-scores",
+            ],
             "simple.output.mixed_depth.call-exact.likelihoods.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--genotype-posteriors"],
+            [
+                "--genotype-posteriors",
+                "--base-error-rate",
+                "0.0",
+                "--use-base-phred-scores",
+            ],
             "simple.output.mixed_depth.call-exact.posteriors.vcf",
         ),
     ],
