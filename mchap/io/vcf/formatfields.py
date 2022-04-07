@@ -65,7 +65,7 @@ GP = FormatField(
     id="GP", number="G", type="Float", descr="Genotype posterior probabilities"
 )
 AFP = FormatField(
-    id="AFP", number="R", type="Float", descr="Posterior allele frequencies"
+    id="AFP", number="R", type="Float", descr="Posterior mean allele frequencies"
 )
 MCI = FormatField(
     id="MCI",

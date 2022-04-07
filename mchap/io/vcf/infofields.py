@@ -32,7 +32,7 @@ AN = InfoField(
 )
 AF = InfoField(id="AF", number="A", type="Float", descr="Allele Frequency")
 AFP = InfoField(
-    id="AFP", number="R", type="Float", descr="Posterior allele frequencies"
+    id="AFP", number="R", type="Float", descr="Posterior mean allele frequencies"
 )
 AA = InfoField(id="AA", number=1, type="String", descr="Ancestral allele")
 END = InfoField(id="END", number=1, type="Integer", descr="End position on CHROM")

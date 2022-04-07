@@ -82,5 +82,5 @@ optional arguments:
   --report [REPORT ...]
                         Extra fields to report within the output VCF: GP =
                         genotype posterior probabilities; GL = genotype
-                        likelihoods.
+                        likelihoods; AFP = posterior mean allele frequencies.
   --cores CORES         Number of cpu cores to use (default = 1).
