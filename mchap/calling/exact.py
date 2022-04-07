@@ -234,6 +234,21 @@ def genotype_posteriors(log_likelihoods, ploidy, n_alleles, inbreeding=0):
     return normalise_log_probs(posteriors)
 
 
+@njit(cache=True)
+def posterior_allele_frequencies(posteriors, ploidy, n_alleles, dosage=False):
+    n_genotypes = len(posteriors)
+    freqs = np.zeros(n_alleles, dtype=np.float32)
+    genotype = np.zeros(ploidy, np.int64)
+    for i in range(n_genotypes):
+        p = posteriors[i]
+        for j in range(ploidy):
+            freqs[genotype[j]] += p
+        increment_genotype(genotype)
+    if dosage is False:
+        freqs /= ploidy
+    return freqs
+
+
 def alternate_dosage_posteriors(genotype_alleles, probabilities):
     """Extract alternate dosage probabilities based on allelic phenotype.
 

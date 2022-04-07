@@ -165,6 +165,36 @@ class PosteriorGenotypeDistribution(object):
         else:
             return uhaps, uprobs
 
+    def allele_frequencies(self, dosage=False):
+        """Calculate posterior frequency of haplotype alleles.
+
+        Parameters
+        ----------
+        dosage : bool
+            If true then frequencies will be multiplied by ploidy
+            resulting in the posterior allele dosage.
+
+        Returns
+        -------
+        haplotypes : ndarray, int, shape (n_haplotypes, n_base)
+            Unique haplotypes.
+        frequencies : ndarray, float, shape (n_haplotypes, )
+            Posterior frequencies of haplotype alleles.
+        """
+        n_gen, ploidy, n_base = self.genotypes.shape
+        haps = self.genotypes.reshape(n_gen * ploidy, n_base)
+        uhaps = mset.unique(haps)
+        ufreqs = np.zeros(len(uhaps), float)
+        freqs = {h.tobytes(): 0.0 for h in uhaps}
+        for gen, prob in zip(self.genotypes, self.probabilities):
+            for hap in gen:
+                freqs[hap.tobytes()] += prob
+        for i, hap in enumerate(uhaps):
+            ufreqs[i] = freqs[hap.tobytes()]
+        if dosage is False:
+            ufreqs /= ploidy
+        return uhaps, ufreqs
+
 
 @dataclass
 class PhenotypeDistribution(object):

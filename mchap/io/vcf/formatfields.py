@@ -64,6 +64,9 @@ GL = FormatField(id="GL", number="G", type="Float", descr="Genotype likelihoods"
 GP = FormatField(
     id="GP", number="G", type="Float", descr="Genotype posterior probabilities"
 )
+AFP = FormatField(
+    id="AFP", number="R", type="Float", descr="Posterior allele frequencies"
+)
 MCI = FormatField(
     id="MCI",
     number=1,
@@ -99,6 +102,7 @@ HEADER_FORMAT_FIELDS = dict(
     AD=AD,
     GL=GL,
     GP=GP,
+    AFP=AFP,
     MCI=MCI,
     KMERCOV=KMERCOV,
     MCAP=MCAP,

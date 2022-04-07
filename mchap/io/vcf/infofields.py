@@ -31,6 +31,9 @@ AN = InfoField(
     descr="Total number of alleles in called genotypes",
 )
 AF = InfoField(id="AF", number="A", type="Float", descr="Allele Frequency")
+AFP = InfoField(
+    id="AFP", number="R", type="Float", descr="Posterior allele frequencies"
+)
 AA = InfoField(id="AA", number=1, type="String", descr="Ancestral allele")
 END = InfoField(id="END", number=1, type="Integer", descr="End position on CHROM")
 NVAR = InfoField(
@@ -64,6 +67,7 @@ HEADER_INFO_FIELDS = dict(
     AC=AC,
     AN=AN,
     AF=AF,
+    AFP=AFP,
     AA=AA,
     END=END,
     NVAR=NVAR,

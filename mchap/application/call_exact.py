@@ -14,6 +14,7 @@ from mchap.calling.exact import (
     genotype_likelihoods,
     genotype_posteriors,
     alternate_dosage_posteriors,
+    posterior_allele_frequencies,
 )
 from mchap.jitutils import natural_log_to_log10, index_as_genotype_alleles
 
@@ -65,6 +66,7 @@ class program(baseclass.program):
             "MCI",
             "GL",
             "GP",
+            "AFP",
         ]:
             data.sampledata[field] = dict()
         haplotypes = data.locus.encode_haplotypes()
@@ -77,7 +79,11 @@ class program(baseclass.program):
                 read_counts = read_counts = data.sampledata["read_dist_counts"][sample]
 
                 # call haplotypes
-                if ("GL" in data.formatfields) or ("GP" in data.formatfields):
+                if (
+                    ("GL" in data.formatfields)
+                    or ("GP" in data.formatfields)
+                    or ("AFP" in data.formatfields)
+                ):
                     # calculate full arrays
                     llks = genotype_likelihoods(
                         reads=reads,
@@ -99,7 +105,12 @@ class program(baseclass.program):
                     )
                     phenotype_prob = phenotype_probs.sum()
 
-                    # store specify arrays
+                    # store specified arrays
+                    if "AFP" in data.formatfields:
+                        freqs = posterior_allele_frequencies(
+                            probabilities, ploidy, len(haplotypes)
+                        )
+                        data.sampledata["AFP"][sample] = np.round(freqs, self.precision)
                     if "GL" in data.formatfields:
                         data.sampledata["GL"][sample] = np.round(
                             natural_log_to_log10(llks), self.precision

@@ -4,6 +4,7 @@ import numpy as np
 from dataclasses import dataclass
 import pysam
 
+from mchap import mset
 from mchap.application import baseclass
 from mchap.application.baseclass import SampleAssemblyError, SAMPLE_ASSEMBLY_ERROR
 
@@ -100,7 +101,7 @@ class program(baseclass.program):
         -------
         data : LocusAssemblyData
             With sampledata fields: "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
-            and "GL", "GP" if specified.
+            and "GL", "GP", "AFP" if specified.
         """
         for field in [
             "alleles",
@@ -112,6 +113,7 @@ class program(baseclass.program):
             "MCI",
             "GL",
             "GP",
+            "AFP",
         ]:
             data.sampledata[field] = dict()
         # dict to temporarily store posteriors
@@ -196,6 +198,16 @@ class program(baseclass.program):
                     haplotype_labels,
                 )
                 data.sampledata["alleles"][sample] = alleles
+
+                # posterior allele frequencies if requested
+                if "AFP" in data.formatfields:
+                    frequencies = np.zeros(len(haplotypes))
+                    haps, freqs = sample_posteriors[sample].allele_frequencies()
+                    idx = mset.categorize(haplotypes, haps)
+                    frequencies[idx >= 0] = freqs[idx[idx >= 0]]
+                    data.sampledata["AFP"][sample] = np.round(
+                        frequencies, self.precision
+                    )
 
                 # encode posterior probabilities if requested
                 if "GP" in data.formatfields:
