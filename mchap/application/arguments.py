@@ -203,22 +203,6 @@ sample_ploidy = Parameter(
     ),
 )
 
-sample_list = Parameter(
-    "--sample-list",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "Optionally specify a file containing a list of samples to "
-            "genotype (one sample id per line). "
-            "This file also specifies the sample order in the output. "
-            "If not specified, all samples in the input bam files will "
-            "be genotyped."
-        ),
-    ),
-)
-
 inbreeding = Parameter(
     "--inbreeding",
     dict(
@@ -322,21 +306,17 @@ use_assembly_posteriors = BooleanFlag(
     ),
 )
 
-genotype_likelihoods = BooleanFlag(
-    "--genotype-likelihoods",
+report = Parameter(
+    "--report",
     dict(
-        dest="genotype_likelihoods",
-        action="store_true",
-        help=("Flag: Report genotype likelihoods in the GL VCF field."),
-    ),
-)
-
-genotype_posteriors = BooleanFlag(
-    "--genotype-posteriors",
-    dict(
-        dest="genotype_posteriors",
-        action="store_true",
-        help=("Flag: Report genotype posterior probabilities in the GP VCF field."),
+        type=str,
+        nargs="*",
+        default=[],
+        help=(
+            "Extra fields to report within the output VCF: "
+            "GP = genotype posterior probabilities; "
+            "GL = genotype likelihoods."
+        ),
     ),
 )
 
@@ -575,7 +555,6 @@ DEFAULT_PARSER_ARGUMENTS = [
     bam,
     bam_list,
     sample_bam,
-    sample_list,
     ploidy,
     sample_ploidy,
     inbreeding,
@@ -587,8 +566,7 @@ DEFAULT_PARSER_ARGUMENTS = [
     skip_qcfail,
     skip_supplementary,
     read_group_field,
-    genotype_likelihoods,
-    genotype_posteriors,
+    report,
     cores,
 ]
 
@@ -676,18 +654,7 @@ def parse_sample_bam_paths(arguments):
                     sample, bam = line.strip().split("\t")
                     sample_bams[sample] = bam
 
-    # samples list
-    if hasattr(arguments, "sample_list"):
-        path = arguments.sample_list[0]
-        if path:
-            with open(path) as f:
-                samples = [line.strip() for line in f.readlines()]
-            # remove non-listed samples
-            sample_bams = {s: sample_bams[s] for s in samples if s in sample_bams}
-        else:
-            samples = list(sample_bams.keys())
-    else:
-        samples = list(sample_bams.keys())
+    samples = list(sample_bams.keys())
     if len(samples) != len(set(samples)):
         raise IOError("Duplicate input samples")
 
@@ -823,8 +790,7 @@ def collect_default_program_arguments(arguments):
         skip_duplicates=arguments.skip_duplicates,
         skip_qcfail=arguments.skip_qcfail,
         skip_supplementary=arguments.skip_supplementary,
-        report_genotype_likelihoods=arguments.genotype_likelihoods,
-        report_genotype_posterior=arguments.genotype_posteriors,
+        report_fields=arguments.report,
         n_cores=arguments.cores[0],
     )
 

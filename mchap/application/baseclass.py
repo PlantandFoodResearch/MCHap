@@ -52,8 +52,7 @@ class program(object):
     skip_duplicates: bool = True
     skip_qcfail: bool = True
     skip_supplementary: bool = True
-    report_genotype_likelihoods: bool = False
-    report_genotype_posterior: bool = False
+    report_fields: list = ()
     n_cores: int = 1
     precision: int = 3
     random_seed: int = 42
@@ -94,9 +93,9 @@ class program(object):
             "PHPM",
             "MCI",
         ]
-        if self.report_genotype_likelihoods:
+        if "GL" in self.report_fields:
             formatfields += ["GL"]
-        if self.report_genotype_posterior:
+        if "GP" in self.report_fields:
             formatfields += ["GP"]
         return formatfields
 

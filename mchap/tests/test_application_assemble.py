@@ -77,7 +77,7 @@ def test_Program__cli_lists():
     REF = str(path / "simple.fasta")
 
     # partial overlap with bam samples
-    samples = ["SAMPLE3", "SAMPLE4", "SAMPLE1"]
+    samples = ["SAMPLE1", "SAMPLE2", "SAMPLE3"]
 
     bams = [
         str(path / "simple.sample1.deep.bam"),
@@ -87,6 +87,7 @@ def test_Program__cli_lists():
 
     sample_bams = {
         "SAMPLE1": str(path / "simple.sample1.deep.bam"),
+        "SAMPLE2": str(path / "simple.sample2.deep.bam"),
         "SAMPLE3": str(path / "simple.sample3.deep.bam"),
     }
 
@@ -96,10 +97,6 @@ def test_Program__cli_lists():
     tmp_bam_list = dirpath + "/bams.txt"
     with open(tmp_bam_list, "w") as f:
         f.write("\n".join(bams))
-
-    tmp_sample_list = dirpath + "/samples.txt"
-    with open(tmp_sample_list, "w") as f:
-        f.write("\n".join(samples))
 
     tmp_sample_ploidy = dirpath + "/sample-ploidy.txt"
     with open(tmp_sample_ploidy, "w") as f:
@@ -124,8 +121,6 @@ def test_Program__cli_lists():
         "assemble",
         "--bam-list",
         tmp_bam_list,
-        "--sample-list",
-        tmp_sample_list,
         "--sample-ploidy",
         tmp_sample_ploidy,
         "--ploidy",
@@ -164,16 +159,16 @@ def test_Program__cli_lists():
     assert prog.samples == samples
     assert prog.sample_bams == sample_bams
 
-    for k, v in zip(samples, [2, 4, 6]):
+    for k, v in zip(samples, [6, 4, 2]):
         assert prog.sample_ploidy[k] == v
 
-    for k, v in zip(samples, [0.1, 0.0, 0.2]):
+    for k, v in zip(samples, [0.2, 0.0, 0.1]):
         assert prog.sample_inbreeding[k] == v
 
     temps = [
-        [0.1, 0.2, 0.8, 1.0],  # sample 3
-        [1.0],  # sample 4
         [0.2, 1.0],  # sample 1
+        [1.0],  # sample 2
+        [0.1, 0.2, 0.8, 1.0],  # sample 3
     ]
     for k, v in zip(samples, temps):
         assert prog.sample_mcmc_temperatures[k] == v
