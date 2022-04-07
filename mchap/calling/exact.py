@@ -90,15 +90,49 @@ def _phenotype_log_joint(genotype, reads, haplotypes, read_counts=None, inbreedi
     return phenotype_ljoint
 
 
-def call_posterior_mode(
+@njit(cache=True)
+def _posterior_allele_frequencies(
+    ldenominator, reads, ploidy, haplotypes, n_genotypes, read_counts=None, inbreeding=0
+):
+    """Calculate posterior mean allele frequencies."""
+    n_alleles = len(haplotypes)
+    genotype = np.zeros(ploidy, np.int64)
+    dosage = np.zeros(ploidy, np.int8)
+    freqs = np.zeros(n_alleles, dtype=np.float64)
+    for i in range(n_genotypes):
+        # log likelihood
+        llk = log_likelihood(
+            reads=reads,
+            genotype=haplotypes[genotype],
+            read_counts=read_counts,
+        )
+        # log prior
+        get_haplotype_dosage(dosage, genotype.reshape(ploidy, 1))
+        lpr = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
+        # scaled log posterior
+        ljoint = llk + lpr
+        # posterior prob
+        prob = np.exp(ljoint - ldenominator)
+        for a in genotype:
+            freqs[a] += prob
+        # next genotype
+        increment_genotype(genotype)
+    return freqs / ploidy
+
+
+def posterior_mode(
     reads,
     ploidy,
     haplotypes,
     read_counts=None,
     inbreeding=0,
-    return_phenotype_prob=True,
+    return_phenotype_prob=False,
+    return_posterior_frequencies=False,
 ):
     """Call posterior mode genotype with statistics from a set of known haplotypes.
+
+    This function has a lower memory requirement than computing and storing the
+    entire posterior distribution in memory.
 
     Parameters
     ----------
@@ -113,7 +147,9 @@ def call_posterior_mode(
     inbreeding : float
         Expected inbreeding coefficient of genotype.
     return_phenotype_prob : bool
-        Return the mode_phenotype_probability (default = true).
+        Return the mode phenotype probability (default = false).
+    return_posterior_frequencies : bool
+        Return posterior mean allele frequencies (default = false).
 
     Returns
     -------
@@ -125,6 +161,8 @@ def call_posterior_mode(
         Posterior probability of the mode genotype.
     mode_phenotype_probability : float
         Sum posterior probability of all genotypes within the mode phenotype.
+    mean_allele_frequencies : ndarray, float, shape (n_alleles, )
+        Posterior mean allele frequencies.
 
     Notes
     -----
@@ -142,18 +180,32 @@ def call_posterior_mode(
     )
     mode_genotype_prob = np.exp(mode_ljoint - total_ljoint)
 
-    if not return_phenotype_prob:
-        return mode_genotype, mode_llk, mode_genotype_prob
+    result = [mode_genotype, mode_llk, mode_genotype_prob]
 
-    phenotype_ljoint = _phenotype_log_joint(
-        genotype=mode_genotype,
-        reads=reads,
-        haplotypes=haplotypes,
-        read_counts=read_counts,
-        inbreeding=inbreeding,
-    )
-    mode_phenotype_prob = np.exp(phenotype_ljoint - total_ljoint)
-    return mode_genotype, mode_llk, mode_genotype_prob, mode_phenotype_prob
+    if return_phenotype_prob:
+        phenotype_ljoint = _phenotype_log_joint(
+            genotype=mode_genotype,
+            reads=reads,
+            haplotypes=haplotypes,
+            read_counts=read_counts,
+            inbreeding=inbreeding,
+        )
+        mode_phenotype_prob = np.exp(phenotype_ljoint - total_ljoint)
+        result.append(mode_phenotype_prob)
+
+    if return_posterior_frequencies:
+        mean_frequencies = _posterior_allele_frequencies(
+            ldenominator=total_ljoint,
+            reads=reads,
+            ploidy=ploidy,
+            haplotypes=haplotypes,
+            n_genotypes=n_genotypes,
+            read_counts=read_counts,
+            inbreeding=inbreeding,
+        )
+        result.append(mean_frequencies)
+
+    return tuple(result)
 
 
 @njit(cache=True)
@@ -236,8 +288,27 @@ def genotype_posteriors(log_likelihoods, ploidy, n_alleles, inbreeding=0):
 
 @njit(cache=True)
 def posterior_allele_frequencies(posteriors, ploidy, n_alleles, dosage=False):
+    """Calculate posterior mean allele frequencies of every allele
+    for a given posteriors distribution.
+
+    Parameters
+    ----------
+    posteriors : ndarray, float, shape(n_genotypes, )
+        VCF ordered posterior probabilities.
+    ploidy : int
+        Ploidy of organism.
+    n_alleles : int
+        Total number of possible (haplotype) alleles at this locus.
+    dosage : bool
+        If true returns the posterior mean dosage rather than allele frequencies.
+
+    Returns
+    -------
+    posteriors : ndarray, float, shape(n_genotypes, )
+        VCF ordered posterior probability of each possible genotype.
+    """
     n_genotypes = len(posteriors)
-    freqs = np.zeros(n_alleles, dtype=np.float32)
+    freqs = np.zeros(n_alleles, dtype=np.float64)
     genotype = np.zeros(ploidy, np.int64)
     for i in range(n_genotypes):
         p = posteriors[i]

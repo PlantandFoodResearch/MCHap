@@ -10,7 +10,7 @@ from mchap.application.arguments import (
     collect_call_exact_program_arguments,
 )
 from mchap.calling.exact import (
-    call_posterior_mode,
+    posterior_mode,
     genotype_likelihoods,
     genotype_posteriors,
     alternate_dosage_posteriors,
@@ -122,7 +122,7 @@ class program(baseclass.program):
 
                 else:
                     # use low memory calculation
-                    alleles, _, genotype_prob, phenotype_prob = call_posterior_mode(
+                    alleles, _, genotype_prob, phenotype_prob = posterior_mode(
                         reads=reads,
                         read_counts=read_counts,
                         haplotypes=haplotypes,
