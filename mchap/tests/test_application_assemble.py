@@ -329,6 +329,11 @@ def test_Program__run(cli_extra, output_vcf):
             "simple.output.mixed_depth.assemble.vcf",
         ),
         (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--report", "AFP"],
+            "simple.output.mixed_depth.assemble.frequencies.vcf",
+        ),
+        (
             ["simple.sample1.bam", "simple.sample2.bam", "simple.sample3.bam"],
             [
                 "--haplotype-posterior-threshold",
