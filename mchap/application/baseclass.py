@@ -76,7 +76,7 @@ class program(object):
             "END",
             "NVAR",
             "SNVPOS",
-        ]
+        ] + [f for f in ["AFP"] if f in self.report_fields]
         return infofields
 
     def format_fields(self):
@@ -92,11 +92,7 @@ class program(object):
             "GPM",
             "PHPM",
             "MCI",
-        ]
-        if "GL" in self.report_fields:
-            formatfields += ["GL"]
-        if "GP" in self.report_fields:
-            formatfields += ["GP"]
+        ] + [f for f in ["GP", "GL", "AFP", "DS"] if f in self.report_fields]
         return formatfields
 
     def loci(self):
@@ -284,7 +280,8 @@ class program(object):
         -------
         data : LocusAssemblyData
             With columndata fields: "REF" "ALTS" and infodata fields:
-            "END", "NVAR", "SNVPOS", "AC", "AN", "NS", "DP", "RCOUNT".
+            "END", "NVAR", "SNVPOS", "AC", "AN", "NS", "DP", "RCOUNT"
+            and "AFP" if specified.
         """
         # postions
         data.infodata["END"] = data.locus.stop
@@ -317,6 +314,16 @@ class program(object):
             data.infodata["DP"] = np.nansum(list(data.sampledata["DP"].values()))
         # total read count
         data.infodata["RCOUNT"] = np.nansum(list(data.sampledata["RCOUNT"].values()))
+        # population mean posterior allele frequencies
+        if "AFP" in data.infofields:
+            # need to weight frequencies of each individual by ploidy
+            pop_ploidy = 0
+            pop_total = np.zeros(len(data.columndata["ALTS"]) + 1, float)
+            for sample, freqs in data.sampledata["AFP"].items():
+                ploidy = self.sample_ploidy[sample]
+                pop_ploidy += ploidy
+                pop_total += freqs * ploidy
+            data.infodata["AFP"] = (pop_total / pop_ploidy).round(self.precision)
         return data
 
     def call_locus(self, locus):

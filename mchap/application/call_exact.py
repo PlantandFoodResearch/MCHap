@@ -10,10 +10,11 @@ from mchap.application.arguments import (
     collect_call_exact_program_arguments,
 )
 from mchap.calling.exact import (
-    call_posterior_mode,
+    posterior_mode,
     genotype_likelihoods,
     genotype_posteriors,
     alternate_dosage_posteriors,
+    posterior_allele_frequencies,
 )
 from mchap.jitutils import natural_log_to_log10, index_as_genotype_alleles
 
@@ -65,6 +66,7 @@ class program(baseclass.program):
             "MCI",
             "GL",
             "GP",
+            "AFP",
         ]:
             data.sampledata[field] = dict()
         haplotypes = data.locus.encode_haplotypes()
@@ -99,7 +101,12 @@ class program(baseclass.program):
                     )
                     phenotype_prob = phenotype_probs.sum()
 
-                    # store specify arrays
+                    # store specified arrays
+                    if "AFP" in data.formatfields:
+                        freqs = posterior_allele_frequencies(
+                            probabilities, ploidy, len(haplotypes)
+                        )
+                        data.sampledata["AFP"][sample] = np.round(freqs, self.precision)
                     if "GL" in data.formatfields:
                         data.sampledata["GL"][sample] = np.round(
                             natural_log_to_log10(llks), self.precision
@@ -111,14 +118,20 @@ class program(baseclass.program):
 
                 else:
                     # use low memory calculation
-                    alleles, _, genotype_prob, phenotype_prob = call_posterior_mode(
+                    mode_results = posterior_mode(
                         reads=reads,
                         read_counts=read_counts,
                         haplotypes=haplotypes,
                         ploidy=ploidy,
                         inbreeding=inbreeding,
                         return_phenotype_prob=True,
+                        return_posterior_frequencies="AFP" in data.formatfields,
                     )
+                    alleles, _, genotype_prob, phenotype_prob = mode_results[0:4]
+                    if "AFP" in data.formatfields:
+                        data.sampledata["AFP"][sample] = np.round(
+                            mode_results[-1], self.precision
+                        )
 
                 # store variables
                 data.sampledata["alleles"][sample] = alleles

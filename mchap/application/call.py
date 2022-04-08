@@ -66,6 +66,7 @@ class program(baseclass.program):
             "MCI",
             "GL",
             "GP",
+            "AFP",
         ]:
             data.sampledata[field] = dict()
         haplotypes = data.locus.encode_haplotypes()
@@ -106,6 +107,15 @@ class program(baseclass.program):
                 )
                 data.sampledata["PHQ"][sample] = qual_of_prob(phenotype_prob)
                 data.sampledata["MCI"][sample] = incongruence
+
+                # posterior allele frequencies if requested
+                if "AFP" in data.formatfields:
+                    frequencies = np.zeros(len(haplotypes))
+                    alleles, counts = np.unique(trace.genotypes, return_counts=True)
+                    frequencies[alleles] = counts / counts.sum()
+                    data.sampledata["AFP"][sample] = np.round(
+                        frequencies, self.precision
+                    )
 
                 # genotype posteriors if requested
                 if "GP" in data.formatfields:

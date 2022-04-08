@@ -140,7 +140,7 @@ def test_PhenotypeDistribution___mode_genotype():
     assert expect[1] == actual[1]
 
 
-def test_PosteriorGenotypeDistribution__haplotype_probabilities():
+def test_PosteriorGenotypeDistribution__allele_occurrence():
     array = np.array(
         [
             [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
@@ -168,12 +168,12 @@ def test_PosteriorGenotypeDistribution__haplotype_probabilities():
             0.1,
         ]
     )
-    actual_haps, actual_probs = dist.haplotype_probabilities()
+    actual_haps, actual_probs = dist.allele_occurrence()
     np.testing.assert_array_equal(actual_haps, expect_haps)
     np.testing.assert_array_almost_equal(actual_probs, expect_probs)
 
 
-def test_PosteriorGenotypeDistribution__haplotype_probabilities__weights():
+def test_PosteriorGenotypeDistribution__allele_frequencies():
     array = np.array(
         [
             [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
@@ -193,15 +193,7 @@ def test_PosteriorGenotypeDistribution__haplotype_probabilities__weights():
             [0, 1, 0],
         ]
     )
-    expect_probs = np.array(
-        [
-            0.05 + 0.65 + 0.2 + 0.1,
-            0.65 + 0.2 + 0.1,
-            0.2 + 0.1,
-            0.1,
-        ]
-    )
-    expect_weights = np.array(
+    expect_freqs = np.array(
         [
             0.05 * 1 + 0.65 * (3 / 4) + 0.2 * (2 / 4) + 0.1 * (1 / 4),
             0.65 * (1 / 4) + 0.2 * (1 / 4) + 0.1 * (1 / 4),
@@ -209,12 +201,9 @@ def test_PosteriorGenotypeDistribution__haplotype_probabilities__weights():
             0.1 * (1 / 4),
         ]
     )
-    actual_haps, actual_probs, actual_weights = dist.haplotype_probabilities(
-        return_weighted=True
-    )
+    actual_haps, actual_freqs = dist.allele_frequencies()
     np.testing.assert_array_equal(actual_haps, expect_haps)
-    np.testing.assert_array_almost_equal(actual_probs, expect_probs)
-    np.testing.assert_array_almost_equal(actual_weights, expect_weights)
+    np.testing.assert_array_almost_equal(actual_freqs, expect_freqs)
 
 
 @pytest.mark.parametrize(
