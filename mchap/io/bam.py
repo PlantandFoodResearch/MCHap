@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import os
 import pysam
 import numpy as np
 
@@ -17,6 +16,9 @@ __all__ = [
 ]
 
 
+ID_TAGS = {"ID", "SM"}
+
+
 def extract_sample_ids(bam_paths, id="SM"):
     """Extract sample id's from a list of bam files.
 
@@ -25,26 +27,26 @@ def extract_sample_ids(bam_paths, id="SM"):
     bam_paths : list, str
         List of bam file paths.
     id : str
-        Read-group field to use as sample id (default = 'SM')
+        Read-group field to use as sample id (default = 'SM').
+        Must be one of "ID" or "SM".
+
+    Returns
+    -------
+    sample_bams : dict, list, str
+        Mapping of sample names a list of bam files.
     """
-    if id is None:
-        data = {os.path.basename(path): path for path in bam_paths}
-
-    else:
-        data = {}
-
-        for path in bam_paths:
-            bam = pysam.AlignmentFile(path)
-            sample_names = [read_group[id] for read_group in bam.header["RG"]]
-            for sample in sample_names:
-                if sample in data:
-                    raise IOError(
-                        'Duplicate sample with id = "{}" in file "{}"'.format(
-                            sample, path
-                        )
-                    )
-                else:
-                    data[sample] = path
+    assert id in ID_TAGS
+    data = {}
+    for path in bam_paths:
+        bam = pysam.AlignmentFile(path)
+        sample_names = [read_group[id] for read_group in bam.header["RG"]]
+        for sample in sample_names:
+            if sample in data:
+                raise IOError(
+                    'Duplicate sample with id = "{}" in file "{}"'.format(sample, path)
+                )
+            else:
+                data[sample] = path
     return data
 
 
@@ -116,11 +118,8 @@ def extract_read_variants(
         # map read group ID to RG field (may be ID to ID)
         sample_keys[dictionary["ID"]] = sample_key
 
-        # check no sample id is reused from another bam
-        if sample_key in data:
-            raise IOError("Duplicate sample id: {}".format(sample_key))
         # only add specified samples to returned dict
-        elif samples and sample_key not in samples:
+        if samples and sample_key not in samples:
             # this read is not from a sample in the specified set
             pass
         else:

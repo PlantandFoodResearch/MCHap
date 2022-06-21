@@ -1,26 +1,36 @@
 import numpy as np
 import pathlib
+import pytest
 
 from mchap.io import loci
 from mchap.io import bam
 
 
-def test_extract_sample_ids():
-
+@pytest.mark.parametrize(
+    "id",
+    ["SM", "ID"],
+)
+def test_extract_sample_ids(id):
     path = pathlib.Path(__file__).parent.absolute()
     paths = [
         str(path / "data/simple.sample1.bam"),
         str(path / "data/simple.sample2.bam"),
     ]
 
-    expect = {
-        "SAMPLE1": paths[0],
-        "SAMPLE2": paths[1],
-    }
+    if id == "SM":
+        expect = {
+            "SAMPLE1": paths[0],
+            "SAMPLE2": paths[1],
+        }
+    elif id == "ID":
+        expect = {
+            "RG1_SAMPLE1": paths[0],
+            "RG1_SAMPLE2": paths[1],
+        }
 
     actual = bam.extract_sample_ids(
         paths,
-        id="SM",
+        id=id,
     )
 
     assert len(expect) == len(actual)

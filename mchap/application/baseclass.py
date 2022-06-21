@@ -25,9 +25,7 @@ warnings.simplefilter("error", RuntimeWarning)
 LOCUS_ASSEMBLY_ERROR = (
     "Exception encountered at locus: '{name}', '{contig}:{start}-{stop}'."
 )
-SAMPLE_ASSEMBLY_ERROR = (
-    "Exception encountered when assembling sample '{sample}' from file '{bam}'."
-)
+SAMPLE_ASSEMBLY_ERROR = "Exception encountered when assembling sample '{sample}'."
 
 
 class LocusAssemblyError(Exception):
@@ -169,23 +167,28 @@ class program(object):
             data.sampledata[field] = dict()
         locus = data.locus
         for sample in data.samples:
-
-            # path to bam for this sample
-            path = data.sample_bams[sample]
-
             # wrap in try clause to pass sample info back with any exception
             try:
-
-                # extract read data
-                read_chars, read_quals = extract_read_variants(
-                    data.locus,
-                    path,
-                    id=self.read_group_field,
-                    min_quality=self.mapping_quality,
-                    skip_duplicates=self.skip_duplicates,
-                    skip_qcfail=self.skip_qcfail,
-                    skip_supplementary=self.skip_supplementary,
-                )[sample]
+                # extract read data for potentially pooled samples
+                # each "sample" is a "pool" which is mapped to a list
+                # of bam sample-path pairs.
+                pairs = data.sample_bams[sample]
+                read_chars, read_quals = [], []
+                for name, path in pairs:
+                    chars, quals = extract_read_variants(
+                        data.locus,
+                        path=path,
+                        samples=name,
+                        id=self.read_group_field,
+                        min_quality=self.mapping_quality,
+                        skip_duplicates=self.skip_duplicates,
+                        skip_qcfail=self.skip_qcfail,
+                        skip_supplementary=self.skip_supplementary,
+                    )[name]
+                    read_chars.append(chars)
+                    read_quals.append(quals)
+                read_chars = np.concatenate(read_chars)
+                read_quals = np.concatenate(read_quals)
 
                 # get read stats
                 read_count = read_chars.shape[0]
@@ -219,8 +222,7 @@ class program(object):
 
             # end of try clause for specific sample
             except Exception as e:
-                path = data.sample_bams.get(sample)
-                message = SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
+                message = SAMPLE_ASSEMBLY_ERROR.format(sample=sample)
                 raise SampleAssemblyError(message) from e
         return data
 
@@ -263,8 +265,7 @@ class program(object):
                 data.sampledata["MEC"][sample] = mec
                 data.sampledata["KMERCOV"][sample] = cov
             except Exception as e:
-                path = data.sample_bams.get(sample)
-                message = SAMPLE_ASSEMBLY_ERROR.format(sample=sample, bam=path)
+                message = SAMPLE_ASSEMBLY_ERROR.format(sample=sample)
                 raise SampleAssemblyError(message) from e
         return data
 
