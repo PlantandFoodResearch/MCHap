@@ -6,6 +6,7 @@ import multiprocessing as mp
 from collections import OrderedDict
 
 from mchap import mset
+from mchap.constant import PFEIFFER_ERROR
 from mchap.encoding import character, integer
 from mchap.io import (
     Locus,
@@ -44,8 +45,8 @@ class program(object):
     sample_ploidy: dict
     sample_inbreeding: dict
     read_group_field: str = "SM"
-    base_error_rate: float = 0.0
-    ignore_base_phred_scores: bool = False
+    base_error_rate: float = PFEIFFER_ERROR
+    ignore_base_phred_scores: bool = True
     mapping_quality: int = 20
     skip_duplicates: bool = True
     skip_qcfail: bool = True
@@ -86,7 +87,7 @@ class program(object):
             "RCOUNT",
             "RCALLS",
             "MEC",
-            "KMERCOV",
+            "MECP",
             "GPM",
             "PHPM",
             "MCI",
@@ -241,9 +242,9 @@ class program(object):
         Returns
         -------
         data : LocusAssemblyData
-            With sampledata fields: "GT" "MEC" "KMERCOV".
+            With sampledata fields: "GT" "MEC" "MECP".
         """
-        for field in ["GT", "MEC", "KMERCOV"]:
+        for field in ["GT", "MEC", "MECP"]:
             data.sampledata[field] = dict()
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
@@ -253,17 +254,15 @@ class program(object):
                 read_calls = data.sampledata["read_calls"][sample]
                 gt = "/".join([str(a) if a >= 0 else "." for a in alleles])
                 mec = np.sum(integer.minimum_error_correction(read_calls, genotype))
-                cov = np.round(
-                    integer.min_kmer_coverage(
-                        read_calls,
-                        genotype,
-                        ks=[1, 2, 3],
-                    ),
-                    self.precision,
+                mec_denom = np.sum(read_calls >= 0)
+                mecp = (
+                    np.round(mec / mec_denom, self.precision)
+                    if mec_denom > 0
+                    else np.nan
                 )
                 data.sampledata["GT"][sample] = gt
                 data.sampledata["MEC"][sample] = mec
-                data.sampledata["KMERCOV"][sample] = cov
+                data.sampledata["MECP"][sample] = mecp
             except Exception as e:
                 message = SAMPLE_ASSEMBLY_ERROR.format(sample=sample)
                 raise SampleAssemblyError(message) from e

@@ -54,6 +54,9 @@ DOSEXP = FormatField(
     id="DOSEXP", number=".", type="Float", descr="Mode phenotype expected dosage"
 )
 MEC = FormatField(id="MEC", number=1, type="Integer", descr="Minimum error correction")
+MECP = FormatField(
+    id="MECP", number=1, type="Float", descr="Minimum error correction proportion"
+)
 AD = FormatField(
     id="AD",
     number="R",
@@ -99,6 +102,7 @@ HEADER_FORMAT_FIELDS = dict(
     PHPM=PHPM,
     DOSEXP=DOSEXP,
     MEC=MEC,
+    MECP=MECP,
     AD=AD,
     GL=GL,
     GP=GP,

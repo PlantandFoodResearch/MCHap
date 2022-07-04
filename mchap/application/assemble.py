@@ -39,8 +39,8 @@ class program(baseclass.program):
     region_id: str = None
     haplotype_posterior_threshold: float = 0.2
     mcmc_chains: int = 1
-    mcmc_steps: int = 1000
-    mcmc_burn: int = 500
+    mcmc_steps: int = 2000
+    mcmc_burn: int = 1000
     mcmc_alpha: float = 1.0
     mcmc_beta: float = 3.0
     mcmc_fix_homozygous: float = 0.999
