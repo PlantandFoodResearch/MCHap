@@ -124,10 +124,10 @@ optional arguments:
                         (default = 2).
   --mcmc-steps MCMC_STEPS
                         Number of steps to simulate in each MCMC chain
-                        (default = 1500).
+                        (default = 2000).
   --mcmc-burn MCMC_BURN
                         Number of initial steps to discard from each MCMC
-                        chain (default = 500).
+                        chain (default = 1000).
   --mcmc-seed MCMC_SEED
                         Random seed for MCMC (default = 42).
   --mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD
