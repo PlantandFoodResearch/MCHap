@@ -1,8 +1,10 @@
+import sys
 import pytest
 import pathlib
 import subprocess
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="argparse formatting changed")
 @pytest.mark.parametrize(
     "subtool",
     [
