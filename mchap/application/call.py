@@ -19,8 +19,8 @@ from mchap.io import qual_of_prob
 @dataclass
 class program(baseclass.program):
     mcmc_chains: int = 1
-    mcmc_steps: int = 1000
-    mcmc_burn: int = 500
+    mcmc_steps: int = 2000
+    mcmc_burn: int = 1000
     mcmc_incongruence_threshold: float = 0.60
 
     @classmethod

@@ -428,8 +428,8 @@ mcmc_steps = Parameter(
     dict(
         type=int,
         nargs=1,
-        default=[1500],
-        help="Number of steps to simulate in each MCMC chain (default = 1500).",
+        default=[2000],
+        help="Number of steps to simulate in each MCMC chain (default = 2000).",
     ),
 )
 
@@ -438,8 +438,8 @@ mcmc_burn = Parameter(
     dict(
         type=int,
         nargs=1,
-        default=[500],
-        help="Number of initial steps to discard from each MCMC chain (default = 500).",
+        default=[1000],
+        help="Number of initial steps to discard from each MCMC chain (default = 1000).",
     ),
 )
 
