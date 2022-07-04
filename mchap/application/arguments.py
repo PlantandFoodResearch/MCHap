@@ -233,6 +233,19 @@ sample_inbreeding = Parameter(
     ),
 )
 
+sample_pool = Parameter(
+    "--sample-pool",
+    dict(
+        type=str,
+        nargs=1,
+        default=[None],
+        help=(
+            "A name used to pool all sample reads into a single sample. "
+            "WARNING: this is an experimental feature."
+        ),
+    ),
+)
+
 base_error_rate = Parameter(
     "--base-error-rate",
     dict(
@@ -560,6 +573,7 @@ DEFAULT_PARSER_ARGUMENTS = [
     sample_ploidy,
     inbreeding,
     sample_inbreeding,
+    sample_pool,
     base_error_rate,
     ignore_base_phred_scores,
     mapping_quality,
@@ -658,6 +672,14 @@ def parse_sample_bam_paths(arguments):
     samples = list(sample_bams.keys())
     if len(samples) != len(set(samples)):
         raise IOError("Duplicate input samples")
+
+    # samples as pools. TODO: multi-pools
+    pool = arguments.sample_pool[0]
+    if pool is None:
+        sample_bams = {k: [(k, v)] for k, v in sample_bams.items()}
+    else:
+        samples = [pool]
+        sample_bams = {pool: [(k, v) for k, v in sample_bams.items()]}
 
     return samples, sample_bams
 

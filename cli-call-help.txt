@@ -4,6 +4,7 @@ usage: MCMC haplotype calling [-h] [--haplotypes HAPLOTYPES] [--bam [BAM ...]]
                               [--sample-ploidy SAMPLE_PLOIDY]
                               [--inbreeding INBREEDING]
                               [--sample-inbreeding SAMPLE_INBREEDING]
+                              [--sample-pool SAMPLE_POOL]
                               [--base-error-rate BASE_ERROR_RATE]
                               [--use-base-phred-scores]
                               [--mapping-quality MAPPING_QUALITY]
@@ -57,6 +58,9 @@ optional arguments:
                         contain a sample identifier followed by a tab and then
                         a inbreeding coefficient value within the interval [0,
                         1].
+  --sample-pool SAMPLE_POOL
+                        A name used to pool all sample reads into a single
+                        sample. WARNING: this is an experimental feature.
   --base-error-rate BASE_ERROR_RATE
                         Expected base error rate of read sequences (default =
                         0.0024). The default value comes from Pfeiffer et al

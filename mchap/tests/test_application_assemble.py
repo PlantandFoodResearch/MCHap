@@ -157,7 +157,7 @@ def test_Program__cli_lists():
     assert prog.cli_command == command
 
     assert prog.samples == samples
-    assert prog.sample_bams == sample_bams
+    assert prog.sample_bams == {k: [(k, v)] for k, v in sample_bams.items()}
 
     for k, v in zip(samples, [6, 4, 2]):
         assert prog.sample_ploidy[k] == v
@@ -332,6 +332,11 @@ def test_Program__run(cli_extra, output_vcf):
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             ["--report", "AFP"],
             "simple.output.mixed_depth.assemble.frequencies.vcf",
+        ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--sample-pool", "POOL", "--report", "AFP"],
+            "simple.output.mixed_depth.assemble.pool.frequencies.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.bam", "simple.sample3.bam"],
