@@ -304,12 +304,12 @@ haplotype_frequencies = Parameter(
         nargs=1,
         default=[None],
         help=(
-            "Specify an INFO field within the input VCF file to use for approximation "
-            "of prior allele frequencies. "
+            "Optionally specify an INFO field within the input VCF file to "
+            "designate as allele frequencies for the input haplotypes. "
             "This can be any numerical field of length 'R' and these "
             "values will automatically be normalized. "
-            "This parameter has no affect on the output but is necessary for some "
-            "other parameters."
+            "This parameter has no affect on the output by itself but "
+            "is required by some other parameters."
         ),
     ),
 )

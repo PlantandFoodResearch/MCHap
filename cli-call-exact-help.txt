@@ -21,12 +21,12 @@ optional arguments:
                         Tabix indexed VCF file containing haplotype/MNP/SNP
                         variants to be re-called among input samples.
   --haplotype-frequencies HAPLOTYPE_FREQUENCIES
-                        Specify an INFO field within the input VCF file to use
-                        for approximation of prior allele frequencies. This
-                        can be any numerical field of length 'R' and these
-                        values will automatically be normalized. This
-                        parameter has no affect on the output but is necessary
-                        for some other parameters.
+                        Optionally specify an INFO field within the input VCF
+                        file to designate as allele frequencies for the input
+                        haplotypes. This can be any numerical field of length
+                        'R' and these values will automatically be normalized.
+                        This parameter has no affect on the output by itself
+                        but is required by some other parameters.
   --skip-rare-haplotypes SKIP_RARE_HAPLOTYPES
                         Optionally ignore haplotypes from the input VCF file
                         if their frequency within that file is less than the
