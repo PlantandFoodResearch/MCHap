@@ -12,6 +12,7 @@ from mchap.jitutils import (
     genotype_alleles_as_index,
     index_as_genotype_alleles,
     add_log_prob,
+    comb_with_replacement,
 )
 
 
@@ -356,3 +357,31 @@ def alternate_dosage_posteriors(genotype_alleles, probabilities):
         probs[i] = probabilities[idx]
     idx = np.argsort(indices)
     return genotypes[idx], probs[idx]
+
+
+@njit(cache=True)
+def genotypes_with_allele(ploidy, n_alleles, allele=0):
+    """Identify genotypes containing a specific allele.
+
+    Parameters
+    ----------
+    ploidy : int
+        Ploidy of organism.
+    n_alleles : int
+        Total number of possible (haplotype) alleles at this locus.
+    allele : int
+        Allele to check for.
+
+    Returns
+    -------
+    mask : ndarray, bool, shape(n_genotypes, )
+        Array indicating genotypes containing allele.
+    """
+    n_genotypes = comb_with_replacement(n_alleles, ploidy)
+    out = np.zeros(n_genotypes, dtype=np.bool8)
+    genotype = np.zeros(ploidy, dtype=np.int64)
+    for i in range(n_genotypes):
+        if allele in genotype:
+            out[i] = True
+        increment_genotype(genotype)
+    return out

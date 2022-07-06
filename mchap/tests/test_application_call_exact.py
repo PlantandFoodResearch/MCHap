@@ -8,14 +8,16 @@ from mchap.application.call_exact import program
 
 
 @pytest.mark.parametrize(
-    "bams,cli_extra,output_vcf",
+    "input_vcf,bams,cli_extra,output_vcf",
     [
         (
+            "simple.output.mixed_depth.assemble.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [],
             "simple.output.mixed_depth.call-exact.vcf",
         ),
         (
+            "simple.output.mixed_depth.assemble.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
                 "--report",
@@ -23,7 +25,35 @@ from mchap.application.call_exact import program
             ],
             "simple.output.mixed_depth.call-exact.frequencies.vcf",
         ),
+        (  # test using mock input will low ref allele frequency at first allele
+            "mock.input.frequencies.skiprare.vcf",
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            [
+                "--haplotype-frequencies",
+                "AFP",
+                "--skip-rare-haplotypes",
+                "0.1",
+                "--report",
+                "AFP",
+            ],
+            "simple.output.mixed_depth.call-exact.frequencies.skiprare.vcf",
+        ),
+        (  # test using mock input will low ref allele frequency at first allele
+            "mock.input.frequencies.skiprare.vcf",
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            [
+                "--haplotype-frequencies",
+                "AFP",
+                "--skip-rare-haplotypes",
+                "0.1",
+                "--report",
+                "AFP",
+                "GP",
+            ],
+            "simple.output.mixed_depth.call-exact.frequencies.posteriors.skiprare.vcf",
+        ),
         (
+            "simple.output.mixed_depth.assemble.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
                 "--report",
@@ -35,6 +65,7 @@ from mchap.application.call_exact import program
             "simple.output.mixed_depth.call-exact.likelihoods.vcf",
         ),
         (
+            "simple.output.mixed_depth.assemble.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
                 "--report",
@@ -48,11 +79,11 @@ from mchap.application.call_exact import program
     ],
 )
 @pytest.mark.parametrize("n_cores", [1, 2])
-def test_Program__run_stdout(bams, cli_extra, output_vcf, n_cores):
+def test_Program__run_stdout(input_vcf, bams, cli_extra, output_vcf, n_cores):
     path = pathlib.Path(__file__).parent.absolute()
     path = path / "test_io/data"
 
-    VCF = str(path / "simple.output.mixed_depth.assemble.vcf")
+    VCF = str(path / input_vcf)
     BAMS = [str(path / bam) for bam in bams]
 
     command = (

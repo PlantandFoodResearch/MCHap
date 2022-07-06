@@ -93,7 +93,7 @@ class program(object):
             "GPM",
             "PHPM",
             "MCI",
-        ] + [f for f in ["GP", "GL", "AFP", "DS"] if f in self.report_fields]
+        ] + [f for f in ["AFP", "DS", "GP", "GL"] if f in self.report_fields]
         return formatfields
 
     def loci(self):
