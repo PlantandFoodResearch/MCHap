@@ -141,6 +141,25 @@ class GenotypeAllelesMultiTrace(object):
     genotypes: np.ndarray
     llks: np.ndarray
 
+    def relabel(self, labels):
+        """Returns a new GenotypeTrace object with relabeled alleles.
+
+        Parameters
+        ----------
+        labels : ndarray, int, shape (n_alleles,)
+            New integer labels.
+
+        Returns
+        -------
+        trace : GenotypeTrace
+            A new instance of the GenotypeTrace with relabeled alleles.
+        """
+        new = type(self)(
+            labels[self.genotypes],
+            self.llks,
+        )
+        return new
+
     def burn(self, n):
         """Returns a new GenotypeTrace object without the first
         `n` observations of each chain.

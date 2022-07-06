@@ -1,6 +1,8 @@
-usage: MCMC haplotype calling [-h] [--haplotypes HAPLOTYPES] [--bam [BAM ...]]
-                              [--bam-list BAM_LIST] [--sample-bam SAMPLE_BAM]
-                              [--ploidy PLOIDY]
+usage: MCMC haplotype calling [-h] [--haplotypes HAPLOTYPES]
+                              [--haplotype-frequencies HAPLOTYPE_FREQUENCIES]
+                              [--skip-rare-haplotypes SKIP_RARE_HAPLOTYPES]
+                              [--bam [BAM ...]] [--bam-list BAM_LIST]
+                              [--sample-bam SAMPLE_BAM] [--ploidy PLOIDY]
                               [--sample-ploidy SAMPLE_PLOIDY]
                               [--inbreeding INBREEDING]
                               [--sample-inbreeding SAMPLE_INBREEDING]
@@ -22,6 +24,18 @@ optional arguments:
   --haplotypes HAPLOTYPES
                         Tabix indexed VCF file containing haplotype/MNP/SNP
                         variants to be re-called among input samples.
+  --haplotype-frequencies HAPLOTYPE_FREQUENCIES
+                        Specify an INFO field within the input VCF file to use
+                        for approximation of prior allele frequencies. This
+                        can be any numerical field of length 'R' and these
+                        values will automatically be normalized. This
+                        parameter has no affect on the output but is necessary
+                        for some other parameters.
+  --skip-rare-haplotypes SKIP_RARE_HAPLOTYPES
+                        Optionally ignore haplotypes from the input VCF file
+                        if their frequency within that file is less than the
+                        specified value. This requires that the --haplotype-
+                        frequencies parameter is also specified.
   --bam [BAM ...]       A list of 0 or more bam files. All samples found
                         within the listed bam files will be genotypes unless
                         the --sample-list parameter is used.

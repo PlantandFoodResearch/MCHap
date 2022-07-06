@@ -70,6 +70,20 @@ class program(baseclass.program):
         ]:
             data.sampledata[field] = dict()
         haplotypes = data.locus.encode_haplotypes()
+
+        # need to skip reference allele if it was bellow specified frequency
+        if self.haplotype_frequencies_tag and self.skip_rare_haplotypes:
+            exclude_reference_allele = (
+                data.locus.frequencies[0] < self.skip_rare_haplotypes
+            )
+        else:
+            exclude_reference_allele = False
+        if exclude_reference_allele:
+            mcmc_haplotypes = haplotypes[1:]
+        else:
+            mcmc_haplotypes = haplotypes
+
+        # iterate of samples
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
             try:
@@ -79,7 +93,7 @@ class program(baseclass.program):
                 trace = (
                     CallingMCMC(
                         ploidy=data.sample_ploidy[sample],
-                        haplotypes=haplotypes,
+                        haplotypes=mcmc_haplotypes,
                         inbreeding=data.sample_inbreeding[sample],
                         steps=self.mcmc_steps,
                         chains=self.mcmc_chains,
@@ -91,6 +105,9 @@ class program(baseclass.program):
                     )
                     .burn(self.mcmc_burn)
                 )
+                if exclude_reference_allele:
+                    # need to relabel alleles from 1 because ref is 0
+                    trace = trace.relabel(np.arange(1, len(haplotypes)))
                 incongruence = trace.replicate_incongruence(
                     threshold=self.mcmc_incongruence_threshold
                 )

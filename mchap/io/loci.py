@@ -34,6 +34,7 @@ class Locus:
     sequence: str
     variants: tuple
     alts: tuple = None
+    frequencies: np.ndarray = None
 
     @property
     def positions(self):
@@ -127,7 +128,9 @@ class Locus:
         )
 
     @classmethod
-    def from_variant_record(cls, record, use_snvpos=False):
+    def from_variant_record(
+        cls, record, use_snvpos=False, frequency_tag=None, frequency_min=None
+    ):
         """Generate a locus object with reference and variants from
         a known MNP.
 
@@ -139,6 +142,12 @@ class Locus:
             If true then the "SNVPOS" info tag will be used to
             identify psotions of SNV variants rather than identifying
             them directly from the ref and alt sequences.
+        frequency_tag : str
+            VCF INFO tag to estimate allele frequencies from.
+        frequency_min : float
+            Minimum frequency required to include an alternate allele.
+            If the reference allele does not meet this threshold then
+            it will be included with a frequency of 0.
 
         Returns
         -------
@@ -150,9 +159,35 @@ class Locus:
         if record.alts:
             assert all(ref_length == len(alt) for alt in record.alts)
             alts = record.alts
-            sequences += alts
         else:
             alts = ()
+
+        if frequency_tag:
+            frequencies = np.array(record.info[frequency_tag])
+            frequencies /= frequencies.sum()
+            assert len(frequencies) == len(alts) + 1
+            if frequency_min:
+                keep = frequencies >= frequency_min
+                # must keep reference so set frequency to 0
+                if not keep[0]:
+                    keep[0] = True
+                    frequencies[0] = 0.0
+                frequencies = frequencies[keep]
+                denom = frequencies.sum()
+                if denom > 0:
+                    frequencies /= denom
+                else:
+                    frequencies[:] = np.nan
+                alts = tuple(a for a, k in zip(alts, keep[1:]) if k)
+                assert len(frequencies) == len(alts) + 1
+        elif frequency_min:
+            raise ValueError(
+                "Use of frequency minimum requires specification of frequency tag"
+            )
+        else:
+            frequencies = None
+
+        sequences += alts
         haplotypes = np.array([list(var) for var in sequences])
         if use_snvpos:
             snvpos = record.info["SNVPOS"]
@@ -177,6 +212,7 @@ class Locus:
             sequence=record.ref,
             variants=tuple(snps),
             alts=alts,
+            frequencies=frequencies,
         )
 
 
