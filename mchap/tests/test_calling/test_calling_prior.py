@@ -2,9 +2,31 @@ import numpy as np
 import pytest
 
 from mchap.calling.prior import (
-    inbreeding_as_dispersion,
+    calculate_alphas,
     log_genotype_allele_prior,
 )
+
+
+@pytest.mark.parametrize(
+    "inbreeding,frequencies,alphas",
+    [
+        [0.1, np.array([0.25, 0.25, 0.25, 0.25]), np.array([2.25, 2.25, 2.25, 2.25])],
+        [
+            0.1,
+            np.array([0.0, 0.25, 0.25, 0.25, 0.25]),
+            np.array([0.0, 2.25, 2.25, 2.25, 2.25]),
+        ],
+        [0.5, np.array([0.25, 0.25, 0.25, 0.25]), np.array([0.25, 0.25, 0.25, 0.25])],
+        [
+            0.5,
+            np.array([0.0, 0.25, 0.25, 0.25, 0.25]),
+            np.array([0.0, 0.25, 0.25, 0.25, 0.25]),
+        ],
+    ],
+)
+def test_calculate_alphas(inbreeding, frequencies, alphas):
+    actual = calculate_alphas(inbreeding, frequencies)
+    np.testing.assert_array_almost_equal(actual, alphas)
 
 
 @pytest.mark.parametrize(
@@ -19,8 +41,8 @@ from mchap.calling.prior import (
         [0.1, 32, 0.28125],
     ],
 )
-def test_inbreeding_as_dispersion(inbreeding, unique_haplotypes, dispersion):
-    actual = inbreeding_as_dispersion(inbreeding, unique_haplotypes)
+def test_calculate_alphas__flat_frequency(inbreeding, unique_haplotypes, dispersion):
+    actual = calculate_alphas(inbreeding, 1 / unique_haplotypes)
     assert actual == dispersion
 
 
