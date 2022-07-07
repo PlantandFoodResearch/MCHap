@@ -4,6 +4,7 @@ import pytest
 from mchap.calling.prior import (
     calculate_alphas,
     log_genotype_allele_prior,
+    log_genotype_prior,
 )
 
 
@@ -64,7 +65,7 @@ def test_calculate_alphas__flat_frequency(inbreeding, unique_haplotypes, dispers
         [[0, 3, 3, 3], 0, 16, 0.5, np.log(0.015625)],
     ],
 )
-def test_log_genotype_allele_prior(
+def test_log_genotype_allele_prior__flat_frequency(
     genotype, variable_allele, unique_haplotypes, inbreeding, expect
 ):
     genotype = np.array(genotype)
@@ -72,3 +73,34 @@ def test_log_genotype_allele_prior(
         genotype, variable_allele, unique_haplotypes, inbreeding
     )
     np.testing.assert_almost_equal(actual, expect)
+
+
+@pytest.mark.parametrize(
+    "genotype,unique_haplotypes,inbreeding,probability",
+    [
+        [[0, 1, 2, 3], 16, 0.0, 0.0003662109375],
+        [[2, 3, 4, 2], 16, 0.0, 0.00018310546875],
+        [[1, 2, 1, 2], 16, 0.0, 9.155273437499999e-05],
+        [[0, 7, 0, 0], 16, 0.0, 6.103515625000003e-05],
+        [[3, 3, 3, 3], 16, 0.0, 1.5258789062500007e-05],
+        [
+            [0, 1, 2, 3],
+            16,
+            0.1,
+            0.00020224831321022713,
+        ],  # with F = 0.1 and u_haps = 16 then dispesion = 0.5625
+        [[2, 3, 4, 2], 16, 0.1, 0.00028090043501420423],
+        [[1, 2, 1, 2], 16, 0.1, 0.0003901394930752838],
+        [[0, 7, 0, 0], 16, 0.1, 0.00042655251242897644],
+        [[3, 3, 3, 3], 16, 0.1, 0.0006753748113458795],
+    ],
+)
+def test_log_genotype_prior__flat_frequency(
+    genotype, unique_haplotypes, inbreeding, probability
+):
+    # Actual probabilities for inbreeding == 0 calculated independently using scipy multinomial
+    # Actual probabilities for inbreeding > 0 calculated independently using tensorflow-probabilities
+    expect = np.log(probability)
+    genotype = np.array(genotype)
+    actual = log_genotype_prior(genotype, unique_haplotypes, inbreeding)
+    np.testing.assert_almost_equal(actual, expect, decimal=10)

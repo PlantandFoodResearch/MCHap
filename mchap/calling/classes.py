@@ -15,6 +15,7 @@ class CallingMCMC(Assembler):
 
     ploidy: int
     haplotypes: np.ndarray
+    frequencies: np.array = None
     inbreeding: float = 0
     steps: int = 1000
     chains: int = 2
@@ -30,6 +31,8 @@ class CallingMCMC(Assembler):
     haplotypes : ndarray, int, shape, (n_haplotypes, n_pos)
         Number of possible alleles at each position in the
         assembled locus.
+    frequencies : ndarray, float , shape (n_haplotypes, )
+        Optional prior frequencies for each haplotype allele.
     inbreeding : float
         Expected inbreeding coefficient of genotype.
     steps : int, optional
@@ -113,6 +116,7 @@ class CallingMCMC(Assembler):
                 reads=reads,
                 read_counts=read_counts,
                 inbreeding=self.inbreeding,
+                frequencies=self.frequencies,
                 n_steps=self.steps,
                 cache=True,
                 step_type=step_type,

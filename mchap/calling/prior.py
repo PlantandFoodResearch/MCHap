@@ -2,9 +2,11 @@ import numpy as np
 import numba
 from math import lgamma
 
-from mchap.calling.utils import count_allele
+from mchap.jitutils import ln_equivalent_permutations
+from mchap.calling.utils import count_allele, allelic_dosage
 
 
+# TODO: consider pre-calculating alpha(s) at MCMC-model initialization
 @numba.njit(cache=True)
 def calculate_alphas(inbreeding, frequencies):
     """Calculate dispersion parameter of a Dirichlet-multinomial
@@ -45,6 +47,8 @@ def log_genotype_allele_prior(
         Number of possible haplotype alleles at this locus.
     inbreeding : float
         Expected inbreeding coefficient of the sample.
+    frequencies : ndarray, float, shape (n_alleles)
+        Prior allele frequencies.
 
     Returns
     -------
@@ -82,3 +86,70 @@ def log_genotype_allele_prior(
     left = lgamma(sum_alpha) - lgamma(1 + sum_alpha)
     right = lgamma(1 + variable_alpha) - lgamma(variable_alpha)
     return left + right
+
+
+@numba.njit(cache=True)
+def log_genotype_prior(genotype, unique_haplotypes, inbreeding=0, frequencies=None):
+    """Prior probability of a dosage for an individual genotype
+    assuming all haplotypes are equally probable.
+
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, )
+        Integer encoded alleles in the proposed genotype.
+    unique_haplotypes : int
+        Number of possible haplotype alleles at this locus.
+    inbreeding : float
+        Expected inbreeding coefficient of the sample.
+    frequencies : ndarray, float, shape (n_alleles)
+        Prior allele frequencies.
+
+    Returns
+    -------
+    lprior : float
+        Log-prior probability of dosage.
+
+    """
+    assert 0 <= inbreeding < 1
+    ploidy = len(genotype)
+    dosage = allelic_dosage(genotype)
+
+    # if not inbred use null prior
+    if inbreeding == 0:
+        ln_perms = ln_equivalent_permutations(dosage)
+        if frequencies is None:
+            return ln_perms - ploidy * np.log(unique_haplotypes)
+        else:
+            prod = 1
+            for i in range(ploidy):
+                prod *= frequencies[genotype[i]]
+            return ln_perms + np.log(prod)
+
+    # calculate the dispersion parameter for the PMF
+    if frequencies is None:
+        alpha_const = calculate_alphas(inbreeding, 1 / unique_haplotypes)
+        sum_alphas = alpha_const * unique_haplotypes
+    else:
+        alphas = calculate_alphas(inbreeding, frequencies)
+        sum_alphas = alphas.sum()
+
+    # left side of equation in log space
+    num = lgamma(ploidy + 1) + lgamma(sum_alphas)
+    denom = lgamma(ploidy + sum_alphas)
+    left = num - denom
+
+    # right side of equation
+    prod = 0.0  # log(1.0)
+    for i in range(len(dosage)):
+        dose = dosage[i]
+        if dose > 0:
+            if frequencies is None:
+                alpha_i = alpha_const
+            else:
+                alpha_i = alphas[i]
+            num = lgamma(dose + alpha_i)
+            denom = lgamma(dose + 1) + lgamma(alpha_i)
+            prod += num - denom
+
+    # return as log probability
+    return left + prod
