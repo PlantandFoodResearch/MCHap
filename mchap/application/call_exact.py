@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 from dataclasses import dataclass
 
-from mchap.application import baseclass
+from mchap.application import call_baseclass
 from mchap.application.baseclass import SampleAssemblyError, SAMPLE_ASSEMBLY_ERROR
 from mchap.application.arguments import (
     CALL_EXACT_PARSER_ARGUMENTS,
@@ -15,7 +15,6 @@ from mchap.calling.exact import (
     genotype_posteriors,
     alternate_dosage_posteriors,
     posterior_allele_frequencies,
-    genotypes_with_allele,
 )
 from mchap.jitutils import (
     natural_log_to_log10,
@@ -26,7 +25,7 @@ from mchap.io import qual_of_prob
 
 
 @dataclass
-class program(baseclass.program):
+class program(call_baseclass.program):
     @classmethod
     def cli(cls, command):
         """Program initialization from cli command
@@ -75,19 +74,21 @@ class program(baseclass.program):
             data.sampledata[field] = dict()
         haplotypes = data.locus.encode_haplotypes()
 
-        # need to skip reference allele if it was bellow specified frequency
-        # TODO: this logic can be handled by setting ref allele
-        # freq to 0 when using prior allele freqs.
-        if self.haplotype_frequencies_tag and self.skip_rare_haplotypes:
-            exclude_reference_allele = (
-                data.locus.frequencies[0] < self.skip_rare_haplotypes
-            )
+        # get prior for allele frequencies
+        if self.use_haplotype_frequencies_prior:
+            assert self.haplotype_frequencies_tag
+            prior_frequencies = data.locus.frequencies
+            assert prior_frequencies is not None
+        elif self.skip_rare_haplotypes:
+            # need to specify flat prior over alleles that meet the specified threshold
+            assert self.haplotype_frequencies_tag
+            prior_frequencies = data.locus.frequencies
+            assert prior_frequencies is not None
+            idx = prior_frequencies >= self.skip_rare_haplotypes
+            prior_frequencies[idx] = 1 / idx.sum()
+            prior_frequencies[~idx] = 0
         else:
-            exclude_reference_allele = False
-        if exclude_reference_allele:
-            evaluated_haplotypes = haplotypes[1:]
-        else:
-            evaluated_haplotypes = haplotypes
+            prior_frequencies = None
 
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
@@ -107,25 +108,13 @@ class program(baseclass.program):
                         haplotypes=haplotypes,
                         ploidy=ploidy,
                     )
-                    if exclude_reference_allele:
-                        # TODO: this logic can be handled by setting ref allele
-                        # freq to 0 when using prior allele freqs.
-                        idx = ~genotypes_with_allele(ploidy, len(haplotypes), allele=0)
-                        probabilities_evaluated = genotype_posteriors(
-                            log_likelihoods=llks[idx],
-                            ploidy=ploidy,
-                            n_alleles=len(haplotypes) - 1,
-                            inbreeding=inbreeding,
-                        )
-                        probabilities = np.zeros(len(llks))
-                        probabilities[idx] = probabilities_evaluated
-                    else:
-                        probabilities = genotype_posteriors(
-                            log_likelihoods=llks,
-                            ploidy=ploidy,
-                            n_alleles=len(haplotypes),
-                            inbreeding=inbreeding,
-                        )
+                    probabilities = genotype_posteriors(
+                        log_likelihoods=llks,
+                        ploidy=ploidy,
+                        n_alleles=len(haplotypes),
+                        inbreeding=inbreeding,
+                        frequencies=prior_frequencies,
+                    )
                     idx = np.argmax(probabilities)
                     alleles = index_as_genotype_alleles(idx, ploidy)
                     genotype_prob = probabilities[idx]
@@ -154,25 +143,16 @@ class program(baseclass.program):
                     mode_results = posterior_mode(
                         reads=reads,
                         read_counts=read_counts,
-                        haplotypes=evaluated_haplotypes,
+                        haplotypes=haplotypes,
                         ploidy=ploidy,
                         inbreeding=inbreeding,
+                        frequencies=prior_frequencies,
                         return_phenotype_prob=True,
                         return_posterior_frequencies="AFP" in data.formatfields,
                     )
                     alleles, _, genotype_prob, phenotype_prob = mode_results[0:4]
-                    if exclude_reference_allele:
-                        # TODO: this logic can be handled by setting ref allele
-                        # freq to 0 when using prior allele freqs.
-                        alleles += 1
                     if "AFP" in data.formatfields:
                         freqs = np.round(mode_results[-1], self.precision)
-                        if exclude_reference_allele:
-                            # TODO: this logic can be handled by setting ref allele
-                            # freq to 0 when using prior allele freqs.
-                            freqs_evaluated = freqs
-                            freqs = np.zeros(len(freqs) + 1)
-                            freqs[1:] = freqs_evaluated
                         data.sampledata["AFP"][sample] = freqs
 
                 # store variables

@@ -51,8 +51,6 @@ class program(object):
     skip_duplicates: bool = True
     skip_qcfail: bool = True
     skip_supplementary: bool = True
-    haplotype_frequencies_tag: str = None
-    skip_rare_haplotypes: float = None
     report_fields: list = ()
     n_cores: int = 1
     precision: int = 3
@@ -97,14 +95,7 @@ class program(object):
         return formatfields
 
     def loci(self):
-        with pysam.VariantFile(self.vcf) as f:
-            for record in f.fetch():
-                locus = Locus.from_variant_record(
-                    record,
-                    frequency_tag=self.haplotype_frequencies_tag,
-                    frequency_min=self.skip_rare_haplotypes,
-                )
-                yield locus
+        raise NotImplementedError()
 
     def header_contigs(self):
         with pysam.VariantFile(self.vcf) as f:

@@ -4,26 +4,29 @@ from itertools import combinations_with_replacement
 
 from mchap.combinatorics import count_unique_genotypes
 from mchap.assemble.likelihood import log_likelihood
-from mchap.assemble.prior import log_genotype_prior
+from mchap.calling.prior import log_genotype_prior
 from mchap.jitutils import (
-    get_haplotype_dosage,
     increment_genotype,
     normalise_log_probs,
     genotype_alleles_as_index,
     index_as_genotype_alleles,
     add_log_prob,
-    comb_with_replacement,
 )
 
 
 @njit(cache=True)
 def _call_posterior_mode(
-    reads, ploidy, haplotypes, n_genotypes, read_counts=None, inbreeding=0
+    reads,
+    ploidy,
+    haplotypes,
+    n_genotypes,
+    read_counts=None,
+    inbreeding=0,
+    frequencies=None,
 ):
     """Call posterior mode genotype from a set of known haplotypes."""
     n_alleles = len(haplotypes)
     genotype = np.zeros(ploidy, np.int64)
-    dosage = np.zeros(ploidy, np.int8)
 
     mode_idx = 0
     mode_llk = -np.inf
@@ -38,8 +41,9 @@ def _call_posterior_mode(
             read_counts=read_counts,
         )
         # log prior
-        get_haplotype_dosage(dosage, genotype.reshape(ploidy, 1))
-        lpr = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
+        lpr = log_genotype_prior(
+            genotype, n_alleles, inbreeding=inbreeding, frequencies=frequencies
+        )
         # scaled log posterior
         ljoint = llk + lpr
         if ljoint > mode_ljoint:
@@ -55,7 +59,9 @@ def _call_posterior_mode(
     return mode_genotype, mode_llk, mode_ljoint, total_ljoint
 
 
-def _phenotype_log_joint(genotype, reads, haplotypes, read_counts=None, inbreeding=0):
+def _phenotype_log_joint(
+    genotype, reads, haplotypes, read_counts=None, inbreeding=0, frequencies=None
+):
     """Calculate phenotype posterior probability from a genotype and a set of known haplotypes."""
     ploidy = len(genotype)
     # unique alleles
@@ -65,24 +71,27 @@ def _phenotype_log_joint(genotype, reads, haplotypes, read_counts=None, inbreedi
     # possible dosage configurations
     options = list(combinations_with_replacement(phenotype, remainder))
 
-    array = np.zeros(ploidy, dtype=genotype.dtype)
-    dosage = np.zeros(ploidy, np.int8)
+    tmp_genotype = np.zeros(ploidy, dtype=genotype.dtype)
 
     phenotype_ljoint = -np.inf
     for opt in options:
         # get sorted genotype alleles
-        array[0:n_genotype_alleles] = phenotype
-        array[n_genotype_alleles:ploidy] = opt
-        array = np.sort(array)
+        tmp_genotype[0:n_genotype_alleles] = phenotype
+        tmp_genotype[n_genotype_alleles:ploidy] = opt
+        tmp_genotype = np.sort(tmp_genotype)
         # log likelihood
         llk = log_likelihood(
             reads=reads,
-            genotype=haplotypes[array],
+            genotype=haplotypes[tmp_genotype],
             read_counts=read_counts,
         )
         # log prior
-        get_haplotype_dosage(dosage, array.reshape(ploidy, 1))
-        lpr = log_genotype_prior(dosage, len(haplotypes), inbreeding=inbreeding)
+        lpr = log_genotype_prior(
+            tmp_genotype,
+            len(haplotypes),
+            inbreeding=inbreeding,
+            frequencies=frequencies,
+        )
         # scaled log posterior
         ljoint = llk + lpr
 
@@ -93,12 +102,18 @@ def _phenotype_log_joint(genotype, reads, haplotypes, read_counts=None, inbreedi
 
 @njit(cache=True)
 def _posterior_allele_frequencies(
-    ldenominator, reads, ploidy, haplotypes, n_genotypes, read_counts=None, inbreeding=0
+    ldenominator,
+    reads,
+    ploidy,
+    haplotypes,
+    n_genotypes,
+    read_counts=None,
+    inbreeding=0,
+    frequencies=None,
 ):
     """Calculate posterior mean allele frequencies."""
     n_alleles = len(haplotypes)
     genotype = np.zeros(ploidy, np.int64)
-    dosage = np.zeros(ploidy, np.int8)
     freqs = np.zeros(n_alleles, dtype=np.float64)
     for i in range(n_genotypes):
         # log likelihood
@@ -108,8 +123,9 @@ def _posterior_allele_frequencies(
             read_counts=read_counts,
         )
         # log prior
-        get_haplotype_dosage(dosage, genotype.reshape(ploidy, 1))
-        lpr = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
+        lpr = log_genotype_prior(
+            genotype, n_alleles, inbreeding=inbreeding, frequencies=frequencies
+        )
         # scaled log posterior
         ljoint = llk + lpr
         # posterior prob
@@ -127,6 +143,7 @@ def posterior_mode(
     haplotypes,
     read_counts=None,
     inbreeding=0,
+    frequencies=None,
     return_phenotype_prob=False,
     return_posterior_frequencies=False,
 ):
@@ -147,6 +164,8 @@ def posterior_mode(
         Counts of each (unique) read.
     inbreeding : float
         Expected inbreeding coefficient of genotype.
+    frequencies : ndarray, float , shape (n_haplotypes, )
+        Optional prior frequencies for each haplotype allele.
     return_phenotype_prob : bool
         Return the mode phenotype probability (default = false).
     return_posterior_frequencies : bool
@@ -178,6 +197,7 @@ def posterior_mode(
         n_genotypes=n_genotypes,
         read_counts=read_counts,
         inbreeding=inbreeding,
+        frequencies=frequencies,
     )
     mode_genotype_prob = np.exp(mode_ljoint - total_ljoint)
 
@@ -190,6 +210,7 @@ def posterior_mode(
             haplotypes=haplotypes,
             read_counts=read_counts,
             inbreeding=inbreeding,
+            frequencies=frequencies,
         )
         mode_phenotype_prob = np.exp(phenotype_ljoint - total_ljoint)
         result.append(mode_phenotype_prob)
@@ -203,6 +224,7 @@ def posterior_mode(
             n_genotypes=n_genotypes,
             read_counts=read_counts,
             inbreeding=inbreeding,
+            frequencies=frequencies,
         )
         result.append(mean_frequencies)
 
@@ -253,7 +275,9 @@ def genotype_likelihoods(reads, ploidy, haplotypes, read_counts=None):
 
 
 @njit(cache=True)
-def genotype_posteriors(log_likelihoods, ploidy, n_alleles, inbreeding=0):
+def genotype_posteriors(
+    log_likelihoods, ploidy, n_alleles, inbreeding=0, frequencies=None
+):
     """Calculate posterior probability of every possible genotype
     for a given set of likelihoods, ploidy, and number of alleles.
 
@@ -268,6 +292,8 @@ def genotype_posteriors(log_likelihoods, ploidy, n_alleles, inbreeding=0):
     inbreeding : float
         Inbreeding coefficient of organism used when calculating prior
         probabilities.
+    frequencies : ndarray, float , shape (n_haplotypes, )
+        Optional prior frequencies for each haplotype allele.
 
     Returns
     -------
@@ -277,11 +303,11 @@ def genotype_posteriors(log_likelihoods, ploidy, n_alleles, inbreeding=0):
     n_genotypes = len(log_likelihoods)
     posteriors = np.zeros(n_genotypes, dtype=log_likelihoods.dtype)
     genotype = np.zeros(ploidy, np.int64)
-    dosage = np.zeros(ploidy, np.int8)
     for i in range(n_genotypes):
-        get_haplotype_dosage(dosage, genotype.reshape(ploidy, 1))
         llk = log_likelihoods[i]
-        lpr = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
+        lpr = log_genotype_prior(
+            genotype, n_alleles, inbreeding=inbreeding, frequencies=frequencies
+        )
         posteriors[i] = llk + lpr
         increment_genotype(genotype)
     return normalise_log_probs(posteriors)
@@ -357,31 +383,3 @@ def alternate_dosage_posteriors(genotype_alleles, probabilities):
         probs[i] = probabilities[idx]
     idx = np.argsort(indices)
     return genotypes[idx], probs[idx]
-
-
-@njit(cache=True)
-def genotypes_with_allele(ploidy, n_alleles, allele=0):
-    """Identify genotypes containing a specific allele.
-
-    Parameters
-    ----------
-    ploidy : int
-        Ploidy of organism.
-    n_alleles : int
-        Total number of possible (haplotype) alleles at this locus.
-    allele : int
-        Allele to check for.
-
-    Returns
-    -------
-    mask : ndarray, bool, shape(n_genotypes, )
-        Array indicating genotypes containing allele.
-    """
-    n_genotypes = comb_with_replacement(n_alleles, ploidy)
-    out = np.zeros(n_genotypes, dtype=np.bool8)
-    genotype = np.zeros(ploidy, dtype=np.int64)
-    for i in range(n_genotypes):
-        if allele in genotype:
-            out[i] = True
-        increment_genotype(genotype)
-    return out

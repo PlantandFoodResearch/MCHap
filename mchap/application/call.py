@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 from dataclasses import dataclass
 
-from mchap.application import baseclass
+from mchap.application import call_baseclass
 from mchap.application.baseclass import SampleAssemblyError, SAMPLE_ASSEMBLY_ERROR
 from mchap.application.arguments import (
     CALL_MCMC_PARSER_ARGUMENTS,
@@ -17,7 +17,7 @@ from mchap.io import qual_of_prob
 
 
 @dataclass
-class program(baseclass.program):
+class program(call_baseclass.program):
     mcmc_chains: int = 1
     mcmc_steps: int = 2000
     mcmc_burn: int = 1000
@@ -69,19 +69,35 @@ class program(baseclass.program):
             "AFP",
         ]:
             data.sampledata[field] = dict()
-        haplotypes = data.locus.encode_haplotypes()
 
-        # need to skip reference allele if it was bellow specified frequency
-        if self.haplotype_frequencies_tag and self.skip_rare_haplotypes:
-            exclude_reference_allele = (
-                data.locus.frequencies[0] < self.skip_rare_haplotypes
-            )
+        # get haplotypes an check if we need to use a subset
+        haplotypes = data.locus.encode_haplotypes()
+        haplotype_frequencies = data.locus.frequencies
+        if self.use_haplotype_frequencies_prior or self.skip_rare_haplotypes:
+            # frequencies must be set
+            assert self.haplotype_frequencies_tag
+            assert haplotype_frequencies is not None
+            # need to skip any allele with a frequency of 0
+            mcmc_haplotype_labels = np.where(haplotype_frequencies > 0)[0]
+            if len(mcmc_haplotype_labels) < len(haplotypes):
+                # subset of haplotypes
+                mcmc_haplotypes = haplotypes[mcmc_haplotype_labels]
+            else:
+                # using all haplotypes anyway
+                mcmc_haplotype_labels = None
+                mcmc_haplotypes = haplotypes
         else:
-            exclude_reference_allele = False
-        if exclude_reference_allele:
-            mcmc_haplotypes = haplotypes[1:]
-        else:
+            # use all haplotypes
+            mcmc_haplotype_labels = None
             mcmc_haplotypes = haplotypes
+
+        # get prior for allele frequencies
+        if self.use_haplotype_frequencies_prior and mcmc_haplotype_labels is not None:
+            prior_frequencies = haplotype_frequencies[mcmc_haplotype_labels]
+        elif self.use_haplotype_frequencies_prior:
+            prior_frequencies = haplotype_frequencies
+        else:
+            prior_frequencies = None
 
         # iterate of samples
         for sample in data.samples:
@@ -95,6 +111,7 @@ class program(baseclass.program):
                         ploidy=data.sample_ploidy[sample],
                         haplotypes=mcmc_haplotypes,
                         inbreeding=data.sample_inbreeding[sample],
+                        frequencies=prior_frequencies,
                         steps=self.mcmc_steps,
                         chains=self.mcmc_chains,
                         random_seed=self.random_seed,
@@ -105,9 +122,9 @@ class program(baseclass.program):
                     )
                     .burn(self.mcmc_burn)
                 )
-                if exclude_reference_allele:
-                    # need to relabel alleles from 1 because ref is 0
-                    trace = trace.relabel(np.arange(1, len(haplotypes)))
+                if mcmc_haplotype_labels is not None:
+                    # need to relabel alleles within subset
+                    trace = trace.relabel(mcmc_haplotype_labels)
                 incongruence = trace.replicate_incongruence(
                     threshold=self.mcmc_incongruence_threshold
                 )

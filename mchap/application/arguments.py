@@ -314,6 +314,18 @@ haplotype_frequencies = Parameter(
     ),
 )
 
+haplotype_frequencies_prior = BooleanFlag(
+    "--haplotype-frequencies-prior",
+    dict(
+        dest="haplotype_frequencies_prior",
+        action="store_true",
+        help=(
+            "Flag: Use haplotype frequencies to inform prior distribution. "
+            "This requires that the --haplotype-frequencies parameter is also specified."
+        ),
+    ),
+)
+
 skip_rare_haplotypes = Parameter(
     "--skip-rare-haplotypes",
     dict(
@@ -594,11 +606,14 @@ DEFAULT_PARSER_ARGUMENTS = [
     cores,
 ]
 
-CALL_EXACT_PARSER_ARGUMENTS = [
+KNOWN_HAPLOTYPES_ARGUMENTS = [
     haplotypes,
     haplotype_frequencies,
+    haplotype_frequencies_prior,
     skip_rare_haplotypes,
-] + DEFAULT_PARSER_ARGUMENTS
+]
+
+CALL_EXACT_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_PARSER_ARGUMENTS
 
 DEFAULT_MCMC_PARSER_ARGUMENTS = DEFAULT_PARSER_ARGUMENTS + [
     mcmc_chains,
@@ -608,11 +623,7 @@ DEFAULT_MCMC_PARSER_ARGUMENTS = DEFAULT_PARSER_ARGUMENTS + [
     mcmc_chain_incongruence_threshold,
 ]
 
-CALL_MCMC_PARSER_ARGUMENTS = [
-    haplotypes,
-    haplotype_frequencies,
-    skip_rare_haplotypes,
-] + DEFAULT_MCMC_PARSER_ARGUMENTS
+CALL_MCMC_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_MCMC_PARSER_ARGUMENTS
 
 ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
     [
@@ -835,6 +846,7 @@ def collect_call_exact_program_arguments(arguments):
     data = collect_default_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
     data["random_seed"] = None
+    data["use_haplotype_frequencies_prior"] = arguments.haplotype_frequencies_prior
     data["haplotype_frequencies_tag"] = arguments.haplotype_frequencies[0]
     data["skip_rare_haplotypes"] = arguments.skip_rare_haplotypes[0]
     return data
@@ -857,6 +869,7 @@ def collect_default_mcmc_program_arguments(arguments):
 def collect_call_mcmc_program_arguments(arguments):
     data = collect_default_mcmc_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
+    data["use_haplotype_frequencies_prior"] = arguments.haplotype_frequencies_prior
     data["haplotype_frequencies_tag"] = arguments.haplotype_frequencies[0]
     data["skip_rare_haplotypes"] = arguments.skip_rare_haplotypes[0]
     return data
