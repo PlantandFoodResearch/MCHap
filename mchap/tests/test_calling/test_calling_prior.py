@@ -7,7 +7,11 @@ from mchap.calling.prior import (
     log_genotype_prior,
 )
 from mchap.calling.utils import allelic_dosage
-from mchap.jitutils import increment_genotype, comb_with_replacement
+from mchap.jitutils import (
+    increment_genotype,
+    comb_with_replacement,
+    genotype_alleles_as_index,
+)
 
 
 @pytest.mark.parametrize(
@@ -167,4 +171,48 @@ def test_log_genotype_prior__expected_homozygosity(ploidy, inbreeding, frequenci
     np.testing.assert_almost_equal(
         expected_hom,
         enumerated_hom,
+    )
+
+
+@pytest.mark.parametrize("ploidy", [4, 6])
+@pytest.mark.parametrize("inbreeding", [0.1])
+@pytest.mark.parametrize(
+    "frequencies",
+    [
+        [0.5, 0.5],
+        [1 / 3, 1 / 3, 1 / 3],
+        [0.25, 0.5, 0.125, 0.125],
+        [0.01, 0.69, 0.05, 0.1, 0.14, 0.01],
+    ],
+)
+def test_log_genotype_prior__simulation(ploidy, inbreeding, frequencies):
+    frequencies = np.array(frequencies)
+
+    n_alleles = len(frequencies)
+    n_genotypes = comb_with_replacement(n_alleles, ploidy)
+    exact_priors = np.zeros(n_genotypes)
+    genotype = np.zeros(ploidy, np.int8)
+    for i in range(n_genotypes):
+        lprior = log_genotype_prior(
+            genotype,
+            n_alleles,
+            inbreeding=inbreeding,
+            frequencies=frequencies,
+        )
+        exact_priors[i] = np.exp(lprior)
+        increment_genotype(genotype)
+
+    simulated_priors = np.zeros(n_genotypes)
+    sims = 5000
+    for _ in range(sims):
+        alphas = calculate_alphas(inbreeding, frequencies)
+        ac = np.random.multinomial(ploidy, np.random.dirichlet(alphas))
+        gt = np.repeat(np.arange(len(ac)), ac)
+        idx = genotype_alleles_as_index(gt)
+        simulated_priors[idx] += 1 / sims
+
+    np.testing.assert_almost_equal(
+        exact_priors,
+        simulated_priors,
+        decimal=2,
     )
