@@ -3,6 +3,7 @@ import pytest
 
 from mchap.testing import simulate_reads
 from mchap.calling.mcmc import gibbs_options, mh_options
+from mchap.calling.classes import CallingMCMC
 
 
 @pytest.mark.parametrize(
@@ -98,3 +99,78 @@ def test_gibbs_mh_transition_equivalence(seed, random_frequencies):
 
     # assert gibbs and MH longruns are equivalent
     np.testing.assert_array_almost_equal(gibbs_long_run, mh_long_run)
+
+
+@pytest.mark.parametrize(
+    "seed,inbred,random_frequencies",
+    [
+        (11, False, False),
+        (42, True, False),
+        (13, False, True),
+        (0, True, True),
+        (12234, False, False),
+        (213, True, False),
+        (4536, False, True),
+        (2345, True, True),
+    ],
+)
+def test_gibbs_mh_mcmc_equivalence(seed, inbred, random_frequencies):
+    np.random.seed(seed)
+    inbreeding = np.random.rand() * inbred
+    n_pos = np.random.randint(3, 13)
+    n_haps = np.random.randint(2, 20)
+    n_reads = np.random.randint(2, 15)
+    ploidy = np.random.randint(2, 6)
+    haplotypes = np.random.randint(0, 2, size=(n_haps, n_pos))
+    # de-duplicate haplotypes
+    haplotypes = np.unique(haplotypes, axis=0)
+    n_haps = len(haplotypes)
+    if random_frequencies:
+        prior_frequencies = np.random.rand(n_haps)
+        prior_frequencies /= prior_frequencies.sum()
+    else:
+        prior_frequencies = None
+    genotype_alleles = np.random.randint(0, n_haps, size=ploidy)
+    genotype_alleles.sort()
+    genotype_haplotypes = haplotypes[genotype_alleles]
+    reads = simulate_reads(
+        genotype_haplotypes,
+        n_alleles=np.full(n_pos, 2, int),
+        n_reads=n_reads,
+    )
+    read_counts = np.random.randint(1, 10, size=n_reads)
+
+    steps = 5000
+    burn = 1000
+    gibbs_posterior = (
+        CallingMCMC(
+            ploidy=ploidy,
+            haplotypes=haplotypes,
+            frequencies=prior_frequencies,
+            inbreeding=inbreeding,
+            steps=steps,
+            random_seed=seed,
+            step_type="Gibbs",
+        )
+        .fit(reads, read_counts)
+        .burn(burn)
+        .posterior()
+        .as_array(n_haps)
+    )
+    mh_posterior = (
+        CallingMCMC(
+            ploidy=ploidy,
+            haplotypes=haplotypes,
+            frequencies=prior_frequencies,
+            inbreeding=inbreeding,
+            steps=steps,
+            random_seed=seed,
+            step_type="Metropolis-Hastings",
+        )
+        .fit(reads, read_counts)
+        .burn(burn)
+        .posterior()
+        .as_array(n_haps)
+    )
+
+    np.testing.assert_array_almost_equal(gibbs_posterior, mh_posterior, decimal=2)
