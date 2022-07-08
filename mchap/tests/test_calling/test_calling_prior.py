@@ -6,6 +6,8 @@ from mchap.calling.prior import (
     log_genotype_allele_prior,
     log_genotype_prior,
 )
+from mchap.calling.utils import allelic_dosage
+from mchap.jitutils import increment_genotype, comb_with_replacement
 
 
 @pytest.mark.parametrize(
@@ -120,3 +122,49 @@ def test_log_genotype_prior__flat_frequency(
         genotype, unique_haplotypes, inbreeding, frequencies=frequencies
     )
     np.testing.assert_almost_equal(actual, expect, decimal=10)
+
+
+@pytest.mark.parametrize("ploidy", [2, 3, 4, 5])
+@pytest.mark.parametrize("inbreeding", [0.0, 0.1, 0.7])
+@pytest.mark.parametrize(
+    "frequencies",
+    [
+        [0.5, 0.5],
+        [1 / 3, 1 / 3, 1 / 3],
+        [0.25, 0.5, 0.125, 0.125],
+        [0.0, 0.7, 0.05, 0.1, 0.14, 0.01],
+    ],
+)
+def test_log_genotype_prior__expected_homozygosity(ploidy, inbreeding, frequencies):
+    frequencies = np.array(frequencies)
+    np.testing.assert_almost_equal(1, frequencies.sum())
+
+    # expected homozygosity based on inbreeding and population allele frequencies
+    incidental_ibs = (frequencies**2).sum()
+    expected_hom = inbreeding + (1 - inbreeding) * incidental_ibs
+
+    # calculate homozygosity by enumerating over all possible genotypes and
+    # multiplying their homozygosity by their prior probability based on
+    # inbreeding and population allele frequencies
+    n_alleles = len(frequencies)
+    n_genotypes = comb_with_replacement(n_alleles, ploidy)
+    enumerated_hom = 0.0
+    genotype = np.zeros(ploidy, np.int8)
+    for _ in range(n_genotypes):
+        dosage = allelic_dosage(genotype)
+        af = dosage / ploidy
+        ibs = (af**2).sum()
+        hom = (ibs * ploidy - 1) / (ploidy - 1)
+        lprior = log_genotype_prior(
+            genotype,
+            n_alleles,
+            inbreeding=inbreeding,
+            frequencies=frequencies,
+        )
+        enumerated_hom += np.exp(lprior) * hom
+        increment_genotype(genotype)
+
+    np.testing.assert_almost_equal(
+        expected_hom,
+        enumerated_hom,
+    )
