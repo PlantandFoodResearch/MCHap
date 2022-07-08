@@ -4,6 +4,7 @@ import pytest
 from mchap.testing import simulate_reads
 from mchap.calling.mcmc import gibbs_options, mh_options
 from mchap.calling.classes import CallingMCMC
+from mchap.calling.exact import genotype_likelihoods, genotype_posteriors
 
 
 @pytest.mark.parametrize(
@@ -142,6 +143,8 @@ def test_gibbs_mh_mcmc_equivalence(seed, inbred, random_frequencies):
 
     steps = 5000
     burn = 1000
+
+    # Gibbs step
     gibbs_posterior = (
         CallingMCMC(
             ploidy=ploidy,
@@ -157,6 +160,8 @@ def test_gibbs_mh_mcmc_equivalence(seed, inbred, random_frequencies):
         .posterior()
         .as_array(n_haps)
     )
+
+    # Metropolis-Hastings step
     mh_posterior = (
         CallingMCMC(
             ploidy=ploidy,
@@ -173,4 +178,21 @@ def test_gibbs_mh_mcmc_equivalence(seed, inbred, random_frequencies):
         .as_array(n_haps)
     )
 
+    # Exact method
+    llks = genotype_likelihoods(
+        reads=reads,
+        read_counts=read_counts,
+        ploidy=ploidy,
+        haplotypes=haplotypes,
+    )
+    exact_posterior = genotype_posteriors(
+        llks,
+        ploidy=ploidy,
+        n_alleles=len(haplotypes),
+        inbreeding=inbreeding,
+        frequencies=prior_frequencies,
+    )
+
     np.testing.assert_array_almost_equal(gibbs_posterior, mh_posterior, decimal=2)
+    np.testing.assert_array_almost_equal(gibbs_posterior, exact_posterior, decimal=2)
+    np.testing.assert_array_almost_equal(mh_posterior, exact_posterior, decimal=2)
