@@ -140,13 +140,13 @@ def log_genotype_prior(genotype, unique_haplotypes, inbreeding=0, frequencies=No
 
     # right side of equation
     prod = 0.0  # log(1.0)
-    for i in range(len(dosage)):
+    for i in range(ploidy):
         dose = dosage[i]
         if dose > 0:
             if frequencies is None:
                 alpha_i = alpha_const
             else:
-                alpha_i = alphas[i]
+                alpha_i = alphas[genotype[i]]
             num = lgamma(dose + alpha_i)
             denom = lgamma(dose + 1) + lgamma(alpha_i)
             prod += num - denom

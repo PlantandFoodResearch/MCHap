@@ -47,6 +47,7 @@ def test_calculate_alphas__flat_frequency(inbreeding, unique_haplotypes, dispers
     assert actual == dispersion
 
 
+@pytest.mark.parametrize("use_frequencies", [False, True])
 @pytest.mark.parametrize(
     "genotype,variable_allele,unique_haplotypes,inbreeding,expect",
     [
@@ -66,15 +67,24 @@ def test_calculate_alphas__flat_frequency(inbreeding, unique_haplotypes, dispers
     ],
 )
 def test_log_genotype_allele_prior__flat_frequency(
-    genotype, variable_allele, unique_haplotypes, inbreeding, expect
+    genotype, variable_allele, unique_haplotypes, inbreeding, use_frequencies, expect
 ):
     genotype = np.array(genotype)
+    if use_frequencies:
+        frequencies = np.ones(unique_haplotypes) / unique_haplotypes
+    else:
+        frequencies = None
     actual = log_genotype_allele_prior(
-        genotype, variable_allele, unique_haplotypes, inbreeding
+        genotype,
+        variable_allele,
+        unique_haplotypes,
+        inbreeding,
+        frequencies=frequencies,
     )
     np.testing.assert_almost_equal(actual, expect)
 
 
+@pytest.mark.parametrize("use_frequencies", [False, True])
 @pytest.mark.parametrize(
     "genotype,unique_haplotypes,inbreeding,probability",
     [
@@ -96,11 +106,17 @@ def test_log_genotype_allele_prior__flat_frequency(
     ],
 )
 def test_log_genotype_prior__flat_frequency(
-    genotype, unique_haplotypes, inbreeding, probability
+    genotype, unique_haplotypes, inbreeding, use_frequencies, probability
 ):
     # Actual probabilities for inbreeding == 0 calculated independently using scipy multinomial
     # Actual probabilities for inbreeding > 0 calculated independently using tensorflow-probabilities
     expect = np.log(probability)
     genotype = np.array(genotype)
-    actual = log_genotype_prior(genotype, unique_haplotypes, inbreeding)
+    if use_frequencies:
+        frequencies = np.ones(unique_haplotypes) / unique_haplotypes
+    else:
+        frequencies = None
+    actual = log_genotype_prior(
+        genotype, unique_haplotypes, inbreeding, frequencies=frequencies
+    )
     np.testing.assert_almost_equal(actual, expect, decimal=10)
