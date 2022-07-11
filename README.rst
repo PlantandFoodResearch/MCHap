@@ -143,19 +143,6 @@ Note that if an assembly is run with more than ``1`` thread then the records
 in the output VCF may be in a different order than the loci were in the
 input BED file so it may be necessary to sort the VCF file.
 
-Specifying a constant error-rate
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-By default, ``mchap assemble`` will use the per base phred-scores found in the
-input BAM files to encode read error-rates.
-This is a logical default but the variable error-rates limit the ability of 
-MCHap to efficiently calculate likelihoods. 
-If you know what the expected error-rate for your data is then you can input
-this value using the ``--base-error-rate`` argument and ignore the use of phred
-scores with the ``--ignore-base-phred-scores`` flag.
-This combination of arguments can significantly improve assembly speed,
-especially with higher read depths.
-
 Tuning MCMC parameters
 ~~~~~~~~~~~~~~~~~~~~~~
 
