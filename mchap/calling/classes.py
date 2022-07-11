@@ -15,6 +15,7 @@ class CallingMCMC(Assembler):
 
     ploidy: int
     haplotypes: np.ndarray
+    frequencies: np.array = None
     inbreeding: float = 0
     steps: int = 1000
     chains: int = 2
@@ -30,6 +31,8 @@ class CallingMCMC(Assembler):
     haplotypes : ndarray, int, shape, (n_haplotypes, n_pos)
         Number of possible alleles at each position in the
         assembled locus.
+    frequencies : ndarray, float , shape (n_haplotypes, )
+        Optional prior frequencies for each haplotype allele.
     inbreeding : float
         Expected inbreeding coefficient of genotype.
     steps : int, optional
@@ -113,6 +116,7 @@ class CallingMCMC(Assembler):
                 reads=reads,
                 read_counts=read_counts,
                 inbreeding=self.inbreeding,
+                frequencies=self.frequencies,
                 n_steps=self.steps,
                 cache=True,
                 step_type=step_type,
@@ -140,6 +144,25 @@ class GenotypeAllelesMultiTrace(object):
 
     genotypes: np.ndarray
     llks: np.ndarray
+
+    def relabel(self, labels):
+        """Returns a new GenotypeTrace object with relabeled alleles.
+
+        Parameters
+        ----------
+        labels : ndarray, int, shape (n_alleles,)
+            New integer labels.
+
+        Returns
+        -------
+        trace : GenotypeTrace
+            A new instance of the GenotypeTrace with relabeled alleles.
+        """
+        new = type(self)(
+            labels[self.genotypes],
+            self.llks,
+        )
+        return new
 
     def burn(self, n):
         """Returns a new GenotypeTrace object without the first

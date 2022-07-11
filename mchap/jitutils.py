@@ -18,6 +18,8 @@ def add_log_prob(x, y):
         The log-transformed sum of the un-transformed `x` and `y`.
 
     """
+    if x == y == -np.inf:
+        return -np.inf
     if x > y:
         return x + np.log1p(np.exp(y - x))
     else:

@@ -1,12 +1,11 @@
 import numpy as np
 from numba import njit
 
-from mchap.assemble.prior import log_genotype_prior
 from mchap.jitutils import random_choice, normalise_log_probs
 
-from .utils import allelic_dosage, count_allele
+from .utils import count_allele
 from .likelihood import log_likelihood_alleles, log_likelihood_alleles_cached
-from .prior import log_genotype_allele_prior
+from .prior import log_genotype_allele_prior, log_genotype_prior
 
 
 @njit(cache=True)
@@ -20,6 +19,7 @@ def mh_options(
     llks_array,
     lpriors_array,
     probabilities_array,
+    frequencies=None,
     llk_cache=None,
 ):
     """Calculate transition probabilities for a Metropolis-Hastings step.
@@ -44,6 +44,8 @@ def mh_options(
         Array to be populated with log-prior of each step option.
     probabilities_array : ndarray, float , shape (n_haplotypes, )
         Array to be populated with transition probability of each step option.
+    frequencies : ndarray, float , shape (n_haplotypes, )
+        Optional prior frequencies for each haplotype allele.
     llk_cache : dict
         Cache of log-likelihoods mapping genotype index (int) to llk (float).
 
@@ -62,12 +64,12 @@ def mh_options(
 
     # stats of current genotype
     n_alleles = len(haplotypes)
-    dosage = allelic_dosage(genotype_alleles)
     allele_copies = count_allele(genotype_alleles, genotype_alleles[variable_allele])
     lprior = log_genotype_prior(
-        dosage=dosage,
+        genotype=genotype_alleles,
         unique_haplotypes=n_alleles,
         inbreeding=inbreeding,
+        frequencies=frequencies,
     )
     llk = log_likelihood_alleles_cached(
         reads=reads,
@@ -97,11 +99,11 @@ def mh_options(
             genotype_alleles[variable_allele] = a
 
             # calculate prior
-            dosage_i = allelic_dosage(genotype_alleles)
             lpriors_array[a] = log_genotype_prior(
-                dosage=dosage_i,
+                genotype=genotype_alleles,
                 unique_haplotypes=n_alleles,
                 inbreeding=inbreeding,
+                frequencies=frequencies,
             )
 
             # calculate likelihood
@@ -144,6 +146,7 @@ def gibbs_options(
     llks_array,
     lpriors_array,
     probabilities_array,
+    frequencies=None,
     llk_cache=None,
 ):
     """Calculate transition probabilities for a Gibbs step.
@@ -168,6 +171,8 @@ def gibbs_options(
         Array to be populated with log-prior of each step option.
     probabilities_array : ndarray, float , shape (n_haplotypes, )
         Array to be populated with transition probability of each step option.
+    frequencies : ndarray, float , shape (n_haplotypes, )
+        Optional prior frequencies for each haplotype allele.
     llk_cache : dict
         Cache of log-likelihoods mapping genotype index (int) to llk (float).
 
@@ -197,6 +202,7 @@ def gibbs_options(
             variable_allele=variable_allele,
             unique_haplotypes=len(haplotypes),
             inbreeding=inbreeding,
+            frequencies=frequencies,
         )
 
         # genotype likelihood
@@ -223,6 +229,7 @@ def compound_step(
     reads,
     read_counts,
     inbreeding,
+    frequencies=None,
     llk_cache=None,
     step_type=0,
 ):
@@ -240,6 +247,8 @@ def compound_step(
         Count of each read.
     inbreeding : float
         Expected inbreeding coefficient of sample.
+    frequencies : ndarray, float , shape (n_haplotypes, )
+        Optional prior frequencies for each haplotype allele.
     llk_cache : dict
         Cache of log-likelihoods mapping genotype index (int) to llk (float).
     step_type : int
@@ -285,6 +294,7 @@ def compound_step(
                 llks_array=llks,
                 lpriors_array=lpriors,
                 probabilities_array=probabilities,
+                frequencies=frequencies,
                 llk_cache=llk_cache,
             )
         elif step_type == 1:
@@ -298,6 +308,7 @@ def compound_step(
                 llks_array=llks,
                 lpriors_array=lpriors,
                 probabilities_array=probabilities,
+                frequencies=frequencies,
                 llk_cache=llk_cache,
             )
         else:
@@ -321,6 +332,7 @@ def mcmc_sampler(
     reads,
     read_counts,
     inbreeding,
+    frequencies=None,
     n_steps=1000,
     cache=False,
     step_type=0,
@@ -339,6 +351,10 @@ def mcmc_sampler(
         Count of each read.
     inbreeding : float
         Expected inbreeding coefficient of sample.
+    frequencies : ndarray, float , shape (n_haplotypes, )
+        Optional prior frequencies for each haplotype allele.
+    frequencies : ndarray, float , shape (n_haplotypes, )
+        Optional prior frequencies for each haplotype allele.
     n_steps : int
         Number of (compound) steps to simulate.
     step_type : int
@@ -369,6 +385,7 @@ def mcmc_sampler(
             reads=reads,
             read_counts=read_counts,
             inbreeding=inbreeding,
+            frequencies=frequencies,
             llk_cache=llk_cache,
             step_type=step_type,
         )
@@ -378,7 +395,9 @@ def mcmc_sampler(
 
 
 @njit(cache=True)
-def greedy_caller(haplotypes, ploidy, reads, read_counts, inbreeding=0.0):
+def greedy_caller(
+    haplotypes, ploidy, reads, read_counts, inbreeding=0.0, frequencies=None
+):
     """Greedy method for calling genotype from known haplotypes.
 
     Parameters
@@ -393,6 +412,8 @@ def greedy_caller(haplotypes, ploidy, reads, read_counts, inbreeding=0.0):
         Count of each read.
     inbreeding : float
         Expected inbreeding coefficient of sample.
+    frequencies : ndarray, float , shape (n_haplotypes, )
+        Optional prior frequencies for each haplotype allele.
 
     Returns
     -------
@@ -420,9 +441,10 @@ def greedy_caller(haplotypes, ploidy, reads, read_counts, inbreeding=0.0):
                 genotype_alleles=genotype,
             )
             lprior = log_genotype_prior(
-                dosage=allelic_dosage(genotype),
+                genotype=genotype,
                 unique_haplotypes=len(haplotypes),
                 inbreeding=inbreeding,
+                frequencies=frequencies,
             )
             lprob = llk + lprior
             if lprob > best_lprob:

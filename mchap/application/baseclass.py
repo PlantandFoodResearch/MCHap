@@ -91,14 +91,11 @@ class program(object):
             "GPM",
             "PHPM",
             "MCI",
-        ] + [f for f in ["GP", "GL", "AFP", "DS"] if f in self.report_fields]
+        ] + [f for f in ["AFP", "DS", "GP", "GL"] if f in self.report_fields]
         return formatfields
 
     def loci(self):
-        with pysam.VariantFile(self.vcf) as f:
-            for record in f.fetch():
-                locus = Locus.from_variant_record(record)
-                yield locus
+        raise NotImplementedError()
 
     def header_contigs(self):
         with pysam.VariantFile(self.vcf) as f:

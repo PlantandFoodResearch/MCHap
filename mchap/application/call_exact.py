@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 from dataclasses import dataclass
 
-from mchap.application import baseclass
+from mchap.application import call_baseclass
 from mchap.application.baseclass import SampleAssemblyError, SAMPLE_ASSEMBLY_ERROR
 from mchap.application.arguments import (
     CALL_EXACT_PARSER_ARGUMENTS,
@@ -16,13 +16,16 @@ from mchap.calling.exact import (
     alternate_dosage_posteriors,
     posterior_allele_frequencies,
 )
-from mchap.jitutils import natural_log_to_log10, index_as_genotype_alleles
+from mchap.jitutils import (
+    natural_log_to_log10,
+    index_as_genotype_alleles,
+)
 
 from mchap.io import qual_of_prob
 
 
 @dataclass
-class program(baseclass.program):
+class program(call_baseclass.program):
     @classmethod
     def cli(cls, command):
         """Program initialization from cli command
@@ -70,6 +73,23 @@ class program(baseclass.program):
         ]:
             data.sampledata[field] = dict()
         haplotypes = data.locus.encode_haplotypes()
+
+        # get prior for allele frequencies
+        if self.use_haplotype_frequencies_prior:
+            assert self.haplotype_frequencies_tag
+            prior_frequencies = data.locus.frequencies
+            assert prior_frequencies is not None
+        elif self.skip_rare_haplotypes:
+            # need to specify flat prior over alleles that meet the specified threshold
+            assert self.haplotype_frequencies_tag
+            prior_frequencies = data.locus.frequencies
+            assert prior_frequencies is not None
+            idx = prior_frequencies >= self.skip_rare_haplotypes
+            prior_frequencies[idx] = 1 / idx.sum()
+            prior_frequencies[~idx] = 0
+        else:
+            prior_frequencies = None
+
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
             try:
@@ -80,6 +100,7 @@ class program(baseclass.program):
 
                 # call haplotypes
                 if ("GL" in data.formatfields) or ("GP" in data.formatfields):
+
                     # calculate full arrays
                     llks = genotype_likelihoods(
                         reads=reads,
@@ -92,6 +113,7 @@ class program(baseclass.program):
                         ploidy=ploidy,
                         n_alleles=len(haplotypes),
                         inbreeding=inbreeding,
+                        frequencies=prior_frequencies,
                     )
                     idx = np.argmax(probabilities)
                     alleles = index_as_genotype_alleles(idx, ploidy)
@@ -124,14 +146,14 @@ class program(baseclass.program):
                         haplotypes=haplotypes,
                         ploidy=ploidy,
                         inbreeding=inbreeding,
+                        frequencies=prior_frequencies,
                         return_phenotype_prob=True,
                         return_posterior_frequencies="AFP" in data.formatfields,
                     )
                     alleles, _, genotype_prob, phenotype_prob = mode_results[0:4]
                     if "AFP" in data.formatfields:
-                        data.sampledata["AFP"][sample] = np.round(
-                            mode_results[-1], self.precision
-                        )
+                        freqs = np.round(mode_results[-1], self.precision)
+                        data.sampledata["AFP"][sample] = freqs
 
                 # store variables
                 data.sampledata["alleles"][sample] = alleles

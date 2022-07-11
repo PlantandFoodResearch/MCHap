@@ -278,29 +278,44 @@ def test_call_posterior_mode():
 
 
 @pytest.mark.parametrize(
-    "ploidy, positions, inbreeding, n_haps, n_reads",
+    "ploidy, positions, inbreeding, n_haps, n_reads, frequencies",
     [
-        (2, 3, 0.0, 4, 1),
-        (3, 10, 0.02, 15, 10),
-        (4, 6, 0.01, 10, 20),
+        (2, 3, 0.0, 4, 1, None),
+        (3, 10, 0.02, 15, 10, True),
+        (4, 6, 0.01, 10, 5, False),
+        (4, 12, 0.0, 7, 3, None),
+        (4, 12, 0.0, 7, 3, True),
+        (4, 12, 0.3, 7, 3, None),
+        (4, 12, 0.3, 7, 3, True),
+        (6, 7, 0.0, 3, 3, True),
+        (6, 13, 0.1, 7, 5, True),
     ],
 )
-def test_call_posterior_mode__fuzz(ploidy, positions, inbreeding, n_haps, n_reads):
-    ploidy = 4
-    positions = 6
-    inbreeding = 0.01
-    n_haps = 10
-    n_reads = 20
+def test_call_posterior_mode__fuzz(
+    ploidy, positions, inbreeding, n_haps, n_reads, frequencies
+):
+    np.random.seed(0)
 
     haplotypes = mset.unique(np.random.randint(0, 2, size=(n_haps, positions)))
     n_haps = len(haplotypes)
+    if frequencies is None:
+        prior_frequencies = None
+    elif frequencies is True:
+        prior_frequencies = np.random.rand(n_haps)
+        prior_frequencies /= prior_frequencies.sum()
+    else:
+        prior_frequencies = np.ones(n_haps) / n_haps
     genotype = haplotypes[np.random.randint(0, n_haps, size=ploidy)]
     reads = simulate_reads(genotype, n_reads=n_reads, n_alleles=np.repeat(2, positions))
 
     # compute full distribution
     llks = exact.genotype_likelihoods(reads=reads, ploidy=ploidy, haplotypes=haplotypes)
     post = exact.genotype_posteriors(
-        llks, ploidy=ploidy, n_alleles=n_haps, inbreeding=inbreeding
+        llks,
+        ploidy=ploidy,
+        n_alleles=n_haps,
+        inbreeding=inbreeding,
+        frequencies=prior_frequencies,
     )
     freqs = exact.posterior_allele_frequencies(post, ploidy=ploidy, n_alleles=n_haps)
     mode = np.argmax(post)
@@ -314,9 +329,56 @@ def test_call_posterior_mode__fuzz(ploidy, positions, inbreeding, n_haps, n_read
         inbreeding=inbreeding,
         return_phenotype_prob=False,
         return_posterior_frequencies=True,
+        frequencies=prior_frequencies,
     )
 
     np.testing.assert_array_equal(alleles, mode_alleles)
     np.testing.assert_almost_equal(llks[mode], mode_llk, 5)
     np.testing.assert_almost_equal(post[mode], mode_post, 5)
     np.testing.assert_array_almost_equal(freqs, mean_freqs, 5)
+
+
+@pytest.mark.parametrize(
+    "ploidy, positions, inbreeding, n_haps, n_reads",
+    [
+        (2, 3, 0.0, 4, 1),
+        (3, 10, 0.02, 15, 10),
+        (4, 6, 0.01, 10, 5),
+        (4, 12, 0.0, 7, 3),
+        (4, 12, 0.3, 7, 3),
+    ],
+)
+def test_call_posterior_mode__flat_frequencies(
+    ploidy, positions, inbreeding, n_haps, n_reads
+):
+    np.random.seed(0)
+
+    haplotypes = mset.unique(np.random.randint(0, 2, size=(n_haps, positions)))
+    n_haps = len(haplotypes)
+    genotype = haplotypes[np.random.randint(0, n_haps, size=ploidy)]
+    reads = simulate_reads(genotype, n_reads=n_reads, n_alleles=np.repeat(2, positions))
+
+    mode_alleles_x, mode_llk_x, mode_post_x, mean_freqs_x = exact.posterior_mode(
+        reads=reads,
+        ploidy=ploidy,
+        haplotypes=haplotypes,
+        inbreeding=inbreeding,
+        return_phenotype_prob=False,
+        return_posterior_frequencies=True,
+        frequencies=None,
+    )
+
+    mode_alleles_y, mode_llk_y, mode_post_y, mean_freqs_y = exact.posterior_mode(
+        reads=reads,
+        ploidy=ploidy,
+        haplotypes=haplotypes,
+        inbreeding=inbreeding,
+        return_phenotype_prob=False,
+        return_posterior_frequencies=True,
+        frequencies=np.ones(n_haps) / n_haps,
+    )
+
+    np.testing.assert_array_equal(mode_alleles_x, mode_alleles_y)
+    np.testing.assert_almost_equal(mode_llk_x, mode_llk_y)
+    np.testing.assert_almost_equal(mode_post_x, mode_post_y)
+    np.testing.assert_array_almost_equal(mean_freqs_x, mean_freqs_y)

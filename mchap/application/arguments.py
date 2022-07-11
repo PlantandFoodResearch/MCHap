@@ -297,24 +297,45 @@ haplotype_posterior_threshold = Parameter(
     ),
 )
 
-use_assembly_posteriors = BooleanFlag(
-    "--use-assembly-posteriors",
+haplotype_frequencies = Parameter(
+    "--haplotype-frequencies",
     dict(
-        dest="use_assembly_posteriors",
+        type=str,
+        nargs=1,
+        default=[None],
+        help=(
+            "Optionally specify an INFO field within the input VCF file to "
+            "designate as allele frequencies for the input haplotypes. "
+            "This can be any numerical field of length 'R' and these "
+            "values will automatically be normalized. "
+            "This parameter has no affect on the output by itself but "
+            "is required by some other parameters."
+        ),
+    ),
+)
+
+haplotype_frequencies_prior = BooleanFlag(
+    "--haplotype-frequencies-prior",
+    dict(
+        dest="haplotype_frequencies_prior",
         action="store_true",
         help=(
-            "Flag: Use posterior probabilities from each individuals "
-            "assembly rather than recomputing posteriors based on the "
-            "observed alleles across all samples. "
-            "These posterior probabilities will be used to call genotypes "
-            ", metrics related to the genotype, and the posterior "
-            "distribution (GP field) if specified. "
-            "This may lead to less robust genotype calls in the presence "
-            "of multi-modality and hence it is recommended to run the "
-            "simulation for longer or using parallel-tempering when "
-            "using this option. "
-            "This option may be more suitable than the default when calling "
-            "haplotypes in unrelated individuals. "
+            "Flag: Use haplotype frequencies to inform prior distribution. "
+            "This requires that the --haplotype-frequencies parameter is also specified."
+        ),
+    ),
+)
+
+skip_rare_haplotypes = Parameter(
+    "--skip-rare-haplotypes",
+    dict(
+        type=float,
+        nargs=1,
+        default=[None],
+        help=(
+            "Optionally ignore haplotypes from the input VCF file if their frequency "
+            "within that file is less than the specified value. "
+            "This requires that the --haplotype-frequencies parameter is also specified."
         ),
     ),
 )
@@ -585,9 +606,14 @@ DEFAULT_PARSER_ARGUMENTS = [
     cores,
 ]
 
-CALL_EXACT_PARSER_ARGUMENTS = [
+KNOWN_HAPLOTYPES_ARGUMENTS = [
     haplotypes,
-] + DEFAULT_PARSER_ARGUMENTS
+    haplotype_frequencies,
+    haplotype_frequencies_prior,
+    skip_rare_haplotypes,
+]
+
+CALL_EXACT_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_PARSER_ARGUMENTS
 
 DEFAULT_MCMC_PARSER_ARGUMENTS = DEFAULT_PARSER_ARGUMENTS + [
     mcmc_chains,
@@ -597,9 +623,7 @@ DEFAULT_MCMC_PARSER_ARGUMENTS = DEFAULT_PARSER_ARGUMENTS + [
     mcmc_chain_incongruence_threshold,
 ]
 
-CALL_MCMC_PARSER_ARGUMENTS = [
-    haplotypes,
-] + DEFAULT_MCMC_PARSER_ARGUMENTS
+CALL_MCMC_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_MCMC_PARSER_ARGUMENTS
 
 ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
     [
@@ -822,6 +846,9 @@ def collect_call_exact_program_arguments(arguments):
     data = collect_default_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
     data["random_seed"] = None
+    data["use_haplotype_frequencies_prior"] = arguments.haplotype_frequencies_prior
+    data["haplotype_frequencies_tag"] = arguments.haplotype_frequencies[0]
+    data["skip_rare_haplotypes"] = arguments.skip_rare_haplotypes[0]
     return data
 
 
@@ -842,6 +869,9 @@ def collect_default_mcmc_program_arguments(arguments):
 def collect_call_mcmc_program_arguments(arguments):
     data = collect_default_mcmc_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
+    data["use_haplotype_frequencies_prior"] = arguments.haplotype_frequencies_prior
+    data["haplotype_frequencies_tag"] = arguments.haplotype_frequencies[0]
+    data["skip_rare_haplotypes"] = arguments.skip_rare_haplotypes[0]
     return data
 
 
