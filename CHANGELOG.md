@@ -1,0 +1,182 @@
+# Changelog
+
+## Unreleased 
+
+
+## Beta v0.6.0
+
+New Features:
+- Optionally output posterior allele frequencies #135
+- Optionally specify a prior allele frequencies in `mchap call` and `mchap call-exact` #120
+- Optionally filter input haplotypes by input frequencies in `mchap call` and `mchap call-exact` #113
+- Improve PMF performance for `mchap call` and `mchap call-exact` #125
+- Allow pooling of all samples into single sample #140
+- Allow arbitrary ploidy in PMFs #124
+
+CLI Changes:
+- Default to constant base error rate without using phred scores #127
+- Replaced `--ignore-base-phred-scores` with `--use-base-phred-scores` #127
+- Increased default MCMC steps and burnin to 2000 and 1000 respectively #137
+- Removed `--sample-list` argument #128
+- Merged `--genotype-likelihoods` and `--genotype-posteriors` into `--report` #128
+- Added option to report `AFP` via `--report` #135
+- Added `--sample-pool` argument #140
+- Added `--haplotype-frequencies` parameter to `mchap call` and `mchap call-exact`
+- Added `--haplotype-frequencies-prior` flag to `mchap call` and `mchap call-exact`
+- Added `--skip-rare-haplotypes` parameter to `mchap call` and `mchap call-exact`
+- Removed `pedigraph` tool #138
+
+VCF Changes:
+- Replaced `KMERCOV` with `MECP` (`MEC` / `RCALLS`) #134
+- Optional `AFP` field to report posterior allele frequencies #135
+
+
+
+## Beta v0.5.1
+
+Bug Fixes:
+- Fix addition of null allele counts to final allele #115
+- Fix integer overflow with many haplotypes #117
+
+
+## Beta v0.5.0
+
+New Features:
+- Added Gibbs sampler re-calling tool: `mchap call` #110, #104
+- Added exact re-calling tool:mchap `call-exact` #110
+
+CLI Changes:
+- Removed exact re-calling option from `mchap assemble` #110
+- Reordering of some CLI arguments to facilitate reusing arguments between sub-tools
+
+Internal Changes:
+- Move CLI parser arguments into reusable components
+- Reuse CLI tool methods via inheritance
+- Prior and likelihood functions for known sets of haplotypes
+- Generate Locus objects from pysam variant records
+- Reorganize internal sub-modules
+
+
+
+## Beta v0.4.2
+
+New Features:
+- Per-sample specification of temperatures for parallel-tempering #99
+
+
+
+## Beta v0.4.1
+
+VCF Changes:
+- Removed `FORMAT/FT` from header #101
+- Removed `INFO/AD` and `FORMAT/AD` #98
+- Dynamically omit `FORMAT/GL` and `FORMAT/GP` fields from VCF when they are not used #102
+
+
+
+## Beta v0.4.0
+
+New Features:
+- Haplotype inclusion based on haplotype posterior threshold rather than genotype/phenotype #93
+- Recalling genotypes based on observed haplotypes #93
+- Removed per-sample filters and replaced with metadata for downstream filtering #96
+- Options to call full genotype posterior or likelihoods over all genotypes #93
+- Improve specification of per-locus assembly for better integration with asub #90
+    - `--region` and `--region-id` arguments
+    - `--sample-bams` argument
+- Mechanism to cache log-likelihoods for reuse #21
+- Enable caching of JIT compiled functions #94
+
+Bug Fixes:
+- Fix bug in which read counts are ignored when excluding SNPs based on --mcmc-fix-homozygous threshold
+
+VCF Changes:
+- Added fields:
+    `INFO/DP`
+    `INFO/RCOUNT`
+    `INFO/NVAR`
+    `FORMAT/KMERCOV`
+    `FORMAT/MCI`
+    `FORMAT/GL`
+    `FORMAT/GP`
+- Removed fields:
+    `FORMAT/DOSEXP`
+
+
+
+## Beta v0.3.0
+
+New Features:
+- Parallel-tempering #65
+- Option to use inbreeding coefficient to inform prior #75
+- Separate recombination and dosage swap sub-steps
+- Control of recombination and dosage swap sub-steps via probabilities
+- Arguments to exclude/include duplicate, qcfail and supplementary reads #74
+- Added AD format field #63
+- Added filters for chain in-congruence #69 #70
+- Specification on constant error rate via `--base-error-rate` and `--ignore-base-phred-scores` #83
+
+VCF Changes:
+- Added AD format field #63
+- Added filters for chain in-congruence #69 #70
+- Rename format fields `MPED` to `DOSEXP` and `PPM` to `PHPM`
+- Remove `MPGP` and `RASSIGN` format fields #63
+- Fix off-by-1 error of variant positions in VCF output
+
+Bug Fixes:
+- Added missing dependencies #61
+- Correction for null prior probability
+- Correct Metropolis-Hastings transition probabilities #66
+- Improve single core method for running assemble program
+- Use simple plain-text pedigree format for pedigraph tool #49
+- Correct use or region string argument in pedigraph tool #42
+- Fix off-by-1 error of variant positions in VCF output
+- Replace ndarray tostring calls with tobytes #62
+
+Internal Changes:
+- Add minimal set of functions to top level API #77
+- Simplify main loop of assemble program #76
+- Simplify MCMC file hierarchy
+- Enforce formatting with Black and Flake8 #78
+- Optimization by de-duplication of identical reads #83
+- Removal of old unused "brute force" assembler
+- Improved exception handling during assembly #88
+
+
+
+## Alpha v0.2.3
+
+- Fixes bug in filter introduced in v0.2.2
+
+
+
+## Alpha v0.2.2
+
+- Add filter for chain incongruence #64
+- Add filter to identify CNV across chains #69
+- Fix potential bug with masked allele llk from np.empty
+
+
+
+## Alpha v0.2.1
+
+- Add missing sub-module for statistics on integer encoded sequences
+
+
+
+## Alpha v0.2.0
+
+- Use non-normalized probability encodings for reads #56
+- Remove `probabilistic` encoding sub-module
+- Rename `allelic` and `symbolic` encoding sub-modules to integer and character
+- Add `MEC` score to VCF output #58
+- Rename `RC` format field to `RCOUNT`
+- Add `RCALLS` format field to record the number of variant encoding bases among reads
+- Add `RASSIGN` format field to record approximate read assignment to haplotypes based on MEC
+- Improve string formatting of floats in VCF output to remove .0 from values without decimals
+
+
+
+## Alpha v0.1.0
+
+- Initial release
