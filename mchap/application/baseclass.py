@@ -69,6 +69,7 @@ class program(object):
         infofields = [
             "AN",
             "AC",
+            "REFMASKED",
             "NS",
             "DP",
             "RCOUNT",
@@ -113,7 +114,8 @@ class program(object):
         ]
         contigs = self.header_contigs()
         filters = [
-            vcf.filters.SamplePassFilter(),
+            vcf.filters.PASS,
+            vcf.filters.NAA,
         ]
         info_fields = [HEADER_INFO_FIELDS[field] for field in self.info_fields()]
         format_fields = [HEADER_FORMAT_FIELDS[field] for field in self.format_fields()]
@@ -289,6 +291,15 @@ class program(object):
         # sequences
         data.columndata["REF"] = data.locus.sequence
         data.columndata["ALTS"] = data.locus.alts
+        # filters
+        filters = []
+        if (len(data.locus.alts) == 0) and data.infodata.get(
+            vcf.infofields.REFMASKED.id, False
+        ):
+            filters.append(vcf.filters.NAA.id)
+        if len(filters) == 0:
+            filters.append(vcf.filters.PASS.id)
+        data.columndata["FILTER"] = ";".join(filters)
         # alt allele counts
         allele_counts = np.zeros(len(data.columndata["ALTS"]) + 1, int)
         for array in data.sampledata["alleles"].values():

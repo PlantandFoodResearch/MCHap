@@ -35,6 +35,7 @@ class Locus:
     variants: tuple
     alts: tuple = None
     frequencies: np.ndarray = None
+    mask_reference_allele: bool = False
 
     @property
     def positions(self):
@@ -129,18 +130,23 @@ class Locus:
 
     @classmethod
     def from_variant_record(
-        cls, record, use_snvpos=False, frequency_tag=None, frequency_min=None
+        cls,
+        record,
+        use_snvpos=False,
+        frequency_tag=None,
+        frequency_min=None,
+        ignore_ref_allele_flag="REFMASKED",
     ):
         """Generate a locus object with reference and variants from
         a known MNP.
 
-        Paramters
+        Parameters
         ---------
         record : VariantRecord.
             A pysam VariantRecord object for an MNP variant.
         use_snvpos : bool
             If true then the "SNVPOS" info tag will be used to
-            identify psotions of SNV variants rather than identifying
+            identify positions of SNV variants rather than identifying
             them directly from the ref and alt sequences.
         frequency_tag : str
             VCF INFO tag to estimate allele frequencies from.
@@ -148,6 +154,9 @@ class Locus:
             Minimum frequency required to include an alternate allele.
             If the reference allele does not meet this threshold then
             it will be included with a frequency of 0.
+        ignore_ref_allele_flag : str
+            VCF INFO tag used to indicate that the reference allele should
+            not be used.
 
         Returns
         -------
@@ -161,25 +170,44 @@ class Locus:
             alts = record.alts
         else:
             alts = ()
+        sequences += alts
+
+        # start mask for alleles
+        if ignore_ref_allele_flag in record.info:
+            mask_reference_allele = record.info[ignore_ref_allele_flag]
+        else:
+            mask_reference_allele = False
 
         if frequency_tag:
             frequencies = np.array(record.info[frequency_tag])
-            frequencies /= frequencies.sum()
-            assert len(frequencies) == len(alts) + 1
+            assert len(frequencies) == len(sequences)
+            # if ref is masked set freq to 0
+            if mask_reference_allele:
+                frequencies[0] = 0
+            # normalise frequencies
+            denom = frequencies.sum()
+            if denom > 0:
+                frequencies /= denom
+            else:
+                frequencies[:] = np.nan
+            # mask rare haplotypes
             if frequency_min:
                 keep = frequencies >= frequency_min
-                # must keep reference so set frequency to 0
                 if not keep[0]:
+                    # must keep ref so mask
+                    mask_reference_allele = True
+                    frequencies[0] = 0
                     keep[0] = True
-                    frequencies[0] = 0.0
+                # drop alts
+                sequences = tuple(a for a, k in zip(sequences, keep) if k)
                 frequencies = frequencies[keep]
+                # re-normalise frequencies
                 denom = frequencies.sum()
                 if denom > 0:
                     frequencies /= denom
                 else:
                     frequencies[:] = np.nan
-                alts = tuple(a for a, k in zip(alts, keep[1:]) if k)
-                assert len(frequencies) == len(alts) + 1
+            assert len(frequencies) == len(sequences)
         elif frequency_min:
             raise ValueError(
                 "Use of frequency minimum requires specification of frequency tag"
@@ -187,7 +215,6 @@ class Locus:
         else:
             frequencies = None
 
-        sequences += alts
         haplotypes = np.array([list(var) for var in sequences])
         if use_snvpos:
             snvpos = record.info["SNVPOS"]
@@ -211,8 +238,9 @@ class Locus:
             name=record.id if record.id else ".",
             sequence=record.ref,
             variants=tuple(snps),
-            alts=alts,
+            alts=sequences[1:],
             frequencies=frequencies,
+            mask_reference_allele=mask_reference_allele,
         )
 
 

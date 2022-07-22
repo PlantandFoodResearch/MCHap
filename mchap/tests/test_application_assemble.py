@@ -235,6 +235,7 @@ def test_Program__header():
 
     filters_expect = [
         '##FILTER=<ID=PASS,Description="All filters passed">',
+        '##FILTER=<ID=NAA,Description="No alleles assembled with probability greater than threshold">',
     ]
     filters_actual = [line for line in header if line.startswith("##FILTER")]
     assert filters_actual == filters_expect

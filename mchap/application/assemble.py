@@ -101,7 +101,7 @@ class program(baseclass.program):
         -------
         data : LocusAssemblyData
             With sampledata fields: "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
-            and "GL", "GP", "AFP" if specified.
+            and "GL", "GP", "AFP" if specified and infodata flag "NRO".
         """
         for field in [
             "alleles",
@@ -175,11 +175,17 @@ class program(baseclass.program):
                 raise SampleAssemblyError(message) from e
 
         # call posterior haplotypes and sort and map to allele numbers
-        haplotypes = call_posterior_haplotypes(
+        haplotypes, ref_called = call_posterior_haplotypes(
             list(sample_posteriors.values()),
             threshold=self.haplotype_posterior_threshold,
         )
         haplotype_labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
+
+        # record if reference allele was not observed
+        data.infodata["REFMASKED"] = not ref_called
+        if not ref_called:
+            # remove from labeling
+            haplotype_labels.pop(haplotypes[0].tobytes())
 
         # decode and set alt alleles
         if len(haplotypes) > 1:

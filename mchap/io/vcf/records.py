@@ -15,7 +15,15 @@ def format_info_field(**kwargs):
     string : str
         VCF info field.
     """
-    parts = ["{}={}".format(k, vcfstr(v)) for k, v in kwargs.items()]
+    template = "{}={}"
+    parts = []
+    for k, v in kwargs.items():
+        if isinstance(v, bool):
+            # assume this is a flag
+            if v is True:
+                parts.append(k)
+        else:
+            parts.append(template.format(k, vcfstr(v)))
     return ";".join(parts)
 
 

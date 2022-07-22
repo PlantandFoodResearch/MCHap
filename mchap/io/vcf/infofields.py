@@ -60,6 +60,12 @@ RCOUNT = InfoField(
     type="Integer",
     descr="Total number of observed reads across all samples",
 )
+REFMASKED = InfoField(
+    id="REFMASKED",
+    number=0,
+    type="Flag",
+    descr="Reference allele is masked",
+)
 
 HEADER_INFO_FIELDS = dict(
     NS=NS,
@@ -74,4 +80,5 @@ HEADER_INFO_FIELDS = dict(
     SNVPOS=SNVPOS,
     AD=AD,
     RCOUNT=RCOUNT,
+    REFMASKED=REFMASKED,
 )
