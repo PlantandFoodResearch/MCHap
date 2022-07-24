@@ -11,6 +11,7 @@ from mchap.encoding import integer, character
 __all__ = [
     "SNP",
     "Locus",
+    "LocusPrior",
     "read_bed4",
 ]
 
@@ -33,9 +34,6 @@ class Locus:
     name: str
     sequence: str
     variants: tuple
-    alts: tuple = None
-    frequencies: np.ndarray = None
-    mask_reference_allele: bool = False
 
     @property
     def positions(self):
@@ -60,7 +58,6 @@ class Locus:
             name=self.name,
             sequence=self.sequence,
             variants=self.variants,
-            alts=self.alts,
         )
 
     def set(self, **kwargs):
@@ -97,14 +94,6 @@ class Locus:
         # join and return
         return "".join(chars)
 
-    def encode_haplotypes(self):
-        strings = (self.sequence,) + self.alts
-        chars = np.array([list(string) for string in strings])
-        idx = np.array(self.positions) - self.start
-        if len(idx) == 0:
-            return np.zeros((len(strings), 0), dtype=int)
-        return character.as_allelic(chars[:, idx], self.alleles)
-
     def format_haplotypes(self, array, gap="-"):
         """Format integer encoded alleles as a haplotype string"""
         variants = integer.as_characters(array, gap=gap, alleles=self.alleles)
@@ -128,6 +117,30 @@ class Locus:
             variants=None,
         )
 
+
+@dataclass(frozen=True, order=True)
+class LocusPrior(Locus):
+    alts: tuple
+    frequencies: np.ndarray
+    mask_reference_allele: bool = False
+
+    def set(self):
+        raise NotImplementedError
+
+    def set_sequence(self):
+        raise NotImplementedError
+
+    def set_variants(self):
+        raise NotImplementedError
+
+    def encode_haplotypes(self):
+        strings = (self.sequence,) + self.alts
+        chars = np.array([list(string) for string in strings])
+        idx = np.array(self.positions) - self.start
+        if len(idx) == 0:
+            return np.zeros((len(strings), 0), dtype=int)
+        return character.as_allelic(chars[:, idx], self.alleles)
+
     @classmethod
     def from_variant_record(
         cls,
@@ -135,9 +148,10 @@ class Locus:
         use_snvpos=False,
         frequency_tag=None,
         frequency_min=None,
-        ignore_ref_allele_flag="REFMASKED",
+        frequency_prior=False,
+        masked_reference_flag="REFMASKED",
     ):
-        """Generate a locus object with reference and variants from
+        """Generate a locusPrior object with reference and variants from
         a known MNP.
 
         Parameters
@@ -154,7 +168,10 @@ class Locus:
             Minimum frequency required to include an alternate allele.
             If the reference allele does not meet this threshold then
             it will be included with a frequency of 0.
-        ignore_ref_allele_flag : str
+        frequency_prior : bool
+            By default a flat prior is used, if true the observed frequencies
+            will be used in place of the flat prior.
+        masked_reference_flag : str
             VCF INFO tag used to indicate that the reference allele should
             not be used.
 
@@ -172,49 +189,64 @@ class Locus:
             alts = ()
         sequences += alts
 
-        # start mask for alleles
-        if ignore_ref_allele_flag in record.info:
-            mask_reference_allele = record.info[ignore_ref_allele_flag]
-        else:
-            mask_reference_allele = False
-
+        # prior allele frequencies
         if frequency_tag:
             frequencies = np.array(record.info[frequency_tag])
             assert len(frequencies) == len(sequences)
-            # if ref is masked set freq to 0
+        else:
+            # flat prior
+            frequencies = np.ones(len(sequences)) / len(sequences)
+
+        # check if ref allele is masked and make frequency match
+        if masked_reference_flag in record.info:
+            mask_reference_allele = record.info[masked_reference_flag]
             if mask_reference_allele:
                 frequencies[0] = 0
-            # normalise frequencies
+        else:
+            mask_reference_allele = False
+
+        # normalise frequencies
+        denom = frequencies.sum()
+        if denom > 0:
+            frequencies /= denom
+        else:
+            frequencies[:] = np.nan
+
+        # mask rare haplotypes
+        if frequency_min:
+            keep = frequencies >= frequency_min
+            if not keep[0]:
+                # must keep ref so mask
+                mask_reference_allele = True
+                frequencies[0] = 0
+                keep[0] = True
+            # drop alts
+            sequences = tuple(a for a, k in zip(sequences, keep) if k)
+            frequencies = frequencies[keep]
+            # re-normalise frequencies
             denom = frequencies.sum()
             if denom > 0:
                 frequencies /= denom
             else:
                 frequencies[:] = np.nan
-            # mask rare haplotypes
-            if frequency_min:
-                keep = frequencies >= frequency_min
-                if not keep[0]:
-                    # must keep ref so mask
-                    mask_reference_allele = True
-                    frequencies[0] = 0
-                    keep[0] = True
-                # drop alts
-                sequences = tuple(a for a, k in zip(sequences, keep) if k)
-                frequencies = frequencies[keep]
-                # re-normalise frequencies
-                denom = frequencies.sum()
-                if denom > 0:
-                    frequencies /= denom
-                else:
-                    frequencies[:] = np.nan
-            assert len(frequencies) == len(sequences)
-        elif frequency_min:
-            raise ValueError(
-                "Use of frequency minimum requires specification of frequency tag"
-            )
-        else:
-            frequencies = None
+        assert len(frequencies) == len(sequences)
 
+        # flatten prior if needed
+        if frequency_prior:
+            assert frequency_tag is not None
+            pass
+        else:
+            # flatten prior
+            frequencies = np.ones(len(sequences))
+            if mask_reference_allele:
+                frequencies[0] = 0
+            denom = frequencies.sum()
+            if denom > 0:
+                frequencies /= denom
+            else:
+                frequencies[:] = np.nan
+
+        # encoded haplotypes
         haplotypes = np.array([list(var) for var in sequences])
         if use_snvpos:
             snvpos = record.info["SNVPOS"]
@@ -256,7 +288,12 @@ def _parse_bed4_line(line):
         name = None
 
     return Locus(
-        contig=contig, start=start, stop=stop, name=name, sequence=None, variants=None
+        contig=contig,
+        start=start,
+        stop=stop,
+        name=name,
+        sequence=None,
+        variants=None,
     )
 
 

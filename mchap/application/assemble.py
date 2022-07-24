@@ -100,8 +100,9 @@ class program(baseclass.program):
         Returns
         -------
         data : LocusAssemblyData
-            With sampledata fields: "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
-            and "GL", "GP", "AFP" if specified and infodata flag "NRO".
+            With columndata fields REF and ALTS, sampledata fields: "alleles",
+            "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
+            and "GL", "GP", "AFP" if specified and infodata flag "REFMASKED".
         """
         for field in [
             "alleles",
@@ -187,12 +188,13 @@ class program(baseclass.program):
             # remove from labeling
             haplotype_labels.pop(haplotypes[0].tobytes())
 
-        # decode and set alt alleles
+        # decode and save alt alleles
         if len(haplotypes) > 1:
             alts = data.locus.format_haplotypes(haplotypes[1:])
         else:
             alts = []
-        data.locus = data.locus.set(alts=alts)
+        data.columndata["REF"] = data.locus.sequence
+        data.columndata["ALTS"] = alts
 
         # encode sample haplotypes as alleles
         for sample in data.samples:

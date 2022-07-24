@@ -3,6 +3,7 @@ from mchap.calling import CallingMCMC
 from mchap.io import (
     SNP,
     Locus,
+    LocusPrior,
     read_bed4,
     extract_sample_ids,
     extract_read_variants,
@@ -21,6 +22,7 @@ __all__ = [
     "DenovoMCMC",
     "CallingMCMC",
     "Locus",
+    "LocusPrior",
     "SNP",
     "combinatorics",
     "read_bed4",

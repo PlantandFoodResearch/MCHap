@@ -56,8 +56,9 @@ class program(call_baseclass.program):
         Returns
         -------
         data : LocusAssemblyData
-            With sampledata fields: "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
-            and "GL", "GP" if specified.
+            With columndata fields REF and ALTS, sampledata fields:
+            "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
+            and "GL", "GP" if specified and infodata flag "REFMASKED".
         """
         for field in [
             "alleles",
@@ -73,22 +74,38 @@ class program(call_baseclass.program):
         ]:
             data.sampledata[field] = dict()
         haplotypes = data.locus.encode_haplotypes()
+        mask_reference_allele = data.locus.mask_reference_allele
 
-        # get prior for allele frequencies
-        if self.use_haplotype_frequencies_prior:
+        # save allele sequences
+        data.columndata["REF"] = data.locus.sequence
+        data.columndata["ALTS"] = data.locus.alts
+        data.infodata["REFMASKED"] = mask_reference_allele
+
+        # get prior for allele frequencies and check arguments
+        prior_frequencies = data.locus.frequencies
+        if self.use_haplotype_frequencies_prior or self.skip_rare_haplotypes:
             assert self.haplotype_frequencies_tag
-            prior_frequencies = data.locus.frequencies
-            assert prior_frequencies is not None
-        elif self.skip_rare_haplotypes:
-            # need to specify flat prior over alleles that meet the specified threshold
-            assert self.haplotype_frequencies_tag
-            prior_frequencies = data.locus.frequencies
-            assert prior_frequencies is not None
-            idx = prior_frequencies >= self.skip_rare_haplotypes
-            prior_frequencies[idx] = 1 / idx.sum()
-            prior_frequencies[~idx] = 0
-        else:
-            prior_frequencies = None
+        if mask_reference_allele:
+            assert (prior_frequencies[0] == 0) or np.isnan(prior_frequencies[0])
+
+        # need to mock null results if we have nan priors
+        # TODO: handle this more elegantly?
+        if np.sum(prior_frequencies).round() != 1:
+            for sample in data.samples:
+                ploidy = data.sample_ploidy[sample]
+                data.sampledata["alleles"][sample] = np.full(ploidy, -1, int)
+                data.sampledata["haplotypes"][sample] = np.full(
+                    (ploidy, len(haplotypes[0])), -1, int
+                )
+                data.sampledata["GQ"][sample] = np.nan
+                data.sampledata["GPM"][sample] = np.nan
+                data.sampledata["PHPM"][sample] = np.nan
+                data.sampledata["PHQ"][sample] = np.nan
+                data.sampledata["MCI"][sample] = np.nan
+                data.sampledata["AFP"][sample] = np.array([np.nan])
+                data.sampledata["GP"][sample] = np.array([np.nan])
+                data.sampledata["GL"][sample] = np.array([np.nan])
+            return data
 
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception

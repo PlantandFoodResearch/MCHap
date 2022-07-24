@@ -53,8 +53,9 @@ class program(call_baseclass.program):
         Returns
         -------
         data : LocusAssemblyData
-            With sampledata fields: "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
-            and "GL", "GP" if specified and infodata flag "NRO".
+            With columndata fields REF and ALTS, sampledata fields:
+            "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
+            and "GL", "GP" if specified and infodata flag "REFMASKED".
         """
         for field in [
             "alleles",
@@ -76,7 +77,9 @@ class program(call_baseclass.program):
         mask = np.zeros(len(haplotypes), bool)
         mask[0] = mask_reference_allele
 
-        # record if reference allele was masked
+        # save allele sequences
+        data.columndata["REF"] = data.locus.sequence
+        data.columndata["ALTS"] = data.locus.alts
         data.infodata["REFMASKED"] = mask_reference_allele
 
         # mask zero frequency haplotypes if using prior
@@ -102,7 +105,7 @@ class program(call_baseclass.program):
         else:
             prior_frequencies = None
 
-        # need to mock null results if we can do MCMC
+        # need to mock null results if we cant do MCMC
         # TODO: handle this more elegantly?
         if invalid_scenario:
             for sample in data.samples:

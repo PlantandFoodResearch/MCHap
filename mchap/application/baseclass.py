@@ -278,7 +278,7 @@ class program(object):
         Returns
         -------
         data : LocusAssemblyData
-            With columndata fields: "REF" "ALTS" and infodata fields:
+            With infodata fields:
             "END", "NVAR", "SNVPOS", "AC", "AN", "NS", "DP", "RCOUNT"
             and "AFP" if specified.
         """
@@ -288,12 +288,9 @@ class program(object):
         data.infodata["SNVPOS"] = (
             np.subtract(data.locus.positions, data.locus.start) + 1
         )
-        # sequences
-        data.columndata["REF"] = data.locus.sequence
-        data.columndata["ALTS"] = data.locus.alts
         # filters
         filters = []
-        if (len(data.locus.alts) == 0) and data.infodata.get(
+        if (len(data.columndata["ALTS"]) == 0) and data.infodata.get(
             vcf.infofields.REFMASKED.id, False
         ):
             filters.append(vcf.filters.NAA.id)

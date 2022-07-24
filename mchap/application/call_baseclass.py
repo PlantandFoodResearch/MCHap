@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import pysam
 
 from mchap.application import baseclass
-from mchap.io import Locus
+from mchap.io import LocusPrior
 
 
 @dataclass
@@ -14,7 +14,7 @@ class program(baseclass.program):
     def loci(self):
         with pysam.VariantFile(self.vcf) as f:
             for record in f.fetch():
-                locus = Locus.from_variant_record(
+                locus = LocusPrior.from_variant_record(
                     record,
                     frequency_tag=self.haplotype_frequencies_tag,
                     frequency_min=self.skip_rare_haplotypes,
