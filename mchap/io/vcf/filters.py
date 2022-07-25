@@ -12,11 +12,9 @@ class VariantFilter(object):
 
 
 PASS = VariantFilter("PASS", "All filters passed")
-NAA = VariantFilter(
-    "NAA", "No alleles assembled with probability greater than threshold"
-)
+NOA = VariantFilter("NOA", "No observed alleles at locus")
 
 VARIANT_FILTERS = dict(
     PASS=PASS,
-    NAA=NAA,
+    NOA=NOA,
 )

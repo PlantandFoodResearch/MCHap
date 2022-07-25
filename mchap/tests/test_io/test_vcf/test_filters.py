@@ -7,7 +7,7 @@ def test_PASS():
     assert filters.PASS.id == "PASS"
 
 
-def test_NAA():
-    expect = '##FILTER=<ID=NAA,Description="No alleles assembled with probability greater than threshold">'
-    assert str(filters.NAA) == expect
-    assert filters.NAA.id == "NAA"
+def test_NOA():
+    expect = '##FILTER=<ID=NOA,Description="No observed alleles at locus">'
+    assert str(filters.NOA) == expect
+    assert filters.NOA.id == "NOA"

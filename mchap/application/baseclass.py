@@ -115,7 +115,7 @@ class program(object):
         contigs = self.header_contigs()
         filters = [
             vcf.filters.PASS,
-            vcf.filters.NAA,
+            vcf.filters.NOA,
         ]
         info_fields = [HEADER_INFO_FIELDS[field] for field in self.info_fields()]
         format_fields = [HEADER_FORMAT_FIELDS[field] for field in self.format_fields()]
@@ -293,7 +293,7 @@ class program(object):
         if (len(data.columndata["ALTS"]) == 0) and data.infodata.get(
             vcf.infofields.REFMASKED.id, False
         ):
-            filters.append(vcf.filters.NAA.id)
+            filters.append(vcf.filters.NOA.id)
         if len(filters) == 0:
             filters.append(vcf.filters.PASS.id)
         data.columndata["FILTER"] = ";".join(filters)

@@ -8,7 +8,7 @@
 ##contig=<ID=CHR2,length=60>
 ##contig=<ID=CHR3,length=60>
 ##FILTER=<ID=PASS,Description="All filters passed">
-##FILTER=<ID=NAA,Description="No alleles assembled with probability greater than threshold">
+##FILTER=<ID=NOA,Description="No observed alleles at locus">
 ##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
 ##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
 ##INFO=<ID=REFMASKED,Number=0,Type=Flag,Description="Reference allele is masked">
