@@ -2,6 +2,8 @@
 
 ## Unreleased 
 
+## Beta v0.7.0
+
 New Features:
 - Mask reference allele when it is only reported to satisfy VCF spec #146
 - Optionally report prior allele frequencies in `AFPR` field
