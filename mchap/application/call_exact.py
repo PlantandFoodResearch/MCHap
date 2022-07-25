@@ -21,7 +21,7 @@ from mchap.jitutils import (
     index_as_genotype_alleles,
 )
 
-from mchap.io import qual_of_prob
+from mchap.io import qual_of_prob, vcf
 
 
 @dataclass
@@ -89,9 +89,21 @@ class program(call_baseclass.program):
         if mask_reference_allele:
             assert (prior_frequencies[0] == 0) or np.isnan(prior_frequencies[0])
 
-        # need to mock null results if we have nan priors
+        # handle invalid scenarios
         # TODO: handle this more elegantly?
-        if np.sum(prior_frequencies).round() != 1:
+        if mask_reference_allele and len(haplotypes) == 1:
+            # only allele is masked
+            invalid_scenario = True
+            data.columndata["FILTER"].append(vcf.filters.NOA.id)
+        elif np.any(np.isnan(prior_frequencies)):
+            # nan caused by zero freq
+            invalid_scenario = True
+            data.columndata["FILTER"].append(vcf.filters.AF0.id)
+        else:
+            invalid_scenario = False
+
+        # mock data for invalid scenario
+        if invalid_scenario:
             for sample in data.samples:
                 ploidy = data.sample_ploidy[sample]
                 data.sampledata["alleles"][sample] = np.full(ploidy, -1, int)

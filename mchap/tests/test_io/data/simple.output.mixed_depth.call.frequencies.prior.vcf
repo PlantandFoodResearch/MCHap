@@ -2,13 +2,14 @@
 ##fileDate=20210420
 ##source=mchap v0.6.0
 ##phasing=None
-##commandline="mchap call --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --haplotypes mock.input.frequencies.skiprare.vcf --haplotype-frequencies AFP --haplotype-frequencies-prior --mcmc-steps 500 --mcmc-burn 100 --mcmc-seed 11 --report AFPR AFP"
+##commandline="mchap call --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --haplotypes mock.input.frequencies.vcf --haplotype-frequencies AFP --haplotype-frequencies-prior --mcmc-steps 500 --mcmc-burn 100 --mcmc-seed 11 --report AFPR AFP"
 ##randomseed=11
 ##contig=<ID=CHR1,length=60>
 ##contig=<ID=CHR2,length=60>
 ##contig=<ID=CHR3,length=60>
 ##FILTER=<ID=PASS,Description="All filters passed">
 ##FILTER=<ID=NOA,Description="No observed alleles at locus">
+##FILTER=<ID=AF0,Description="All alleles have prior allele frequency of zero">
 ##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
 ##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
 ##INFO=<ID=REFMASKED,Number=0,Type=Flag,Description="Reference allele is masked">
@@ -38,4 +39,4 @@ CHR1	31	CHR1_30_50	AAAAAAAAAAAAAAAAAAAA	.	.	PASS	AN=1;AC=.;NS=3;DP=.;RCOUNT=288;
 CHR2	11	CHR2_10_30	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAGAAAAAAAAAA,AAAAAAAAATAAAAAAAAAA,AAAATAAAAGAAAAAAAAAA	.	PASS	AN=4;AC=3,2,1;NS=3;DP=168;RCOUNT=288;END=30;NVAR=2;SNVPOS=5,10;AFPR=0.487,0.238,0.18,0.094;AFP=0.504,0.236,0.172,0.088	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/0/2:11:18:14:24:28:0:0:0.924:0.984:0:0.731,0.003,0.265,0.001	0/0/1/2:60:60:140:240:280:0:0:1:1:0:0.5,0.25,0.25,0	0/1/1/3:8:24:14:24:28:0:0:0.825:0.996:0:0.281,0.456,0.001,0.262
 CHR3	21	CHR3_20_40	AAAAAAAAAAAAAAAAAAAA	.	.	PASS	AN=1;AC=.;NS=3;DP=.;RCOUNT=0;END=40;NVAR=0;SNVPOS=.;AFPR=1;AFP=1	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/0/0:60:60:.:0:0:0:.:1:1:0:1	0/0/0/0:60:60:.:0:0:0:.:1:1:0:1	0/0/0/0:60:60:.:0:0:0:.:1:1:0:1
 CHR1	31	CHR1_30_50_MASK	AAAAAAAAAAAAAAAAAAAA	.	.	NOA	AN=0;AC=.;REFMASKED;NS=0;DP=.;RCOUNT=288;END=50;NVAR=0;SNVPOS=.;AFPR=.;AFP=.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	./././.:.:.:.:24:0:0:.:.:.:.:.	./././.:.:.:.:240:0:0:.:.:.:.:.	./././.:.:.:.:24:0:0:.:.:.:.:.
-CHR1	6	CHR1_05_25_ZERO	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	PASS	AN=0;AC=0,0;NS=0;DP=159;RCOUNT=240;END=25;NVAR=3;SNVPOS=2,11,18;AFPR=.,.,.;AFP=.,.,.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	./././.:.:.:13:20:40:40:1:.:.:.:.	./././.:.:.:133:200:400:400:1:.:.:.:.	./././.:.:.:13:20:40:40:1:.:.:.:.
+CHR1	6	CHR1_05_25_ZERO	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	AF0	AN=0;AC=0,0;NS=0;DP=159;RCOUNT=240;END=25;NVAR=3;SNVPOS=2,11,18;AFPR=.,.,.;AFP=.,.,.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	./././.:.:.:13:20:40:40:1:.:.:.:.	./././.:.:.:133:200:400:400:1:.:.:.:.	./././.:.:.:13:20:40:40:1:.:.:.:.

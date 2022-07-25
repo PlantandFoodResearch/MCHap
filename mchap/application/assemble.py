@@ -187,6 +187,9 @@ class program(baseclass.program):
         if not ref_called:
             # remove from labeling
             haplotype_labels.pop(haplotypes[0].tobytes())
+            # filter for no observed alleles
+            if len(haplotypes) == 1:
+                data.columndata["FILTER"].append(vcf.filters.NOA.id)
 
         # decode and save alt alleles
         if len(haplotypes) > 1:

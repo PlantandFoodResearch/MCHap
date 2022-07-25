@@ -13,7 +13,7 @@ from mchap.calling.classes import CallingMCMC
 from mchap.calling.exact import genotype_likelihoods
 from mchap.jitutils import natural_log_to_log10
 
-from mchap.io import qual_of_prob
+from mchap.io import qual_of_prob, vcf
 
 
 @dataclass
@@ -102,12 +102,23 @@ class program(call_baseclass.program):
         # get prior for allele frequencies
         if self.use_haplotype_frequencies_prior:
             prior_frequencies = haplotype_frequencies[~mask]
-            invalid_scenario |= np.any(np.isnan(prior_frequencies))
         else:
             prior_frequencies = None
 
-        # need to mock null results if we cant do MCMC
+        # handle invalid scenarios
         # TODO: handle this more elegantly?
+        if len(mcmc_haplotypes) == 0:
+            # must have one or more haplotypes for MCMC
+            invalid_scenario = True
+            data.columndata["FILTER"].append(vcf.filters.NOA.id)
+        elif self.use_haplotype_frequencies_prior and np.any(
+            np.isnan(prior_frequencies)
+        ):
+            # nan caused by zero freq
+            invalid_scenario = True
+            data.columndata["FILTER"].append(vcf.filters.AF0.id)
+        else:
+            invalid_scenario = False
         if invalid_scenario:
             for sample in data.samples:
                 ploidy = data.sample_ploidy[sample]

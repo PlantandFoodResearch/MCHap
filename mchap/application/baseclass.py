@@ -116,6 +116,7 @@ class program(object):
         filters = [
             vcf.filters.PASS,
             vcf.filters.NOA,
+            vcf.filters.AF0,
         ]
         info_fields = [HEADER_INFO_FIELDS[field] for field in self.info_fields()]
         format_fields = [HEADER_FORMAT_FIELDS[field] for field in self.format_fields()]
@@ -137,7 +138,7 @@ class program(object):
             sample_inbreeding=self.sample_inbreeding,
             infofields=infofields,
             formatfields=formatfields,
-            columndata=dict(),
+            columndata=dict(FILTER=list()),
             infodata=dict(),
             sampledata=dict(),
         )
@@ -288,15 +289,9 @@ class program(object):
         data.infodata["SNVPOS"] = (
             np.subtract(data.locus.positions, data.locus.start) + 1
         )
-        # filters
-        filters = []
-        if (len(data.columndata["ALTS"]) == 0) and data.infodata.get(
-            vcf.infofields.REFMASKED.id, False
-        ):
-            filters.append(vcf.filters.NOA.id)
-        if len(filters) == 0:
-            filters.append(vcf.filters.PASS.id)
-        data.columndata["FILTER"] = ";".join(filters)
+        # if no filters applied then locus passed
+        if len(data.columndata["FILTER"]) == 0:
+            data.columndata["FILTER"] = vcf.filters.PASS.id
         # alt allele counts
         allele_counts = np.zeros(len(data.columndata["ALTS"]) + 1, int)
         for array in data.sampledata["alleles"].values():
