@@ -81,7 +81,7 @@ class program(call_baseclass.program):
         data.columndata["REF"] = data.locus.sequence
         data.columndata["ALTS"] = data.locus.alts
         data.infodata["REFMASKED"] = mask_reference_allele
-        data.infodata["AFPR"] = np.round(prior_frequencies, self.precision)
+        data.infodata["AFPRIOR"] = np.round(prior_frequencies, self.precision)
 
         # check prior frequencies arguments
         if self.use_haplotype_frequencies_prior or self.skip_rare_haplotypes:
