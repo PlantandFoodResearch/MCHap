@@ -18,5 +18,6 @@ class program(baseclass.program):
                     record,
                     frequency_tag=self.haplotype_frequencies_tag,
                     frequency_min=self.skip_rare_haplotypes,
+                    frequency_prior=self.use_haplotype_frequencies_prior,
                 )
                 yield locus
