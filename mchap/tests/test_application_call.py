@@ -34,6 +34,7 @@ from mchap.application.call import program
                 "--skip-rare-haplotypes",
                 "0.1",
                 "--report",
+                "AFPR",
                 "AFP",
             ],
             "simple.output.mixed_depth.call.frequencies.skiprare.vcf",

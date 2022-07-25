@@ -76,7 +76,7 @@ class program(object):
             "END",
             "NVAR",
             "SNVPOS",
-        ] + [f for f in ["AFP"] if f in self.report_fields]
+        ] + [f for f in ["AFPR", "AFP"] if f in self.report_fields]
         return infofields
 
     def format_fields(self):

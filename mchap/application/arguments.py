@@ -348,9 +348,10 @@ report = Parameter(
         default=[],
         help=(
             "Extra fields to report within the output VCF: "
+            "AFPR = prior allele frequencies; "
+            "AFP = posterior mean allele frequencies; "
             "GP = genotype posterior probabilities; "
-            "GL = genotype likelihoods; "
-            "AFP = posterior mean allele frequencies."
+            "GL = genotype likelihoods."
         ),
     ),
 )

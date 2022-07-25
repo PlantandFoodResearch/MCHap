@@ -75,14 +75,15 @@ class program(call_baseclass.program):
             data.sampledata[field] = dict()
         haplotypes = data.locus.encode_haplotypes()
         mask_reference_allele = data.locus.mask_reference_allele
+        prior_frequencies = data.locus.frequencies
 
         # save allele sequences
         data.columndata["REF"] = data.locus.sequence
         data.columndata["ALTS"] = data.locus.alts
         data.infodata["REFMASKED"] = mask_reference_allele
+        data.infodata["AFPR"] = np.round(prior_frequencies, self.precision)
 
-        # get prior for allele frequencies and check arguments
-        prior_frequencies = data.locus.frequencies
+        # check prior frequencies arguments
         if self.use_haplotype_frequencies_prior or self.skip_rare_haplotypes:
             assert self.haplotype_frequencies_tag
         if mask_reference_allele:

@@ -81,6 +81,7 @@ class program(call_baseclass.program):
         data.columndata["REF"] = data.locus.sequence
         data.columndata["ALTS"] = data.locus.alts
         data.infodata["REFMASKED"] = mask_reference_allele
+        data.infodata["AFPR"] = np.round(haplotype_frequencies, self.precision)
 
         # mask zero frequency haplotypes if using prior
         if self.use_haplotype_frequencies_prior:
