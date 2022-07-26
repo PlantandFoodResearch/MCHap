@@ -13,7 +13,7 @@ from mchap.calling.classes import CallingMCMC
 from mchap.calling.exact import genotype_likelihoods
 from mchap.jitutils import natural_log_to_log10
 
-from mchap.io import qual_of_prob
+from mchap.io import qual_of_prob, vcf
 
 
 @dataclass
@@ -53,8 +53,9 @@ class program(call_baseclass.program):
         Returns
         -------
         data : LocusAssemblyData
-            With sampledata fields: "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
-            and "GL", "GP" if specified.
+            With columndata fields REF and ALTS, sampledata fields:
+            "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
+            and "GL", "GP" if specified and infodata flag "REFMASKED".
         """
         for field in [
             "alleles",
@@ -69,35 +70,71 @@ class program(call_baseclass.program):
             "AFP",
         ]:
             data.sampledata[field] = dict()
-
-        # get haplotypes an check if we need to use a subset
+        # get haplotypes and metadata
         haplotypes = data.locus.encode_haplotypes()
         haplotype_frequencies = data.locus.frequencies
-        if self.use_haplotype_frequencies_prior or self.skip_rare_haplotypes:
-            # frequencies must be set
-            assert self.haplotype_frequencies_tag
-            assert haplotype_frequencies is not None
-            # need to skip any allele with a frequency of 0
-            mcmc_haplotype_labels = np.where(haplotype_frequencies > 0)[0]
-            if len(mcmc_haplotype_labels) < len(haplotypes):
-                # subset of haplotypes
-                mcmc_haplotypes = haplotypes[mcmc_haplotype_labels]
-            else:
-                # using all haplotypes anyway
-                mcmc_haplotype_labels = None
-                mcmc_haplotypes = haplotypes
+        mask_reference_allele = data.locus.mask_reference_allele
+        mask = np.zeros(len(haplotypes), bool)
+        mask[0] = mask_reference_allele
+
+        # save allele sequences
+        data.columndata["REF"] = data.locus.sequence
+        data.columndata["ALTS"] = data.locus.alts
+        data.infodata["REFMASKED"] = mask_reference_allele
+        data.infodata["AFPRIOR"] = np.round(haplotype_frequencies, self.precision)
+
+        # mask zero frequency haplotypes if using prior
+        if self.use_haplotype_frequencies_prior:
+            mask |= haplotype_frequencies == 0
+
+        # remove masked haplotypes from mcmc
+        if np.any(mask):
+            mcmc_haplotypes = haplotypes[~mask]
+            mcmc_haplotype_labels = np.where(~mask)[0]
         else:
             # use all haplotypes
             mcmc_haplotype_labels = None
             mcmc_haplotypes = haplotypes
 
+        # must have one or more haplotypes for MCMC
+        invalid_scenario = len(mcmc_haplotypes) == 0
+
         # get prior for allele frequencies
-        if self.use_haplotype_frequencies_prior and mcmc_haplotype_labels is not None:
-            prior_frequencies = haplotype_frequencies[mcmc_haplotype_labels]
-        elif self.use_haplotype_frequencies_prior:
-            prior_frequencies = haplotype_frequencies
+        if self.use_haplotype_frequencies_prior:
+            prior_frequencies = haplotype_frequencies[~mask]
         else:
             prior_frequencies = None
+
+        # handle invalid scenarios
+        # TODO: handle this more elegantly?
+        if len(mcmc_haplotypes) == 0:
+            # must have one or more haplotypes for MCMC
+            invalid_scenario = True
+            data.columndata["FILTER"].append(vcf.filters.NOA.id)
+        elif self.use_haplotype_frequencies_prior and np.any(
+            np.isnan(prior_frequencies)
+        ):
+            # nan caused by zero freq
+            invalid_scenario = True
+            data.columndata["FILTER"].append(vcf.filters.AF0.id)
+        else:
+            invalid_scenario = False
+        if invalid_scenario:
+            for sample in data.samples:
+                ploidy = data.sample_ploidy[sample]
+                data.sampledata["alleles"][sample] = np.full(ploidy, -1, int)
+                data.sampledata["haplotypes"][sample] = np.full(
+                    (ploidy, len(haplotypes[0])), -1, int
+                )
+                data.sampledata["GQ"][sample] = np.nan
+                data.sampledata["GPM"][sample] = np.nan
+                data.sampledata["PHPM"][sample] = np.nan
+                data.sampledata["PHQ"][sample] = np.nan
+                data.sampledata["MCI"][sample] = np.nan
+                data.sampledata["AFP"][sample] = np.array([np.nan])
+                data.sampledata["GP"][sample] = np.array([np.nan])
+                data.sampledata["GL"][sample] = np.array([np.nan])
+            return data
 
         # iterate of samples
         for sample in data.samples:

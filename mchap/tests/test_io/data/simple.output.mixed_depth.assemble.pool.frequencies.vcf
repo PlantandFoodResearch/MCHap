@@ -1,6 +1,6 @@
 ##fileformat=VCFv4.3
 ##fileDate=20220412
-##source=mchap v0.6.0
+##source=mchap v0.7.0
 ##phasing=None
 ##commandline="mchap assemble --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --targets simple.bed.gz --variants simple.vcf.gz --reference simple.fasta --mcmc-steps 500 --mcmc-burn 100 --mcmc-seed 11 --read-group-field POOL --report AFP"
 ##randomseed=11
@@ -8,8 +8,11 @@
 ##contig=<ID=CHR2,length=60>
 ##contig=<ID=CHR3,length=60>
 ##FILTER=<ID=PASS,Description="All filters passed">
+##FILTER=<ID=NOA,Description="No observed alleles at locus">
+##FILTER=<ID=AF0,Description="All alleles have prior allele frequency of zero">
 ##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
 ##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=REFMASKED,Number=0,Type=Flag,Description="Reference allele is masked">
 ##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of samples with data">
 ##INFO=<ID=DP,Number=1,Type=Integer,Description="Combined depth across samples">
 ##INFO=<ID=RCOUNT,Number=1,Type=Integer,Description="Total number of observed reads across all samples">
@@ -30,7 +33,7 @@
 ##FORMAT=<ID=MCI,Number=1,Type=Integer,Description="Replicate Markov-chain incongruence, 0 = none, 1 = incongruence, 2 = putative CNV">
 ##FORMAT=<ID=AFP,Number=R,Type=Float,Description="Posterior mean allele frequencies">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	POOL
-CHR1	6	CHR1_05_25	AAAAAAAAAAAAAAAAAAAA	ACAAAAAAAAGAAAAAACAA,AAAAAAAAAAGAAAAAATAA	.	.	AN=3;AC=1,1;NS=1;DP=160;RCOUNT=240;END=25;NVAR=3;SNVPOS=2,11,18;AFP=0.5,0.25,0.25	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/1/2:60:60:160:240:480:0:0:1:1:0:0.5,0.25,0.25
-CHR1	31	CHR1_30_50	AAAAAAAAAAAAAAAAAAAA	.	.	.	AN=1;AC=.;NS=1;DP=.;RCOUNT=288;END=50;NVAR=0;SNVPOS=.;AFP=1	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/0/0:60:60:.:288:0:0:.:1:1:0:1
-CHR2	11	CHR2_10_30	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAATAAAAAAAAAA,AAAAAAAAAGAAAAAAAAAA	.	.	AN=3;AC=1,1;NS=1;DP=168;RCOUNT=288;END=30;NVAR=2;SNVPOS=5,10;AFP=0.5,0.25,0.25	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/1/2:60:60:168:288:336:3:0.009:1:1:0:0.5,0.25,0.25
-CHR3	21	CHR3_20_40	AAAAAAAAAAAAAAAAAAAA	.	.	.	AN=1;AC=.;NS=1;DP=.;RCOUNT=0;END=40;NVAR=0;SNVPOS=.;AFP=1	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/0/0:60:60:.:0:0:0:.:1:1:0:1
+CHR1	6	CHR1_05_25	AAAAAAAAAAAAAAAAAAAA	ACAAAAAAAAGAAAAAACAA,AAAAAAAAAAGAAAAAATAA	.	PASS	AN=3;AC=1,1;NS=1;DP=160;RCOUNT=240;END=25;NVAR=3;SNVPOS=2,11,18;AFP=0.5,0.25,0.25	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/1/2:60:60:160:240:480:0:0:1:1:0:0.5,0.25,0.25
+CHR1	31	CHR1_30_50	AAAAAAAAAAAAAAAAAAAA	.	.	PASS	AN=1;AC=.;NS=1;DP=.;RCOUNT=288;END=50;NVAR=0;SNVPOS=.;AFP=1	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/0/0:60:60:.:288:0:0:.:1:1:0:1
+CHR2	11	CHR2_10_30	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAATAAAAAAAAAA,AAAAAAAAAGAAAAAAAAAA	.	PASS	AN=3;AC=1,1;NS=1;DP=168;RCOUNT=288;END=30;NVAR=2;SNVPOS=5,10;AFP=0.5,0.25,0.25	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/1/2:60:60:168:288:336:3:0.009:1:1:0:0.5,0.25,0.25
+CHR3	21	CHR3_20_40	AAAAAAAAAAAAAAAAAAAA	.	.	PASS	AN=1;AC=.;NS=1;DP=.;RCOUNT=0;END=40;NVAR=0;SNVPOS=.;AFP=1	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/0/0:60:60:.:0:0:0:.:1:1:0:1

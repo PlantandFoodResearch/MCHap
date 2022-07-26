@@ -17,6 +17,8 @@ def call_posterior_haplotypes(posteriors, threshold=0.01):
     -------
     haplotypes : ndarray, int, shape, (n_haplotypes, n_base)
         VCF sorted haplotype arrays.
+    ref_observed : bool
+        Bool indicating that the reference allele was called.
     """
     # maps of bytes to arrays and bytes to sum probs
     haplotype_arrays = {}
@@ -48,6 +50,9 @@ def call_posterior_haplotypes(posteriors, threshold=0.01):
     if refbytes is not None:
         haplotype_arrays.pop(refbytes)
         haplotype_values.pop(refbytes)
+        ref_observed = True
+    else:
+        ref_observed = False
     # combine all called haplotypes into array
     n_alleles = len(haplotype_arrays) + 1
     n_base = posteriors[0].genotypes.shape[-1]
@@ -60,4 +65,4 @@ def call_posterior_haplotypes(posteriors, threshold=0.01):
     haplotypes[-1][:] = 0  # ref allele
     values[-1] = values.max() + 1
     order = np.flip(np.argsort(values))
-    return haplotypes[order]
+    return haplotypes[order], ref_observed

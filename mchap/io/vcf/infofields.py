@@ -34,6 +34,9 @@ AF = InfoField(id="AF", number="A", type="Float", descr="Allele Frequency")
 AFP = InfoField(
     id="AFP", number="R", type="Float", descr="Posterior mean allele frequencies"
 )
+AFPRIOR = InfoField(
+    id="AFPRIOR", number="R", type="Float", descr="Prior allele frequencies"
+)
 AA = InfoField(id="AA", number=1, type="String", descr="Ancestral allele")
 END = InfoField(id="END", number=1, type="Integer", descr="End position on CHROM")
 NVAR = InfoField(
@@ -60,6 +63,12 @@ RCOUNT = InfoField(
     type="Integer",
     descr="Total number of observed reads across all samples",
 )
+REFMASKED = InfoField(
+    id="REFMASKED",
+    number=0,
+    type="Flag",
+    descr="Reference allele is masked",
+)
 
 HEADER_INFO_FIELDS = dict(
     NS=NS,
@@ -68,10 +77,12 @@ HEADER_INFO_FIELDS = dict(
     AN=AN,
     AF=AF,
     AFP=AFP,
+    AFPRIOR=AFPRIOR,
     AA=AA,
     END=END,
     NVAR=NVAR,
     SNVPOS=SNVPOS,
     AD=AD,
     RCOUNT=RCOUNT,
+    REFMASKED=REFMASKED,
 )

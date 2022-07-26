@@ -26,7 +26,7 @@ from mchap.application.call import program
             "simple.output.mixed_depth.call.frequencies.vcf",
         ),
         (  # test using mock input will low ref allele frequency at first allele
-            "mock.input.frequencies.skiprare.vcf",
+            "mock.input.frequencies.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
                 "--haplotype-frequencies",
@@ -34,9 +34,23 @@ from mchap.application.call import program
                 "--skip-rare-haplotypes",
                 "0.1",
                 "--report",
+                "AFPRIOR",
                 "AFP",
             ],
             "simple.output.mixed_depth.call.frequencies.skiprare.vcf",
+        ),
+        (  # test using mock input will low ref allele frequency at first allele
+            "mock.input.frequencies.vcf",
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            [
+                "--haplotype-frequencies",
+                "AFP",
+                "--haplotype-frequencies-prior",
+                "--report",
+                "AFPRIOR",
+                "AFP",
+            ],
+            "simple.output.mixed_depth.call.frequencies.prior.vcf",
         ),
         (
             "simple.output.mixed_depth.assemble.vcf",

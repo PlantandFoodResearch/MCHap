@@ -100,8 +100,9 @@ class program(baseclass.program):
         Returns
         -------
         data : LocusAssemblyData
-            With sampledata fields: "alleles", "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
-            and "GL", "GP", "AFP" if specified.
+            With columndata fields REF and ALTS, sampledata fields: "alleles",
+            "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
+            and "GL", "GP", "AFP" if specified and infodata flag "REFMASKED".
         """
         for field in [
             "alleles",
@@ -175,18 +176,28 @@ class program(baseclass.program):
                 raise SampleAssemblyError(message) from e
 
         # call posterior haplotypes and sort and map to allele numbers
-        haplotypes = call_posterior_haplotypes(
+        haplotypes, ref_called = call_posterior_haplotypes(
             list(sample_posteriors.values()),
             threshold=self.haplotype_posterior_threshold,
         )
         haplotype_labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
 
-        # decode and set alt alleles
+        # record if reference allele was not observed
+        data.infodata["REFMASKED"] = not ref_called
+        if not ref_called:
+            # remove from labeling
+            haplotype_labels.pop(haplotypes[0].tobytes())
+            # filter for no observed alleles
+            if len(haplotypes) == 1:
+                data.columndata["FILTER"].append(vcf.filters.NOA.id)
+
+        # decode and save alt alleles
         if len(haplotypes) > 1:
             alts = data.locus.format_haplotypes(haplotypes[1:])
         else:
             alts = []
-        data.locus = data.locus.set(alts=alts)
+        data.columndata["REF"] = data.locus.sequence
+        data.columndata["ALTS"] = alts
 
         # encode sample haplotypes as alleles
         for sample in data.samples:

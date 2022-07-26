@@ -2,6 +2,21 @@
 
 ## Unreleased 
 
+## Beta v0.7.0
+
+New Features:
+- Mask reference allele when it is only reported to satisfy VCF spec #146
+- Optionally report prior allele frequencies in `AFPRIOR` field
+- Filtering for some edge cases where genotypes should not be reported (`AF0` and `NOA`)
+
+Bug Fixes:
+- Handle edge-case where all prior allele frequencies are zero #145
+
+VCF Changes:
+- Added `REFMASKED` info flag to indicate reference allele is amsked and should be ignored
+- Added `AFPRIOR` infor filed to indicate prior allele frequencies
+- Added `NOA` filter to indicate loci where no alleles were observed (e.g., masked reference only)
+- Added `AF0` filter to indicate invalid prior allele frequencies in which all frequencies were zero
 
 ## Beta v0.6.0
 

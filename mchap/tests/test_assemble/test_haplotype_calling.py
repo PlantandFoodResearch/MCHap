@@ -50,8 +50,9 @@ def test_call_posterior_haplotypes():
     )
     posteriors = [dist1, dist2, dist3]
     actual = haplotype_calling.call_posterior_haplotypes(posteriors, threshold=0.15)
-    expect = haplotypes[[0, 2, 1, 3]]  # ref then ordered
-    np.testing.assert_array_equal(actual, expect)
+    expect = haplotypes[[0, 2, 1, 3]], True  # ref then ordered with called ref
+    np.testing.assert_array_equal(actual[0], expect[0])
+    assert actual[1] == expect[1]
 
 
 def test_call_posterior_haplotypes__no_ref():
@@ -99,5 +100,6 @@ def test_call_posterior_haplotypes__no_ref():
     )
     posteriors = [dist1, dist2, dist3]
     actual = haplotype_calling.call_posterior_haplotypes(posteriors, threshold=0.15)
-    expect = haplotypes[[0, 2, 3, 1]]  # ref added at front ordered
-    np.testing.assert_array_equal(actual, expect)
+    expect = haplotypes[[0, 2, 3, 1]], False  # ref not called added at front
+    np.testing.assert_array_equal(actual[0], expect[0])
+    assert actual[1] == expect[1]
