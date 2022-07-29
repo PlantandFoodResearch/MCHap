@@ -1,9 +1,11 @@
 import numpy as np
+from math import lgamma
 from numba import njit
 
 from mchap.calling.utils import allelic_dosage
-from mchap.jitutils import comb, add_log_prob
+from mchap.jitutils import comb, add_log_prob, ln_equivalent_permutations
 from mchap.assemble.prior import log_genotype_prior
+from mchap.calling.prior import calculate_alphas
 
 
 @njit(cache=True)
@@ -89,6 +91,44 @@ def increment_dosage(dosage, constraint):
 
 
 @njit(cache=True)
+def second_gamete_log_pmf(gamete_dose, constant_dose, unique_haplotypes, inbreeding=0):
+    # TODO: prior frequencies
+    assert 0 <= inbreeding < 1
+    assert len(gamete_dose) == len(constant_dose)
+    gamete_tau = gamete_dose.sum()
+    constant_tau = constant_dose.sum()
+
+    # if not inbred use null prior
+    if inbreeding == 0:
+        ln_perms = ln_equivalent_permutations(gamete_dose)
+        return ln_perms - gamete_tau * np.log(unique_haplotypes)
+
+    # calculate the dispersion parameter for the PMF
+    alpha_const = calculate_alphas(inbreeding, 1 / unique_haplotypes)
+
+    # alpha of each allele is the base alpha plus constant dose
+    sum_alphas = constant_tau + alpha_const * unique_haplotypes
+
+    # left side of equation in log space
+    num = lgamma(gamete_tau + 1) + lgamma(sum_alphas)
+    denom = lgamma(gamete_tau + sum_alphas)
+    left = num - denom
+
+    # right side of equation
+    prod = 0.0  # log(1.0)
+    for i in range(len(gamete_dose)):
+        dose = gamete_dose[i]
+        if dose > 0:
+            alpha_i = alpha_const + constant_dose[i]
+            num = lgamma(dose + alpha_i)
+            denom = lgamma(dose + 1) + lgamma(alpha_i)
+            prod += num - denom
+
+    # return as log probability
+    return left + prod
+
+
+@njit(cache=True)
 def trio_log_pmf(
     progeny,
     parent_p,
@@ -138,9 +178,11 @@ def trio_log_pmf(
             lprob_pq = lprob_p + lprob_q
             lprob = add_log_prob(lprob, lprob_pq)
             # assuming p valid and q invalid (avoids iterating gametes of p twice)
-            # TODO: probability of gamete_q given gamete_p
+            # probability of gamete_q given gamete_p
             lprob_q = (
-                log_genotype_prior(gamete_q, n_alleles, inbreeding=inbreeding)
+                second_gamete_log_pmf(
+                    gamete_q, gamete_p, n_alleles, inbreeding=inbreeding
+                )
                 + lerror_q
             )
             lprob_pq = lprob_p + lprob_q
@@ -163,9 +205,11 @@ def trio_log_pmf(
                 np.log(dosage_permutations(gamete_p, dosage_p) / comb(ploidy_p, tau_p))
                 + lcorrect_p
             )
-            # TODO: probability of gamete_q given gamete_p
+            # probability of gamete_q given gamete_p
             lprob_q = (
-                log_genotype_prior(gamete_q, n_alleles, inbreeding=inbreeding)
+                second_gamete_log_pmf(
+                    gamete_q, gamete_p, n_alleles, inbreeding=inbreeding
+                )
                 + lerror_q
             )
             lprob_pq = lprob_p + lprob_q
@@ -184,9 +228,11 @@ def trio_log_pmf(
         gamete_q = initial_dosage(tau_q, constraint_q)
         gamete_p = dosage - gamete_q
         while True:
-            # TODO: probability of gamete_p given gamete_q
+            # probability of gamete_p given gamete_q
             lprob_p = (
-                log_genotype_prior(gamete_p, n_alleles, inbreeding=inbreeding)
+                second_gamete_log_pmf(
+                    gamete_p, gamete_q, n_alleles, inbreeding=inbreeding
+                )
                 + lerror_p
             )
             lprob_q = (
