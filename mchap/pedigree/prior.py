@@ -10,6 +10,28 @@ from mchap.calling.prior import calculate_alphas
 
 @njit(cache=True)
 def parental_copies(parent_alleles, progeny_alleles):
+    """Count the number of parental copies of each allele present
+    with a progeny genotype.
+
+    Parameters
+    ----------
+    parent_alleles : ndarray, int, shape (ploidy,)
+        Alleles observed within parent.
+    progeny_alleles : ndarray, int, shape (ploidy,)
+        Alleles observed within progeny.
+
+    Returns
+    -------
+    parental_copies : ndarray, int , shape (ploidy,)
+        The number of parental copies of each allele observed
+        in the progeny.
+
+    Notes
+    -----
+    Returned counts correspond to the first instance of each
+    progeny allele and subsequent copies of that allele will
+    correspond to a count of zero.
+    """
     parent_ploidy = len(parent_alleles)
     progeny_ploidy = len(progeny_alleles)
     copies = np.zeros_like(progeny_alleles)
@@ -24,6 +46,28 @@ def parental_copies(parent_alleles, progeny_alleles):
 
 @njit(cache=True)
 def dosage_permutations(dosage, constraint):
+    """Count the number of possible permutations in which
+    the observed dosage can be drawn from a constraint dosage
+    without replacement.
+
+    Parameters
+    ----------
+    dosage : ndarray, int, shape (ploidy,)
+        Counts of each unique allele in a genotype.
+    constraint : ndarray, int, shape (ploidy,)
+        Initial count of each allele.
+
+    Returns
+    -------
+    n : int
+        Number of permutations.
+
+    Notes
+    -----
+    This function can be used to determine the number of
+    possible permutations in which a gametes observed
+    dosage can be drawn from the parental (constraint) dosage.
+    """
     n = 1
     for i in range(len(dosage)):
         n *= comb(constraint[i], dosage[i])
@@ -32,6 +76,20 @@ def dosage_permutations(dosage, constraint):
 
 @njit(cache=True)
 def initial_dosage(ploidy, constraint):
+    """Calculate the initial dosage that fits within a constraint.
+
+    Parameters
+    ----------
+    ploidy : int
+        Number of alleles in dosage array.
+    constraint : ndarray, int, shape (ploidy,)
+        Max count of each allele.
+
+    Returns
+    -------
+    dosage : ndarray, int, shape (ploidy,)
+        Counts of each unique allele in a genotype.
+    """
     dosage = np.zeros_like(constraint)
     for i in range(len(constraint)):
         count = min(ploidy, constraint[i])
@@ -44,6 +102,25 @@ def initial_dosage(ploidy, constraint):
 
 @njit(cache=True)
 def increment_dosage(dosage, constraint):
+    """Increment a given dosage to the next possible dosage
+    within a given constraint.
+
+    Parameters
+    ----------
+    dosage : ndarray, int, shape (ploidy,)
+        Counts of each unique allele in a genotype.
+    constraint : ndarray, int, shape (ploidy,)
+        Max count of each allele.
+
+    Raises
+    ------
+    ValueError
+        If there are no further dosage options.
+
+    Notes
+    -----
+    The dosage is incremented in place.
+    """
     ploidy = len(dosage)
     i = ploidy - 1
     change = 0
@@ -91,7 +168,27 @@ def increment_dosage(dosage, constraint):
 
 
 @njit(cache=True)
-def second_gamete_log_pmf(gamete_dose, constant_dose, unique_haplotypes, inbreeding=0):
+def second_gamete_log_pmf(gamete_dose, constant_dose, n_alleles, inbreeding):
+    """Log probability of an gamete of unknown origin given a known gamete and the expected
+    inbreeding coefficient.
+
+    Parameters
+    ----------
+    gamete_dose : ndarray, int, shape (ploidy, )
+        Allele counts of the proposed gamete.
+    constant_dose : ndarray, int, shape (ploidy, )
+        Allele counts of the known gamete to be held as constant.
+
+    n_alleles : int
+        Number of possible alleles at this locus.
+    inbreeding : float
+        Expected inbreeding coefficient of the sample.
+
+    Returns
+    -------
+    lprob : float
+        Log-probability of the proposed gamete given the known gamete.
+    """
     # TODO: prior frequencies
     assert 0 <= inbreeding < 1
     assert len(gamete_dose) == len(constant_dose)
@@ -101,13 +198,13 @@ def second_gamete_log_pmf(gamete_dose, constant_dose, unique_haplotypes, inbreed
     # if not inbred use null prior
     if inbreeding == 0:
         ln_perms = ln_equivalent_permutations(gamete_dose)
-        return ln_perms - gamete_tau * np.log(unique_haplotypes)
+        return ln_perms - gamete_tau * np.log(n_alleles)
 
     # calculate the dispersion parameter for the PMF
-    alpha_const = calculate_alphas(inbreeding, 1 / unique_haplotypes)
+    alpha_const = calculate_alphas(inbreeding, 1 / n_alleles)
 
     # alpha of each allele is the base alpha plus constant dose
-    sum_alphas = constant_tau + alpha_const * unique_haplotypes
+    sum_alphas = constant_tau + alpha_const * n_alleles
 
     # left side of equation in log space
     num = lgamma(gamete_tau + 1) + lgamma(sum_alphas)
@@ -140,6 +237,46 @@ def trio_log_pmf(
     inbreeding,
     n_alleles,
 ):
+    """Log probability of a trio of genotypes.
+
+    Parameters
+    ----------
+    progeny : ndarray, int, shape (ploidy,)
+        Integer encoded alleles in the progeny genotype.
+    parent_p : ndarray, int, shape (ploidy,)
+        Integer encoded alleles in the first parental genotype.
+    parent_q : ndarray, int, shape (ploidy,)
+        Integer encoded alleles in the second parental genotype.
+    tau_p : int
+        Number of alleles inherited from parent_p.
+    tau_q : int
+        Number of alleles inherited from parent_q.
+    error_p : float
+        Probability that parent_p is not the correct
+        parental genotype.
+    error_q : float
+        Probability that parent_q is not the correct
+        parental genotype.
+    inbreeding : float
+        Expected inbreeding coefficient of the sample.
+    n_alleles : int
+        Number of possible alleles at this locus.
+
+    Returns
+    -------
+    lprob : float
+        Log-probability of the trio.
+
+    Notes
+    -----
+    In the case that one or both parental genotypes are incorrect
+    (as encoded by the error terms) this function assumes that the
+    progeny genotype has the specified inbreeding coefficient and that
+    the gametes of unknown origin are drawn from a background population
+    in which all alleles are equally frequent.
+    The inbreeding coefficient is does not inform a case in which both
+    parents are correct (i.e., when the error terms are zero).
+    """
     dosage = allelic_dosage(progeny)
 
     ploidy_p = len(parent_p)
@@ -181,7 +318,7 @@ def trio_log_pmf(
             # probability of gamete_q given gamete_p
             lprob_q = (
                 second_gamete_log_pmf(
-                    gamete_q, gamete_p, n_alleles, inbreeding=inbreeding
+                    gamete_q, gamete_p, n_alleles=n_alleles, inbreeding=inbreeding
                 )
                 + lerror_q
             )
@@ -208,7 +345,7 @@ def trio_log_pmf(
             # probability of gamete_q given gamete_p
             lprob_q = (
                 second_gamete_log_pmf(
-                    gamete_q, gamete_p, n_alleles, inbreeding=inbreeding
+                    gamete_q, gamete_p, n_alleles=n_alleles, inbreeding=inbreeding
                 )
                 + lerror_q
             )
@@ -231,7 +368,7 @@ def trio_log_pmf(
             # probability of gamete_p given gamete_q
             lprob_p = (
                 second_gamete_log_pmf(
-                    gamete_p, gamete_q, n_alleles, inbreeding=inbreeding
+                    gamete_p, gamete_q, n_alleles=n_alleles, inbreeding=inbreeding
                 )
                 + lerror_p
             )
