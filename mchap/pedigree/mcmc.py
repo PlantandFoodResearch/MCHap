@@ -169,7 +169,7 @@ def compound_step(
 
 
 @njit(cache=True)
-def ped_mcmc3(
+def mcmc_sampler(
     sample_genotypes,
     sample_ploidy,
     sample_inbreeding,
@@ -180,10 +180,41 @@ def ped_mcmc3(
     sample_read_counts,
     haplotypes,
     n_steps=2000,
-    burn=1000,
-    discard_burn=True,
-    annealing=True,
+    annealing=1000,
 ):
+    """MCMC simulation for calling alleles in pedigreed genotypes from a set of known haplotypes.
+
+    Parameters
+    ----------
+    sample_genotypes : ndarray, int, shape (n_samples, ploidy)
+        Index of each haplotype in each genotype for each sample.
+    sample_ploidy : ndarray, int, shape (n_samples,)
+        Ploidy of each samples
+    sample_inbreeding : ndarray, float, shape (n_samples,)
+        Expected inbreeding coefficient of each samples
+    sample_parents : ndarray, int, shape (n_samples, 2)
+        Indices of the parents of each sample with negative values
+        indicating unknown parents.
+    gamete_tau : ndarray, int, shape (n_samples, 2)
+        Number of chromosomal copies contributed by each parent.
+    gamete_error : ndarray, float, shape (n_samples, 2)
+        Error term associated with each gamete.
+    sample_read_dists : ndarray, float, shape (n_samples, n_reads, n_pos, n_nucl)
+        Probabilistically encoded reads for each samples.
+    sample_read_counts : ndarray, int, shape (n_samples, n_reads)
+        Number of observations of each read for each samples.
+    haplotypes : ndarray, int, shape (n_haplotypes, n_pos)
+        Integer encoded haplotypes.
+    n_steps : int
+        Number of (compound) steps to simulate.
+    annealing : int
+        Number of initial steps in which to perform simulated annealing.
+
+    Returns
+    -------
+    genotype_alleles_trace : ndarray, int, shape (n_samples, n_steps, ploidy)
+        Genotype alleles trace for each sample.
+    """
     # set up caches
     llk_cache = {}
     llk_cache[(-1, -1)] = np.nan
@@ -191,7 +222,7 @@ def ped_mcmc3(
     # sample error weighting for annealing burin in
     error_weight = np.ones(n_steps, np.float64)
     if annealing:
-        error_weight[0:burn] = np.linspace(0.0, 1.0, burn)
+        error_weight[0:annealing] = np.linspace(0.0, 1.0, annealing)
 
     sample_genotypes = sample_genotypes.copy()
     n_samples, max_ploidy = sample_genotypes.shape
@@ -210,7 +241,4 @@ def ped_mcmc3(
             llk_cache=llk_cache,
         )
         trace[i] = sample_genotypes.copy()
-    if discard_burn:
-        return trace[burn:]
-    else:
-        return trace
+    return trace
