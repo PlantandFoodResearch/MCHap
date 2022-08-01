@@ -35,20 +35,22 @@ def log_likelihood_alleles_cached(
     """
     genotype_index = genotype_alleles_as_index(genotype_alleles)
     if cache is None:
+        idx = read_counts > 0
         llk = log_likelihood(
-            reads=reads,
+            reads=reads[idx],
             genotype=haplotypes[genotype_alleles],
-            read_counts=read_counts,
+            read_counts=read_counts[idx],
         )
     else:
         key = (sample, genotype_index)
         if key in cache:
             llk = cache[key]
         else:
+            idx = read_counts > 0
             llk = log_likelihood(
-                reads=reads,
+                reads=reads[idx],
                 genotype=haplotypes[genotype_alleles],
-                read_counts=read_counts,
+                read_counts=read_counts[idx],
             )
             cache[key] = llk
     return llk
