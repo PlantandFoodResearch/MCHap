@@ -10,6 +10,7 @@ from mchap.pedigree.prior import (
     increment_dosage,
     duplicate_permutations,
     log_gamete_pmf,
+    second_gamete_log_pmf,
     trio_log_pmf,
 )
 
@@ -191,6 +192,35 @@ def test_log_gamete_pmf__raise_on_non_diploid_lambda():
             log_lambda=np.log(0.01),
             log_inv_lambda=np.log(1 - 0.01),
         )
+
+
+@pytest.mark.parametrize(
+    "seed",
+    np.arange(10),
+)
+def test_second_gamete_log_pmf__sum_to_one(seed):
+    np.random.seed(seed)
+    n_alleles = np.random.randint(1, 10)
+    inbreeding = np.random.rand()
+    constant_dose = np.zeros(n_alleles, int)
+    const_ploidy = np.random.randint(1, 4)
+    gamete_ploidy = np.random.randint(1, 4)
+    for _ in range(const_ploidy):
+        a = np.random.randint(n_alleles)
+        constant_dose[a] += 1
+    constraint = np.full(n_alleles, gamete_ploidy, int)
+    n_gametes = comb_with_replacement(n_alleles, gamete_ploidy)
+
+    total_prob = 0.0
+    gamete_dose = initial_dosage(gamete_ploidy, constraint)
+    for i in range(0, n_gametes):
+        if i:
+            increment_dosage(gamete_dose, constraint)
+        prob = np.exp(
+            second_gamete_log_pmf(gamete_dose, constant_dose, n_alleles, inbreeding)
+        )
+        total_prob += prob
+    np.testing.assert_almost_equal(total_prob, 1.0)
 
 
 @pytest.mark.parametrize(
