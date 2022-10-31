@@ -2,12 +2,14 @@ import numpy as np
 import pytest
 
 from mchap.jitutils import increment_genotype, comb_with_replacement
+from mchap.calling.utils import allelic_dosage
 from mchap.pedigree.prior import (
     parental_copies,
     dosage_permutations,
     initial_dosage,
     increment_dosage,
     duplicate_permutations,
+    log_gamete_pmf,
     trio_log_pmf,
 )
 
@@ -110,6 +112,85 @@ def test_duplicate_permutations(gamete_dosage, parent_dosage, expect):
     parent_dosage = np.array(parent_dosage)
     observed = duplicate_permutations(gamete_dosage, parent_dosage)
     assert expect == observed
+
+
+@pytest.mark.parametrize(
+    "seed",
+    np.arange(10),
+)
+def test_log_gamete_pmf__sum_to_one(seed):
+    np.random.seed(seed)
+    n_alleles = np.random.randint(1, 10)
+    gamete_ploidy = np.random.randint(1, 3)
+    parent_ploidy = np.random.randint(2, 4)
+    parent_genotype = np.random.randint(n_alleles, size=parent_ploidy)
+    n_gametes = comb_with_replacement(n_alleles, gamete_ploidy)
+    total_prob = 0.0
+    gamete_genotype = np.zeros(gamete_ploidy, int)
+    for _ in range(n_gametes):
+        gamete_dosage = allelic_dosage(gamete_genotype)
+        parent_dosage = parental_copies(parent_genotype, gamete_genotype)
+        prob = np.exp(
+            log_gamete_pmf(
+                gamete_dose=gamete_dosage,
+                gamete_ploidy=gamete_ploidy,
+                parent_dose=parent_dosage,
+                parent_ploidy=parent_ploidy,
+                log_lambda=-np.inf,
+                log_inv_lambda=0.0,
+            )
+        )
+        total_prob += prob
+        increment_genotype(gamete_genotype)
+    np.testing.assert_almost_equal(total_prob, 1.0)
+
+
+@pytest.mark.parametrize(
+    "seed",
+    np.arange(10),
+)
+def test_log_gamete_pmf__sum_to_one_lambda(seed):
+    np.random.seed(seed)
+    n_alleles = np.random.randint(1, 10)
+    gamete_ploidy = 2
+    parent_ploidy = np.random.randint(2, 4)
+    parent_genotype = np.random.randint(n_alleles, size=parent_ploidy)
+    n_gametes = comb_with_replacement(n_alleles, gamete_ploidy)
+    total_prob = 0.0
+    lambda_ = np.random.rand()
+    log_lambda = np.log(lambda_)
+    log_inv_lambda = np.log(1 - lambda_)
+    gamete_genotype = np.zeros(gamete_ploidy, int)
+    for _ in range(n_gametes):
+        gamete_dosage = allelic_dosage(gamete_genotype)
+        parent_dosage = parental_copies(parent_genotype, gamete_genotype)
+        prob = np.exp(
+            log_gamete_pmf(
+                gamete_dose=gamete_dosage,
+                gamete_ploidy=gamete_ploidy,
+                parent_dose=parent_dosage,
+                parent_ploidy=parent_ploidy,
+                log_lambda=log_lambda,
+                log_inv_lambda=log_inv_lambda,
+            )
+        )
+        total_prob += prob
+        increment_genotype(gamete_genotype)
+    np.testing.assert_almost_equal(total_prob, 1.0)
+
+
+def test_log_gamete_pmf__raise_on_non_diploid_lambda():
+    with pytest.raises(
+        ValueError, match="Lambda parameter is only supported for diploid gametes"
+    ):
+        log_gamete_pmf(
+            gamete_dose=np.array([2, 1, 0]),
+            gamete_ploidy=3,
+            parent_dose=np.array([2, 2, 2]),
+            parent_ploidy=6,
+            log_lambda=np.log(0.01),
+            log_inv_lambda=np.log(1 - 0.01),
+        )
 
 
 @pytest.mark.parametrize(
