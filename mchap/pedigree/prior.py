@@ -45,17 +45,17 @@ def parental_copies(parent_alleles, progeny_alleles):
 
 
 @njit(cache=True)
-def dosage_permutations(dosage, constraint):
+def dosage_permutations(gamete_dosage, parent_dosage):
     """Count the number of possible permutations in which
-    the observed dosage can be drawn from a constraint dosage
+    the observed gamete dosage can be drawn from a parent dosage
     without replacement.
 
     Parameters
     ----------
-    dosage : ndarray, int, shape (ploidy,)
-        Counts of each unique allele in a genotype.
-    constraint : ndarray, int, shape (ploidy,)
-        Initial count of each allele.
+    gamete_dosage : ndarray, int, shape (ploidy,)
+        Counts of each unique allele in a gamete.
+    parent_dosage : ndarray, int, shape (ploidy,)
+        Counts of each gamete allele in a parent.
 
     Returns
     -------
@@ -69,8 +69,8 @@ def dosage_permutations(dosage, constraint):
     dosage can be drawn from the parental (constraint) dosage.
     """
     n = 1
-    for i in range(len(dosage)):
-        n *= comb(constraint[i], dosage[i])
+    for i in range(len(gamete_dosage)):
+        n *= comb(parent_dosage[i], gamete_dosage[i])
     return n
 
 
@@ -168,6 +168,90 @@ def increment_dosage(dosage, constraint):
 
 
 @njit(cache=True)
+def duplicate_permutations(gamete_dosage, parent_dosage):
+    """Count the number of possible permutations in which the
+    observed gamete dosage can be drawn from a parent dosage
+    assuming double reduction.
+
+    Parameters
+    ----------
+    gamete_dosage : ndarray, int, shape (ploidy,)
+        Counts of each unique allele in a gamete.
+    parent_dosage : ndarray, int, shape (ploidy,)
+        Counts of each gamete allele in a parent.
+
+    Returns
+    -------
+    n : int
+        Number of permutations.
+
+    Notes
+    -----
+    This function is only valid for diploid gametes!
+    """
+    n = 0
+    for i in range(len(gamete_dosage)):
+        if gamete_dosage[i] == 2:
+            assert n == 0
+            n = parent_dosage[i]
+        elif gamete_dosage[i] != 0:
+            return 0
+    return n
+
+
+@njit(cache=True)
+def log_gamete_pmf(
+    gamete_dose,
+    gamete_ploidy,
+    parent_dose,
+    parent_ploidy,
+    log_lambda=-np.inf,
+    log_inv_lambda=0.0,
+):
+    """Log probability of a gamete drawn from a known genotype.
+
+    Parameters
+    ----------
+    gamete_dose : ndarray, int
+        Counts of each unique allele in the gamete.
+    gamete_ploidy : int
+        Ploidy (tau) of the gamete.
+    parent_dose : ndarray, int
+        Counts of each unique gamete allele within the parent genotype.
+    parent_ploidy : int
+        Ploidy of the parent.
+    log_lambda : float
+        Log-transformed excess IBD probability of gamete.
+    log_inv_lambda : float
+        Log-transformed inverse of the excess IBD probability of gamete.
+
+    Returns
+    -------
+    Log-transformed probability of gamete being derived from parental genotype.
+
+    Notes
+    -----
+    A non-zero lambda value is only supported for diploid gametes.
+    """
+    lprob = (
+        np.log(
+            dosage_permutations(gamete_dose, parent_dose)
+            / comb(parent_ploidy, gamete_ploidy)
+        )
+        + log_inv_lambda
+    )
+    if log_lambda != -np.inf:
+        if gamete_ploidy != 2:
+            raise ValueError("Lambda parameter is only supported for diploid gametes")
+        lprob_dr = (
+            np.log(duplicate_permutations(gamete_dose, parent_dose) / parent_ploidy)
+            + log_lambda
+        )
+        lprob = add_log_prob(lprob, lprob_dr)
+    return lprob
+
+
+@njit(cache=True)
 def second_gamete_log_pmf(gamete_dose, constant_dose, n_alleles, inbreeding):
     """Log probability of an gamete of unknown origin given a known gamete and the expected
     inbreeding coefficient.
@@ -232,6 +316,8 @@ def trio_log_pmf(
     parent_q,
     tau_p,
     tau_q,
+    lambda_p,
+    lambda_q,
     error_p,
     error_q,
     inbreeding,
@@ -277,25 +363,50 @@ def trio_log_pmf(
     The inbreeding coefficient is does not inform a case in which both
     parents are correct (i.e., when the error terms are zero).
     """
-    dosage = allelic_dosage(progeny)
-
     ploidy_p = len(parent_p)
     ploidy_q = len(parent_q)
-
-    dosage_p = parental_copies(parent_p, progeny)
-    dosage_q = parental_copies(parent_q, progeny)
-
-    constraint_p = np.minimum(dosage, dosage_p)
-    constraint_q = np.minimum(dosage, dosage_q)
-
-    valid_p = constraint_p.sum() >= tau_p
-    valid_q = constraint_q.sum() >= tau_q
 
     lerror_p = np.log(error_p)
     lerror_q = np.log(error_q)
     lcorrect_p = np.log(1 - error_p)
     lcorrect_q = np.log(1 - error_q)
 
+    dosage = allelic_dosage(progeny)
+    dosage_p = parental_copies(parent_p, progeny)
+    dosage_q = parental_copies(parent_q, progeny)
+
+    constraint_p = np.minimum(dosage, dosage_p)
+    constraint_q = np.minimum(dosage, dosage_q)
+
+    # handle lambda parameter (diploid gametes only)
+    if lambda_p > 0.0:
+        if tau_p != 2:
+            raise ValueError(
+                "Non-zero lambda is only supported for a gametic ploidy (tau) of 2"
+            )
+        # adjust constraint for double reduction
+        for i in range(len(dosage)):
+            if (dosage[i] >= 2) and (constraint_p[i] == 1):
+                constraint_p[i] = 2
+    log_lambda_p = np.log(lambda_p)
+    log_inv_lambda_p = np.log(1 - lambda_p)
+    if lambda_q > 0.0:
+        if tau_q != 2:
+            raise ValueError(
+                "Non-zero lambda is only supported for a gametic ploidy (tau) of 2"
+            )
+        # adjust constraint for double reduction
+        for i in range(len(dosage)):
+            if (dosage[i] >= 2) and (constraint_q[i] == 1):
+                constraint_q[i] = 2
+    log_lambda_q = np.log(lambda_q)
+    log_inv_lambda_q = np.log(1 - lambda_q)
+
+    # used to prune code paths
+    valid_p = constraint_p.sum() >= tau_p
+    valid_q = constraint_q.sum() >= tau_q
+
+    # accumulate log-probabilities
     lprob = -np.inf
 
     # assuming both parents are valid
@@ -305,11 +416,25 @@ def trio_log_pmf(
         while True:
             # assuming both parents are valid
             lprob_p = (
-                np.log(dosage_permutations(gamete_p, dosage_p) / comb(ploidy_p, tau_p))
+                log_gamete_pmf(
+                    gamete_dose=gamete_p,
+                    gamete_ploidy=tau_p,
+                    parent_dose=dosage_p,
+                    parent_ploidy=ploidy_p,
+                    log_lambda=log_lambda_p,
+                    log_inv_lambda=log_inv_lambda_p,
+                )
                 + lcorrect_p
             )
             lprob_q = (
-                np.log(dosage_permutations(gamete_q, dosage_q) / comb(ploidy_q, tau_q))
+                log_gamete_pmf(
+                    gamete_dose=gamete_q,
+                    gamete_ploidy=tau_q,
+                    parent_dose=dosage_q,
+                    parent_ploidy=ploidy_q,
+                    log_lambda=log_lambda_q,
+                    log_inv_lambda=log_inv_lambda_q,
+                )
                 + lcorrect_q
             )
             lprob_pq = lprob_p + lprob_q
@@ -339,7 +464,14 @@ def trio_log_pmf(
         gamete_q = dosage - gamete_p
         while True:
             lprob_p = (
-                np.log(dosage_permutations(gamete_p, dosage_p) / comb(ploidy_p, tau_p))
+                log_gamete_pmf(
+                    gamete_dose=gamete_p,
+                    gamete_ploidy=tau_p,
+                    parent_dose=dosage_p,
+                    parent_ploidy=ploidy_p,
+                    log_lambda=log_lambda_p,
+                    log_inv_lambda=log_inv_lambda_p,
+                )
                 + lcorrect_p
             )
             # probability of gamete_q given gamete_p
@@ -373,7 +505,14 @@ def trio_log_pmf(
                 + lerror_p
             )
             lprob_q = (
-                np.log(dosage_permutations(gamete_q, dosage_q) / comb(ploidy_q, tau_q))
+                log_gamete_pmf(
+                    gamete_dose=gamete_q,
+                    gamete_ploidy=tau_q,
+                    parent_dose=dosage_q,
+                    parent_ploidy=ploidy_q,
+                    log_lambda=log_lambda_q,
+                    log_inv_lambda=log_inv_lambda_q,
+                )
                 + lcorrect_q
             )
             lprob_pq = lprob_p + lprob_q
@@ -405,6 +544,7 @@ def markov_blanket_log_probability(
     sample_inbreeding,
     sample_parents,
     gamete_tau,
+    gamete_lambda,
     gamete_error,
     n_alleles,
 ):
@@ -426,6 +566,8 @@ def markov_blanket_log_probability(
         unknown parents.
     gamete_tau : int, shape (n_samples, 2)
         Gamete ploidy associated with each pedigree edge.
+    gamete_lambda : float, shape (n_samples, 2)
+        Excess IBDy associated with each pedigree edge.
     gamete_error : float, shape (n_samples, 2)
         Error rate associated with each pedigree edge.
     n_alleles : int
@@ -464,6 +606,8 @@ def markov_blanket_log_probability(
                 genotype_q,
                 tau_p=gamete_tau[i, 0],
                 tau_q=gamete_tau[i, 1],
+                lambda_p=gamete_lambda[i, 0],
+                lambda_q=gamete_lambda[i, 1],
                 error_p=error_p,
                 error_q=error_q,
                 inbreeding=sample_inbreeding[i],
