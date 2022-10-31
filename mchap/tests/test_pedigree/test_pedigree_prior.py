@@ -2,7 +2,114 @@ import numpy as np
 import pytest
 
 from mchap.jitutils import increment_genotype, comb_with_replacement
-from mchap.pedigree.prior import trio_log_pmf
+from mchap.pedigree.prior import (
+    parental_copies,
+    dosage_permutations,
+    initial_dosage,
+    increment_dosage,
+    duplicate_permutations,
+    trio_log_pmf,
+)
+
+
+@pytest.mark.parametrize(
+    "parent, progeny, expect",
+    [
+        ([0, 0, 0, 0], [0, 0], [4, 0]),
+        ([0, 1, 1, 2], [0, 2], [1, 1]),
+        ([0, 1, 2, 3, 4, 5], [6, 7, 8], [0, 0, 0]),
+        ([0, 1], [1, 1], [1, 0]),
+    ],
+)
+def test_parental_copies(parent, progeny, expect):
+    progeny = np.array(progeny)
+    parent = np.array(parent)
+    expect = np.array(expect)
+    observed = parental_copies(parent, progeny)
+    np.testing.assert_array_equal(observed, expect)
+
+
+@pytest.mark.parametrize(
+    "gamete_dosage, parent_dosage, expect",
+    [
+        ([2, 0], [2, 0], 1),
+        ([2, 0], [3, 0], 3),
+        ([2, 0], [4, 0], 6),
+        ([1, 1], [1, 0], 0),
+        ([1, 1], [1, 1], 1),
+        ([1, 1], [2, 1], 2),
+        ([1, 1], [2, 2], 4),
+        ([2, 1, 0], [2, 2, 0], 2),
+        ([2, 1, 0], [3, 2, 0], 6),
+    ],
+)
+def test_dosage_permutations(gamete_dosage, parent_dosage, expect):
+    gamete_dosage = np.array(gamete_dosage)
+    parent_dosage = np.array(parent_dosage)
+    observed = dosage_permutations(gamete_dosage, parent_dosage)
+    assert observed == expect
+
+
+@pytest.mark.parametrize(
+    "ploidy, constraint, expect",
+    [
+        (2, [2, 0, 2, 0], [2, 0, 0, 0]),
+        (2, [1, 2, 1, 0], [1, 1, 0, 0]),
+        (3, [1, 2, 1, 0], [1, 2, 0, 0]),
+    ],
+)
+def test_initial_dosage(ploidy, constraint, expect):
+    constraint = np.array(constraint)
+    expect = np.array(expect)
+    observed = initial_dosage(ploidy, constraint)
+    np.testing.assert_array_equal(observed, expect)
+
+
+def test_initial_dosage__raise_on_ploidy():
+    ploidy = 2
+    constraint = np.array([1, 0, 0, 0])
+    with pytest.raises(ValueError, match="Ploidy does not fit within constraint"):
+        initial_dosage(ploidy, constraint)
+
+
+@pytest.mark.parametrize(
+    "dosage, constraint, expect",
+    [
+        ([2, 0, 0, 0], [2, 0, 2, 0], [1, 0, 1, 0]),
+        ([1, 0, 1, 0], [2, 0, 2, 0], [0, 0, 2, 0]),
+        ([1, 1, 0, 0], [3, 1, 2, 0], [1, 0, 1, 0]),
+        ([1, 0, 1, 0], [3, 1, 2, 0], [0, 1, 1, 0]),
+    ],
+)
+def test_increment_dosage(dosage, constraint, expect):
+    dosage = np.array(dosage)
+    expect = np.array(expect)
+    constraint = np.array(constraint)
+    increment_dosage(dosage, constraint)
+    np.testing.assert_array_equal(dosage, expect)
+
+
+def test_increment_dosage__raise_on_final():
+    dosage = np.array([0, 0, 2, 0])
+    constraint = np.array([2, 0, 2, 0])
+    with pytest.raises(ValueError, match="Final dosage"):
+        increment_dosage(dosage, constraint)
+
+
+@pytest.mark.parametrize(
+    "gamete_dosage, parent_dosage, expect",
+    [
+        ([1, 1], [1, 1], 0),
+        ([1, 1], [2, 0], 0),
+        ([2, 0], [1, 0], 1),
+        ([2, 0], [2, 0], 2),
+    ],
+)
+def test_duplicate_permutations(gamete_dosage, parent_dosage, expect):
+    gamete_dosage = np.array(gamete_dosage)
+    parent_dosage = np.array(parent_dosage)
+    observed = duplicate_permutations(gamete_dosage, parent_dosage)
+    assert expect == observed
 
 
 @pytest.mark.parametrize(
