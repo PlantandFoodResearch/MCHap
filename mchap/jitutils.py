@@ -194,6 +194,10 @@ def _greatest_common_denominatior(x: int, y: int) -> int:
 
 @numba.njit(cache=True)
 def comb(n: int, k: int) -> int:
+    if n < 0:
+        raise ValueError("n must be a non-negative integer")
+    if k < 0:
+        raise ValueError("k must be a non-negative integer")
     if k > n:
         return 0
     r = 1
@@ -208,6 +212,10 @@ def comb(n: int, k: int) -> int:
 
 @numba.njit(cache=True)
 def comb_with_replacement(n: int, k: int) -> int:
+    if n < 0:
+        raise ValueError("n must be a non-negative integer")
+    if n == 0 and k == 0:
+        return 0
     n = n + k - 1
     return comb(n, k)
 

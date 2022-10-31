@@ -15,6 +15,7 @@ def allele_step(
     sample_inbreeding,
     sample_parents,
     gamete_tau,
+    gamete_lambda,
     gamete_error,
     sample_read_dists,  # array (n_samples, n_reads, n_pos, n_nucl)
     sample_read_counts,  # array (n_samples, n_reads)
@@ -46,6 +47,7 @@ def allele_step(
         sample_inbreeding=sample_inbreeding,
         sample_parents=sample_parents,
         gamete_tau=gamete_tau,
+        gamete_lambda=gamete_lambda,
         gamete_error=gamete_error,
         n_alleles=n_alleles,
     )
@@ -74,14 +76,15 @@ def allele_step(
 
             # calculate ratio of priors: ln(P(G')/P(G))
             lprior_i = markov_blanket_log_probability(
-                target_index,
-                sample_genotypes,
-                sample_ploidy,
-                sample_inbreeding,
-                sample_parents,
-                gamete_tau,
-                gamete_error,
-                n_alleles,
+                target_index=target_index,
+                sample_genotypes=sample_genotypes,
+                sample_ploidy=sample_ploidy,
+                sample_inbreeding=sample_inbreeding,
+                sample_parents=sample_parents,
+                gamete_tau=gamete_tau,
+                gamete_lambda=gamete_lambda,
+                gamete_error=gamete_error,
+                n_alleles=n_alleles,
             )
             lprior_ratio = lprior_i - lprior
 
@@ -112,6 +115,7 @@ def sample_step(
     sample_inbreeding,
     sample_parents,
     gamete_tau,
+    gamete_lambda,
     gamete_error,
     sample_read_dists,
     sample_read_counts,
@@ -129,6 +133,7 @@ def sample_step(
             sample_inbreeding=sample_inbreeding,
             sample_parents=sample_parents,
             gamete_tau=gamete_tau,
+            gamete_lambda=gamete_lambda,
             gamete_error=gamete_error,
             sample_read_dists=sample_read_dists,
             sample_read_counts=sample_read_counts,
@@ -144,6 +149,7 @@ def compound_step(
     sample_inbreeding,
     sample_parents,
     gamete_tau,
+    gamete_lambda,
     gamete_error,
     sample_read_dists,
     sample_read_counts,
@@ -160,6 +166,7 @@ def compound_step(
             sample_inbreeding=sample_inbreeding,
             sample_parents=sample_parents,
             gamete_tau=gamete_tau,
+            gamete_lambda=gamete_lambda,
             gamete_error=gamete_error,
             sample_read_dists=sample_read_dists,
             sample_read_counts=sample_read_counts,
@@ -175,6 +182,7 @@ def mcmc_sampler(
     sample_inbreeding,
     sample_parents,
     gamete_tau,
+    gamete_lambda,
     gamete_error,
     sample_read_dists,
     sample_read_counts,
@@ -197,6 +205,8 @@ def mcmc_sampler(
         indicating unknown parents.
     gamete_tau : ndarray, int, shape (n_samples, 2)
         Number of chromosomal copies contributed by each parent.
+    gamete_lambda : ndarray, float, shape (n_samples, 2)
+        Excess IBD caused by miotic processes.
     gamete_error : ndarray, float, shape (n_samples, 2)
         Error term associated with each gamete.
     sample_read_dists : ndarray, float, shape (n_samples, n_reads, n_pos, n_nucl)
@@ -209,6 +219,11 @@ def mcmc_sampler(
         Number of (compound) steps to simulate.
     annealing : int
         Number of initial steps in which to perform simulated annealing.
+
+    Notes
+    -----
+    The gamete_lambda variable only supports non-zero values when
+    gametic ploidy (tau) is 2.
 
     Returns
     -------
@@ -234,6 +249,7 @@ def mcmc_sampler(
             sample_inbreeding=sample_inbreeding,
             sample_parents=sample_parents,
             gamete_tau=gamete_tau,
+            gamete_lambda=gamete_lambda,
             gamete_error=gamete_error,
             sample_read_dists=sample_read_dists,
             sample_read_counts=sample_read_counts,
