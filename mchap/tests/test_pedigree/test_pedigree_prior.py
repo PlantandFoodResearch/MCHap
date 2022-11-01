@@ -267,12 +267,12 @@ def test_trio_log_pmf__sum_to_one(seed):
 
 
 @pytest.mark.parametrize(
-    "seed",
-    np.arange(50),
-)
-@pytest.mark.parametrize(
     "use_lambda_p,use_lambda_q",
     [[True, False], [False, True], [True, True]],
+)
+@pytest.mark.parametrize(
+    "seed",
+    np.arange(50),
 )
 def test_trio_log_pmf__sum_to_one_lambda(seed, use_lambda_p, use_lambda_q):
     np.random.seed(seed)
