@@ -5,6 +5,7 @@ from mchap.application import assemble
 from mchap.application import call
 from mchap.application import call_exact
 from mchap.application import find_snvs
+from mchap.application import call_pedigree
 from mchap import __version__
 
 
@@ -19,7 +20,7 @@ def main():
         version=f"mchap {__version__}",
     )
 
-    subprograms = ["assemble", "call", "call-exact", "find-snvs"]
+    subprograms = ["assemble", "call", "call-exact", "call-pedigree", "find-snvs"]
     parser.add_argument(
         "program", nargs=1, choices=subprograms, help="Specify sub-program"
     )
@@ -40,5 +41,8 @@ def main():
             prog.cli(sys.argv).run_stdout()
         elif prog == "find-snvs":
             find_snvs.main(sys.argv)
+        elif prog == "call-pedigree":
+            prog = call_pedigree.program
+            prog.cli(sys.argv).run_stdout()
         else:
             assert False
