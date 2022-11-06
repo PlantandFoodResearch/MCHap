@@ -183,6 +183,88 @@ inbreeding = Parameter(
     ),
 )
 
+sample_parents = Parameter(
+    "--sample-parents",
+    dict(
+        type=str,
+        nargs=1,
+        default=[None],
+        help=(
+            "A file containing a list of samples and their parents "
+            "used to indicate pedigree structure. "
+            "Each line should contain a sample identifier followed by both "
+            "parent identifiers separated by tabs. "
+            "A period '.' is used to indicate unknown parents."
+        ),
+    ),
+)
+
+gamete_ploidy = Parameter(
+    "--gamete-ploidy",
+    dict(
+        type=str,
+        nargs=1,
+        default=[None],
+        help=(
+            "Ploidy of the gametes contributing to each sample. "
+            "By default it is assumed that the ploidy of each gamete "
+            "is equal to half the ploidy of the sample derived from that gamete. "
+            "If all gametes have the same ploidy then a single number can be specified. "
+            "If gametic ploidy is variable then these values must be specified with a"
+            "file containing a list of samples and the ploidy of the gametes they were "
+            "derived from. "
+            "Each line of this file should contain a sample identifier followed by the ploidy "
+            "of gametes derived from each parent in the same order as specified "
+            "using the --sample-parents argument. "
+            "For each sample, the ploidy of the two gametes must sum to the ploidy "
+            "of that sample. "
+        ),
+    ),
+)
+
+gamete_ibd = Parameter(
+    "--gamete-ibd",
+    dict(
+        type=str,
+        nargs=1,
+        default=["0.0"],
+        help=(
+            "Excess IBD/homozygosity due to meiotic processes. "
+            "By default this variable is 0.0 for all gametes and non-zero values "
+            "may only be specified for gametes with a ploidy of 2. "
+            "This value must be in the interval [0, 1] with a value of 0.0 indicating "
+            "no excess ibd/homozygosity and a value of 1.0 indicating that the gamete "
+            "must be fully homozygous."
+            "If a single value is specified then this will be applied to all gametes. "
+            "If this value varies between gametes then it must be specified with a"
+            "file containing a list of samples and the value associated with each gamete "
+            "those samples are derived from. "
+            "Each line should contain a sample identifier followed by value of each "
+            "gamete in the same order as specified using the --sample-parents argument. "
+        ),
+    ),
+)
+
+gamete_error = Parameter(
+    "--gamete-error",
+    dict(
+        type=str,
+        nargs=1,
+        default=["0.1"],
+        help=(
+            "An error term associated with each parent-child pair indicating the "
+            "probability that that gamete was not derived from the specified parent. "
+            "By default this variable is 0.1 for all parent-child pairs. "
+            "This value must be in the interval [0, 1] and should generally be > 0 and < 1."
+            "If a single value is specified then this will be applied to all parent-child pairs. "
+            "If this value varies between gametes then it must be specified with a"
+            "file containing a list of samples and the value associated with each gamete "
+            "those samples are derived from. "
+            "Each line should contain a sample identifier followed by value of each "
+            "gamete in the same order as specified using the --sample-parents argument. "
+        ),
+    ),
+)
 
 sample_pool = Parameter(
     "--sample-pool",
@@ -653,7 +735,18 @@ DEFAULT_MCMC_PARSER_ARGUMENTS = DEFAULT_PARSER_ARGUMENTS + [
     mcmc_chain_incongruence_threshold,
 ]
 
+PEDIGREE_PARSER_ARGUMENTS = [
+    sample_parents,
+    gamete_ploidy,
+    gamete_ibd,
+    gamete_error,
+]
+
 CALL_MCMC_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_MCMC_PARSER_ARGUMENTS
+
+CALL_PEDIGREE_MCMC_PARSER_ARGUMENTS = (
+    CALL_MCMC_PARSER_ARGUMENTS + PEDIGREE_PARSER_ARGUMENTS
+)
 
 ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
     [
@@ -818,22 +911,142 @@ def parse_sample_value_map(argument, samples, type):
     return data
 
 
+def parse_pedigree_arguments(
+    samples,
+    sample_bams,
+    sample_ploidy,  # TODO: handle dummy samples ploidy
+    sample_parents_argument,
+    gamete_ploidy_argument,
+    gamete_ibd_argument,
+    gamete_error_argument,
+):
+    """Parse arguments related to pedigree specification.
+
+    Parameters
+    ----------
+    samples : list
+        List of ordered samples.
+    sample_bams : dict[str, str]
+        Dict mapping sample names to bam filepaths.
+    sample_ploidy : dict[str, int]
+        Dict mapping sample names to ploidy.
+    sample_parents_argument : str
+        Filepath to tab-separated values describing pedigree.
+    gamete_ploidy_argument : str
+        Filepath or default value for for gametic ploidy.
+    gamete_ibd_argument,
+        Filepath or default value for for gametic IBD excess.
+    gamete_error_argument,
+        Filepath or default value for for gametic error.
+
+    Returns
+    -------
+    data : dict
+        A dictionary containing the following:
+        - 'samples': list of ordered samples.
+        - 'sample_bams': dict mapping sample names to bam filepaths.
+        - 'sample_parents': dict mapping sample names to parent sample names.
+        - 'gamete_ploidy': dict mapping sample names to ploidy of contributing gametes.
+        - 'gamete_ibd': dict mapping sample names to excess IBD of contributing gametes.
+        - 'gamete_error': dict mapping sample names to parental error of contributing gametes.
+
+    Note
+    ----
+    Samples listed in the 'sample_parents_argument' file will be appended
+    to the 'samples' list and 'sample_bams' dict if they are not already present.
+    A None value is used to indicate that no bam file is available for that sample.
+    """
+    # parse pedigree, inserting new samples as required
+    known_samples = set(samples)
+    sample_parents = dict()
+    with open(sample_parents_argument) as f:
+        for line in f.readlines():
+            sample, p, q = line.strip().split("\t")
+            if sample not in known_samples:
+                # add a dummy sample
+                samples.append(sample)
+                sample_bams[sample] = None
+                known_samples.add(sample)
+            p = None if p == "." else p
+            q = None if q == "." else q
+            sample_parents[sample] = (p, q)
+
+    # gamete ploidy
+    gamete_ploidy = dict()
+    if gamete_ploidy_argument is None:
+        # assume it is half the individuals ploidy
+        for sample in samples:
+            ploidy = sample_ploidy[sample]
+            if ploidy % 2:
+                raise ValueError(
+                    "Gamete ploidy must be specified for individuals with odd ploidy"
+                )
+            tau = ploidy // 2
+            gamete_ploidy[sample] = (tau, tau)
+    elif gamete_ploidy_argument.isdigit():
+        # constant for all samples
+        tau = int(gamete_ploidy_argument)
+        for sample in samples:
+            gamete_ploidy[sample] = (tau, tau)
+    else:
+        # must be a file
+        with open(gamete_ploidy_argument) as f:
+            for line in f.readlines():
+                sample, tau_p, tau_q = line.strip().split("\t")
+                gamete_ploidy[sample] = (int(tau_p), int(tau_q))
+
+    # gamete ibd
+    gamete_ibd = dict()
+    if gamete_ibd_argument.replace(".", "", 1).isdigit():
+        # constant for all samples
+        lambda_ = float(gamete_ibd_argument)
+        for sample in samples:
+            gamete_ibd[sample] = (lambda_, lambda_)
+    else:
+        # must be a file
+        with open(gamete_ibd_argument) as f:
+            for line in f.readlines():
+                sample, lambda_p, lambda_q = line.strip().split("\t")
+                gamete_ibd[sample] = (float(lambda_p), float(lambda_q))
+
+    # gamete error
+    gamete_error = dict()
+    if gamete_error_argument.replace(".", "", 1).isdigit():
+        # constant for all samples
+        err = float(gamete_error_argument)
+        for sample in samples:
+            gamete_error[sample] = (err, err)
+    else:
+        # must be a file
+        with open(gamete_error_argument) as f:
+            for line in f.readlines():
+                sample, err_p, err_q = line.strip().split("\t")
+                gamete_error[sample] = (float(err_p), float(err_q))
+
+    return dict(
+        samples=samples,
+        sample_bams=sample_bams,
+        sample_ploidy=sample_ploidy,
+        sample_parents=sample_parents,
+        gamete_ploidy=gamete_ploidy,
+        gamete_ibd=gamete_ibd,
+        gamete_error=gamete_error,
+    )
+
+
 def parse_sample_temperatures(mcmc_temperatures_argument, samples):
     """Parse inverse temperatures for MCMC simulation
     with parallel-tempering.
-
     Parameters
     ----------
     mcmc_temperatures_argument : str
         Value(s) for mcmc_temperatures.
     samples : list
         List of samples.
-
     Returns
     -------
     sample_temperatures : dict
         Dict mapping each sample to a list of temperatures (floats).
-
     """
     if len(mcmc_temperatures_argument) > 1:
         # must be a list of temps
@@ -938,6 +1151,22 @@ def collect_call_mcmc_program_arguments(arguments):
     data["vcf"] = arguments.haplotypes[0]
     data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
     data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
+    return data
+
+
+def collect_call_pedigree_mcmc_program_arguments(arguments):
+    data = collect_call_mcmc_program_arguments(arguments)
+    data.update(
+        parse_pedigree_arguments(
+            samples=data["samples"],
+            sample_bams=data["sample_bams"],
+            sample_ploidy=data["sample_ploidy"],
+            sample_parents_argument=arguments.sample_parents[0],
+            gamete_ploidy_argument=arguments.gamete_ploidy[0],
+            gamete_ibd_argument=arguments.gamete_ibd[0],
+            gamete_error_argument=arguments.gamete_error[0],
+        )
+    )
     return data
 
 
