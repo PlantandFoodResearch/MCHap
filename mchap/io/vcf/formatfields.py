@@ -98,11 +98,43 @@ MCAP = FormatField(
     type="Float",
     descr="Posterior probability of allele-presence from assembly MCMC",
 )
+
 SNVDP = FormatField(
     id="SNVDP",
     number=".",
     type="Integer",
     descr="Read depth at each SNV position",
+
+PEDERR = FormatField(
+    id="PEDERR",
+    number=1,
+    type="Float",
+    descr="Posterior probability of pedigree error between an individual and its specified parents",
+)
+
+HEADER_FORMAT_FIELDS = dict(
+    GT=GT,
+    GQ=GQ,
+    SQ=SQ,
+    DP=DP,
+    PS=PS,
+    FT=FT,
+    RCOUNT=RCOUNT,
+    RCALLS=RCALLS,
+    GPM=GPM,
+    SPM=SPM,
+    DOSEXP=DOSEXP,
+    MEC=MEC,
+    MECP=MECP,
+    AD=AD,
+    GL=GL,
+    GP=GP,
+    AFP=AFP,
+    AOP=AOP,
+    MCI=MCI,
+    KMERCOV=KMERCOV,
+    MCAP=MCAP,
+    PEDERR=PEDERR,
 )
 
 DEFAULT_FIELDS = [

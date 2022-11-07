@@ -257,4 +257,12 @@ def mcmc_sampler(
             llk_cache=llk_cache,
         )
         trace[i] = sample_genotypes.copy()
+
+    # sort trace allowing for mixed ploidy
+    for j in range(n_samples):
+        ploidy = sample_ploidy[j]
+        for i in range(n_steps):
+            trace[i, j] = np.sort(trace[i, j])
+            if ploidy < max_ploidy:
+                trace[i, j] = np.roll(trace[i, j], ploidy - max_ploidy)
     return trace

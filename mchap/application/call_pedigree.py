@@ -49,6 +49,9 @@ class program(call_baseclass.program):
         arguments = collect_call_pedigree_mcmc_program_arguments(args)
         return cls(cli_command=command, **arguments)
 
+    def format_fields(self):
+        return super().format_fields() + ["PEDERR"]
+
     def call_sample_genotypes(self, data):
         """Pedigree based genotype calling.
 
@@ -75,6 +78,7 @@ class program(call_baseclass.program):
             "GL",
             "GP",
             "AFP",
+            "PEDERR",
         ]:
             data.sampledata[field] = dict()
         # get haplotypes and metadata
@@ -141,6 +145,7 @@ class program(call_baseclass.program):
                 data.sampledata["AFP"][sample] = np.array([np.nan])
                 data.sampledata["GP"][sample] = np.array([np.nan])
                 data.sampledata["GL"][sample] = np.array([np.nan])
+                data.sampledata["PEDERR"][sample] = np.nan
             return data
 
         # combine samples reads into a single array
@@ -163,6 +168,7 @@ class program(call_baseclass.program):
         pedigree_position = {s: i for i, s in enumerate(data.samples)}
         pedigree_position[None] = -1
         n_samples = len(data.samples)
+        sample_ploidy = np.array([data.sample_ploidy[s] for s in data.samples])
         parent_indices = np.full((n_samples, 2), -1, dtype=int)
         gamete_tau = np.full((n_samples, 2), -1, dtype=int)
         gamete_lambda = np.full((n_samples, 2), np.nan, dtype=float)
@@ -182,7 +188,7 @@ class program(call_baseclass.program):
         # pedigree based assembly
         pedigree_trace = (
             PedigreeCallingMCMC(
-                sample_ploidy=np.array([data.sample_ploidy[s] for s in data.samples]),
+                sample_ploidy=sample_ploidy,
                 sample_inbreeding=np.array(
                     [data.sample_inbreeding[s] for s in data.samples]
                 ),
@@ -202,6 +208,12 @@ class program(call_baseclass.program):
             )
             .burn(self.mcmc_burn)
         )  # burn all annealing
+        pedigree_posterior_error = pedigree_trace.incongruence(
+            sample_ploidy=sample_ploidy,
+            sample_parents=parent_indices,
+            gamete_tau=gamete_tau,
+            gamete_lambda=gamete_lambda,
+        )
 
         # iterate of samples to summarize
         for i, sample in enumerate(data.samples):
@@ -227,6 +239,9 @@ class program(call_baseclass.program):
                 )
                 data.sampledata["PHQ"][sample] = qual_of_prob(phenotype_prob)
                 data.sampledata["MCI"][sample] = incongruence
+                data.sampledata["PEDERR"][sample] = np.round(
+                    pedigree_posterior_error[i], self.precision
+                )
 
                 # posterior allele frequencies if requested
                 if "AFP" in data.formatfields:
