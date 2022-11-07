@@ -151,61 +151,37 @@ bam = Parameter(
 ploidy = Parameter(
     "--ploidy",
     dict(
-        type=int,
+        type=str,
         nargs=1,
-        default=[2],
+        default=["2"],
         help=(
-            "Default ploidy for all samples (default = 2). "
-            "This value is used for all samples which are not specified using "
-            "the --sample-ploidy parameter"
+            "Specify sample ploidy (default = 2)."
+            "This may be (1) a single integer used to specify the ploidy of all samples or "
+            "(2) a file containing a list of all samples and their ploidy. "
+            "If option (2) is used then each line of the plaintext file must "
+            "contain a single sample identifier and the ploidy of that sample separated by a tab."
         ),
     ),
 )
 
-sample_ploidy = Parameter(
-    "--sample-ploidy",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "A file containing a list of samples with a ploidy value "
-            "used to indicate where their ploidy differs from the "
-            "default value. Each line should contain a sample identifier "
-            "followed by a tab and then an integer ploidy value."
-        ),
-    ),
-)
 
 inbreeding = Parameter(
     "--inbreeding",
     dict(
-        type=float,
+        type=str,
         nargs=1,
-        default=[0.0],
+        default=["0.0"],
         help=(
-            "Default inbreeding coefficient for all samples (default = 0.0). "
-            "This value is used for all samples which are not specified using "
-            "the --sample-inbreeding parameter."
+            "Specify expected sample inbreeding coefficient (default = 0.0)."
+            "This may be (1) a single floating point value in the interval [0, 1] "
+            "used to specify the inbreeding coefficient of all samples or "
+            "(2) a file containing a list of all samples and their inbreeding coefficient. "
+            "If option (2) is used then each line of the plaintext file must "
+            "contain a single sample identifier and the inbreeding coefficient of that sample separated by a tab."
         ),
     ),
 )
 
-sample_inbreeding = Parameter(
-    "--sample-inbreeding",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "A file containing a list of samples with an inbreeding coefficient "
-            "used to indicate where their expected inbreeding coefficient "
-            "default value. Each line should contain a sample identifier "
-            "followed by a tab and then a inbreeding coefficient value "
-            "within the interval [0, 1]."
-        ),
-    ),
-)
 
 sample_pool = Parameter(
     "--sample-pool",
@@ -564,9 +540,7 @@ cores = Parameter(
 DEFAULT_PARSER_ARGUMENTS = [
     bam,
     ploidy,
-    sample_ploidy,
     inbreeding,
-    sample_inbreeding,
     sample_pool,
     base_error_rate,
     ignore_base_phred_scores,
@@ -686,46 +660,35 @@ def parse_sample_bam_paths(bam_argument, sample_pool_argument, read_group_field)
     return samples, sample_bams
 
 
-def parse_sample_value_map(arguments, samples, default, sample_map, type):
+def parse_sample_value_map(argument, samples, type):
     """Combine arguments specified for a default value and sample-value map file.
 
     Parameters
     ----------
-    arguments
-        Parsed arguments containing some the default value argument
-        and the optionally the sample-value map file argument.
+    argument : str
+        Argument to parse.
     samples : list
         List of sample names
-    default : str
-        Name of argument with default value.
-    sample_map : str
-        Path of file containing tab-seperated per sample values.
     type : type
-        Type of the specified values.
+        Type of the specified values (float or int).
 
     Returns
     -------
     sample_values : dict
         Dict mapping samples to values.
     """
-    sample_value = dict()
-    assert hasattr(arguments, default)
-    # sample value map
-    if hasattr(arguments, sample_map):
-        path = getattr(arguments, sample_map)[0]
-        if path:
-            with open(path) as f:
-                for line in f.readlines():
-                    sample, value = line.strip().split("\t")
-                    sample_value[sample] = type(value)
-    # default value
-    default_value = getattr(arguments, default)[0]
-    for sample in samples:
-        if sample in sample_value:
-            pass
-        else:
-            sample_value[sample] = default_value
-    return sample_value
+    if (type is int) and argument.isdigit():
+        value = int(argument)
+        return {s: value for s in samples}
+    if (type is float) and argument.replace(".", "", 1).isdigit():
+        value = float(argument)
+        return {s: value for s in samples}
+    data = dict()
+    with open(argument) as f:
+        for line in f.readlines():
+            sample, value = line.strip().split("\t")
+            data[sample] = type(value)
+    return data
 
 
 def parse_sample_temperatures(arguments, samples):
@@ -792,17 +755,13 @@ def collect_default_program_arguments(arguments):
         arguments.bam, arguments.sample_pool[0], arguments.read_group_field[0]
     )
     sample_ploidy = parse_sample_value_map(
-        arguments,
+        arguments.ploidy[0],
         samples,
-        default="ploidy",
-        sample_map="sample_ploidy",
         type=int,
     )
     sample_inbreeding = parse_sample_value_map(
-        arguments,
+        arguments.inbreeding[0],
         samples,
-        default="inbreeding",
-        sample_map="sample_inbreeding",
         type=float,
     )
     return dict(

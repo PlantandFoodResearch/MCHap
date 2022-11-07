@@ -1,10 +1,7 @@
 usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
                                [--targets TARGETS] [--variants VARIANTS]
                                [--reference REFERENCE] [--bam BAM [BAM ...]]
-                               [--ploidy PLOIDY]
-                               [--sample-ploidy SAMPLE_PLOIDY]
-                               [--inbreeding INBREEDING]
-                               [--sample-inbreeding SAMPLE_INBREEDING]
+                               [--ploidy PLOIDY] [--inbreeding INBREEDING]
                                [--sample-pool SAMPLE_POOL]
                                [--base-error-rate BASE_ERROR_RATE]
                                [--use-base-phred-scores]
@@ -59,27 +56,23 @@ optional arguments:
                         be extracted from each bam file and An error will be
                         raised if a sample is not found within its specified
                         bam file.
-  --ploidy PLOIDY       Default ploidy for all samples (default = 2). This
-                        value is used for all samples which are not specified
-                        using the --sample-ploidy parameter
-  --sample-ploidy SAMPLE_PLOIDY
-                        A file containing a list of samples with a ploidy
-                        value used to indicate where their ploidy differs from
-                        the default value. Each line should contain a sample
-                        identifier followed by a tab and then an integer
-                        ploidy value.
+  --ploidy PLOIDY       Specify sample ploidy (default = 2).This may be (1) a
+                        single integer used to specify the ploidy of all
+                        samples or (2) a file containing a list of all samples
+                        and their ploidy. If option (2) is used then each line
+                        of the plaintext file must contain a single sample
+                        identifier and the ploidy of that sample separated by
+                        a tab.
   --inbreeding INBREEDING
-                        Default inbreeding coefficient for all samples
-                        (default = 0.0). This value is used for all samples
-                        which are not specified using the --sample-inbreeding
-                        parameter.
-  --sample-inbreeding SAMPLE_INBREEDING
-                        A file containing a list of samples with an inbreeding
-                        coefficient used to indicate where their expected
-                        inbreeding coefficient default value. Each line should
-                        contain a sample identifier followed by a tab and then
-                        a inbreeding coefficient value within the interval [0,
-                        1].
+                        Specify expected sample inbreeding coefficient
+                        (default = 0.0).This may be (1) a single floating
+                        point value in the interval [0, 1] used to specify the
+                        inbreeding coefficient of all samples or (2) a file
+                        containing a list of all samples and their inbreeding
+                        coefficient. If option (2) is used then each line of
+                        the plaintext file must contain a single sample
+                        identifier and the inbreeding coefficient of that
+                        sample separated by a tab.
   --sample-pool SAMPLE_POOL
                         A name used to pool all sample reads into a single
                         sample. WARNING: this is an experimental feature.
