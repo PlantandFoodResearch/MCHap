@@ -1,4 +1,5 @@
 import copy
+import pysam
 from dataclasses import dataclass
 
 from mchap.constant import PFEIFFER_ERROR
@@ -131,48 +132,21 @@ bam = Parameter(
     "--bam",
     dict(
         type=str,
-        nargs="*",
+        nargs="+",
         default=[],
         help=(
-            "A list of 0 or more bam files. "
-            "All samples found within the listed bam files will be genotypes "
-            "unless the --sample-list parameter is used."
+            "Bam file(s) to use in analysis. "
+            "This may be (1) a list of one or more bam filepaths, "
+            "(2) a plain-text file containing a single bam filepath on each line, "
+            "(3) a plain-text file containing a sample identifier and its "
+            "corresponding bam filepath on each line separated by a tab. "
+            "If options (1) or (2) are used then all samples within each bam will be used within the analysis. "
+            "If option (3) is used then only the specified sample will be extracted from each bam file and "
+            "An error will be raised if a sample is not found within its specified bam file."
         ),
     ),
 )
 
-bam_list = Parameter(
-    "--bam-list",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "A file containing a list of bam file paths (one per line). "
-            "This can optionally be used in place of or combined with the --bam "
-            "parameter."
-        ),
-    ),
-)
-
-sample_bam = Parameter(
-    "--sample-bam",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "A file containing a list of samples with bam file paths. "
-            "Each line of the file should be a sample identifier followed "
-            "by a tab and then a bam file path. "
-            "This can optionally be used in place the --bam and --bam-list "
-            "parameters. This is faster than using those parameters when running "
-            "many small jobs. "
-            "An error will be thrown if a sample is not found within its specified "
-            "bam file."
-        ),
-    ),
-)
 
 ploidy = Parameter(
     "--ploidy",
@@ -589,8 +563,6 @@ cores = Parameter(
 
 DEFAULT_PARSER_ARGUMENTS = [
     bam,
-    bam_list,
-    sample_bam,
     ploidy,
     sample_ploidy,
     inbreeding,
@@ -648,15 +620,14 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
 )
 
 
-def parse_sample_bam_paths(arguments):
+def parse_sample_bam_paths(bam_argument, sample_pool_argument, read_group_field):
     """Combine arguments relating to sample bam file specification.
 
     Parameters
     ----------
-    arguments
-        Parsed arguments containing some combination of
-        arguments for "bam", "bam_list", "sample_bam", and
-        "sample_list".
+    argument : list[str]
+        list of bam filepaths or single plaintext filepath
+    read_group_field : str
 
     Returns
     -------
@@ -665,46 +636,52 @@ def parse_sample_bam_paths(arguments):
     sample_bam : dict
         Dict mapping samples to bam paths.
     """
-    sample_bams = dict()
 
-    # bam paths
-    bams = []
-    if hasattr(arguments, "bam"):
-        bams = arguments.bam
-    if hasattr(arguments, "bam_list"):
-        path = arguments.bam_list[0]
-        if path:
-            with open(arguments.bam_list[0]) as f:
-                bams += [line.strip() for line in f.readlines()]
-        if len(bams) != len(set(bams)):
-            raise IOError("Duplicate input bams")
-    sample_bams.update(extract_sample_ids(bams, id=arguments.read_group_field[0]))
+    # case of list of bam paths
+    textfile = False
+    if len(bam_argument) == 1:
+        try:
+            pysam.AlignmentFile(bam_argument[0])
+        except ValueError:
+            # not a bam
+            textfile = True
+        else:
+            bams = bam_argument
+    else:
+        bams = bam_argument
+    if not textfile:
+        sample_bams = extract_sample_ids(bams, id=read_group_field)
+        samples = list(sample_bams)
 
-    # sample-bams map
-    if hasattr(arguments, "sample_bam"):
-        # only use values in sample_bam file
-        path = arguments.sample_bam[0]
-        if path and len(sample_bams) > 0:
-            raise IOError(
-                "The --sample-bam argument cannot be combined with --bam or --bam-list."
-            )
-        elif path:
-            with open(path) as f:
-                for line in f.readlines():
-                    sample, bam = line.strip().split("\t")
-                    sample_bams[sample] = bam
+    # case of plain-text filepath
+    if textfile:
+        with open(bam_argument[0]) as f:
+            lines = [line.strip().split("\t") for line in f.readlines()]
+        n_fields = len(lines[0])
+        for line in lines:
+            if len(line) != n_fields:
+                raise ValueError("Inconsistent number of fields")
+        if n_fields == 1:
+            # list of bam paths
+            bams = [line[0] for line in lines]
+            sample_bams = extract_sample_ids(bams, id=read_group_field)
+            samples = list(sample_bams)
+        elif n_fields == 2:
+            # list of sample-bam pairs
+            samples = [line[0] for line in lines]
+            sample_bams = dict(lines)
+        else:
+            raise ValueError("Too many fields")
 
-    samples = list(sample_bams.keys())
-    if len(samples) != len(set(samples)):
-        raise IOError("Duplicate input samples")
-
-    # samples as pools. TODO: multi-pools
-    pool = arguments.sample_pool[0]
-    if pool is None:
+    # handle sample pooling
+    if sample_pool_argument is None:
+        # pools of 1
         sample_bams = {k: [(k, v)] for k, v in sample_bams.items()}
     else:
-        samples = [pool]
-        sample_bams = {pool: [(k, v) for k, v in sample_bams.items()]}
+        # pool all samples
+        samples = [sample_pool_argument]
+        sample_bams = {sample_pool_argument: [(k, v) for k, v in sample_bams.items()]}
+    # TODO: multiple pools
 
     return samples, sample_bams
 
@@ -811,7 +788,9 @@ def collect_default_program_arguments(arguments):
                 "Cannot ignore base phred scores if --base-error-rate is 0"
             )
     # merge sample specific data with defaults
-    samples, sample_bams = parse_sample_bam_paths(arguments)
+    samples, sample_bams = parse_sample_bam_paths(
+        arguments.bam, arguments.sample_pool[0], arguments.read_group_field[0]
+    )
     sample_ploidy = parse_sample_value_map(
         arguments,
         samples,

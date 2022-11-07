@@ -2,8 +2,7 @@ usage: MCMC haplotype calling [-h] [--haplotypes HAPLOTYPES]
                               [--haplotype-frequencies HAPLOTYPE_FREQUENCIES]
                               [--haplotype-frequencies-prior]
                               [--skip-rare-haplotypes SKIP_RARE_HAPLOTYPES]
-                              [--bam [BAM ...]] [--bam-list BAM_LIST]
-                              [--sample-bam SAMPLE_BAM] [--ploidy PLOIDY]
+                              [--bam BAM [BAM ...]] [--ploidy PLOIDY]
                               [--sample-ploidy SAMPLE_PLOIDY]
                               [--inbreeding INBREEDING]
                               [--sample-inbreeding SAMPLE_INBREEDING]
@@ -41,21 +40,17 @@ optional arguments:
                         if their frequency within that file is less than the
                         specified value. This requires that the --haplotype-
                         frequencies parameter is also specified.
-  --bam [BAM ...]       A list of 0 or more bam files. All samples found
-                        within the listed bam files will be genotypes unless
-                        the --sample-list parameter is used.
-  --bam-list BAM_LIST   A file containing a list of bam file paths (one per
-                        line). This can optionally be used in place of or
-                        combined with the --bam parameter.
-  --sample-bam SAMPLE_BAM
-                        A file containing a list of samples with bam file
-                        paths. Each line of the file should be a sample
-                        identifier followed by a tab and then a bam file path.
-                        This can optionally be used in place the --bam and
-                        --bam-list parameters. This is faster than using those
-                        parameters when running many small jobs. An error will
-                        be thrown if a sample is not found within its
-                        specified bam file.
+  --bam BAM [BAM ...]   Bam file(s) to use in analysis. This may be (1) a list
+                        of one or more bam filepaths, (2) a plain-text file
+                        containing a single bam filepath on each line, (3) a
+                        plain-text file containing a sample identifier and its
+                        corresponding bam filepath on each line separated by a
+                        tab. If options (1) or (2) are used then all samples
+                        within each bam will be used within the analysis. If
+                        option (3) is used then only the specified sample will
+                        be extracted from each bam file and An error will be
+                        raised if a sample is not found within its specified
+                        bam file.
   --ploidy PLOIDY       Default ploidy for all samples (default = 2). This
                         value is used for all samples which are not specified
                         using the --sample-ploidy parameter

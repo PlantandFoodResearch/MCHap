@@ -119,7 +119,7 @@ def test_Program__cli_lists():
     command = [
         "mchap",
         "assemble",
-        "--bam-list",
+        "--bam",
         tmp_bam_list,
         "--sample-ploidy",
         tmp_sample_ploidy,
@@ -474,7 +474,7 @@ def test_Program__run_stdout__region(region, region_id, cache_threshold):
     command = [
         "mchap",
         "assemble",
-        "--sample-bam",
+        "--bam",
         tmp_sample_bams,
         "--ploidy",
         "4",
