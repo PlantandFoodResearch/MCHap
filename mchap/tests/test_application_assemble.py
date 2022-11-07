@@ -114,7 +114,7 @@ def test_Program__cli_lists():
     with open(tmp_sample_mcmc_temperatures, "w") as f:
         f.write("SAMPLE3\t0.8\t0.1\t1\t0.2\n")  # out of order
         f.write("SAMPLE1\t0.2\n")  # missing cold chain
-        # SAMPLE4 uses default
+        # SAMPLE2 uses default
 
     command = [
         "mchap",
@@ -125,7 +125,7 @@ def test_Program__cli_lists():
         tmp_sample_ploidy,
         "--inbreeding",
         tmp_sample_inbreeding,
-        "--sample-mcmc-temperatures",
+        "--mcmc-temperatures",
         tmp_sample_mcmc_temperatures,
         "--targets",
         BED,

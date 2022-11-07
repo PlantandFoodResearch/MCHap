@@ -362,35 +362,20 @@ mcmc_chains = Parameter(
     ),
 )
 
-
 mcmc_temperatures = Parameter(
     "--mcmc-temperatures",
     dict(
-        type=float,
-        nargs="*",
-        default=[1.0],
-        help=(
-            "A list of inverse-temperatures to use for parallel tempered chains. "
-            "These values must be between 0 and 1 and will automatically be sorted in "
-            "ascending order. The cold chain value of 1.0 will be added automatically if "
-            "it is not specified."
-        ),
-    ),
-)
-
-sample_mcmc_temperatures = Parameter(
-    "--sample-mcmc-temperatures",
-    dict(
         type=str,
-        nargs=1,
-        default=[None],
+        nargs="*",
+        default=["1.0"],
         help=(
-            "A file containing a list of samples with mcmc (inverse) temperatures. "
-            "Each line of the file should start with a sample identifier followed by "
-            "tab seperated numeric values between 0 and 1. "
-            "The number of temperatures specified may vary between samples. "
-            "Samples not listed in this file will use the default values specified "
-            "with the --mcmc-temperatures argument."
+            "Specify inverse-temperatures to use for parallel tempered chains (default = 1.0 i.e., no tempering). "
+            "This may be either (1) a list of floating point values or "
+            "(2) a file containing a list of samples with mcmc inverse-temperatures. "
+            "If option (2) is used then the file must contain a single sample per line "
+            "followed by a list of tab separated inverse temperatures. "
+            "The number of inverse-temperatures may differ between samples and any samples "
+            "not included in the list will default to not using tempering."
         ),
     ),
 )
@@ -588,7 +573,6 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
         mcmc_dosage_step_probability,
         mcmc_partial_dosage_step_probability,
         mcmc_temperatures,
-        sample_mcmc_temperatures,
         haplotype_posterior_threshold,
     ]
 )
@@ -688,19 +672,20 @@ def parse_sample_value_map(argument, samples, type):
         for line in f.readlines():
             sample, value = line.strip().split("\t")
             data[sample] = type(value)
+    for s in samples:
+        if s not in data:
+            raise ValueError("Sample '{}' not found in file '{}'".format(s, argument))
     return data
 
 
-def parse_sample_temperatures(arguments, samples):
+def parse_sample_temperatures(mcmc_temperatures_argument, samples):
     """Parse inverse temperatures for MCMC simulation
     with parallel-tempering.
 
     Parameters
     ----------
-    arguments
-        Parsed arguments containing the "mcmc_temperatures"
-        argument and optionally the "sample_mcmc_temperatures"
-        argument.
+    mcmc_temperatures_argument : str
+        Value(s) for mcmc_temperatures.
     samples : list
         List of samples.
 
@@ -710,37 +695,37 @@ def parse_sample_temperatures(arguments, samples):
         Dict mapping each sample to a list of temperatures (floats).
 
     """
-    assert hasattr(arguments, "mcmc_temperatures")
-    # per sample mcmc temperatures
-    sample_mcmc_temperatures = dict()
-    if hasattr(arguments, "sample_mcmc_temperatures"):
-        path = arguments.sample_mcmc_temperatures[0]
-        if path:
-            with open(path) as f:
-                for line in f.readlines():
-                    values = line.strip().split("\t")
-                    sample = values[0]
-                    temps = [float(v) for v in values[1:]]
-                    temps.sort()
-                    assert temps[0] > 0.0
-                    assert temps[-1] <= 1.0
-                    if temps[-1] != 1.0:
-                        temps.append(1.0)
-                    sample_mcmc_temperatures[sample] = temps
-
-    # default mcmc temperatures
-    temps = arguments.mcmc_temperatures
-    temps.sort()
-    assert temps[0] > 0.0
-    assert temps[-1] <= 1.0
-    if temps[-1] != 1.0:
-        temps.append(1.0)
-    for sample in samples:
-        if sample in sample_mcmc_temperatures:
-            pass
-        else:
-            sample_mcmc_temperatures[sample] = temps
-    return sample_mcmc_temperatures
+    if len(mcmc_temperatures_argument) > 1:
+        # must be a list of temps
+        floats = True
+    elif mcmc_temperatures_argument[0].replace(".", "", 1).isdigit():
+        # must be a single temp
+        floats = True
+    else:
+        floats = False
+    if floats:
+        temps = [float(s) for s in mcmc_temperatures_argument]
+        temps.sort()
+        assert temps[0] > 0.0
+        assert temps[-1] <= 1.0
+        if temps[-1] != 1.0:
+            temps.append(1.0)
+        return {s: temps for s in samples}
+    # case of a file, default to 1.0
+    data = {s: [1.0] for s in samples}
+    with open(mcmc_temperatures_argument[0]) as f:
+        for line in f.readlines():
+            values = line.strip().split("\t")
+            sample = values[0]
+            temps = [float(v) for v in values[1:]]
+            temps.sort()
+            assert temps[0] > 0.0
+            assert temps[-1] <= 1.0
+            if temps[-1] != 1.0:
+                temps.append(1.0)
+            data[sample] = temps
+    assert len(samples) == len(data)
+    return data
 
 
 def collect_default_program_arguments(arguments):
@@ -820,7 +805,7 @@ def collect_assemble_mcmc_program_arguments(arguments):
         raise ValueError("Cannot combine --targets and --region arguments.")
     data = collect_default_mcmc_program_arguments(arguments)
     sample_mcmc_temperatures = parse_sample_temperatures(
-        arguments, samples=data["samples"]
+        arguments.mcmc_temperatures, samples=data["samples"]
     )
     data.update(
         dict(

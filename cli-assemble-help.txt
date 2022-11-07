@@ -20,7 +20,6 @@ usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
                                [--mcmc-dosage-step-probability MCMC_DOSAGE_STEP_PROBABILITY]
                                [--mcmc-partial-dosage-step-probability MCMC_PARTIAL_DOSAGE_STEP_PROBABILITY]
                                [--mcmc-temperatures [MCMC_TEMPERATURES ...]]
-                               [--sample-mcmc-temperatures SAMPLE_MCMC_TEMPERATURES]
                                [--haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD]
 
 optional arguments:
@@ -151,20 +150,16 @@ optional arguments:
                         sub-step during each step of the MCMC. (default =
                         0.5).
   --mcmc-temperatures [MCMC_TEMPERATURES ...]
-                        A list of inverse-temperatures to use for parallel
-                        tempered chains. These values must be between 0 and 1
-                        and will automatically be sorted in ascending order.
-                        The cold chain value of 1.0 will be added
-                        automatically if it is not specified.
-  --sample-mcmc-temperatures SAMPLE_MCMC_TEMPERATURES
-                        A file containing a list of samples with mcmc
-                        (inverse) temperatures. Each line of the file should
-                        start with a sample identifier followed by tab
-                        seperated numeric values between 0 and 1. The number
-                        of temperatures specified may vary between samples.
-                        Samples not listed in this file will use the default
-                        values specified with the --mcmc-temperatures
-                        argument.
+                        Specify inverse-temperatures to use for parallel
+                        tempered chains (default = 1.0 i.e., no tempering).
+                        This may be either (1) a list of floating point values
+                        or (2) a file containing a list of samples with mcmc
+                        inverse-temperatures. If option (2) is used then the
+                        file must contain a single sample per line followed by
+                        a list of tab separated inverse temperatures. The
+                        number of inverse-temperatures may differ between
+                        samples and any samples not included in the list will
+                        default to not using tempering.
   --haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD
                         Posterior probability required for a haplotype to be
                         included in the output VCF as an alternative allele.
