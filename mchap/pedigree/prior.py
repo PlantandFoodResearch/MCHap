@@ -200,13 +200,12 @@ def duplicate_permutations(gamete_dosage, parent_dosage):
 
 
 @njit(cache=True)
-def log_gamete_pmf(
+def gamete_log_pmf(
     gamete_dose,
     gamete_ploidy,
     parent_dose,
     parent_ploidy,
-    log_lambda=-np.inf,
-    log_inv_lambda=0.0,
+    gamete_lambda=0.0,
 ):
     """Log probability of a gamete drawn from a known genotype.
 
@@ -220,10 +219,8 @@ def log_gamete_pmf(
         Counts of each unique gamete allele within the parent genotype.
     parent_ploidy : int
         Ploidy of the parent.
-    log_lambda : float
-        Log-transformed excess IBD probability of gamete.
-    log_inv_lambda : float
-        Log-transformed inverse of the excess IBD probability of gamete.
+    gamete_lambda : float
+        Excess IBD probability of gamete.
 
     Returns
     -------
@@ -233,22 +230,17 @@ def log_gamete_pmf(
     -----
     A non-zero lambda value is only supported for diploid gametes.
     """
-    lprob = (
-        np.log(
-            dosage_permutations(gamete_dose, parent_dose)
-            / comb(parent_ploidy, gamete_ploidy)
-        )
-        + log_inv_lambda
-    )
-    if log_lambda != -np.inf:
+    prob = (
+        dosage_permutations(gamete_dose, parent_dose)
+        / comb(parent_ploidy, gamete_ploidy)
+    ) * (1 - gamete_lambda)
+    if gamete_lambda > 0.0:
         if gamete_ploidy != 2:
             raise ValueError("Lambda parameter is only supported for diploid gametes")
-        lprob_dr = (
-            np.log(duplicate_permutations(gamete_dose, parent_dose) / parent_ploidy)
-            + log_lambda
-        )
-        lprob = add_log_prob(lprob, lprob_dr)
-    return lprob
+        prob_dr = (
+            duplicate_permutations(gamete_dose, parent_dose) / parent_ploidy
+        ) * gamete_lambda
+    return np.log(prob + prob_dr)
 
 
 @njit(cache=True)
@@ -388,8 +380,6 @@ def trio_log_pmf(
         for i in range(len(dosage)):
             if (dosage[i] >= 2) and (constraint_p[i] == 1):
                 constraint_p[i] = 2
-    log_lambda_p = np.log(lambda_p)
-    log_inv_lambda_p = np.log(1 - lambda_p)
     if lambda_q > 0.0:
         if tau_q != 2:
             raise ValueError(
@@ -399,8 +389,6 @@ def trio_log_pmf(
         for i in range(len(dosage)):
             if (dosage[i] >= 2) and (constraint_q[i] == 1):
                 constraint_q[i] = 2
-    log_lambda_q = np.log(lambda_q)
-    log_inv_lambda_q = np.log(1 - lambda_q)
 
     # used to prune code paths
     valid_p = constraint_p.sum() >= tau_p
@@ -416,24 +404,22 @@ def trio_log_pmf(
         while True:
             # assuming both parents are valid
             lprob_p = (
-                log_gamete_pmf(
+                gamete_log_pmf(
                     gamete_dose=gamete_p,
                     gamete_ploidy=tau_p,
                     parent_dose=dosage_p,
                     parent_ploidy=ploidy_p,
-                    log_lambda=log_lambda_p,
-                    log_inv_lambda=log_inv_lambda_p,
+                    gamete_lambda=lambda_p,
                 )
                 + lcorrect_p
             )
             lprob_q = (
-                log_gamete_pmf(
+                gamete_log_pmf(
                     gamete_dose=gamete_q,
                     gamete_ploidy=tau_q,
                     parent_dose=dosage_q,
                     parent_ploidy=ploidy_q,
-                    log_lambda=log_lambda_q,
-                    log_inv_lambda=log_inv_lambda_q,
+                    gamete_lambda=lambda_q,
                 )
                 + lcorrect_q
             )
@@ -464,13 +450,12 @@ def trio_log_pmf(
         gamete_q = dosage - gamete_p
         while True:
             lprob_p = (
-                log_gamete_pmf(
+                gamete_log_pmf(
                     gamete_dose=gamete_p,
                     gamete_ploidy=tau_p,
                     parent_dose=dosage_p,
                     parent_ploidy=ploidy_p,
-                    log_lambda=log_lambda_p,
-                    log_inv_lambda=log_inv_lambda_p,
+                    gamete_lambda=lambda_p,
                 )
                 + lcorrect_p
             )
@@ -505,13 +490,12 @@ def trio_log_pmf(
                 + lerror_p
             )
             lprob_q = (
-                log_gamete_pmf(
+                gamete_log_pmf(
                     gamete_dose=gamete_q,
                     gamete_ploidy=tau_q,
                     parent_dose=dosage_q,
                     parent_ploidy=ploidy_q,
-                    log_lambda=log_lambda_q,
-                    log_inv_lambda=log_inv_lambda_q,
+                    gamete_lambda=lambda_q,
                 )
                 + lcorrect_q
             )

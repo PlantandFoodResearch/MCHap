@@ -9,7 +9,7 @@ from mchap.pedigree.prior import (
     initial_dosage,
     increment_dosage,
     duplicate_permutations,
-    log_gamete_pmf,
+    gamete_log_pmf,
     second_gamete_log_pmf,
     trio_log_pmf,
 )
@@ -132,13 +132,12 @@ def test_log_gamete_pmf__sum_to_one(seed):
         gamete_dosage = allelic_dosage(gamete_genotype)
         parent_dosage = parental_copies(parent_genotype, gamete_genotype)
         prob = np.exp(
-            log_gamete_pmf(
+            gamete_log_pmf(
                 gamete_dose=gamete_dosage,
                 gamete_ploidy=gamete_ploidy,
                 parent_dose=parent_dosage,
                 parent_ploidy=parent_ploidy,
-                log_lambda=-np.inf,
-                log_inv_lambda=0.0,
+                gamete_lambda=0.0,
             )
         )
         total_prob += prob
@@ -159,20 +158,17 @@ def test_log_gamete_pmf__sum_to_one_lambda(seed):
     n_gametes = comb_with_replacement(n_alleles, gamete_ploidy)
     total_prob = 0.0
     lambda_ = np.random.rand()
-    log_lambda = np.log(lambda_)
-    log_inv_lambda = np.log(1 - lambda_)
     gamete_genotype = np.zeros(gamete_ploidy, int)
     for _ in range(n_gametes):
         gamete_dosage = allelic_dosage(gamete_genotype)
         parent_dosage = parental_copies(parent_genotype, gamete_genotype)
         prob = np.exp(
-            log_gamete_pmf(
+            gamete_log_pmf(
                 gamete_dose=gamete_dosage,
                 gamete_ploidy=gamete_ploidy,
                 parent_dose=parent_dosage,
                 parent_ploidy=parent_ploidy,
-                log_lambda=log_lambda,
-                log_inv_lambda=log_inv_lambda,
+                gamete_lambda=lambda_,
             )
         )
         total_prob += prob
@@ -184,13 +180,12 @@ def test_log_gamete_pmf__raise_on_non_diploid_lambda():
     with pytest.raises(
         ValueError, match="Lambda parameter is only supported for diploid gametes"
     ):
-        log_gamete_pmf(
+        gamete_log_pmf(
             gamete_dose=np.array([2, 1, 0]),
             gamete_ploidy=3,
             parent_dose=np.array([2, 2, 2]),
             parent_ploidy=6,
-            log_lambda=np.log(0.01),
-            log_inv_lambda=np.log(1 - 0.01),
+            gamete_lambda=0.01,
         )
 
 
