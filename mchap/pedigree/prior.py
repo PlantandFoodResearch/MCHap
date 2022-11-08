@@ -244,6 +244,61 @@ def gamete_log_pmf(
 
 
 @njit(cache=True)
+def gamete_allele_log_pmf(
+    gamete_count,
+    gamete_ploidy,
+    parent_count,
+    parent_ploidy,
+    gamete_lambda=0.0,
+):
+    """Log probability of allele within a gamete drawn from a known genotype.
+
+    Parameters
+    ----------
+    gamete_count : int
+        Counts of allele in the gamete.
+    gamete_ploidy : int
+        Ploidy (tau) of the gamete.
+    parent_count : int
+        Counts of allele within the parent genotype.
+    parent_ploidy : int
+        Ploidy of the parent.
+    gamete_lambda : float
+        Excess IBD probability of gamete.
+
+    Returns
+    -------
+    Log-transformed probability of allele within gamete being derived from parental genotype.
+
+    Notes
+    -----
+    This function assumes that other alleles of gamete represent a valid partial
+    gamete given the parental genotype.
+
+    A non-zero lambda value is only supported for diploid gametes.
+    """
+    assert gamete_count <= gamete_ploidy
+    assert parent_count <= parent_ploidy
+    if gamete_count == 0:
+        return -np.inf
+    const_count = gamete_count - 1
+    const_ploidy = gamete_ploidy - 1
+    # probability given no dr
+    available_count = parent_count - const_count
+    available_total = parent_ploidy - const_ploidy
+    prob = (available_count / available_total) * (1 - gamete_lambda)
+    # probability given dr only supports diploid gametes
+    if gamete_lambda > 0.0:
+        if gamete_ploidy != 2:
+            raise ValueError("Lambda parameter is only supported for diploid gametes")
+        # gamete must have 2+ copies of this allele
+        if const_count >= 1:
+            # probability of dr resulting in this specific allelic copy
+            prob_dr = (const_count / const_ploidy) * gamete_lambda
+    return np.log(prob + prob_dr)
+
+
+@njit(cache=True)
 def second_gamete_log_pmf(gamete_dose, constant_dose, n_alleles, inbreeding):
     """Log probability of an gamete of unknown origin given a known gamete and the expected
     inbreeding coefficient.
