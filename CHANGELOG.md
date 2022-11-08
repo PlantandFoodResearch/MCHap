@@ -2,6 +2,14 @@
 
 ## Unreleased 
 
+New Features:
+- Combine `--bam`, `--bam-list` and `--sample-bam` arguments #128
+- Combine `--ploidy` and `--sample-ploidy` arguments #128
+- Combine `--inbreeding` and `--sample-inbreeding` arguments #128
+- Combine `--mcmc-temperatures` and `--sample-mcmc-temperatures` arguments #128
+
+
+
 ## Beta v0.7.0
 
 New Features:
@@ -17,6 +25,8 @@ VCF Changes:
 - Added `AFPRIOR` infor filed to indicate prior allele frequencies
 - Added `NOA` filter to indicate loci where no alleles were observed (e.g., masked reference only)
 - Added `AF0` filter to indicate invalid prior allele frequencies in which all frequencies were zero
+
+
 
 ## Beta v0.6.0
 
