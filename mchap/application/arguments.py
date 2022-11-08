@@ -978,7 +978,7 @@ def parse_pedigree_arguments(
             if sample not in known_samples:
                 # add a dummy sample
                 samples.append(sample)
-                sample_bams[sample] = None
+                sample_bams[sample] = []
                 known_samples.add(sample)
             p = None if p == "." else p
             q = None if q == "." else q

@@ -168,6 +168,7 @@ class program(object):
                         )[name]
                         read_chars.append(chars)
                         read_quals.append(quals)
+                # TODO: handle case of no bams (empty list)
                 read_chars = np.concatenate(read_chars)
                 read_quals = np.concatenate(read_quals)
 
