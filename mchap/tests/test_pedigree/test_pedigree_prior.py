@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from mchap.jitutils import increment_genotype, comb_with_replacement
-from mchap.calling.utils import allelic_dosage
+from mchap.calling.utils import allelic_dosage, count_allele
 from mchap.pedigree.prior import (
     parental_copies,
     dosage_permutations,
@@ -10,6 +10,7 @@ from mchap.pedigree.prior import (
     increment_dosage,
     duplicate_permutations,
     gamete_log_pmf,
+    gamete_allele_log_pmf,
     second_gamete_log_pmf,
     trio_log_pmf,
 )
@@ -143,6 +144,38 @@ def test_log_gamete_pmf__sum_to_one(seed):
         total_prob += prob
         increment_genotype(gamete_genotype)
     np.testing.assert_almost_equal(total_prob, 1.0)
+
+
+@pytest.mark.parametrize(
+    "seed",
+    np.arange(20),
+)
+def test_log_gamete_allele_pmf__sum_to_one(seed):
+    np.random.seed(seed)
+    n_alleles = np.random.randint(15)
+    parent_ploidy = np.random.randint(2, 7)
+    gamete_ploidy = np.random.randint(1, parent_ploidy)
+    parent_genotype = np.random.randint(n_alleles, size=parent_ploidy)
+    gamete_genotype = np.random.choice(
+        parent_genotype, size=gamete_ploidy, replace=False
+    )
+    variable_index = np.random.randint(gamete_ploidy)
+    total = 0.0
+    for i in range(n_alleles):
+        gamete_genotype[variable_index] = i
+        gamete_count = count_allele(gamete_genotype, i)
+        parent_count = count_allele(parent_genotype, i)
+        prob = np.exp(
+            gamete_allele_log_pmf(
+                gamete_count=gamete_count,
+                gamete_ploidy=gamete_ploidy,
+                parent_count=parent_count,
+                parent_ploidy=parent_ploidy,
+                gamete_lambda=0.0,
+            )
+        )
+        total += prob
+    np.testing.assert_almost_equal(total, 1.0)
 
 
 @pytest.mark.parametrize(
