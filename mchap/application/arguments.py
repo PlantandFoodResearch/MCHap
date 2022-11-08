@@ -914,7 +914,8 @@ def parse_sample_value_map(argument, samples, type):
 def parse_pedigree_arguments(
     samples,
     sample_bams,
-    sample_ploidy,  # TODO: handle dummy samples ploidy
+    ploidy_argument,
+    inbreeding_argument,
     sample_parents_argument,
     gamete_ploidy_argument,
     gamete_ibd_argument,
@@ -928,8 +929,10 @@ def parse_pedigree_arguments(
         List of ordered samples.
     sample_bams : dict[str, str]
         Dict mapping sample names to bam filepaths.
-    sample_ploidy : dict[str, int]
-        Dict mapping sample names to ploidy.
+    ploidy_argument : str
+        Filepath or default value for for ploidy.
+    inbreeding_argument : str
+        Filepath or default value for for inbreeding.
     sample_parents_argument : str
         Filepath to tab-separated values describing pedigree.
     gamete_ploidy_argument : str
@@ -945,6 +948,8 @@ def parse_pedigree_arguments(
         A dictionary containing the following:
         - 'samples': list of ordered samples.
         - 'sample_bams': dict mapping sample names to bam filepaths.
+        - 'sample_ploidy' dict mapping sample names to ploidy.
+        - 'sample_inbreeding' dict mapping sample names to inbreeding.
         - 'sample_parents': dict mapping sample names to parent sample names.
         - 'gamete_ploidy': dict mapping sample names to ploidy of contributing gametes.
         - 'gamete_ibd': dict mapping sample names to excess IBD of contributing gametes.
@@ -970,6 +975,18 @@ def parse_pedigree_arguments(
             p = None if p == "." else p
             q = None if q == "." else q
             sample_parents[sample] = (p, q)
+
+    # parse ploidy and inbreeding to ensure any additional samples are included
+    sample_ploidy = parse_sample_value_map(
+        ploidy_argument,
+        samples,
+        type=int,
+    )
+    sample_inbreeding = parse_sample_value_map(
+        inbreeding_argument,
+        samples,
+        type=float,
+    )
 
     # gamete ploidy
     gamete_ploidy = dict()
@@ -1027,6 +1044,7 @@ def parse_pedigree_arguments(
         samples=samples,
         sample_bams=sample_bams,
         sample_ploidy=sample_ploidy,
+        sample_inbreeding=sample_inbreeding,
         sample_parents=sample_parents,
         gamete_ploidy=gamete_ploidy,
         gamete_ibd=gamete_ibd,
@@ -1160,7 +1178,8 @@ def collect_call_pedigree_mcmc_program_arguments(arguments):
         parse_pedigree_arguments(
             samples=data["samples"],
             sample_bams=data["sample_bams"],
-            sample_ploidy=data["sample_ploidy"],
+            ploidy_argument=arguments.ploidy[0],
+            inbreeding_argument=arguments.inbreeding[0],
             sample_parents_argument=arguments.sample_parents[0],
             gamete_ploidy_argument=arguments.gamete_ploidy[0],
             gamete_ibd_argument=arguments.gamete_ibd[0],
