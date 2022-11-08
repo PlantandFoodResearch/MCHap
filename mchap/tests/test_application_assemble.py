@@ -102,32 +102,30 @@ def test_Program__cli_lists():
     with open(tmp_sample_ploidy, "w") as f:
         f.write("SAMPLE3\t2\n")
         f.write("SAMPLE1\t6\n")
-        # SAMPLE4 uses default
+        f.write("SAMPLE2\t4\n")
 
     tmp_sample_inbreeding = dirpath + "/sample-inbreeding.txt"
     with open(tmp_sample_inbreeding, "w") as f:
         f.write("SAMPLE3\t0.1\n")
         f.write("SAMPLE1\t0.2\n")
-        # SAMPLE4 uses default
+        f.write("SAMPLE2\t0.0\n")
 
     tmp_sample_mcmc_temperatures = dirpath + "/sample-mcmc-temperatures.txt"
     with open(tmp_sample_mcmc_temperatures, "w") as f:
         f.write("SAMPLE3\t0.8\t0.1\t1\t0.2\n")  # out of order
         f.write("SAMPLE1\t0.2\n")  # missing cold chain
-        # SAMPLE4 uses default
+        # SAMPLE2 uses default
 
     command = [
         "mchap",
         "assemble",
-        "--bam-list",
+        "--bam",
         tmp_bam_list,
-        "--sample-ploidy",
-        tmp_sample_ploidy,
         "--ploidy",
-        "4",
-        "--sample-inbreeding",
+        tmp_sample_ploidy,
+        "--inbreeding",
         tmp_sample_inbreeding,
-        "--sample-mcmc-temperatures",
+        "--mcmc-temperatures",
         tmp_sample_mcmc_temperatures,
         "--targets",
         BED,
@@ -474,7 +472,7 @@ def test_Program__run_stdout__region(region, region_id, cache_threshold):
     command = [
         "mchap",
         "assemble",
-        "--sample-bam",
+        "--bam",
         tmp_sample_bams,
         "--ploidy",
         "4",

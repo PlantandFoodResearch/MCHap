@@ -1,4 +1,5 @@
 import copy
+import pysam
 from dataclasses import dataclass
 
 from mchap.constant import PFEIFFER_ERROR
@@ -131,107 +132,56 @@ bam = Parameter(
     "--bam",
     dict(
         type=str,
-        nargs="*",
+        nargs="+",
         default=[],
         help=(
-            "A list of 0 or more bam files. "
-            "All samples found within the listed bam files will be genotypes "
-            "unless the --sample-list parameter is used."
+            "Bam file(s) to use in analysis. "
+            "This may be (1) a list of one or more bam filepaths, "
+            "(2) a plain-text file containing a single bam filepath on each line, "
+            "(3) a plain-text file containing a sample identifier and its "
+            "corresponding bam filepath on each line separated by a tab. "
+            "If options (1) or (2) are used then all samples within each bam will be used within the analysis. "
+            "If option (3) is used then only the specified sample will be extracted from each bam file and "
+            "An error will be raised if a sample is not found within its specified bam file."
         ),
     ),
 )
 
-bam_list = Parameter(
-    "--bam-list",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "A file containing a list of bam file paths (one per line). "
-            "This can optionally be used in place of or combined with the --bam "
-            "parameter."
-        ),
-    ),
-)
-
-sample_bam = Parameter(
-    "--sample-bam",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "A file containing a list of samples with bam file paths. "
-            "Each line of the file should be a sample identifier followed "
-            "by a tab and then a bam file path. "
-            "This can optionally be used in place the --bam and --bam-list "
-            "parameters. This is faster than using those parameters when running "
-            "many small jobs. "
-            "An error will be thrown if a sample is not found within its specified "
-            "bam file."
-        ),
-    ),
-)
 
 ploidy = Parameter(
     "--ploidy",
     dict(
-        type=int,
+        type=str,
         nargs=1,
-        default=[2],
+        default=["2"],
         help=(
-            "Default ploidy for all samples (default = 2). "
-            "This value is used for all samples which are not specified using "
-            "the --sample-ploidy parameter"
+            "Specify sample ploidy (default = 2)."
+            "This may be (1) a single integer used to specify the ploidy of all samples or "
+            "(2) a file containing a list of all samples and their ploidy. "
+            "If option (2) is used then each line of the plaintext file must "
+            "contain a single sample identifier and the ploidy of that sample separated by a tab."
         ),
     ),
 )
 
-sample_ploidy = Parameter(
-    "--sample-ploidy",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "A file containing a list of samples with a ploidy value "
-            "used to indicate where their ploidy differs from the "
-            "default value. Each line should contain a sample identifier "
-            "followed by a tab and then an integer ploidy value."
-        ),
-    ),
-)
 
 inbreeding = Parameter(
     "--inbreeding",
     dict(
-        type=float,
+        type=str,
         nargs=1,
-        default=[0.0],
+        default=["0.0"],
         help=(
-            "Default inbreeding coefficient for all samples (default = 0.0). "
-            "This value is used for all samples which are not specified using "
-            "the --sample-inbreeding parameter."
+            "Specify expected sample inbreeding coefficient (default = 0.0)."
+            "This may be (1) a single floating point value in the interval [0, 1] "
+            "used to specify the inbreeding coefficient of all samples or "
+            "(2) a file containing a list of all samples and their inbreeding coefficient. "
+            "If option (2) is used then each line of the plaintext file must "
+            "contain a single sample identifier and the inbreeding coefficient of that sample separated by a tab."
         ),
     ),
 )
 
-sample_inbreeding = Parameter(
-    "--sample-inbreeding",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "A file containing a list of samples with an inbreeding coefficient "
-            "used to indicate where their expected inbreeding coefficient "
-            "default value. Each line should contain a sample identifier "
-            "followed by a tab and then a inbreeding coefficient value "
-            "within the interval [0, 1]."
-        ),
-    ),
-)
 
 sample_pool = Parameter(
     "--sample-pool",
@@ -412,35 +362,20 @@ mcmc_chains = Parameter(
     ),
 )
 
-
 mcmc_temperatures = Parameter(
     "--mcmc-temperatures",
     dict(
-        type=float,
-        nargs="*",
-        default=[1.0],
-        help=(
-            "A list of inverse-temperatures to use for parallel tempered chains. "
-            "These values must be between 0 and 1 and will automatically be sorted in "
-            "ascending order. The cold chain value of 1.0 will be added automatically if "
-            "it is not specified."
-        ),
-    ),
-)
-
-sample_mcmc_temperatures = Parameter(
-    "--sample-mcmc-temperatures",
-    dict(
         type=str,
-        nargs=1,
-        default=[None],
+        nargs="*",
+        default=["1.0"],
         help=(
-            "A file containing a list of samples with mcmc (inverse) temperatures. "
-            "Each line of the file should start with a sample identifier followed by "
-            "tab seperated numeric values between 0 and 1. "
-            "The number of temperatures specified may vary between samples. "
-            "Samples not listed in this file will use the default values specified "
-            "with the --mcmc-temperatures argument."
+            "Specify inverse-temperatures to use for parallel tempered chains (default = 1.0 i.e., no tempering). "
+            "This may be either (1) a list of floating point values or "
+            "(2) a file containing a list of samples with mcmc inverse-temperatures. "
+            "If option (2) is used then the file must contain a single sample per line "
+            "followed by a list of tab separated inverse temperatures. "
+            "The number of inverse-temperatures may differ between samples and any samples "
+            "not included in the list will default to not using tempering."
         ),
     ),
 )
@@ -589,12 +524,8 @@ cores = Parameter(
 
 DEFAULT_PARSER_ARGUMENTS = [
     bam,
-    bam_list,
-    sample_bam,
     ploidy,
-    sample_ploidy,
     inbreeding,
-    sample_inbreeding,
     sample_pool,
     base_error_rate,
     ignore_base_phred_scores,
@@ -642,21 +573,19 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
         mcmc_dosage_step_probability,
         mcmc_partial_dosage_step_probability,
         mcmc_temperatures,
-        sample_mcmc_temperatures,
         haplotype_posterior_threshold,
     ]
 )
 
 
-def parse_sample_bam_paths(arguments):
+def parse_sample_bam_paths(bam_argument, sample_pool_argument, read_group_field):
     """Combine arguments relating to sample bam file specification.
 
     Parameters
     ----------
-    arguments
-        Parsed arguments containing some combination of
-        arguments for "bam", "bam_list", "sample_bam", and
-        "sample_list".
+    argument : list[str]
+        list of bam filepaths or single plaintext filepath
+    read_group_field : str
 
     Returns
     -------
@@ -665,102 +594,98 @@ def parse_sample_bam_paths(arguments):
     sample_bam : dict
         Dict mapping samples to bam paths.
     """
-    sample_bams = dict()
 
-    # bam paths
-    bams = []
-    if hasattr(arguments, "bam"):
-        bams = arguments.bam
-    if hasattr(arguments, "bam_list"):
-        path = arguments.bam_list[0]
-        if path:
-            with open(arguments.bam_list[0]) as f:
-                bams += [line.strip() for line in f.readlines()]
-        if len(bams) != len(set(bams)):
-            raise IOError("Duplicate input bams")
-    sample_bams.update(extract_sample_ids(bams, id=arguments.read_group_field[0]))
+    # case of list of bam paths
+    textfile = False
+    if len(bam_argument) == 1:
+        try:
+            pysam.AlignmentFile(bam_argument[0])
+        except ValueError:
+            # not a bam
+            textfile = True
+        else:
+            bams = bam_argument
+    else:
+        bams = bam_argument
+    if not textfile:
+        sample_bams = extract_sample_ids(bams, id=read_group_field)
+        samples = list(sample_bams)
 
-    # sample-bams map
-    if hasattr(arguments, "sample_bam"):
-        # only use values in sample_bam file
-        path = arguments.sample_bam[0]
-        if path and len(sample_bams) > 0:
-            raise IOError(
-                "The --sample-bam argument cannot be combined with --bam or --bam-list."
-            )
-        elif path:
-            with open(path) as f:
-                for line in f.readlines():
-                    sample, bam = line.strip().split("\t")
-                    sample_bams[sample] = bam
+    # case of plain-text filepath
+    if textfile:
+        with open(bam_argument[0]) as f:
+            lines = [line.strip().split("\t") for line in f.readlines()]
+        n_fields = len(lines[0])
+        for line in lines:
+            if len(line) != n_fields:
+                raise ValueError("Inconsistent number of fields")
+        if n_fields == 1:
+            # list of bam paths
+            bams = [line[0] for line in lines]
+            sample_bams = extract_sample_ids(bams, id=read_group_field)
+            samples = list(sample_bams)
+        elif n_fields == 2:
+            # list of sample-bam pairs
+            samples = [line[0] for line in lines]
+            sample_bams = dict(lines)
+        else:
+            raise ValueError("Too many fields")
 
-    samples = list(sample_bams.keys())
-    if len(samples) != len(set(samples)):
-        raise IOError("Duplicate input samples")
-
-    # samples as pools. TODO: multi-pools
-    pool = arguments.sample_pool[0]
-    if pool is None:
+    # handle sample pooling
+    if sample_pool_argument is None:
+        # pools of 1
         sample_bams = {k: [(k, v)] for k, v in sample_bams.items()}
     else:
-        samples = [pool]
-        sample_bams = {pool: [(k, v) for k, v in sample_bams.items()]}
+        # pool all samples
+        samples = [sample_pool_argument]
+        sample_bams = {sample_pool_argument: [(k, v) for k, v in sample_bams.items()]}
+    # TODO: multiple pools
 
     return samples, sample_bams
 
 
-def parse_sample_value_map(arguments, samples, default, sample_map, type):
+def parse_sample_value_map(argument, samples, type):
     """Combine arguments specified for a default value and sample-value map file.
 
     Parameters
     ----------
-    arguments
-        Parsed arguments containing some the default value argument
-        and the optionally the sample-value map file argument.
+    argument : str
+        Argument to parse.
     samples : list
         List of sample names
-    default : str
-        Name of argument with default value.
-    sample_map : str
-        Path of file containing tab-seperated per sample values.
     type : type
-        Type of the specified values.
+        Type of the specified values (float or int).
 
     Returns
     -------
     sample_values : dict
         Dict mapping samples to values.
     """
-    sample_value = dict()
-    assert hasattr(arguments, default)
-    # sample value map
-    if hasattr(arguments, sample_map):
-        path = getattr(arguments, sample_map)[0]
-        if path:
-            with open(path) as f:
-                for line in f.readlines():
-                    sample, value = line.strip().split("\t")
-                    sample_value[sample] = type(value)
-    # default value
-    default_value = getattr(arguments, default)[0]
-    for sample in samples:
-        if sample in sample_value:
-            pass
-        else:
-            sample_value[sample] = default_value
-    return sample_value
+    if (type is int) and argument.isdigit():
+        value = int(argument)
+        return {s: value for s in samples}
+    if (type is float) and argument.replace(".", "", 1).isdigit():
+        value = float(argument)
+        return {s: value for s in samples}
+    data = dict()
+    with open(argument) as f:
+        for line in f.readlines():
+            sample, value = line.strip().split("\t")
+            data[sample] = type(value)
+    for s in samples:
+        if s not in data:
+            raise ValueError("Sample '{}' not found in file '{}'".format(s, argument))
+    return data
 
 
-def parse_sample_temperatures(arguments, samples):
+def parse_sample_temperatures(mcmc_temperatures_argument, samples):
     """Parse inverse temperatures for MCMC simulation
     with parallel-tempering.
 
     Parameters
     ----------
-    arguments
-        Parsed arguments containing the "mcmc_temperatures"
-        argument and optionally the "sample_mcmc_temperatures"
-        argument.
+    mcmc_temperatures_argument : str
+        Value(s) for mcmc_temperatures.
     samples : list
         List of samples.
 
@@ -770,37 +695,37 @@ def parse_sample_temperatures(arguments, samples):
         Dict mapping each sample to a list of temperatures (floats).
 
     """
-    assert hasattr(arguments, "mcmc_temperatures")
-    # per sample mcmc temperatures
-    sample_mcmc_temperatures = dict()
-    if hasattr(arguments, "sample_mcmc_temperatures"):
-        path = arguments.sample_mcmc_temperatures[0]
-        if path:
-            with open(path) as f:
-                for line in f.readlines():
-                    values = line.strip().split("\t")
-                    sample = values[0]
-                    temps = [float(v) for v in values[1:]]
-                    temps.sort()
-                    assert temps[0] > 0.0
-                    assert temps[-1] <= 1.0
-                    if temps[-1] != 1.0:
-                        temps.append(1.0)
-                    sample_mcmc_temperatures[sample] = temps
-
-    # default mcmc temperatures
-    temps = arguments.mcmc_temperatures
-    temps.sort()
-    assert temps[0] > 0.0
-    assert temps[-1] <= 1.0
-    if temps[-1] != 1.0:
-        temps.append(1.0)
-    for sample in samples:
-        if sample in sample_mcmc_temperatures:
-            pass
-        else:
-            sample_mcmc_temperatures[sample] = temps
-    return sample_mcmc_temperatures
+    if len(mcmc_temperatures_argument) > 1:
+        # must be a list of temps
+        floats = True
+    elif mcmc_temperatures_argument[0].replace(".", "", 1).isdigit():
+        # must be a single temp
+        floats = True
+    else:
+        floats = False
+    if floats:
+        temps = [float(s) for s in mcmc_temperatures_argument]
+        temps.sort()
+        assert temps[0] > 0.0
+        assert temps[-1] <= 1.0
+        if temps[-1] != 1.0:
+            temps.append(1.0)
+        return {s: temps for s in samples}
+    # case of a file, default to 1.0
+    data = {s: [1.0] for s in samples}
+    with open(mcmc_temperatures_argument[0]) as f:
+        for line in f.readlines():
+            values = line.strip().split("\t")
+            sample = values[0]
+            temps = [float(v) for v in values[1:]]
+            temps.sort()
+            assert temps[0] > 0.0
+            assert temps[-1] <= 1.0
+            if temps[-1] != 1.0:
+                temps.append(1.0)
+            data[sample] = temps
+    assert len(samples) == len(data)
+    return data
 
 
 def collect_default_program_arguments(arguments):
@@ -811,19 +736,17 @@ def collect_default_program_arguments(arguments):
                 "Cannot ignore base phred scores if --base-error-rate is 0"
             )
     # merge sample specific data with defaults
-    samples, sample_bams = parse_sample_bam_paths(arguments)
+    samples, sample_bams = parse_sample_bam_paths(
+        arguments.bam, arguments.sample_pool[0], arguments.read_group_field[0]
+    )
     sample_ploidy = parse_sample_value_map(
-        arguments,
+        arguments.ploidy[0],
         samples,
-        default="ploidy",
-        sample_map="sample_ploidy",
         type=int,
     )
     sample_inbreeding = parse_sample_value_map(
-        arguments,
+        arguments.inbreeding[0],
         samples,
-        default="inbreeding",
-        sample_map="sample_inbreeding",
         type=float,
     )
     return dict(
@@ -882,7 +805,7 @@ def collect_assemble_mcmc_program_arguments(arguments):
         raise ValueError("Cannot combine --targets and --region arguments.")
     data = collect_default_mcmc_program_arguments(arguments)
     sample_mcmc_temperatures = parse_sample_temperatures(
-        arguments, samples=data["samples"]
+        arguments.mcmc_temperatures, samples=data["samples"]
     )
     data.update(
         dict(

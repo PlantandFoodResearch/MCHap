@@ -2,11 +2,8 @@ usage: MCMC haplotype calling [-h] [--haplotypes HAPLOTYPES]
                               [--haplotype-frequencies HAPLOTYPE_FREQUENCIES]
                               [--haplotype-frequencies-prior]
                               [--skip-rare-haplotypes SKIP_RARE_HAPLOTYPES]
-                              [--bam [BAM ...]] [--bam-list BAM_LIST]
-                              [--sample-bam SAMPLE_BAM] [--ploidy PLOIDY]
-                              [--sample-ploidy SAMPLE_PLOIDY]
+                              [--bam BAM [BAM ...]] [--ploidy PLOIDY]
                               [--inbreeding INBREEDING]
-                              [--sample-inbreeding SAMPLE_INBREEDING]
                               [--sample-pool SAMPLE_POOL]
                               [--base-error-rate BASE_ERROR_RATE]
                               [--use-base-phred-scores]
@@ -41,42 +38,34 @@ optional arguments:
                         if their frequency within that file is less than the
                         specified value. This requires that the --haplotype-
                         frequencies parameter is also specified.
-  --bam [BAM ...]       A list of 0 or more bam files. All samples found
-                        within the listed bam files will be genotypes unless
-                        the --sample-list parameter is used.
-  --bam-list BAM_LIST   A file containing a list of bam file paths (one per
-                        line). This can optionally be used in place of or
-                        combined with the --bam parameter.
-  --sample-bam SAMPLE_BAM
-                        A file containing a list of samples with bam file
-                        paths. Each line of the file should be a sample
-                        identifier followed by a tab and then a bam file path.
-                        This can optionally be used in place the --bam and
-                        --bam-list parameters. This is faster than using those
-                        parameters when running many small jobs. An error will
-                        be thrown if a sample is not found within its
-                        specified bam file.
-  --ploidy PLOIDY       Default ploidy for all samples (default = 2). This
-                        value is used for all samples which are not specified
-                        using the --sample-ploidy parameter
-  --sample-ploidy SAMPLE_PLOIDY
-                        A file containing a list of samples with a ploidy
-                        value used to indicate where their ploidy differs from
-                        the default value. Each line should contain a sample
-                        identifier followed by a tab and then an integer
-                        ploidy value.
+  --bam BAM [BAM ...]   Bam file(s) to use in analysis. This may be (1) a list
+                        of one or more bam filepaths, (2) a plain-text file
+                        containing a single bam filepath on each line, (3) a
+                        plain-text file containing a sample identifier and its
+                        corresponding bam filepath on each line separated by a
+                        tab. If options (1) or (2) are used then all samples
+                        within each bam will be used within the analysis. If
+                        option (3) is used then only the specified sample will
+                        be extracted from each bam file and An error will be
+                        raised if a sample is not found within its specified
+                        bam file.
+  --ploidy PLOIDY       Specify sample ploidy (default = 2).This may be (1) a
+                        single integer used to specify the ploidy of all
+                        samples or (2) a file containing a list of all samples
+                        and their ploidy. If option (2) is used then each line
+                        of the plaintext file must contain a single sample
+                        identifier and the ploidy of that sample separated by
+                        a tab.
   --inbreeding INBREEDING
-                        Default inbreeding coefficient for all samples
-                        (default = 0.0). This value is used for all samples
-                        which are not specified using the --sample-inbreeding
-                        parameter.
-  --sample-inbreeding SAMPLE_INBREEDING
-                        A file containing a list of samples with an inbreeding
-                        coefficient used to indicate where their expected
-                        inbreeding coefficient default value. Each line should
-                        contain a sample identifier followed by a tab and then
-                        a inbreeding coefficient value within the interval [0,
-                        1].
+                        Specify expected sample inbreeding coefficient
+                        (default = 0.0).This may be (1) a single floating
+                        point value in the interval [0, 1] used to specify the
+                        inbreeding coefficient of all samples or (2) a file
+                        containing a list of all samples and their inbreeding
+                        coefficient. If option (2) is used then each line of
+                        the plaintext file must contain a single sample
+                        identifier and the inbreeding coefficient of that
+                        sample separated by a tab.
   --sample-pool SAMPLE_POOL
                         A name used to pool all sample reads into a single
                         sample. WARNING: this is an experimental feature.
