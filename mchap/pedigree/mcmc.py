@@ -7,7 +7,7 @@ from .prior import markov_blanket_log_probability
 
 
 @njit(cache=True)
-def allele_step(
+def metropolis_hastings_probabilities(
     target_index,
     allele_index,
     sample_genotypes,
@@ -102,6 +102,40 @@ def allele_step(
     probabilities = np.exp(log_accept)
     probabilities[current_allele] = 1 - probabilities.sum()
 
+    return probabilities
+
+
+@njit(cache=True)
+def allele_step(
+    target_index,
+    allele_index,
+    sample_genotypes,
+    sample_ploidy,
+    sample_inbreeding,
+    sample_parents,
+    gamete_tau,
+    gamete_lambda,
+    gamete_error,
+    sample_read_dists,  # array (n_samples, n_reads, n_pos, n_nucl)
+    sample_read_counts,  # array (n_samples, n_reads)
+    haplotypes,  # (n_haplotypes, n_pos)
+    llk_cache,
+):
+    probabilities = metropolis_hastings_probabilities(
+        target_index=target_index,
+        allele_index=allele_index,
+        sample_genotypes=sample_genotypes,
+        sample_ploidy=sample_ploidy,
+        sample_inbreeding=sample_inbreeding,
+        sample_parents=sample_parents,
+        gamete_tau=gamete_tau,
+        gamete_lambda=gamete_lambda,
+        gamete_error=gamete_error,
+        sample_read_dists=sample_read_dists,
+        sample_read_counts=sample_read_counts,
+        haplotypes=haplotypes,
+        llk_cache=llk_cache,
+    )
     # random choice of new state using probabilities
     choice = random_choice(probabilities)
     sample_genotypes[target_index, allele_index] = choice
