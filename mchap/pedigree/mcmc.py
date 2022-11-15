@@ -2,6 +2,7 @@ import numpy as np
 from numba import njit
 
 from mchap.jitutils import random_choice
+from mchap.calling.utils import count_allele
 from .likelihood import log_likelihood_alleles_cached
 from .prior import markov_blanket_log_probability
 
@@ -25,6 +26,7 @@ def metropolis_hastings_probabilities(
     n_alleles = len(haplotypes)
     ploidy = sample_ploidy[target_index]
     current_allele = sample_genotypes[target_index, allele_index]
+    allele_copies = count_allele(sample_genotypes[target_index], current_allele)
     reads = sample_read_dists[target_index]
     read_counts = sample_read_counts[target_index]
     idx = read_counts > 0
@@ -88,10 +90,14 @@ def metropolis_hastings_probabilities(
             )
             lprior_ratio = lprior_i - lprior
 
-            # calculate Metropolis-Hastings acceptance probability (proposal ratio is 1)
-            # ln(min(1, (P(G'|R)P(G')) / (P(G|R)P(G)))
+            # calculate proposal ratio = g(G|G') / g(G'|G)
+            allele_copies_i = count_allele(sample_genotypes[target_index], i)
+            lproposal_ratio = np.log(allele_copies_i / allele_copies)
+
+            # calculate Metropolis-Hastings acceptance probability
+            # ln(min(1, (P(G'|R)P(G')g(G|G')) / (P(G|R)P(G)g(G'|G)))
             log_accept[i] = np.minimum(
-                0.0, llk_ratio + lprior_ratio
+                0.0, llk_ratio + lprior_ratio + lproposal_ratio
             )  # max prob of log(1)
 
     # adjust acceptance probabilities by proposal probabilities
@@ -101,6 +107,9 @@ def metropolis_hastings_probabilities(
     # then fill in probability that no step is made (i.e. choose the initial state)
     probabilities = np.exp(log_accept)
     probabilities[current_allele] = 1 - probabilities.sum()
+
+    # reset current allele
+    sample_genotypes[target_index, allele_index] = current_allele
 
     return probabilities
 
