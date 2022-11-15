@@ -5,7 +5,7 @@ from numba import njit
 from mchap.calling.utils import allelic_dosage
 from mchap.jitutils import comb, add_log_prob, ln_equivalent_permutations
 from mchap.assemble.prior import log_genotype_prior
-from mchap.calling.prior import calculate_alphas
+from mchap.calling.prior import calculate_alphas, log_genotype_allele_prior
 
 
 @njit(cache=True)
@@ -98,6 +98,28 @@ def initial_dosage(ploidy, constraint):
     if ploidy > 0:
         raise ValueError("Ploidy does not fit within constraint")
     return dosage
+
+
+@njit(cache=True)
+def valid_dosage(dosage, constraint):
+    """Validate that dosage is possible given constraint.
+
+    Parameters
+    ----------
+    dosage : ndarray, int, shape (ploidy,)
+        Counts of each unique allele in a genotype.
+    constraint : ndarray, int, shape (ploidy,)
+        Max count of each allele.
+
+    Returns
+    -------
+    valid : bool
+        True if dosage is valid
+    """
+    for i in range(len(dosage)):
+        if dosage[i] > constraint[i]:
+            return False
+    return True
 
 
 @njit(cache=True)
@@ -244,6 +266,32 @@ def gamete_log_pmf(
 
 
 @njit(cache=True)
+def gamete_const_log_pmf(
+    allele_index,
+    gamete_dose,
+    gamete_ploidy,
+    parent_dose,
+    parent_ploidy,
+    gamete_lambda=0.0,
+):
+    if gamete_dose[allele_index] > 0:
+        gamete_dose[allele_index] -= 1
+        if gamete_ploidy == 2:
+            gamete_lambda = 0.0
+        lprob = gamete_log_pmf(
+            gamete_dose=gamete_dose,
+            gamete_ploidy=gamete_ploidy - 1,
+            parent_dose=parent_dose,
+            parent_ploidy=parent_ploidy,
+            gamete_lambda=gamete_lambda,
+        )
+        gamete_dose[allele_index] += 1
+    else:
+        lprob = -np.inf
+    return lprob
+
+
+@njit(cache=True)
 def gamete_allele_log_pmf(
     gamete_count,
     gamete_ploidy,
@@ -354,6 +402,19 @@ def second_gamete_log_pmf(gamete_dose, constant_dose, n_alleles, inbreeding):
 
     # return as log probability
     return left + prod
+
+
+@njit(cache=True)
+def second_gamete_const_log_pmf(
+    allele_index, gamete_dose, constant_dose, n_alleles, inbreeding
+):
+    if gamete_dose[allele_index] >= 0:
+        gamete_dose[allele_index] -= 1
+        lprob = second_gamete_log_pmf(gamete_dose, constant_dose, n_alleles, inbreeding)
+        gamete_dose[allele_index] += 1
+    else:
+        lprob = -np.inf
+    return lprob
 
 
 @njit(cache=True)
@@ -571,6 +632,410 @@ def trio_log_pmf(
         + lerror_p
         + lerror_q
     )
+    lprob = add_log_prob(lprob, lprob_pq)
+    return lprob
+
+
+@njit(cache=True)
+def progeny_allele_log_pmf(
+    allele_index,
+    progeny,
+    parent_p,
+    parent_q,
+    tau_p,
+    tau_q,
+    lambda_p,
+    lambda_q,
+    error_p,
+    error_q,
+    inbreeding,
+    n_alleles,
+):
+    """Log probability of a trio of genotypes.
+
+    Parameters
+    ----------
+    allele_index : int
+        Index of allele within progeny treated as variable.
+    progeny : ndarray, int, shape (ploidy,)
+        Integer encoded alleles in the progeny genotype.
+    parent_p : ndarray, int, shape (ploidy,)
+        Integer encoded alleles in the first parental genotype.
+    parent_q : ndarray, int, shape (ploidy,)
+        Integer encoded alleles in the second parental genotype.
+    tau_p : int
+        Number of alleles inherited from parent_p.
+    tau_q : int
+        Number of alleles inherited from parent_q.
+    error_p : float
+        Probability that parent_p is not the correct
+        parental genotype.
+    error_q : float
+        Probability that parent_q is not the correct
+        parental genotype.
+    inbreeding : float
+        Expected inbreeding coefficient of the sample.
+    n_alleles : int
+        Number of possible alleles at this locus.
+
+    Returns
+    -------
+    lprob : float
+        Log-probability of the trio.
+
+    Notes
+    -----
+    In the case that one or both parental genotypes are incorrect
+    (as encoded by the error terms) this function assumes that the
+    progeny genotype has the specified inbreeding coefficient and that
+    the gametes of unknown origin are drawn from a background population
+    in which all alleles are equally frequent.
+    The inbreeding coefficient is does not inform a case in which both
+    parents are correct (i.e., when the error terms are zero).
+    """
+    ploidy_p = len(parent_p)
+    ploidy_q = len(parent_q)
+
+    lerror_p = np.log(error_p)
+    lerror_q = np.log(error_q)
+    lcorrect_p = np.log(1 - error_p)
+    lcorrect_q = np.log(1 - error_q)
+
+    # ensure allele_index is index of first occurrence of that allele within progeny
+    # this is required so that the allele_index can be used on dosage arrays
+    assert allele_index < len(progeny)
+    for i in range(len(progeny)):
+        if progeny[i] == progeny[allele_index]:
+            allele_index = i
+            break
+
+    dosage = allelic_dosage(progeny)
+    dosage_p = parental_copies(parent_p, progeny)
+    dosage_q = parental_copies(parent_q, progeny)
+
+    constraint_p = np.minimum(dosage, dosage_p)
+    constraint_q = np.minimum(dosage, dosage_q)
+
+    # handle lambda parameter (diploid gametes only)
+    if lambda_p > 0.0:
+        if tau_p != 2:
+            raise ValueError(
+                "Non-zero lambda is only supported for a gametic ploidy (tau) of 2"
+            )
+        # adjust constraint for double reduction
+        for i in range(len(dosage)):
+            if (dosage[i] >= 2) and (constraint_p[i] == 1):
+                constraint_p[i] = 2
+    if lambda_q > 0.0:
+        if tau_q != 2:
+            raise ValueError(
+                "Non-zero lambda is only supported for a gametic ploidy (tau) of 2"
+            )
+        # adjust constraint for double reduction
+        for i in range(len(dosage)):
+            if (dosage[i] >= 2) and (constraint_q[i] == 1):
+                constraint_q[i] = 2
+
+    # used to prune code paths
+    valid_p = constraint_p.sum() >= tau_p
+    valid_q = constraint_q.sum() >= tau_q
+
+    # accumulate log-probabilities
+    # for Gibbs sampling these are calculated as probability
+    # of proposed allele given other alleles held as constant
+    # p(a | c)
+    # to do this we iterate over all possible gamete combinations
+    # and model the probability of the allele in question coming from
+    # each gamete in a pair.
+    # therefore the alleles held as constant usually includes alleles
+    # from both gametes.
+    # we need to weight each gamete constant combination by its probability
+    # of occurring and then multiply this by the probability of the allele
+    # given the constant.
+    # This effectively involves calculating three probabilities:
+    # p(gamete_p | parent_p)
+    # p(gamete_q_constant | parent_q, gamete_p)
+    # p(gamete_q_allele | parent_q, gamete_q_constant, gamete_p)
+    lprob = -np.inf
+
+    # assuming both parents are valid
+    if valid_p and valid_q:
+        gamete_p = initial_dosage(tau_p, constraint_p)
+        gamete_q = dosage - gamete_p
+        while True:
+            # probability of each gamete given parent
+            lprob_gamete_p = gamete_log_pmf(
+                gamete_dose=gamete_p,
+                gamete_ploidy=tau_p,
+                parent_dose=dosage_p,
+                parent_ploidy=ploidy_p,
+                gamete_lambda=lambda_p,
+            )
+            lprob_const_p = gamete_const_log_pmf(
+                allele_index=allele_index,
+                gamete_dose=gamete_p,
+                gamete_ploidy=tau_p,
+                parent_dose=dosage_p,
+                parent_ploidy=ploidy_p,
+                gamete_lambda=lambda_p,
+            )
+            lprob_allele_p = gamete_allele_log_pmf(
+                gamete_count=gamete_p[allele_index],
+                gamete_ploidy=tau_p,
+                parent_count=dosage_p[allele_index],
+                parent_ploidy=ploidy_p,
+                gamete_lambda=lambda_p,
+            )
+            lprob_gamete_q = gamete_log_pmf(
+                gamete_dose=gamete_q,
+                gamete_ploidy=tau_q,
+                parent_dose=dosage_q,
+                parent_ploidy=ploidy_q,
+                gamete_lambda=lambda_q,
+            )
+            lprob_const_q = gamete_const_log_pmf(
+                allele_index=allele_index,
+                gamete_dose=gamete_q,
+                gamete_ploidy=tau_q,
+                parent_dose=dosage_q,
+                parent_ploidy=ploidy_q,
+                gamete_lambda=lambda_q,
+            )
+            lprob_allele_q = gamete_allele_log_pmf(
+                gamete_count=gamete_q[allele_index],
+                gamete_ploidy=tau_q,
+                parent_count=dosage_q[allele_index],
+                parent_ploidy=ploidy_q,
+                gamete_lambda=lambda_q,
+            )
+            lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
+            lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
+            lprob_pq = add_log_prob(lprob_p, lprob_q) + lcorrect_p + lcorrect_q
+            lprob = add_log_prob(lprob, lprob_pq)
+
+            # assuming p valid and q invalid (avoids iterating gametes of p twice)
+            lprob_gamete_q = second_gamete_log_pmf(
+                gamete_dose=gamete_q,
+                constant_dose=gamete_p,
+                n_alleles=n_alleles,
+                inbreeding=inbreeding,
+            )
+            lprob_const_q = second_gamete_const_log_pmf(
+                allele_index,
+                gamete_dose=gamete_q,
+                constant_dose=gamete_p,
+                n_alleles=n_alleles,
+                inbreeding=inbreeding,
+            )
+            lprob_allele_q = log_genotype_allele_prior(
+                progeny,
+                allele_index,
+                unique_haplotypes=n_alleles,
+                inbreeding=inbreeding,
+            )
+            lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
+            lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
+            lprob_pq = add_log_prob(lprob_p, lprob_q) + lcorrect_p + lerror_q
+            lprob = add_log_prob(lprob, lprob_pq)
+
+            # increment by gamete of p
+            try:
+                increment_dosage(gamete_p, constraint_p)
+            except:  # noqa: E722
+                break
+            else:
+                for i in range(len(gamete_q)):
+                    gamete_q[i] = dosage[i] - gamete_p[i]
+
+    # assuming p valid and q invalid (unless already done in previous loop)
+    elif valid_p:
+        gamete_p = initial_dosage(tau_p, constraint_p)
+        gamete_q = dosage - gamete_p
+        while True:
+            # assuming p valid and q invalid
+            lprob_gamete_p = gamete_log_pmf(
+                gamete_dose=gamete_p,
+                gamete_ploidy=tau_p,
+                parent_dose=dosage_p,
+                parent_ploidy=ploidy_p,
+                gamete_lambda=lambda_p,
+            )
+            lprob_const_p = gamete_const_log_pmf(
+                allele_index=allele_index,
+                gamete_dose=gamete_p,
+                gamete_ploidy=tau_p,
+                parent_dose=dosage_p,
+                parent_ploidy=ploidy_p,
+                gamete_lambda=lambda_p,
+            )
+            lprob_allele_p = gamete_allele_log_pmf(
+                gamete_count=gamete_p[allele_index],
+                gamete_ploidy=tau_p,
+                parent_count=dosage_p[allele_index],
+                parent_ploidy=ploidy_p,
+                gamete_lambda=lambda_p,
+            )
+            lprob_gamete_q = second_gamete_log_pmf(
+                gamete_dose=gamete_q,
+                constant_dose=gamete_p,
+                n_alleles=n_alleles,
+                inbreeding=inbreeding,
+            )
+            lprob_const_q = second_gamete_const_log_pmf(
+                allele_index,
+                gamete_dose=gamete_q,
+                constant_dose=gamete_p,
+                n_alleles=n_alleles,
+                inbreeding=inbreeding,
+            )
+            lprob_allele_q = log_genotype_allele_prior(
+                progeny,
+                allele_index,
+                unique_haplotypes=n_alleles,
+                inbreeding=inbreeding,
+            )
+            lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
+            lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
+            lprob_pq = add_log_prob(lprob_p, lprob_q) + lcorrect_p + lerror_q
+            lprob = add_log_prob(lprob, lprob_pq)
+            # increment by gamete of p
+            try:
+                increment_dosage(gamete_p, constraint_p)
+            except:  # noqa: E722
+                break
+            else:
+                for i in range(len(gamete_q)):
+                    gamete_q[i] = dosage[i] - gamete_p[i]
+
+    # assuming p invalid and q valid
+    if valid_q:
+        gamete_q = initial_dosage(tau_q, constraint_q)
+        gamete_p = dosage - gamete_q
+        while True:
+            # assuming q valid and p invalid
+            lprob_gamete_q = gamete_log_pmf(
+                gamete_dose=gamete_q,
+                gamete_ploidy=tau_q,
+                parent_dose=dosage_q,
+                parent_ploidy=ploidy_q,
+                gamete_lambda=lambda_q,
+            )
+            lprob_const_q = gamete_const_log_pmf(
+                allele_index=allele_index,
+                gamete_dose=gamete_q,
+                gamete_ploidy=tau_q,
+                parent_dose=dosage_q,
+                parent_ploidy=ploidy_q,
+                gamete_lambda=lambda_q,
+            )
+            lprob_allele_q = gamete_allele_log_pmf(
+                gamete_count=gamete_q[allele_index],
+                gamete_ploidy=tau_q,
+                parent_count=dosage_q[allele_index],
+                parent_ploidy=ploidy_q,
+                gamete_lambda=lambda_q,
+            )
+            lprob_gamete_p = second_gamete_log_pmf(
+                gamete_dose=gamete_p,
+                constant_dose=gamete_q,
+                n_alleles=n_alleles,
+                inbreeding=inbreeding,
+            )
+            lprob_const_p = second_gamete_const_log_pmf(
+                allele_index,
+                gamete_dose=gamete_p,
+                constant_dose=gamete_q,
+                n_alleles=n_alleles,
+                inbreeding=inbreeding,
+            )
+            lprob_allele_p = log_genotype_allele_prior(
+                progeny,
+                allele_index,
+                unique_haplotypes=n_alleles,
+                inbreeding=inbreeding,
+            )
+            lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
+            lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
+            lprob_pq = add_log_prob(lprob_p, lprob_q) + lerror_p + lcorrect_q
+            lprob = add_log_prob(lprob, lprob_pq)
+            # increment by gamete of q
+            try:
+                increment_dosage(gamete_q, constraint_q)
+            except:  # noqa: E722
+                break
+            else:
+                for i in range(len(gamete_p)):
+                    gamete_p[i] = dosage[i] - gamete_q[i]
+
+    # assuming both parents are invalid
+    # probability of allele given other alleles in genotype
+    # lprob_pq = (
+    #    log_genotype_allele_prior(progeny, allele_index, unique_haplotypes=n_alleles, inbreeding=inbreeding)
+    #    + lerror_p
+    #    + lerror_q
+    # )
+    # simulate via gametes for understanding
+    assert lprob == -np.inf
+    gamete_p = initial_dosage(tau_p, dosage)
+    gamete_q = dosage - gamete_p
+    while True:
+
+        lprob_gamete_p = second_gamete_log_pmf(
+            gamete_dose=gamete_p,
+            constant_dose=gamete_q,
+            n_alleles=n_alleles,
+            inbreeding=inbreeding,
+        )
+        # lprob_gamete_p = log_genotype_prior(gamete_p, n_alleles, inbreeding=inbreeding)
+        lprob_const_p = second_gamete_const_log_pmf(
+            allele_index,
+            gamete_dose=gamete_p,
+            constant_dose=gamete_q,
+            n_alleles=n_alleles,
+            inbreeding=inbreeding,
+        )
+        lprob_allele_p = log_genotype_allele_prior(
+            progeny, allele_index, unique_haplotypes=n_alleles, inbreeding=inbreeding
+        )
+
+        lprob_gamete_q = second_gamete_log_pmf(
+            gamete_dose=gamete_q,
+            constant_dose=gamete_p,
+            n_alleles=n_alleles,
+            inbreeding=inbreeding,
+        )
+        # lprob_gamete_q = log_genotype_prior(gamete_q, n_alleles, inbreeding=inbreeding)
+        lprob_const_q = second_gamete_const_log_pmf(
+            allele_index,
+            gamete_dose=gamete_q,
+            constant_dose=gamete_p,
+            n_alleles=n_alleles,
+            inbreeding=inbreeding,
+        )
+        lprob_allele_q = log_genotype_allele_prior(
+            progeny, allele_index, unique_haplotypes=n_alleles, inbreeding=inbreeding
+        )
+
+        lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
+        lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
+        lprob_pq = add_log_prob(lprob_p, lprob_q) + lerror_p + lerror_q
+        lprob = add_log_prob(lprob, lprob_pq)
+
+        print(progeny, dosage, allele_index)
+        print(gamete_p, lprob_gamete_p, lprob_const_p, lprob_allele_p)
+        print(gamete_q, lprob_gamete_q, lprob_const_q, lprob_allele_q)
+        print(lprob_pq)
+        print("\n")
+
+        # increment by gamete of p
+        try:
+            increment_dosage(gamete_p, dosage)
+        except:  # noqa: E722
+            break
+        else:
+            for i in range(len(gamete_q)):
+                gamete_q[i] = dosage[i] - gamete_p[i]
+
     lprob = add_log_prob(lprob, lprob_pq)
     return lprob
 
