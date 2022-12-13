@@ -37,8 +37,8 @@ Haplotypes are assembled from aligned reads using a user specified collection
 of known SNVs (single nucleotide variants).
 For more details refer to the `MCHap assemble documentation`_.
 
-MCHap assemble
---------------
+MCHap call
+----------
 
 ``mchap call`` is used for (re-) calling genotypes using a set of known 
 micro-haplotypes.
