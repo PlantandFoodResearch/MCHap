@@ -140,22 +140,29 @@ effects on the results.
 - ``--ploidy``: The ploidy of all samples in the analysis (default = ``2``, must be a 
   positive integer).
   The ploidy determines the number of alleles called for each sample within the output VCF.
+  
   If samples of multiple ploidy levels are present, then these can be specified within a 
   file and the location of that file is then passed to the ``--ploidy`` argument.
   Each line of this file must contain the identifier of a sample and its ploidy separated
   by a tab.
+
 - ``--inbreeding``: The expected inbreeding coefficient of each sample (default = ``0``, 
   must be less than ``1`` and greater than or equal to ``0``).
+
   The inbreeding coefficient is used in combination with allelic variability in the input 
   VCF to determine a prior distribution of genotypes.
-  Generally speaking, the higher the expected inbreeding coefficient, the higher the 
-  homozygosity of the sample.
-  The effect of the inbreeding coefficient (and the prior distribution) is more pronounced 
-  with lower read depths.
-  It is worth noting that the inbreeding coefficient in rarely ``0`` in real samples, 
+  A higher inbreeding coefficient will result in increased homozygosity of genotype
+  calls.
+  This effect is more pronounced with lower read depths and noisier sequencing data.
+
+  It is worth noting that the inbreeding coefficient is rarely ``0`` in real samples, 
   particularly in autopolyploids.
-  If the genotypes called by MCHap are excessively heterozygous then it is worth considering 
-  estimating sample inbreeding coefficients and re-running the analysis with those estimates.
+  This means that, by default, MCHap will be biased towards excessively heterozygous
+  genotype calls.
+  This bias is more pronounced in inbred samples and with lower sequencing depth.
+  If the genotype calls output by MCHap appear to be excessively heterozygous,
+  it is worth considering if the inbreeding coefficients have been underestimated.
+  
   If samples have variable inbreeding coefficients then these can be specified within a
   file and the location of that file is then passed to the ``--inbreeding`` argument.
   Each line of this file must contain the identifier of a sample and its inbreeding 
@@ -172,6 +179,7 @@ downstream analysis.
   The available options include:
 
   * ``AFP``: Posterior mean allele frequencies (One value per unique allele for each sample).
+    The mean posterior allele frequency across all samples will be reported as an INFO field.
   * ``GP``: Genotype posterior probabilities (One value per possible genotype per sample).
   * ``GL``: Genotype Likelihoods (One value per possible genotype per sample).
 
@@ -237,8 +245,8 @@ distribution for ``mchap call``.
 Performance
 -----------
 
-The performance of ``mchap call`` will depend largely on your data set
-but can be tuned using the available parameters.
+The performance of ``mchap call`` will largely depend on your data,
+but it can be tuned using some of the available parameters.
 Generally speaking, ``mchap call`` will be slower for higher ploidy organisms,
 higher read-depths, and greater numbers of alleles within the input VCF file.
 
@@ -246,10 +254,9 @@ Jit compilation
 ~~~~~~~~~~~~~~~
 
 MCHap heavily utilizes the numba JIT compiler to speed up MCMC simulations.
-However, the first time you run MCHap on a new system it will have to
-compile the functions that make use of the numba JIT compiler and the 
-compiled functions are then cached for reuse.
-This means that MCHap may run a bit slower the first time it's run after
+Numba will compile many functions when MCHap is run for the first time after installation
+and the compiled functions will be cached for reuse. 
+This means that MCHap may be noticeably slower the first time that it's run after
 installation.
 
 Parallelism
@@ -259,23 +266,18 @@ MCHap has built in support for running on multiple cores.
 This is achieved using the ``--cores`` parameter which defaults to ``1``.
 The maximum *possible* number of cores usable by ``mchap call`` is the number of loci
 within the VCF file specified with ``--haplotypes``.
-In practice, this will often mean that ``mchap call`` can utilize all available cores.
+This will often mean that ``mchap call`` can utilize all available cores.
 Note that the resulting VCF file may require sorting when more than one core is used.
 
 On computational clusters, it is often preferable to achieve parallelism within the shell
 for better integration with a job-schedular and spreading computation across multiple nodes.
 This can be achieved by running multiple MCHap processes on different subsets of the targeted
 loci and then merging the resulting VCF files.
-The easiest way to achieve this with ``mchap call`` is to split the input VCF file into
+The easiest approach with ``mchap call`` is to split the input VCF file into
 multiple smaller files.
 Alternatively, if you are running ``mchap call`` on the output of ``mchap assemble`` and
-you have already split your ``mchap assemble`` job into multiple parts then you can
+you have already split your ``mchap assemble`` job into multiple parts, then you can
 simply run ``mchap call`` on each output of ``mchap assemble`` before combining the results.
-
-
-.. _`full list of arguments`: ../cli-call-help.txt
-.. _`mchap assemble`: assemble.rst
-.. _`Pfeiffer et al (2018)`: https://www.doi.org/10.1038/s41598-018-29325-6
 
 Tuning MCMC parameters
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -321,3 +323,7 @@ An example of using these parameters to exclude rare haplotypes may look like:
 In the above example we specify the posterior allele frequencies (``AFP``)
 field that can be optionally output from ``mchap assemble`` and exclude any
 haplotypes with a frequency of less than ``0.01``.
+
+.. _`full list of arguments`: ../cli-call-help.txt
+.. _`mchap assemble`: assemble.rst
+.. _`Pfeiffer et al (2018)`: https://www.doi.org/10.1038/s41598-018-29325-6
