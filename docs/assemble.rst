@@ -246,8 +246,28 @@ read sequences.
 - ``--keep-qcfail-reads``: Use reads marked as qcfail in the assembly (these are skipped by default).
 - ``--keep-supplementary-reads``: Use reads marked as supplementary in the assembly (these are skipped by default).
 
-Parallelism
+
+Performance
 -----------
+
+The performance of ``mchap assemble`` will depend largely on your data set
+but can be tuned using the available parameters.
+Generally speaking, ``mchap assemble`` will be slower for higher ploidy organisms,
+higher read-depths, and greater numbers SNVs falling within each locus in the
+BED file.
+
+Jit compilation
+~~~~~~~~~~~~~~~
+
+MCHap heavily utilizes the numba JIT compiler to speed up MCMC simulations.
+However, the first time you run MCHap on a new system it will have to
+compile the functions that make use of the numba JIT compiler and the 
+compiled functions are then cached for reuse.
+This means that MCHap may run a bit slower the first time it's run after
+installation.
+
+Parallelism
+~~~~~~~~~~~
 
 MCHap has built in support for running on multiple cores.
 This is achieved using the ``--cores`` parameter which defaults to ``1``.
@@ -290,7 +310,63 @@ For example, creating an array of jobs using the `asub`_ script for LSF:
     EOF
     done <"$BEDFILE" | asub -c 100 -j "$JOBNAME"
 
+Tuning MCMC parameters
+~~~~~~~~~~~~~~~~~~~~~~
 
+The ``mchap assemble`` program uses Markov chain Monte-Carlo (MCMC)
+simulations to assemble haplotypes at each locus of each sample.
+Reducing the number of steps or complexity of steps will speed up the
+assembly but may lower the reliability of the results.
+The number of steps is configured with ``--mcmc-steps`` and the number
+that will be removed as burn-in with ``--mcmc-burn``.
+It is recommended to remove at least ``100`` steps as burn-in and that
+at least ``1000`` steps should be kept to calculate posterior probabilities.
+
+The complexity of steps can also be configured by adjusting the proportion
+of structural sub-steps using the ``--mcmc-recombination-step-probability``
+and ``--mcmc-partial-dosage-step-probability`` arguments.
+These arguments represent the probability that a structural sub-step of
+that type will be performed as part of a step in the MCMC simulation.
+These sub-steps can be important for convergence so it is not recommended
+to reduce their probability much lower than ``0.25``.
+
+There is also an additional parameter called ``--mcmc-dosage-step-probability``
+which is used to configure the probability of a "full" dosage-swap sub-step.
+This sub-step type is particularly important for identifying the correct
+dosage of a genotype and is computationally very simple so its probability
+should not be less than ``0.5`` and it is generally recommended to leave it
+at its default value of ``1.0``
+
+Fixing SNVs that are likely to be homozygous
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As mentioned above, the number of SNVs present in a locus has a significant
+impact on the assembly speed.
+The ``--mcmc-fix-homozygous`` argument can be used to identify SNVs that
+have a high probability of being homozygous and 'fixing' them so that they
+do not vary during the assemble process.
+This is applied on a per sample bases and will 'fix' SNVs in one sample
+even if they vary in others.
+The default value for this argument is ``0.999`` and so it will only 'fix'
+SNVs that are extremely unlikely to be heterozygous.
+Reducing this value to ``0.99`` could speed up the assembly process but
+lowering it too much may result in incorrectly called haplotypes especially
+in higher ploidy organisms.
+
+Parallel-tempering
+~~~~~~~~~~~~~~~~~~
+
+The ``mchap assemble`` program can use parallel-tempering to reduce the
+risk of multi-modality and thereby reduce the chance of incorrectly
+assembled haplotypes.
+However, parallel-tempering is computationally intensive as an additional
+MCMC simulation is run for each additional temperature.
+To balance this trade-off it's possible to specify parallel-temperature
+on a per-sample basis using the ``--sample-mcmc-temperatures`` parameter.
+For example, when assembling haplotypes for samples of a pedigree it may
+be desirable to specify multiple temperatures for founding individuals
+to ensure that the founding alleles are identified without using
+parallel-tempering for all of the progeny derived from those founders.
 
 
 .. _`full list of arguments`: ../cli-assemble-help.txt

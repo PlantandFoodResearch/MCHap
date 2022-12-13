@@ -126,6 +126,9 @@ The compressed output vcf is then written to a file.
 When analyzing many samples it is possible to specify a plaintext file containing
 a list of bam file location as described in the documentation for `mchap assemble`_.
 
+Common parameters
+-----------------
+
 Sample parameters
 ~~~~~~~~~~~~~~~~~
 
@@ -191,8 +194,66 @@ read sequences.
 - ``--keep-qcfail-reads``: Use reads marked as qcfail in the assembly (these are skipped by default).
 - ``--keep-supplementary-reads``: Use reads marked as supplementary in the assembly (these are skipped by default).
 
-Parallelism
+Prior allele frequencies
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+In ``mchap call`` the prior distribution for genotypes is controlled by three factors:
+
+- The ploidy of the organism.
+- The expected inbreeding coefficient of the organism.
+- The prior frequencies of haplotype alleles.
+
+The first two factors are controlled using the ``--ploidy`` and ``--inbreeding`` parameters 
+as described above.
+By default a flat prior is used for allele frequencies. 
+That is, an assumption that all of the haplotypes recorded in the input VCF file are equally
+frequent within the sample population.
+A different prior for allele frequencies can be specified by combining the
+``--haplotype-frequencies`` parameter and the ``--haplotype-frequencies-prior`` flag.
+The ``--haplotype-frequencies`` parameter is used to specify an INFO filed within the input VCF
+file that can be interpreted allele frequencies.
+This field must contain a single numerical value for each allele (including the reference allele)
+and those values will be normalized to sum to 1.
+The ``--haplotype-frequencies-prior`` flag does not take any arguments but tells MCHap to use
+the frequencies specified by ``--haplotype-frequencies`` as the prior frequencies for all samples.
+
+An example of using these parameters to specify the prior distribution may look like:
+
+.. code:: bash
+
+    $ mchap call \
+        --bam sample1.bam sample2.bam sample3.bam \
+        --haplotypes haplotypes.vcf.gz \
+        --ploidy 4 \
+        --inbreeding 0.1 \
+        --haplotype-frequencies AFP \
+        --haplotype-frequencies-prior \
+        | bgzip > recalled-haplotypes.vcf.gz
+
+In the above example we specify the posterior allele frequencies (``AFP``) field that
+can be optionally output from ``mchap assemble`` as the prior allele frequency
+distribution for ``mchap call``.
+
+Performance
 -----------
+
+The performance of ``mchap call`` will depend largely on your data set
+but can be tuned using the available parameters.
+Generally speaking, ``mchap call`` will be slower for higher ploidy organisms,
+higher read-depths, and greater numbers of alleles within the input VCF file.
+
+Jit compilation
+~~~~~~~~~~~~~~~
+
+MCHap heavily utilizes the numba JIT compiler to speed up MCMC simulations.
+However, the first time you run MCHap on a new system it will have to
+compile the functions that make use of the numba JIT compiler and the 
+compiled functions are then cached for reuse.
+This means that MCHap may run a bit slower the first time it's run after
+installation.
+
+Parallelism
+~~~~~~~~~~~
 
 MCHap has built in support for running on multiple cores.
 This is achieved using the ``--cores`` parameter which defaults to ``1``.
@@ -215,3 +276,48 @@ simply run ``mchap call`` on each output of ``mchap assemble`` before combining 
 .. _`full list of arguments`: ../cli-call-help.txt
 .. _`mchap assemble`: assemble.rst
 .. _`Pfeiffer et al (2018)`: https://www.doi.org/10.1038/s41598-018-29325-6
+
+Tuning MCMC parameters
+~~~~~~~~~~~~~~~~~~~~~~
+
+The ``mchap call`` program uses Markov chain Monte-Carlo (MCMC)
+simulations to assemble haplotypes at each locus of each sample.
+Reducing the number of steps will speed up the analysis but may lower
+the reliability of the results.
+The number of steps is configured with ``--mcmc-steps`` and the number
+that will be removed as burn-in with ``--mcmc-burn``.
+It is recommended to remove at least ``100`` steps as burn-in and that
+at least ``1000`` steps should be kept to calculate posterior probabilities.
+
+Excluding rare haplotypes
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The speed of each MCMC step in ``mchap assemble`` is largely dependant on the
+ploidy of an individual and the number of unique haplotypes in the input VCF file.
+Therefore, the speed of analysis can be improved by minimizing unnecessary
+haplotypes from the input VCF file.
+Depending on population structure and how that input file was generated,
+it can be sensible to remove rare haplotypes that are likely to be erroneous.
+This can be achieved with a combination of the parameters ``--haplotype-frequencies``
+and ``--skip-rare-haplotypes``.
+The ``--haplotype-frequencies`` parameter is used to specify an INFO field within
+the input VCF which contains relative frequencies of each haplotype.
+The ``--skip-rare-haplotypes`` parameter is then used to specify a threshold (between
+0 and 1) bellow which a haplotype will be excluded from the analysis.
+
+An example of using these parameters to exclude rare haplotypes may look like:
+
+.. code:: bash
+
+    $ mchap call \
+        --bam sample1.bam sample2.bam sample3.bam \
+        --haplotypes haplotypes.vcf.gz \
+        --ploidy 4 \
+        --inbreeding 0.1 \
+        --haplotype-frequencies AFP \
+        --skip-rare-haplotypes 0.01 \
+        | bgzip > recalled-haplotypes.vcf.gz
+
+In the above example we specify the posterior allele frequencies (``AFP``)
+field that can be optionally output from ``mchap assemble`` and exclude any
+haplotypes with a frequency of less than ``0.01``.
