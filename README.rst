@@ -20,7 +20,7 @@ From the root directory of this repository run:
 You should then be able to use the command line tool ``mchap`` which is a wrapper
 around ``mchap assemble`` and ``mchap call``.
 
-MCHap included a suite of unit tests  which can be run from the root directory of
+MCHap includes a suite of unit tests  which can be run from the root directory of
 the repository with:
 
 .. code:: bash
