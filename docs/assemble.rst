@@ -246,7 +246,53 @@ read sequences.
 - ``--keep-qcfail-reads``: Use reads marked as qcfail in the assembly (these are skipped by default).
 - ``--keep-supplementary-reads``: Use reads marked as supplementary in the assembly (these are skipped by default).
 
+Parallelism
+-----------
+
+MCHap has built in support for running on multiple cores.
+This is achieved using the ``--cores`` parameter which defaults to ``1``.
+The maximum *possible* number of cores usable by ``mchap assemble`` is the number of loci
+within the bed file specified with ``--targets``.
+In practice, this will often mean that ``mchap assemble`` can utilize all available cores.
+Note that the resulting VCF file may require sorting when more than one core is used.
+
+On computational clusters, it is often preferable to achieve parallelism within the shell
+for better integration with a job-schedular and spreading computation across multiple nodes.
+This can be achieved by running multiple MCHap processes on different subsets of the targeted
+loci and then merging the resulting VCF files.
+The easiest way to achieve this with ``mchap assemble`` is to split the input bed file into
+multiple smaller files.
+Alternatively, a user can specify a single locus with ``mchap assemble`` by using the ``--region``
+parameter (and optionally the ``--region-id`` parameter) instead of using a bam file with
+``--targets``. 
+This can be used to create an array of single loci jobs.
+For example, creating an array of jobs using the `asub`_ script for LSF: 
+
+.. code:: bash
+
+    JOBNAME='myjob'
+    VCFDIR="./$JOBNAME.vcf"
+    mkdir $VCFDIR
+    while read line; do
+    contig=$(echo "$line" | cut -f 1)
+    start=$(echo "$line" | cut -f 2)
+    stop=$(echo "$line" | cut -f 3)
+    name=$(echo "$line" | cut -f 4)
+    region="$contig:$start-$stop"
+    cat << EOF
+    mchap assemble \
+        --region "$region" \
+        --region-id "$name" \
+        --variants "$VARIANTS" \
+        --reference "$REFERENCE" \
+        --sample-bam "$SAMPLE_BAMS" \
+        | bgzip > $VCFDIR/$name.vcf.gz
+    EOF
+    done <"$BEDFILE" | asub -c 100 -j "$JOBNAME"
+
+
 
 
 .. _`full list of arguments`: ../cli-assemble-help.txt
 .. _`Pfeiffer et al (2018)`: https://www.doi.org/10.1038/s41598-018-29325-6
+.. _`asub`: https://github.com/lh3/asub

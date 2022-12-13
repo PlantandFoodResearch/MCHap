@@ -191,7 +191,25 @@ read sequences.
 - ``--keep-qcfail-reads``: Use reads marked as qcfail in the assembly (these are skipped by default).
 - ``--keep-supplementary-reads``: Use reads marked as supplementary in the assembly (these are skipped by default).
 
+Parallelism
+-----------
 
+MCHap has built in support for running on multiple cores.
+This is achieved using the ``--cores`` parameter which defaults to ``1``.
+The maximum *possible* number of cores usable by ``mchap call`` is the number of loci
+within the VCF file specified with ``--haplotypes``.
+In practice, this will often mean that ``mchap call`` can utilize all available cores.
+Note that the resulting VCF file may require sorting when more than one core is used.
+
+On computational clusters, it is often preferable to achieve parallelism within the shell
+for better integration with a job-schedular and spreading computation across multiple nodes.
+This can be achieved by running multiple MCHap processes on different subsets of the targeted
+loci and then merging the resulting VCF files.
+The easiest way to achieve this with ``mchap call`` is to split the input VCF file into
+multiple smaller files.
+Alternatively, if you are running ``mchap call`` on the output of ``mchap assemble`` and
+you have already split your ``mchap assemble`` job into multiple parts then you can
+simply run ``mchap call`` on each output of ``mchap assemble`` before combining the results.
 
 
 .. _`full list of arguments`: ../cli-call-help.txt
