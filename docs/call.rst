@@ -8,23 +8,37 @@ Calling genotypes from known haplotypes.
 Background
 ----------
 
-The ``mchap call`` tool uses a set of known haplotypes to call genotypes across
-a group of samples.
+The ``mchap call`` tool uses a set of known haplotypes to call genotypes in one
+or more samples.
+
+``mchap call`` uses a Markov chain Monte-Carlo simulation (based on a 
+Gibbs-sampler algorithm) to propose genotypes composed of known micro-haplotypes.
+This algorithm approximates the posterior genotype distribution of each individual
+given its ploidy, inbreeding coefficient, and observed sequence alignments.
+Unlike ``mchap assemble`` which proposes genotypes from a prior distribution
+containing all *possible* haplotypes, ``mchap call`` proposes genotypes from
+a prior distribution constrained to a set of *known* haplotypes.
+The posterior mode genotype is then reported as the called genotype within the
+output VCF file.
 ``mchap call`` is generally faster and more robust than ``mchap assemble`` so
 long as the *real* haplotypes are specified in the inputs.
-``mchap call`` cannot identify novel haplotypes that aren't specified in the input.
-There are a number of situations where ``mchap call`` can be useful:
+
+The genotype calls of different samples are independent of one another with
+the exception that they are constrained to the same set of known haplotypes.
+Therefore, the independence of genotype calls among samples depends upon the
+method used to identify the set of known haplotypes.
+There two main situations in which ``mchap call`` can be useful:
 
 - When ancestral/population haplotypes are already known with high confidence.
 - When we want to improve upon the genotypes called with ``mchap assemble``.
 
-The first of these is quite self explanatory.
+The first situation is mostly self explanatory.
 It's possible that we have prior knowledge of which haplotypes are most likely to
-occur in our samples and we have enough confidence in that hypothesis that we believ
+occur in our samples and we have enough confidence in that hypothesis that we believe
 it to be a more robust approach that de novo assembly from raw data (perhaps the 
 new samples have low read depth).
 
-The second of the above situations is a little counter-intuitive.
+The second situation is a little less intuitive.
 How can re-calling genotypes using ``mchap call`` produce better results than just
 using the genotype calls from ``mchap assemble``?
 There are three main reasons:
@@ -46,21 +60,29 @@ haplotypes identified from the sequences associated with that individual.
 If that sample has poor quality sequencing data then there is a relatively high
 chance that the correct haplotypes may not be identified resulting in an 
 incomplete or erroneous genotype call.
-In ``mchap call`` the genotype of a given sample is called against *all* of the
+In ``mchap call``, the genotype of a given sample is called against *all* of the
 input haplotypes.
-If the input haplotypes come from ``mchap assemble`` then this includes the
-haplotypes identified across *all* samples.
-This means that the genotype of a low quality sample can be called using
-haplotypes from higher quality (related) samples.
+If the input haplotypes come from ``mchap assemble``, then this constrains the
+parameter space (i.e., the prior distribution) to haplotypes observed within the
+sample population.
+Assuming that the haplotypes of each sample can be identified from that
+sample *or* another sample in the population (e.g., due to being related),
+then this will constrain the prior distribution to a small set of haplotypes
+that are likely to include all the relevant haplotypes.
+The more closely related the individuals are, the smaller this set of haplotypes
+will be.
+This effectively uses the information shared among samples to improve genotype
+calling.
 
-Finally, there are several attributes of the method underlying ``mchap call`` that
-can produce more robust results than ``mchap assemble``.
-The most important of these is that ``mchap call`` is sampling from a smaller
-distribution of genotypes than ``mchap assemble`` because the parameter space is
-constrained to the set of known haplotypes rather than all possible haplotypes.
-Futhermore, ``mchap call`` uses a Gibbs-sampler with better mixing properties
-(``mchap assemble`` uses a Metropolis-Hastings sampler due to the potentially
-enormous number of possible haplotypes).
+Finally, there are several attributes of the Gibbs-sampler algorithm used
+by ``mchap call`` that can produce more robust results than ``mchap assemble``.
+The first of these, as already outlined, is constraining the prior distribution.
+This can be further constrained by setting a prior for population allele 
+frequencies (described in the following sections).
+The second advantage of the Gibbs-sampler is that it proposes new genotypes
+by replacing entire haplotypes at each step.
+This improves convergence of the MCMC resulting in a more robust approximation
+of the posterior distribution.
 
 Basic inputs
 ------------
@@ -205,11 +227,12 @@ read sequences.
 Prior allele frequencies
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-In ``mchap call`` the prior distribution for genotypes is controlled by three factors:
+In ``mchap call`` the prior distribution for genotypes is controlled by four factors:
 
 - The ploidy of the organism.
 - The expected inbreeding coefficient of the organism.
-- The prior frequencies of haplotype alleles.
+- The set of known haplotype alleles.
+- The prior frequencies of known haplotype alleles.
 
 The first two factors are controlled using the ``--ploidy`` and ``--inbreeding`` parameters 
 as described above.

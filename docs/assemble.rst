@@ -19,7 +19,7 @@ and genotype calls (some genotype calls may be incomplete).
 ``mchap assemble`` uses a Markov chain Monte-Carlo simulation (based on the 
 Metropolis-Hastings algorithm) to propose genotypes composed of micro-haplotypes.
 This algorithm approximates the posterior genotype distribution of each individual
-given its ploidy, inbreeding coefficient, and the observed sequence alignments.
+given its ploidy, inbreeding coefficient, and observed sequence alignments.
 The posterior mode genotype is then reported as the genotype call within the
 output VCF file.
 Note that the genotype calls of different samples are completely independent of
