@@ -53,5 +53,14 @@ It is often beneficial to re-call genotypes with ``mchap call`` using the micro-
 reported by ``mchap assemble``, particularly in populations of related samples.
 See the `MCHap call documentation`_ for further information.
 
+Funding
+-------
+
+The development of MCHap was partially funded by the "Tools for Polyploids" Specialty Crop Research Initiative
+(NIFA USDA SCRI Award # 2020-51181-32156).
+
+.. image:: docs/img/tools-for-polyploids.png
+   :width: 300
+
 .. _`MCHap assemble documentation`: docs/assemble.rst
 .. _`MCHap call documentation`: docs/call.rst
