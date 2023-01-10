@@ -1,6 +1,6 @@
 ##fileformat=VCFv4.3
 ##fileDate=20210420
-##source=mchap v0.7.0
+##source=mchap v0.8.0
 ##phasing=None
 ##commandline="mchap call-exact --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --haplotypes simple.output.mixed_depth.assemble.vcf"
 ##randomseed=None

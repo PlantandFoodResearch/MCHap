@@ -2,11 +2,15 @@
 
 ## Unreleased 
 
+
+## Beta v0.8.0
+
 New Features:
 - Combine `--bam`, `--bam-list` and `--sample-bam` arguments #128
 - Combine `--ploidy` and `--sample-ploidy` arguments #128
 - Combine `--inbreeding` and `--sample-inbreeding` arguments #128
 - Combine `--mcmc-temperatures` and `--sample-mcmc-temperatures` arguments #128
+- Improvements to documentation
 
 
 
