@@ -53,6 +53,11 @@ It is often beneficial to re-call genotypes with ``mchap call`` using the micro-
 reported by ``mchap assemble``, particularly in populations of related samples.
 See the `MCHap call documentation`_ for further information.
 
+Example notebook
+----------------
+
+An `example notebook`_ demonstrating genotype calling with MCHap in a bi-parental population.
+
 Funding
 -------
 
@@ -64,3 +69,4 @@ The development of MCHap was partially funded by the "Tools for Polyploids" Spec
 
 .. _`MCHap assemble documentation`: docs/assemble.rst
 .. _`MCHap call documentation`: docs/call.rst
+.. _`example notebook`: docs/example/bi-parental.ipynb
