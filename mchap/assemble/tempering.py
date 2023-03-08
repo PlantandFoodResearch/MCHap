@@ -66,7 +66,7 @@ def chain_swap_step(
     genotype_j,
     llk_j,
     temp_j,
-    unique_haplotypes,
+    log_unique_haplotypes,
     inbreeding=0,
 ):
     """Exchange-swap step for exchanging genotypes between chains
@@ -86,8 +86,8 @@ def chain_swap_step(
         Log likelihood for state in the warmer chain.
     temp_j : float
         Inverse temperature of the warmer chain.
-    unique_haplotypes : int
-        Number of possible unique haplotypes in both chains.
+    log_unique_haplotypes : float
+        Log of the total number of possible unique haplotypes in both chains.
     inbreeding : float
         Expected inbreeding coefficient of organism.
 
@@ -108,11 +108,19 @@ def chain_swap_step(
 
     # prior for genotype i dosage
     get_haplotype_dosage(dosage, genotype_i)
-    prior_i = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
+    prior_i = log_genotype_prior(
+        dosage=dosage,
+        log_unique_haplotypes=log_unique_haplotypes,
+        inbreeding=inbreeding,
+    )
 
     # prior for genotype j dosage
     get_haplotype_dosage(dosage, genotype_j)
-    prior_j = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
+    prior_j = log_genotype_prior(
+        dosage=dosage,
+        log_unique_haplotypes=log_unique_haplotypes,
+        inbreeding=inbreeding,
+    )
 
     acceptance = chain_swap_acceptance(
         llk_i,

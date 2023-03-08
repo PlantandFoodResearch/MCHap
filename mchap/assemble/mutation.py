@@ -18,9 +18,9 @@ def base_step(
     llk,
     h,
     j,
-    unique_haplotypes,
+    n_alleles,
+    log_unique_haplotypes,
     inbreeding=0,
-    n_alleles=None,
     temp=1,
     read_counts=None,
     cache=None,
@@ -43,12 +43,12 @@ def base_step(
         Index of the haplotype to be mutated.
     j : int
         Index of the base position to be mutated
-    unique_haplotypes : int
-        Total number of unique haplotypes possible at this locus.
-    inbreeding : float
-        Expected inbreeding coefficient of the genotype.
     n_alleles : int
         Number of possible base alleles at this positions.
+    log_unique_haplotypes : float
+        The log of the total number of possible haplotypes.
+    inbreeding : float
+        Expected inbreeding coefficient of the genotype.
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
@@ -73,9 +73,6 @@ def base_step(
     """
     assert 0 <= temp <= 1
     ploidy = len(genotype)
-    # number of possible alleles given given array size
-    if n_alleles is None:
-        n_alleles = reads.shape[-1]
 
     # store log likelihoods calculated with each allele
     llks = np.empty(n_alleles)
@@ -90,7 +87,11 @@ def base_step(
     # ratio of prior probabilities
     dosage = np.empty(ploidy, dtype=np.int8)
     get_haplotype_dosage(dosage, genotype)
-    lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
+    lprior = log_genotype_prior(
+        dosage=dosage,
+        log_unique_haplotypes=log_unique_haplotypes,
+        inbreeding=inbreeding,
+    )
 
     current_nucleotide = genotype[h, j]
     n_options = 0
@@ -117,7 +118,11 @@ def base_step(
 
             # calculate ratio of priors: ln(P(G')/P(G))
             get_haplotype_dosage(dosage, genotype)
-            lprior_i = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
+            lprior_i = log_genotype_prior(
+                dosage=dosage,
+                log_unique_haplotypes=log_unique_haplotypes,
+                inbreeding=inbreeding,
+            )
             lprior_ratio = lprior_i - lprior
 
             # calculate proposal ratio for detailed balance: ln(g(G|G')/g(G'|G))
@@ -152,8 +157,9 @@ def compound_step(
     genotype,
     reads,
     llk,
+    n_alleles,
+    log_unique_haplotypes,
     inbreeding=0,
-    n_alleles=None,
     temp=1,
     read_counts=None,
     cache=None,
@@ -171,10 +177,12 @@ def compound_step(
     llk : float
         Log-likelihood of the initial haplotype state given the
         observed reads.
-    inbreeding : float
-        Expected inbreeding coefficient of the genotype.
     n_alleles : ndarray, int, shape (n_base, )
         The number of possible alleles at each base position.
+    log_unique_haplotypes : float
+        The log of the total number of possible haplotypes.
+    inbreeding : float
+        Expected inbreeding coefficient of the genotype.
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
@@ -198,14 +206,6 @@ def compound_step(
     """
     ploidy, n_base = genotype.shape
 
-    if n_alleles is None:
-        max_allele = reads.shape[-1]
-        n_alleles = np.empty(n_base, dtype=np.int8)
-        n_alleles[:] = max_allele
-        unique_haplotypes = n_base**max_allele
-    else:
-        unique_haplotypes = np.prod(n_alleles)
-
     # matrix of haplotype-base combinations
     substeps = np.empty((ploidy * n_base, 2), dtype=np.int8)
 
@@ -227,7 +227,7 @@ def compound_step(
             h=h,
             j=j,
             cache=cache,
-            unique_haplotypes=unique_haplotypes,
+            log_unique_haplotypes=log_unique_haplotypes,
             inbreeding=inbreeding,
             n_alleles=n_alleles[j],
             temp=temp,
