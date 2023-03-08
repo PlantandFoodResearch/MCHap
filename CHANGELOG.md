@@ -3,6 +3,17 @@
 ## Unreleased 
 
 
+
+## Beta v0.8.1
+
+Bug Fixes:
+- Fixed integer overflow bug when calculating the total number of unique haplotypes in mchap assemble #157
+
+Internal Changes:
+- Minor performance improvement to SNP homozygosity testing in mchap assemble
+
+
+
 ## Beta v0.8.0
 
 New Features:

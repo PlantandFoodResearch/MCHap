@@ -3,7 +3,7 @@ MCHap assemble
 
 De novo assembly of micro-haplotypes.
 
-*(Last updated for MCHap version 0.8.0)*
+*(Last updated for MCHap version 0.8.1)*
 
 Background
 ----------
