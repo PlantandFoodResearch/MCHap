@@ -153,7 +153,9 @@ def test_genotype_posteriors():
     for i in range(len(expect)):
         genotype = genotypes[i]
         _, dosage = np.unique(genotype, return_counts=True)
-        log_prior = log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
+        log_prior = log_genotype_prior(
+            dosage, log_unique_haplotypes=np.log(n_alleles), inbreeding=inbreeding
+        )
         expect[i] = log_likelihoods[i] + log_prior
     expect = normalise_log_probs(expect)
     actual = exact.genotype_posteriors(

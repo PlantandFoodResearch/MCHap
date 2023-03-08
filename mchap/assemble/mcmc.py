@@ -5,7 +5,12 @@ import numba
 from scipy import stats as _stats
 from dataclasses import dataclass
 
-from mchap.jitutils import random_choice, seed_numba, sample_snv_alleles
+from mchap.jitutils import (
+    random_choice,
+    seed_numba,
+    sample_snv_alleles,
+    genotype_alleles_as_index,
+)
 from mchap.assemble import mutation, structural
 from mchap.assemble.tempering import chain_swap_step
 from mchap.assemble.likelihood import log_likelihood, new_log_likelihood_cache
@@ -160,9 +165,10 @@ class DenovoMCMC(Assembler):
         # identify base positions that are overwhelmingly likely
         # to be homozygous
         # these can be 'fixed' to reduce computational complexity
+        n_alleles = np.array(self.n_alleles, dtype=np.int8)
         hom_probs = _homozygosity_probabilities(
             reads,
-            self.n_alleles,
+            n_alleles,
             self.ploidy,
             inbreeding=self.inbreeding,
             read_counts=read_counts,
@@ -211,7 +217,6 @@ class DenovoMCMC(Assembler):
             break_dist[-1] = 1  # 100% probability of n_intervals -1 break points
 
         # only pass through allele numbers for heterozygous positions
-        n_alleles = np.array(self.n_alleles, dtype=np.int8)
         assert len(n_alleles) == n_base
         n_alleles = n_alleles[heterozygous]
 
@@ -221,7 +226,7 @@ class DenovoMCMC(Assembler):
         assert temperatures[-1] == 1.0
 
         # run the sampler on the heterozygous positions
-        genotypes, llks = _denovo_gibbs_sampler(
+        genotypes, llks = _denovo_assembler(
             genotype=genotype,
             inbreeding=self.inbreeding,
             reads=reads_het,
@@ -261,7 +266,7 @@ class DenovoMCMC(Assembler):
 
 
 @numba.njit(cache=True)
-def _denovo_gibbs_sampler(
+def _denovo_assembler(
     *,
     genotype,
     inbreeding,
@@ -277,13 +282,16 @@ def _denovo_gibbs_sampler(
     return_heated_trace=False,
     llk_cache_threshold=100,
 ):
-    """Gibbs sampler with parallele temporing"""
+    """MCMC sampler with parallel tempering"""
     # assert temperatures[-1] == 1.0
     ploidy, n_base = genotype.shape
+    u_reads, n_read_base, _ = reads.shape
+    assert n_base == n_read_base
+    assert n_base == len(n_alleles)
     n_temps = len(temperatures)
 
     # number of possible unique haplotypes
-    u_haps = np.prod(n_alleles)
+    log_unique_haplotypes = np.log(n_alleles).sum()
 
     # one genotype state per temp
     genotypes = np.empty((n_temps, ploidy, n_base), dtype=genotype.dtype)
@@ -295,7 +303,6 @@ def _denovo_gibbs_sampler(
     llks[:] = log_likelihood(reads, genotype, read_counts=read_counts)
 
     # llk cache
-    u_reads = len(reads)
     if llk_cache_threshold < 0:
         # disable cache for all cases
         cache = None
@@ -332,6 +339,7 @@ def _denovo_gibbs_sampler(
                 reads=reads,
                 llk=llk,
                 n_alleles=n_alleles,
+                log_unique_haplotypes=log_unique_haplotypes,
                 temp=temp,
                 read_counts=read_counts,
                 cache=cache,
@@ -347,7 +355,7 @@ def _denovo_gibbs_sampler(
                     reads=reads,
                     llk=llk,
                     intervals=intervals,
-                    n_alleles=n_alleles,
+                    log_unique_haplotypes=log_unique_haplotypes,
                     step_type=0,
                     temp=temp,
                     read_counts=read_counts,
@@ -364,7 +372,7 @@ def _denovo_gibbs_sampler(
                     reads=reads,
                     llk=llk,
                     intervals=intervals,
-                    n_alleles=n_alleles,
+                    log_unique_haplotypes=log_unique_haplotypes,
                     step_type=1,
                     temp=temp,
                     read_counts=read_counts,
@@ -379,7 +387,7 @@ def _denovo_gibbs_sampler(
                     reads=reads,
                     llk=llk,
                     intervals=np.array([[0, n_base]]),
-                    n_alleles=n_alleles,
+                    log_unique_haplotypes=log_unique_haplotypes,
                     step_type=1,
                     temp=temp,
                     read_counts=read_counts,
@@ -399,7 +407,7 @@ def _denovo_gibbs_sampler(
                     llk_j=llk_prev,
                     temp_j=temp_prev,
                     inbreeding=inbreeding,
-                    unique_haplotypes=u_haps,
+                    log_unique_haplotypes=log_unique_haplotypes,
                 )
                 llks[t - 1] = llk_prev
 
@@ -485,6 +493,7 @@ def _read_mean_dist(reads):
     return dist
 
 
+@numba.njit(cache=True)
 def _homozygosity_probabilities(
     reads, n_alleles, ploidy, inbreeding=0, read_counts=None
 ):
@@ -515,21 +524,18 @@ def _homozygosity_probabilities(
     of alleles at other positions.
     """
     _, n_pos, max_allele = reads.shape
-    probabilites = np.zeros((n_pos, max_allele), dtype=float)
+    homozygous_probs = np.zeros((n_pos, max_allele), dtype=np.float64)
 
+    genotype = np.zeros(ploidy, dtype=np.int8)
     for i in range(n_pos):
-        n = n_alleles[i]
-
         # calculate posterior distribution
-        genotypes, probs = snp_posterior(
-            reads, i, n, ploidy, inbreeding, read_counts=read_counts
+        n = n_alleles[i]
+        _, probs = snp_posterior(
+            reads[:, i, :], n, ploidy, inbreeding, read_counts=read_counts
         )
-
-        # look at homozygous genotypes
-        homozygous = np.all(genotypes[:, 0:1] == genotypes, axis=-1)
-
-        # these are in same order as the hom allele
-        hom_probs = probs[homozygous]
-        probabilites[i, 0:n] = hom_probs
-
-    return probabilites
+        # find index of each homozygous genotype
+        for a in range(n):
+            genotype[:] = a
+            idx = genotype_alleles_as_index(genotype)
+            homozygous_probs[i, a] = probs[idx]
+    return homozygous_probs

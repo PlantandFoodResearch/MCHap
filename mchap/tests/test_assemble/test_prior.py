@@ -35,7 +35,11 @@ def test_log_dirichlet_multinomial_pmf(
     # Actual probabilities calculated independently using tensorflow-probabilities
     expect = np.log(probability)
     dosage = np.array(dosage)
-    actual = log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes)
+    actual = log_dirichlet_multinomial_pmf(
+        dosage=dosage,
+        log_dispersion=np.log(dispersion),
+        log_unique_haplotypes=np.log(unique_haplotypes),
+    )
     np.testing.assert_almost_equal(actual, expect, decimal=10)
 
 
@@ -64,7 +68,11 @@ def test_log_genotype_prior(dosage, unique_haplotypes, inbreeding, probability):
     # Actual probabilities for inbreeding > 0 calculated independently using tensorflow-probabilities
     expect = np.log(probability)
     dosage = np.array(dosage)
-    actual = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
+    actual = log_genotype_prior(
+        dosage=dosage,
+        log_unique_haplotypes=np.log(unique_haplotypes),
+        inbreeding=inbreeding,
+    )
     np.testing.assert_almost_equal(actual, expect, decimal=10)
 
 
@@ -90,6 +98,10 @@ def test_log_genotype_prior__normalised(ploidy, unique_haplotypes, inbreeding):
         list(range(unique_haplotypes)), ploidy
     ):
         _, dosage = np.unique(genotype, return_counts=True)
-        lprob = log_genotype_prior(dosage, unique_haplotypes, inbreeding)
+        lprob = log_genotype_prior(
+            dosage,
+            log_unique_haplotypes=np.log(unique_haplotypes),
+            inbreeding=inbreeding,
+        )
         sum_probs += np.exp(lprob)
     np.testing.assert_almost_equal(sum_probs, 1)

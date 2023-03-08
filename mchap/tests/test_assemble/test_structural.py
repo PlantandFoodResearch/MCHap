@@ -389,6 +389,7 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
     )
     ploidy, n_base = haplotypes.shape
     unique_haplotypes = 2**n_base
+    log_unique_haplotypes = np.log(unique_haplotypes)
 
     reads = simulate_reads(
         haplotypes,
@@ -434,7 +435,9 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
     for i, g in enumerate(genotypes):
         get_haplotype_dosage(dosage, g)
         llk = log_likelihood(reads, g)
-        lprior = log_genotype_prior(dosage, unique_haplotypes, inbreeding=inbreeding)
+        lprior = log_genotype_prior(
+            dosage, log_unique_haplotypes=log_unique_haplotypes, inbreeding=inbreeding
+        )
         log_expect[i] = llk + lprior
     expect = normalise_log_probs(log_expect)
 
@@ -470,7 +473,7 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
             genotype,
             reads,
             llk,
-            unique_haplotypes=unique_haplotypes,
+            log_unique_haplotypes=log_unique_haplotypes,
             interval=interval,
             step_type=0,
             inbreeding=inbreeding,
@@ -535,6 +538,7 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
     )
     ploidy, n_base = haplotypes.shape
     unique_haplotypes = 2**n_base
+    log_unique_haplotypes = np.log(unique_haplotypes)
 
     reads = simulate_reads(
         haplotypes,
@@ -581,7 +585,7 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
         get_haplotype_dosage(dosage, g)
         llks[i] = log_likelihood(reads, g)
         lpriors[i] = log_genotype_prior(
-            dosage, unique_haplotypes, inbreeding=inbreeding
+            dosage, log_unique_haplotypes=log_unique_haplotypes, inbreeding=inbreeding
         )
     exact_posteriors = normalise_log_probs(llks + lpriors)
 
@@ -634,7 +638,7 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
             genotype,
             reads,
             llk,
-            unique_haplotypes=unique_haplotypes,
+            log_unique_haplotypes=log_unique_haplotypes,
             interval=interval,
             step_type=1,
             inbreeding=inbreeding,

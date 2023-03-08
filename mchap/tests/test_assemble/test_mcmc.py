@@ -52,7 +52,7 @@ def test_homozygosity_probabilities():
         ]
     )
     ploidy = len(haplotypes)
-    n_alleles = [2] * 6
+    n_alleles = np.array([2] * 6)
 
     # 16 reads
     reads = simulate_reads(
@@ -92,7 +92,7 @@ def test_DenovoMCMC__zero_reads():
     ploidy, n_base = 4, 6
     n_steps = 1000
     n_burn = 500
-    n_alleles = [2] * n_base
+    n_alleles = np.array([2] * n_base)
     model = mcmc.DenovoMCMC(
         ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
     )
@@ -111,7 +111,7 @@ def test_DenovoMCMC__zero_snps():
     ploidy, n_base = 4, 0  # no snps in locus
     n_steps = 1000
     n_burn = 500
-    n_alleles = []  # no snps in locus
+    n_alleles = np.array([], int)  # no snps in locus
     model = mcmc.DenovoMCMC(
         ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
     )
@@ -130,7 +130,7 @@ def test_DenovoMCMC__zero_reads_or_snps():
     ploidy, n_base = 4, 0  # no snps in locus
     n_steps = 1000
     n_burn = 500
-    n_alleles = []  # no snps in locus
+    n_alleles = np.array([], int)  # no snps in locus
     model = mcmc.DenovoMCMC(
         ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
     )
@@ -149,7 +149,7 @@ def test_DenovoMCMC__all_nans():
     ploidy, n_base = 4, 6
     n_steps = 1000
     n_burn = 500
-    n_alleles = [2] * n_base
+    n_alleles = np.array([2] * n_base)
     model = mcmc.DenovoMCMC(
         ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
     )
@@ -178,7 +178,7 @@ def test_DenovoMCMC__nans_ignored():
     ploidy, n_base = haplotypes.shape
     n_steps = 1000
     n_burn = 500
-    n_alleles = [2] * n_base
+    n_alleles = np.array([2] * n_base)
     model = mcmc.DenovoMCMC(
         ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
     )
@@ -218,7 +218,7 @@ def test_DenovoMCMC__non_variable():
     ploidy, n_base = haplotypes.shape
     n_steps = 100
     n_burn = 50
-    n_alleles = [2] * n_base
+    n_alleles = np.array([2] * n_base)
     model = mcmc.DenovoMCMC(
         ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
     )
@@ -256,7 +256,7 @@ def test_DenovoMCMC__diploid():
     ploidy, n_base = haplotypes.shape
     n_steps = 1000
     n_burn = 500
-    n_alleles = [2] * n_base
+    n_alleles = np.array([2] * n_base)
     model = mcmc.DenovoMCMC(
         ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
     )
@@ -291,7 +291,7 @@ def test_DenovoMCMC__tetraploid():
     ploidy, n_base = haplotypes.shape
     n_steps = 1000
     n_burn = 500
-    n_alleles = [2] * n_base
+    n_alleles = np.array([2] * n_base)
     model = mcmc.DenovoMCMC(
         ploidy=ploidy,
         n_alleles=n_alleles,
@@ -361,7 +361,7 @@ def test_DenovoMCMC__seed():
     n_chains = 2
     ploidy, n_base = haplotypes.shape
     n_steps = 1000
-    n_alleles = [2] * n_base
+    n_alleles = np.array([2] * n_base)
 
     # medium read depth
     reads = simulate_reads(
@@ -408,7 +408,7 @@ def test_DenovoMCMC__fuzz():
             p=[0.45, 0.45, 0.1],
             size=(ploidy, n_base),
         )
-        n_alleles = [np.max(haplotypes) + 1] * n_base
+        n_alleles = np.array([np.max(haplotypes) + 1] * n_base)
         model = mcmc.DenovoMCMC(
             ploidy=ploidy, n_alleles=n_alleles, steps=n_steps, chains=n_chains
         )
@@ -530,7 +530,7 @@ def test_DenovoMCMC__temperatures_submode():
         p=0.999,
     )
     reads = mset.repeat(dists, counts)
-    n_alleles = [2] * 6
+    n_alleles = np.array([2] * 6)
 
     alt_mode = np.array(
         [

@@ -69,7 +69,7 @@ def test_base_step(use_cache, use_read_counts, inbreeding):
             [[0.9, 0.1, 0.0], [0.9, 0.1, 0.0], [0.8, 0.1, 0.1]],
         ]
     )
-    u_haps = int(2 * 2 * 3)
+    log_unique_haplotypes = np.log(2 * 2 * 3)
 
     # conditional probs of possible genotypes
     llks = np.array(
@@ -80,8 +80,16 @@ def test_base_step(use_cache, use_read_counts, inbreeding):
     )
     lpriors = np.array(
         [
-            log_genotype_prior(np.array([2, 0]), u_haps, inbreeding=inbreeding),
-            log_genotype_prior(np.array([1, 1]), u_haps, inbreeding=inbreeding),
+            log_genotype_prior(
+                np.array([2, 0]),
+                log_unique_haplotypes=log_unique_haplotypes,
+                inbreeding=inbreeding,
+            ),
+            log_genotype_prior(
+                np.array([1, 1]),
+                log_unique_haplotypes=log_unique_haplotypes,
+                inbreeding=inbreeding,
+            ),
         ]
     )
 
@@ -131,7 +139,7 @@ def test_base_step(use_cache, use_read_counts, inbreeding):
             llk=llk,
             h=h,
             j=j,
-            unique_haplotypes=u_haps,
+            log_unique_haplotypes=log_unique_haplotypes,
             n_alleles=2,
             inbreeding=inbreeding,
             read_counts=read_counts,
@@ -199,22 +207,25 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
     _, n_base, n_nucl = reads.shape
     ploidy = 2
     n_alleles = np.array([n_nucl] * n_base, np.int8)
-    u_haps = combinatorics.count_unique_haplotypes(n_alleles)
-    assert u_haps == len(haplotypes)
-    u_gens = combinatorics.count_unique_genotypes(u_haps, ploidy)
+    unique_haplotypes = combinatorics.count_unique_haplotypes(n_alleles)
+    log_unique_haplotypes = np.log(unique_haplotypes)
+    assert unique_haplotypes == len(haplotypes)
+    unique_genotypes = combinatorics.count_unique_genotypes(unique_haplotypes, ploidy)
 
     # calculate all possible genotypes
-    genotypes = np.zeros((u_gens, ploidy, n_base), dtype=int)
-    for i in np.arange(u_gens):
+    genotypes = np.zeros((unique_genotypes, ploidy, n_base), dtype=int)
+    for i in np.arange(unique_genotypes):
         genotypes[i] = haplotypes[index_as_genotype_alleles(i, ploidy)]
 
     # calculate expected posterior distribution over all genotypes
-    log_expect = np.empty(u_gens, float)
+    log_expect = np.empty(unique_genotypes, float)
     dosage = np.empty(ploidy, int)
     for i, g in enumerate(genotypes):
         get_haplotype_dosage(dosage, g)
         llk = log_likelihood(reads, g)
-        lprior = log_genotype_prior(dosage, u_haps, inbreeding=inbreeding)
+        lprior = log_genotype_prior(
+            dosage, log_unique_haplotypes=log_unique_haplotypes, inbreeding=inbreeding
+        )
         log_expect[i] = llk + lprior
     expect = normalise_log_probs(log_expect)
 
@@ -241,6 +252,7 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
             reads,
             llk,
             n_alleles=n_alleles,
+            log_unique_haplotypes=log_unique_haplotypes,
             inbreeding=inbreeding,
             read_counts=read_counts,
             cache=cache,
@@ -266,9 +278,10 @@ def test_genotype_compound_step__mask_ragged():
         ]
     )
     mask = np.all(reads == 0.0, axis=0)
-    n_alleles = np.sum(~mask, axis=-1).astype(np.int8)
+    n_alleles = np.sum(~mask, axis=-1)
+    log_unique_haplotypes = np.sum(np.log(n_alleles))
 
-    # intial genotype
+    # initial genotype
     genotype = np.array(
         [
             [0, 1, 0],
@@ -285,7 +298,12 @@ def test_genotype_compound_step__mask_ragged():
     seed_numba(42)
     for i in range(n_steps):
         llk, _ = mutation.compound_step(
-            genotype, reads, llk, n_alleles=n_alleles, cache=None
+            genotype,
+            reads,
+            llk,
+            n_alleles=n_alleles,
+            log_unique_haplotypes=log_unique_haplotypes,
+            cache=None,
         )
         trace[i] = genotype.copy()
 
@@ -294,7 +312,7 @@ def test_genotype_compound_step__mask_ragged():
     assert np.all(allele_1_counts < np.array([2000, 15000, 2000]))
     assert np.all(allele_1_counts > np.array([500, 5000, 500]))
 
-    # check snp allele 2 occurers only in base position 3
+    # check snp allele 2 occurs only in base position 3
     allele_2_counts = (trace == 2).sum(axis=0).sum(axis=0)
     assert np.all(allele_2_counts[0:2] == 0)
     assert allele_2_counts[2] > 0

@@ -190,8 +190,8 @@ def gibbs_options(
     current_allele = genotype_alleles[variable_allele]
 
     # iterate over allele options
-    n_alleles = len(haplotypes)
-    for a in range(n_alleles):
+    unique_haplotypes = len(haplotypes)
+    for a in range(unique_haplotypes):
 
         # set genotype allele
         genotype_alleles[variable_allele] = a
@@ -200,7 +200,7 @@ def gibbs_options(
         lpriors_array[a] = log_genotype_allele_prior(
             genotype=genotype_alleles,
             variable_allele=variable_allele,
-            unique_haplotypes=len(haplotypes),
+            unique_haplotypes=unique_haplotypes,
             inbreeding=inbreeding,
             frequencies=frequencies,
         )

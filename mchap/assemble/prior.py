@@ -13,7 +13,7 @@ __all__ = [
 
 
 @numba.njit(cache=True)
-def log_genotype_null_prior(dosage, unique_haplotypes):
+def log_genotype_null_prior(dosage, log_unique_haplotypes):
     """Prior probability of a dosage for a non-inbred individual
     assuming all haplotypes are equally probable.
 
@@ -21,8 +21,8 @@ def log_genotype_null_prior(dosage, unique_haplotypes):
     ----------
     dosage : ndarray, int, shape (ploidy, )
         Haplotype dosages within a genotype.
-    unique_haplotypes : int
-        Total number of unique possible haplotypes.
+    log_unique_haplotypes : int
+        Log of the total number of unique possible haplotypes.
 
     Returns
     -------
@@ -32,12 +32,12 @@ def log_genotype_null_prior(dosage, unique_haplotypes):
     """
     ploidy = dosage.sum()
     ln_perms = ln_equivalent_permutations(dosage)
-    ln_total_perms = ploidy * np.log(unique_haplotypes)
+    ln_total_perms = ploidy * log_unique_haplotypes
     return ln_perms - ln_total_perms
 
 
 @numba.njit(cache=True)
-def log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
+def log_dirichlet_multinomial_pmf(dosage, log_dispersion, log_unique_haplotypes):
     """Dirichlet-Multinomial probability mass function assuming all categories
     (haplotypes) have equal dispersion parameters (alphas).
 
@@ -45,10 +45,10 @@ def log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
     ----------
     dosage : ndarray, int, shape (ploidy, )
         Counts of the observed haplotypes.
-    dispersion : float
-        Dispersion parameter for every possible haplotype.
-    unique_haplotypes : int
-        Total number of unique possible haplotypes.
+    log_dispersion : float
+        Log of dispersion parameter for every possible haplotype.
+    log_unique_haplotypes : float
+        Log of the total number of unique possible haplotypes.
 
     Returns
     -------
@@ -57,7 +57,8 @@ def log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
 
     """
     ploidy = np.sum(dosage)
-    sum_dispersion = dispersion * unique_haplotypes
+    dispersion = np.exp(log_dispersion)
+    sum_dispersion = np.exp(log_dispersion + log_unique_haplotypes)
 
     # left side of equation in log space
     num = lgamma(ploidy + 1) + lgamma(sum_dispersion)
@@ -78,7 +79,7 @@ def log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes):
 
 
 @numba.njit(cache=True)
-def log_genotype_prior(dosage, unique_haplotypes, inbreeding=0):
+def log_genotype_prior(dosage, log_unique_haplotypes, inbreeding=0):
     """Prior probability of a dosage for an individual genotype
     assuming all haplotypes are equally probable.
 
@@ -86,8 +87,8 @@ def log_genotype_prior(dosage, unique_haplotypes, inbreeding=0):
     ----------
     dosage : ndarray, int, shape (ploidy, )
         Haplotype dosages within a genotype.
-    unique_haplotypes : int
-        Total number of unique possible haplotypes.
+    log_unique_haplotypes : int
+        Log of the total number of unique possible haplotypes.
     inbreeding : float
         Expected inbreeding coefficient in the interval (0, 1).
 
@@ -101,10 +102,11 @@ def log_genotype_prior(dosage, unique_haplotypes, inbreeding=0):
 
     # if not inbred use null prior
     if inbreeding == 0:
-        return log_genotype_null_prior(dosage, unique_haplotypes)
+        return log_genotype_null_prior(dosage, log_unique_haplotypes)
 
     # calculate the dispersion parameter for the PMF
-    dispersion = (1 / unique_haplotypes) * ((1 - inbreeding) / inbreeding)
+    # dispersion = (1 / unique_haplotypes) * ((1 - inbreeding) / inbreeding)
+    log_dispersion = np.log((1 - inbreeding) / inbreeding) - log_unique_haplotypes
 
     # calculate log-prior from Dirichlet-Multinomial PMF
-    return log_dirichlet_multinomial_pmf(dosage, dispersion, unique_haplotypes)
+    return log_dirichlet_multinomial_pmf(dosage, log_dispersion, log_unique_haplotypes)
