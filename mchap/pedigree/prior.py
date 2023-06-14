@@ -969,13 +969,14 @@ def progeny_allele_log_pmf(
 
     # assuming both parents are invalid
     # probability of allele given other alleles in genotype
-    # lprob_pq = (
-    #    log_genotype_allele_prior(progeny, allele_index, unique_haplotypes=n_alleles, inbreeding=inbreeding)
-    #    + lerror_p
-    #    + lerror_q
-    # )
+    #lprob_pq = (
+    #   log_genotype_allele_prior(progeny, allele_index, unique_haplotypes=n_alleles, inbreeding=inbreeding)
+    #   + lerror_p
+    #   + lerror_q
+    #)
+    #lprob = add_log_prob(lprob, lprob_pq)
+
     # simulate via gametes for understanding
-    assert lprob == -np.inf
     gamete_p = initial_dosage(tau_p, dosage)
     gamete_q = dosage - gamete_p
     while True:
@@ -1021,11 +1022,11 @@ def progeny_allele_log_pmf(
         lprob_pq = add_log_prob(lprob_p, lprob_q) + lerror_p + lerror_q
         lprob = add_log_prob(lprob, lprob_pq)
 
-        print(progeny, dosage, allele_index)
-        print(gamete_p, lprob_gamete_p, lprob_const_p, lprob_allele_p)
-        print(gamete_q, lprob_gamete_q, lprob_const_q, lprob_allele_q)
-        print(lprob_pq)
-        print("\n")
+        #print(progeny, dosage, allele_index)
+        #print(gamete_p, lprob_gamete_p, lprob_const_p, lprob_allele_p)
+        #print(gamete_q, lprob_gamete_q, lprob_const_q, lprob_allele_q)
+        #print(lprob_pq)
+        #print("\n")
 
         # increment by gamete of p
         try:
@@ -1036,7 +1037,6 @@ def progeny_allele_log_pmf(
             for i in range(len(gamete_q)):
                 gamete_q[i] = dosage[i] - gamete_p[i]
 
-    lprob = add_log_prob(lprob, lprob_pq)
     return lprob
 
 
