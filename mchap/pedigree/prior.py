@@ -1,11 +1,35 @@
 import numpy as np
-from math import lgamma
 from numba import njit
 
 from mchap.calling.utils import allelic_dosage
 from mchap.jitutils import comb, add_log_prob, ln_equivalent_permutations
-from mchap.assemble.prior import log_genotype_prior
-from mchap.calling.prior import calculate_alphas, log_genotype_allele_prior
+
+
+@njit(cache=True)
+def log_unknown_dosage_prior(dosage, n_alleles, frequencies=None):
+    lperms = ln_equivalent_permutations(dosage)
+    if frequencies is None:
+        lperm_prob = np.log(1/n_alleles) * dosage.sum()
+    else:
+        lperm_prob = 0.0
+        for i in range(len(dosage)):
+            d = dosage[i]
+            if d > 0:
+                lperm_prob += np.log(frequencies[i]) * d
+    return lperms + lperm_prob
+
+
+@njit(cache=True)
+def log_unknown_const_prior(
+    dosage, allele_index, n_alleles, frequencies=None
+):
+    if  dosage[allele_index] >= 0:
+        dosage[allele_index] -= 1
+        lprob = log_unknown_dosage_prior(dosage, n_alleles, frequencies=frequencies)
+        dosage[allele_index] += 1
+    else:
+        lprob = -np.inf
+    return lprob
 
 
 @njit(cache=True)
@@ -347,77 +371,6 @@ def gamete_allele_log_pmf(
 
 
 @njit(cache=True)
-def second_gamete_log_pmf(gamete_dose, constant_dose, n_alleles, inbreeding):
-    """Log probability of an gamete of unknown origin given a known gamete and the expected
-    inbreeding coefficient.
-
-    Parameters
-    ----------
-    gamete_dose : ndarray, int, shape (ploidy, )
-        Allele counts of the proposed gamete.
-    constant_dose : ndarray, int, shape (ploidy, )
-        Allele counts of the known gamete to be held as constant.
-
-    n_alleles : int
-        Number of possible alleles at this locus.
-    inbreeding : float
-        Expected inbreeding coefficient of the sample.
-
-    Returns
-    -------
-    lprob : float
-        Log-probability of the proposed gamete given the known gamete.
-    """
-    # TODO: prior frequencies
-    assert 0 <= inbreeding < 1
-    assert len(gamete_dose) == len(constant_dose)
-    gamete_tau = gamete_dose.sum()
-    constant_tau = constant_dose.sum()
-
-    # if not inbred use null prior
-    if inbreeding == 0:
-        ln_perms = ln_equivalent_permutations(gamete_dose)
-        return ln_perms - gamete_tau * np.log(n_alleles)
-
-    # calculate the dispersion parameter for the PMF
-    alpha_const = calculate_alphas(inbreeding, 1 / n_alleles)
-
-    # alpha of each allele is the base alpha plus constant dose
-    sum_alphas = constant_tau + alpha_const * n_alleles
-
-    # left side of equation in log space
-    num = lgamma(gamete_tau + 1) + lgamma(sum_alphas)
-    denom = lgamma(gamete_tau + sum_alphas)
-    left = num - denom
-
-    # right side of equation
-    prod = 0.0  # log(1.0)
-    for i in range(len(gamete_dose)):
-        dose = gamete_dose[i]
-        if dose > 0:
-            alpha_i = alpha_const + constant_dose[i]
-            num = lgamma(dose + alpha_i)
-            denom = lgamma(dose + 1) + lgamma(alpha_i)
-            prod += num - denom
-
-    # return as log probability
-    return left + prod
-
-
-@njit(cache=True)
-def second_gamete_const_log_pmf(
-    allele_index, gamete_dose, constant_dose, n_alleles, inbreeding
-):
-    if gamete_dose[allele_index] >= 0:
-        gamete_dose[allele_index] -= 1
-        lprob = second_gamete_log_pmf(gamete_dose, constant_dose, n_alleles, inbreeding)
-        gamete_dose[allele_index] += 1
-    else:
-        lprob = -np.inf
-    return lprob
-
-
-@njit(cache=True)
 def trio_log_pmf(
     progeny,
     parent_p,
@@ -428,7 +381,6 @@ def trio_log_pmf(
     lambda_q,
     error_p,
     error_q,
-    inbreeding,
     n_alleles,
 ):
     """Log probability of a trio of genotypes.
@@ -451,8 +403,6 @@ def trio_log_pmf(
     error_q : float
         Probability that parent_q is not the correct
         parental genotype.
-    inbreeding : float
-        Expected inbreeding coefficient of the sample.
     n_alleles : int
         Number of possible alleles at this locus.
 
@@ -460,16 +410,6 @@ def trio_log_pmf(
     -------
     lprob : float
         Log-probability of the trio.
-
-    Notes
-    -----
-    In the case that one or both parental genotypes are incorrect
-    (as encoded by the error terms) this function assumes that the
-    progeny genotype has the specified inbreeding coefficient and that
-    the gametes of unknown origin are drawn from a background population
-    in which all alleles are equally frequent.
-    The inbreeding coefficient is does not inform a case in which both
-    parents are correct (i.e., when the error terms are zero).
     """
     ploidy_p = len(parent_p)
     ploidy_q = len(parent_q)
@@ -542,13 +482,8 @@ def trio_log_pmf(
             lprob_pq = lprob_p + lprob_q
             lprob = add_log_prob(lprob, lprob_pq)
             # assuming p valid and q invalid (avoids iterating gametes of p twice)
-            # probability of gamete_q given gamete_p
-            lprob_q = (
-                second_gamete_log_pmf(
-                    gamete_q, gamete_p, n_alleles=n_alleles, inbreeding=inbreeding
-                )
-                + lerror_q
-            )
+            # probability of gamete_q
+            lprob_q = log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None) + lerror_q
             lprob_pq = lprob_p + lprob_q
             lprob = add_log_prob(lprob, lprob_pq)
             # increment by gamete of p
@@ -575,13 +510,8 @@ def trio_log_pmf(
                 )
                 + lcorrect_p
             )
-            # probability of gamete_q given gamete_p
-            lprob_q = (
-                second_gamete_log_pmf(
-                    gamete_q, gamete_p, n_alleles=n_alleles, inbreeding=inbreeding
-                )
-                + lerror_q
-            )
+            # probability of gamete_q 
+            lprob_q = log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None) + lerror_q
             lprob_pq = lprob_p + lprob_q
             lprob = add_log_prob(lprob, lprob_pq)
             # increment by gamete of p
@@ -598,13 +528,8 @@ def trio_log_pmf(
         gamete_q = initial_dosage(tau_q, constraint_q)
         gamete_p = dosage - gamete_q
         while True:
-            # probability of gamete_p given gamete_q
-            lprob_p = (
-                second_gamete_log_pmf(
-                    gamete_p, gamete_q, n_alleles=n_alleles, inbreeding=inbreeding
-                )
-                + lerror_p
-            )
+            # probability of gamete_p
+            lprob_p = log_unknown_dosage_prior(gamete_p, n_alleles, frequencies=None) + lerror_p
             lprob_q = (
                 gamete_log_pmf(
                     gamete_dose=gamete_q,
@@ -627,11 +552,7 @@ def trio_log_pmf(
                     gamete_p[i] = dosage[i] - gamete_q[i]
 
     # assuming both parents are invalid
-    lprob_pq = (
-        log_genotype_prior(dosage, n_alleles, inbreeding=inbreeding)
-        + lerror_p
-        + lerror_q
-    )
+    lprob_pq = log_unknown_dosage_prior(dosage, n_alleles, frequencies=None) + lerror_p + lerror_q
     lprob = add_log_prob(lprob, lprob_pq)
     return lprob
 
@@ -648,7 +569,6 @@ def progeny_allele_log_pmf(
     lambda_q,
     error_p,
     error_q,
-    inbreeding,
     n_alleles,
 ):
     """Log probability of a trio of genotypes.
@@ -673,25 +593,13 @@ def progeny_allele_log_pmf(
     error_q : float
         Probability that parent_q is not the correct
         parental genotype.
-    inbreeding : float
-        Expected inbreeding coefficient of the sample.
     n_alleles : int
         Number of possible alleles at this locus.
 
     Returns
     -------
     lprob : float
-        Log-probability of the trio.
-
-    Notes
-    -----
-    In the case that one or both parental genotypes are incorrect
-    (as encoded by the error terms) this function assumes that the
-    progeny genotype has the specified inbreeding coefficient and that
-    the gametes of unknown origin are drawn from a background population
-    in which all alleles are equally frequent.
-    The inbreeding coefficient is does not inform a case in which both
-    parents are correct (i.e., when the error terms are zero).
+        Log-probability.
     """
     ploidy_p = len(parent_p)
     ploidy_q = len(parent_q)
@@ -814,25 +722,9 @@ def progeny_allele_log_pmf(
             lprob = add_log_prob(lprob, lprob_pq)
 
             # assuming p valid and q invalid (avoids iterating gametes of p twice)
-            lprob_gamete_q = second_gamete_log_pmf(
-                gamete_dose=gamete_q,
-                constant_dose=gamete_p,
-                n_alleles=n_alleles,
-                inbreeding=inbreeding,
-            )
-            lprob_const_q = second_gamete_const_log_pmf(
-                allele_index,
-                gamete_dose=gamete_q,
-                constant_dose=gamete_p,
-                n_alleles=n_alleles,
-                inbreeding=inbreeding,
-            )
-            lprob_allele_q = log_genotype_allele_prior(
-                progeny,
-                allele_index,
-                unique_haplotypes=n_alleles,
-                inbreeding=inbreeding,
-            )
+            lprob_gamete_q = log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None)
+            lprob_const_q = log_unknown_const_prior(gamete_q, allele_index, n_alleles, frequencies=None)
+            lprob_allele_q = np.log(1/n_alleles)  # log frequency of allele
             lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
             lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
             lprob_pq = add_log_prob(lprob_p, lprob_q) + lcorrect_p + lerror_q
@@ -875,25 +767,9 @@ def progeny_allele_log_pmf(
                 parent_ploidy=ploidy_p,
                 gamete_lambda=lambda_p,
             )
-            lprob_gamete_q = second_gamete_log_pmf(
-                gamete_dose=gamete_q,
-                constant_dose=gamete_p,
-                n_alleles=n_alleles,
-                inbreeding=inbreeding,
-            )
-            lprob_const_q = second_gamete_const_log_pmf(
-                allele_index,
-                gamete_dose=gamete_q,
-                constant_dose=gamete_p,
-                n_alleles=n_alleles,
-                inbreeding=inbreeding,
-            )
-            lprob_allele_q = log_genotype_allele_prior(
-                progeny,
-                allele_index,
-                unique_haplotypes=n_alleles,
-                inbreeding=inbreeding,
-            )
+            lprob_gamete_q = log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None)
+            lprob_const_q = log_unknown_const_prior(gamete_q, allele_index, n_alleles, frequencies=None)
+            lprob_allele_q = np.log(1/n_alleles)  # log frequency of allele
             lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
             lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
             lprob_pq = add_log_prob(lprob_p, lprob_q) + lcorrect_p + lerror_q
@@ -935,25 +811,9 @@ def progeny_allele_log_pmf(
                 parent_ploidy=ploidy_q,
                 gamete_lambda=lambda_q,
             )
-            lprob_gamete_p = second_gamete_log_pmf(
-                gamete_dose=gamete_p,
-                constant_dose=gamete_q,
-                n_alleles=n_alleles,
-                inbreeding=inbreeding,
-            )
-            lprob_const_p = second_gamete_const_log_pmf(
-                allele_index,
-                gamete_dose=gamete_p,
-                constant_dose=gamete_q,
-                n_alleles=n_alleles,
-                inbreeding=inbreeding,
-            )
-            lprob_allele_p = log_genotype_allele_prior(
-                progeny,
-                allele_index,
-                unique_haplotypes=n_alleles,
-                inbreeding=inbreeding,
-            )
+            lprob_gamete_p = log_unknown_dosage_prior(gamete_p, n_alleles, frequencies=None)
+            lprob_const_p = log_unknown_const_prior(gamete_p, allele_index, n_alleles, frequencies=None)
+            lprob_allele_p = np.log(1/n_alleles)  # log frequency of allele
             lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
             lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
             lprob_pq = add_log_prob(lprob_p, lprob_q) + lerror_p + lcorrect_q
@@ -969,15 +829,8 @@ def progeny_allele_log_pmf(
 
     # assuming both parents are invalid
     # p(constant) * p(allele | constant) * 2
-    const = dosage.copy()
-    const[allele_index] -= 1
-    lprob_const = log_genotype_prior(const, n_alleles, inbreeding=inbreeding)
-    lprob_allele = log_genotype_allele_prior(
-        progeny,
-        allele_index,
-        unique_haplotypes=n_alleles,
-        inbreeding=inbreeding,
-    ) + np.log(2)
+    lprob_const = log_unknown_const_prior(dosage, allele_index, n_alleles, frequencies=None)
+    lprob_allele = - np.log(n_alleles) + np.log(2)  # log frequency of allele * 2
     lprob_pq = lprob_const + lprob_allele + lerror_p + lerror_q
     lprob = add_log_prob(lprob, lprob_pq)
 
@@ -989,7 +842,6 @@ def markov_blanket_log_probability(
     target_index,
     sample_genotypes,
     sample_ploidy,
-    sample_inbreeding,
     sample_parents,
     gamete_tau,
     gamete_lambda,
@@ -1007,8 +859,6 @@ def markov_blanket_log_probability(
         Genotype of each sample padded by negative values.
     sample_ploidy  : ndarray, int, shape (n_sample,)
         Sample ploidy
-    sample_inbreeding  : ndarray, float, shape (n_sample,)
-        Expected inbreeding coefficients
     sample_parents : ndarray, int, shape (n_samples, 2)
         Parent indices of each sample with -1 indicating
         unknown parents.
@@ -1058,7 +908,6 @@ def markov_blanket_log_probability(
                 lambda_q=gamete_lambda[i, 1],
                 error_p=error_p,
                 error_q=error_q,
-                inbreeding=sample_inbreeding[i],
                 n_alleles=n_alleles,
             )
     return log_joint

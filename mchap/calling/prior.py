@@ -90,8 +90,7 @@ def log_genotype_allele_prior(
 
 @numba.njit(cache=True)
 def log_genotype_prior(genotype, unique_haplotypes, inbreeding=0, frequencies=None):
-    """Prior probability of a dosage for an individual genotype
-    assuming all haplotypes are equally probable.
+    """Prior probability of an individual genotype
 
     Parameters
     ----------
@@ -107,7 +106,7 @@ def log_genotype_prior(genotype, unique_haplotypes, inbreeding=0, frequencies=No
     Returns
     -------
     lprior : float
-        Log-prior probability of dosage.
+        Log-prior probability of genotype.
 
     """
     assert 0 <= inbreeding < 1
