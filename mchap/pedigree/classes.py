@@ -52,7 +52,6 @@ class PedigreeCallingMCMC(Assembler):
             trace[i] = mcmc_sampler(
                 sample_genotypes=initial,
                 sample_ploidy=self.sample_ploidy,
-                sample_inbreeding=self.sample_inbreeding,
                 sample_parents=self.sample_parents,
                 gamete_tau=self.gamete_tau,
                 gamete_lambda=self.gamete_lambda,

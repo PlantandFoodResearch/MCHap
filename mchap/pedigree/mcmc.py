@@ -13,7 +13,6 @@ def metropolis_hastings_probabilities(
     allele_index,
     sample_genotypes,
     sample_ploidy,
-    sample_inbreeding,
     sample_parents,
     gamete_tau,
     gamete_lambda,
@@ -46,7 +45,6 @@ def metropolis_hastings_probabilities(
         target_index=target_index,
         sample_genotypes=sample_genotypes,
         sample_ploidy=sample_ploidy,
-        sample_inbreeding=sample_inbreeding,
         sample_parents=sample_parents,
         gamete_tau=gamete_tau,
         gamete_lambda=gamete_lambda,
@@ -81,7 +79,6 @@ def metropolis_hastings_probabilities(
                 target_index=target_index,
                 sample_genotypes=sample_genotypes,
                 sample_ploidy=sample_ploidy,
-                sample_inbreeding=sample_inbreeding,
                 sample_parents=sample_parents,
                 gamete_tau=gamete_tau,
                 gamete_lambda=gamete_lambda,
@@ -120,7 +117,6 @@ def allele_step(
     allele_index,
     sample_genotypes,
     sample_ploidy,
-    sample_inbreeding,
     sample_parents,
     gamete_tau,
     gamete_lambda,
@@ -135,7 +131,6 @@ def allele_step(
         allele_index=allele_index,
         sample_genotypes=sample_genotypes,
         sample_ploidy=sample_ploidy,
-        sample_inbreeding=sample_inbreeding,
         sample_parents=sample_parents,
         gamete_tau=gamete_tau,
         gamete_lambda=gamete_lambda,
@@ -155,7 +150,6 @@ def sample_step(
     target_index,
     sample_genotypes,
     sample_ploidy,
-    sample_inbreeding,
     sample_parents,
     gamete_tau,
     gamete_lambda,
@@ -173,7 +167,6 @@ def sample_step(
             allele_index=allele_indices[i],
             sample_genotypes=sample_genotypes,
             sample_ploidy=sample_ploidy,
-            sample_inbreeding=sample_inbreeding,
             sample_parents=sample_parents,
             gamete_tau=gamete_tau,
             gamete_lambda=gamete_lambda,
@@ -189,7 +182,6 @@ def sample_step(
 def compound_step(
     sample_genotypes,
     sample_ploidy,
-    sample_inbreeding,
     sample_parents,
     gamete_tau,
     gamete_lambda,
@@ -206,7 +198,6 @@ def compound_step(
             target_index=target_indices[i],
             sample_genotypes=sample_genotypes,
             sample_ploidy=sample_ploidy,
-            sample_inbreeding=sample_inbreeding,
             sample_parents=sample_parents,
             gamete_tau=gamete_tau,
             gamete_lambda=gamete_lambda,
@@ -222,7 +213,6 @@ def compound_step(
 def mcmc_sampler(
     sample_genotypes,
     sample_ploidy,
-    sample_inbreeding,
     sample_parents,
     gamete_tau,
     gamete_lambda,
@@ -241,8 +231,6 @@ def mcmc_sampler(
         Index of each haplotype in each genotype for each sample.
     sample_ploidy : ndarray, int, shape (n_samples,)
         Ploidy of each samples
-    sample_inbreeding : ndarray, float, shape (n_samples,)
-        Expected inbreeding coefficient of each samples
     sample_parents : ndarray, int, shape (n_samples, 2)
         Indices of the parents of each sample with negative values
         indicating unknown parents.
@@ -289,7 +277,6 @@ def mcmc_sampler(
         compound_step(
             sample_genotypes=sample_genotypes,
             sample_ploidy=sample_ploidy,
-            sample_inbreeding=sample_inbreeding,
             sample_parents=sample_parents,
             gamete_tau=gamete_tau,
             gamete_lambda=gamete_lambda,
