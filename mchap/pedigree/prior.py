@@ -968,74 +968,18 @@ def progeny_allele_log_pmf(
                     gamete_p[i] = dosage[i] - gamete_q[i]
 
     # assuming both parents are invalid
-    # probability of allele given other alleles in genotype
-    #lprob_pq = (
-    #   log_genotype_allele_prior(progeny, allele_index, unique_haplotypes=n_alleles, inbreeding=inbreeding)
-    #   + lerror_p
-    #   + lerror_q
-    #)
-    #lprob = add_log_prob(lprob, lprob_pq)
-
-    # simulate via gametes for understanding
-    gamete_p = initial_dosage(tau_p, dosage)
-    gamete_q = dosage - gamete_p
-    while True:
-
-        lprob_gamete_p = second_gamete_log_pmf(
-            gamete_dose=gamete_p,
-            constant_dose=gamete_q,
-            n_alleles=n_alleles,
-            inbreeding=inbreeding,
-        )
-        # lprob_gamete_p = log_genotype_prior(gamete_p, n_alleles, inbreeding=inbreeding)
-        lprob_const_p = second_gamete_const_log_pmf(
-            allele_index,
-            gamete_dose=gamete_p,
-            constant_dose=gamete_q,
-            n_alleles=n_alleles,
-            inbreeding=inbreeding,
-        )
-        lprob_allele_p = log_genotype_allele_prior(
-            progeny, allele_index, unique_haplotypes=n_alleles, inbreeding=inbreeding
-        )
-
-        lprob_gamete_q = second_gamete_log_pmf(
-            gamete_dose=gamete_q,
-            constant_dose=gamete_p,
-            n_alleles=n_alleles,
-            inbreeding=inbreeding,
-        )
-        # lprob_gamete_q = log_genotype_prior(gamete_q, n_alleles, inbreeding=inbreeding)
-        lprob_const_q = second_gamete_const_log_pmf(
-            allele_index,
-            gamete_dose=gamete_q,
-            constant_dose=gamete_p,
-            n_alleles=n_alleles,
-            inbreeding=inbreeding,
-        )
-        lprob_allele_q = log_genotype_allele_prior(
-            progeny, allele_index, unique_haplotypes=n_alleles, inbreeding=inbreeding
-        )
-
-        lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
-        lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
-        lprob_pq = add_log_prob(lprob_p, lprob_q) + lerror_p + lerror_q
-        lprob = add_log_prob(lprob, lprob_pq)
-
-        #print(progeny, dosage, allele_index)
-        #print(gamete_p, lprob_gamete_p, lprob_const_p, lprob_allele_p)
-        #print(gamete_q, lprob_gamete_q, lprob_const_q, lprob_allele_q)
-        #print(lprob_pq)
-        #print("\n")
-
-        # increment by gamete of p
-        try:
-            increment_dosage(gamete_p, dosage)
-        except:  # noqa: E722
-            break
-        else:
-            for i in range(len(gamete_q)):
-                gamete_q[i] = dosage[i] - gamete_p[i]
+    # p(constant) * p(allele | constant) * 2
+    const = dosage.copy()
+    const[allele_index] -= 1
+    lprob_const = log_genotype_prior(const, n_alleles, inbreeding=inbreeding)
+    lprob_allele = log_genotype_allele_prior(
+        progeny,
+        allele_index,
+        unique_haplotypes=n_alleles,
+        inbreeding=inbreeding,
+    ) + np.log(2)
+    lprob_pq = lprob_const + lprob_allele + lerror_p + lerror_q
+    lprob = add_log_prob(lprob, lprob_pq)
 
     return lprob
 
