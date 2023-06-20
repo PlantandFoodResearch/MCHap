@@ -353,6 +353,8 @@ def gamete_allele_log_pmf(
     assert parent_count <= parent_ploidy
     if gamete_count == 0:
         return -np.inf
+    if parent_count == 0:
+        return -np.inf
     const_count = gamete_count - 1
     const_ploidy = gamete_ploidy - 1
     # probability given no dr
@@ -558,7 +560,83 @@ def trio_log_pmf(
 
 
 @njit(cache=True)
-def progeny_allele_log_pmf(
+def markov_blanket_log_probability(
+    target_index,
+    sample_genotypes,
+    sample_ploidy,
+    sample_parents,
+    gamete_tau,
+    gamete_lambda,
+    gamete_error,
+    n_alleles,
+):
+    """Joint probability of pedigree items that fall within the
+    Markov blanket of the specified target sample.
+
+    Parameters
+    ----------
+    target_index : int
+        Index of target sample.
+    sample_genotypes : ndarray, int, shape (n_sample, max_ploidy)
+        Genotype of each sample padded by negative values.
+    sample_ploidy  : ndarray, int, shape (n_sample,)
+        Sample ploidy
+    sample_parents : ndarray, int, shape (n_samples, 2)
+        Parent indices of each sample with -1 indicating
+        unknown parents.
+    gamete_tau : int, shape (n_samples, 2)
+        Gamete ploidy associated with each pedigree edge.
+    gamete_lambda : float, shape (n_samples, 2)
+        Excess IBDy associated with each pedigree edge.
+    gamete_error : float, shape (n_samples, 2)
+        Error rate associated with each pedigree edge.
+    n_alleles : int
+        Number of possible haplotype alleles at this locus.
+
+    Returns
+    -------
+    log_probability : float
+        Joint log probability of pedigree items that fall within the
+        Markov blanket of the specified target sample.
+
+    """
+    n_samples, _ = sample_genotypes.shape
+    assert 0 <= target_index < n_samples
+    log_joint = 0.0
+    for i in range(n_samples):
+        p = sample_parents[i, 0]
+        q = sample_parents[i, 1]
+        if (target_index == i) or (target_index == p) or (target_index == q):
+            if p >= 0:
+                error_p = gamete_error[i, 0]
+                genotype_p = sample_genotypes[p, 0 : sample_ploidy[p]]
+            else:
+                error_p = 1.0
+                genotype_p = np.array([-1], dtype=sample_genotypes.dtype)
+            if q >= 0:
+                error_q = gamete_error[i, 1]
+                genotype_q = sample_genotypes[q, 0 : sample_ploidy[q]]
+            else:
+                error_q = 1.0
+                genotype_q = np.array([-1], dtype=sample_genotypes.dtype)
+            genotype_i = sample_genotypes[i, 0 : sample_ploidy[i]]
+            log_joint += trio_log_pmf(
+                genotype_i,
+                genotype_p,
+                genotype_q,
+                tau_p=gamete_tau[i, 0],
+                tau_q=gamete_tau[i, 1],
+                lambda_p=gamete_lambda[i, 0],
+                lambda_q=gamete_lambda[i, 1],
+                error_p=error_p,
+                error_q=error_q,
+                n_alleles=n_alleles,
+            )
+    return log_joint
+
+
+@njit(cache=True)
+def trio_allele_log_pmf(
     allele_index,
     progeny,
     parent_p,
@@ -571,7 +649,7 @@ def progeny_allele_log_pmf(
     error_q,
     n_alleles,
 ):
-    """Log probability of a trio of genotypes.
+    """Log probability of allele within a trio of genotypes.
 
     Parameters
     ----------
@@ -833,13 +911,14 @@ def progeny_allele_log_pmf(
     lprob_allele = - np.log(n_alleles) + np.log(2)  # log frequency of allele * 2
     lprob_pq = lprob_const + lprob_allele + lerror_p + lerror_q
     lprob = add_log_prob(lprob, lprob_pq)
-
+    assert not np.isnan(lprob)
     return lprob
 
 
 @njit(cache=True)
-def markov_blanket_log_probability(
+def markov_blanket_log_allele_probability(
     target_index,
+    allele_index,
     sample_genotypes,
     sample_ploidy,
     sample_parents,
@@ -855,6 +934,8 @@ def markov_blanket_log_probability(
     ----------
     target_index : int
         Index of target sample.
+    allele_index : int
+        Index of target allele.
     sample_genotypes : ndarray, int, shape (n_sample, max_ploidy)
         Genotype of each sample padded by negative values.
     sample_ploidy  : ndarray, int, shape (n_sample,)
@@ -898,10 +979,11 @@ def markov_blanket_log_probability(
                 error_q = 1.0
                 genotype_q = np.array([-1], dtype=sample_genotypes.dtype)
             genotype_i = sample_genotypes[i, 0 : sample_ploidy[i]]
-            log_joint += trio_log_pmf(
-                genotype_i,
-                genotype_p,
-                genotype_q,
+            log_joint += trio_allele_log_pmf(
+                allele_index=allele_index,
+                progeny=genotype_i,
+                parent_p=genotype_p,
+                parent_q=genotype_q,
                 tau_p=gamete_tau[i, 0],
                 tau_q=gamete_tau[i, 1],
                 lambda_p=gamete_lambda[i, 0],

@@ -1,10 +1,10 @@
 import numpy as np
 from numba import njit
 
-from mchap.jitutils import random_choice
+from mchap.jitutils import random_choice, normalise_log_probs
 from mchap.calling.utils import count_allele
 from .likelihood import log_likelihood_alleles_cached
-from .prior import markov_blanket_log_probability
+from .prior import markov_blanket_log_probability, markov_blanket_log_allele_probability
 
 
 @njit(cache=True)
@@ -112,7 +112,7 @@ def metropolis_hastings_probabilities(
 
 
 @njit(cache=True)
-def allele_step(
+def gibbs_probabilities(
     target_index,
     allele_index,
     sample_genotypes,
@@ -126,20 +126,99 @@ def allele_step(
     haplotypes,  # (n_haplotypes, n_pos)
     llk_cache,
 ):
-    probabilities = metropolis_hastings_probabilities(
-        target_index=target_index,
-        allele_index=allele_index,
-        sample_genotypes=sample_genotypes,
-        sample_ploidy=sample_ploidy,
-        sample_parents=sample_parents,
-        gamete_tau=gamete_tau,
-        gamete_lambda=gamete_lambda,
-        gamete_error=gamete_error,
-        sample_read_dists=sample_read_dists,
-        sample_read_counts=sample_read_counts,
-        haplotypes=haplotypes,
-        llk_cache=llk_cache,
-    )
+    n_alleles = len(haplotypes)
+    ploidy = sample_ploidy[target_index]
+    current_allele = sample_genotypes[target_index, allele_index]
+    reads = sample_read_dists[target_index]
+    read_counts = sample_read_counts[target_index]
+    idx = read_counts > 0
+    reads = reads[idx]
+    read_counts = read_counts[idx]
+
+    # store gibbs probability for each allele
+    log_probabilities = np.empty(n_alleles)
+
+    for i in range(n_alleles):
+        sample_genotypes[target_index, allele_index] = i
+
+        # calculate log likelihood ratio: ln(P(G'|R)/P(G|R))
+        llk_i = log_likelihood_alleles_cached(
+            reads=reads,
+            read_counts=read_counts,
+            haplotypes=haplotypes,
+            sample=target_index,
+            genotype_alleles=np.sort(sample_genotypes[target_index, 0:ploidy]),
+            cache=llk_cache,
+        )
+
+        # calculate ratio of priors: ln(P(G')/P(G))
+        lprior_i = markov_blanket_log_allele_probability(
+            target_index=target_index,
+            allele_index=allele_index,
+            sample_genotypes=sample_genotypes,
+            sample_ploidy=sample_ploidy,
+            sample_parents=sample_parents,
+            gamete_tau=gamete_tau,
+            gamete_lambda=gamete_lambda,
+            gamete_error=gamete_error,
+            n_alleles=n_alleles,
+        )
+        log_probabilities[i] = llk_i + lprior_i
+
+    probabilities = normalise_log_probs(log_probabilities)
+    # reset current allele
+    sample_genotypes[target_index, allele_index] = current_allele
+    return probabilities
+
+
+@njit(cache=True)
+def allele_step(
+    target_index,
+    allele_index,
+    sample_genotypes,
+    sample_ploidy,
+    sample_parents,
+    gamete_tau,
+    gamete_lambda,
+    gamete_error,
+    sample_read_dists,  # array (n_samples, n_reads, n_pos, n_nucl)
+    sample_read_counts,  # array (n_samples, n_reads)
+    haplotypes,  # (n_haplotypes, n_pos)
+    llk_cache,
+    step_type=0,  # 0=Gibbs, 1=MH
+):
+    if step_type==0:
+        probabilities = gibbs_probabilities(
+            target_index=target_index,
+            allele_index=allele_index,
+            sample_genotypes=sample_genotypes,
+            sample_ploidy=sample_ploidy,
+            sample_parents=sample_parents,
+            gamete_tau=gamete_tau,
+            gamete_lambda=gamete_lambda,
+            gamete_error=gamete_error,
+            sample_read_dists=sample_read_dists,
+            sample_read_counts=sample_read_counts,
+            haplotypes=haplotypes,
+            llk_cache=llk_cache,
+        )
+    elif step_type == 1:
+        probabilities = metropolis_hastings_probabilities(
+            target_index=target_index,
+            allele_index=allele_index,
+            sample_genotypes=sample_genotypes,
+            sample_ploidy=sample_ploidy,
+            sample_parents=sample_parents,
+            gamete_tau=gamete_tau,
+            gamete_lambda=gamete_lambda,
+            gamete_error=gamete_error,
+            sample_read_dists=sample_read_dists,
+            sample_read_counts=sample_read_counts,
+            haplotypes=haplotypes,
+            llk_cache=llk_cache,
+        )
+    else:
+        raise ValueError
     # random choice of new state using probabilities
     choice = random_choice(probabilities)
     sample_genotypes[target_index, allele_index] = choice
@@ -158,6 +237,7 @@ def sample_step(
     sample_read_counts,
     haplotypes,
     llk_cache,
+    step_type=0,
 ):
     allele_indices = np.arange(sample_ploidy[target_index])
     np.random.shuffle(allele_indices)
@@ -175,6 +255,7 @@ def sample_step(
             sample_read_counts=sample_read_counts,
             haplotypes=haplotypes,
             llk_cache=llk_cache,
+            step_type=step_type,
         )
 
 
@@ -190,6 +271,7 @@ def compound_step(
     sample_read_counts,
     haplotypes,
     llk_cache,
+    step_type=0,
 ):
     target_indices = np.arange(len(sample_genotypes))
     np.random.shuffle(target_indices)
@@ -206,6 +288,7 @@ def compound_step(
             sample_read_counts=sample_read_counts,
             haplotypes=haplotypes,
             llk_cache=llk_cache,
+            step_type=step_type,
         )
 
 
@@ -222,6 +305,7 @@ def mcmc_sampler(
     haplotypes,
     n_steps=2000,
     annealing=1000,
+    step_type=0,
 ):
     """MCMC simulation for calling alleles in pedigreed genotypes from a set of known haplotypes.
 
@@ -250,6 +334,9 @@ def mcmc_sampler(
         Number of (compound) steps to simulate.
     annealing : int
         Number of initial steps in which to perform simulated annealing.
+    step_type : int
+        Step type with 0 for a Gibbs-step and 1 for a
+        Metropolis-Hastings step.
 
     Notes
     -----
@@ -285,6 +372,7 @@ def mcmc_sampler(
             sample_read_counts=sample_read_counts,
             haplotypes=haplotypes,
             llk_cache=llk_cache,
+            step_type=step_type,
         )
         trace[i] = sample_genotypes.copy()
 
