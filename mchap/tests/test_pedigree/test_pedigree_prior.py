@@ -11,7 +11,6 @@ from mchap.pedigree.prior import (
     duplicate_permutations,
     gamete_log_pmf,
     gamete_allele_log_pmf,
-    second_gamete_log_pmf,
     trio_log_pmf,
 )
 
@@ -224,35 +223,6 @@ def test_log_gamete_pmf__raise_on_non_diploid_lambda():
 
 @pytest.mark.parametrize(
     "seed",
-    np.arange(10),
-)
-def test_second_gamete_log_pmf__sum_to_one(seed):
-    np.random.seed(seed)
-    n_alleles = np.random.randint(1, 10)
-    inbreeding = np.random.rand()
-    constant_dose = np.zeros(n_alleles, int)
-    const_ploidy = np.random.randint(1, 4)
-    gamete_ploidy = np.random.randint(1, 4)
-    for _ in range(const_ploidy):
-        a = np.random.randint(n_alleles)
-        constant_dose[a] += 1
-    constraint = np.full(n_alleles, gamete_ploidy, int)
-    n_gametes = comb_with_replacement(n_alleles, gamete_ploidy)
-
-    total_prob = 0.0
-    gamete_dose = initial_dosage(gamete_ploidy, constraint)
-    for i in range(0, n_gametes):
-        if i:
-            increment_dosage(gamete_dose, constraint)
-        prob = np.exp(
-            second_gamete_log_pmf(gamete_dose, constant_dose, n_alleles, inbreeding)
-        )
-        total_prob += prob
-    np.testing.assert_almost_equal(total_prob, 1.0)
-
-
-@pytest.mark.parametrize(
-    "seed",
     np.arange(50),
 )
 def test_trio_log_pmf__sum_to_one(seed):
@@ -266,7 +236,6 @@ def test_trio_log_pmf__sum_to_one(seed):
     tau_q = np.random.randint(1, ploidy_q)
     error_p = np.random.rand()
     error_q = np.random.rand()
-    inbreeding = np.random.rand()
 
     ploidy = tau_p + tau_q
     n_genotypes = comb_with_replacement(n_alleles, ploidy)
@@ -285,7 +254,6 @@ def test_trio_log_pmf__sum_to_one(seed):
                 lambda_q=0.0,
                 error_p=error_p,
                 error_q=error_q,
-                inbreeding=inbreeding,
                 n_alleles=n_alleles,
             )
         )
@@ -314,7 +282,6 @@ def test_trio_log_pmf__sum_to_one_lambda(seed, use_lambda_p, use_lambda_q):
     lambda_q = np.random.rand() if use_lambda_q else 0.0
     error_p = np.random.rand()
     error_q = np.random.rand()
-    inbreeding = np.random.rand()
 
     ploidy = tau_p + tau_q
     n_genotypes = comb_with_replacement(n_alleles, ploidy)
@@ -333,7 +300,6 @@ def test_trio_log_pmf__sum_to_one_lambda(seed, use_lambda_p, use_lambda_q):
                 lambda_q=lambda_q,
                 error_p=error_p,
                 error_q=error_q,
-                inbreeding=inbreeding,
                 n_alleles=n_alleles,
             )
         )
