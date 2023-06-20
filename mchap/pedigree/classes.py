@@ -24,6 +24,7 @@ class PedigreeCallingMCMC(Assembler):
     annealing: int = 1000
     chains: int = 2
     random_seed: int = None
+    step_type: str = "Gibbs"
 
     def fit(self, sample_reads, sample_read_counts, initial=None):
         n_samples = len(self.sample_ploidy)
@@ -46,6 +47,15 @@ class PedigreeCallingMCMC(Assembler):
                 )
                 initial[i][0 : self.sample_ploidy[i]] = genotype
 
+
+        # step type
+        if self.step_type == "Gibbs":
+            step_type = 0
+        elif self.step_type == "Metropolis-Hastings":
+            step_type = 1
+        else:
+            raise ValueError('MCMC step type must be "Gibbs" or "Metropolis-Hastings"')
+
         shape = (self.chains, self.steps, n_samples, max_ploidy)
         trace = np.empty(shape=shape, dtype=np.int16)
         for i in range(self.chains):
@@ -61,6 +71,7 @@ class PedigreeCallingMCMC(Assembler):
                 haplotypes=self.haplotypes,
                 n_steps=self.steps,
                 annealing=self.annealing,
+                step_type=step_type,
             )
         return PedigreeAllelesMultiTrace(trace)
 
