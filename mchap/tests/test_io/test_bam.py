@@ -25,6 +25,7 @@ def test_extract_sample_ids(id):
     elif id == "ID":
         expect = {
             "RG1_SAMPLE1": paths[0],
+            "RG2_SAMPLE1": paths[0],  # multiple read groups for sample 1
             "RG1_SAMPLE2": paths[1],
         }
 

@@ -39,14 +39,15 @@ def extract_sample_ids(bam_paths, id="SM"):
     data = {}
     for path in bam_paths:
         bam = pysam.AlignmentFile(path)
-        sample_names = [read_group[id] for read_group in bam.header["RG"]]
-        for sample in sample_names:
+        # allow multiple read groups for a single sample within a bam file
+        # but guard against duplicate sample identifier across multiple bams
+        bam_data = {read_group[id]: path for read_group in bam.header["RG"]}
+        for sample in bam_data.keys():
             if sample in data:
                 raise IOError(
                     'Duplicate sample with id = "{}" in file "{}"'.format(sample, path)
                 )
-            else:
-                data[sample] = path
+        data.update(bam_data)
     return data
 
 
