@@ -140,39 +140,6 @@ def test_PhenotypeDistribution___mode_genotype():
     assert expect[1] == actual[1]
 
 
-def test_PosteriorGenotypeDistribution__allele_occurrence():
-    array = np.array(
-        [
-            [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
-            [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 1, 1]],
-            [[0, 0, 0], [0, 0, 0], [1, 0, 1], [1, 1, 1]],
-            [[0, 0, 0], [1, 0, 1], [0, 1, 0], [1, 1, 1]],
-        ],
-        dtype=np.int8,
-    )
-    probs = np.array([0.05, 0.65, 0.2, 0.1])
-    dist = classes.PosteriorGenotypeDistribution(array, probs)
-    expect_haps = np.array(
-        [
-            [0, 0, 0],
-            [1, 1, 1],
-            [1, 0, 1],
-            [0, 1, 0],
-        ]
-    )
-    expect_probs = np.array(
-        [
-            0.05 + 0.65 + 0.2 + 0.1,
-            0.65 + 0.2 + 0.1,
-            0.2 + 0.1,
-            0.1,
-        ]
-    )
-    actual_haps, actual_probs = dist.allele_occurrence()
-    np.testing.assert_array_equal(actual_haps, expect_haps)
-    np.testing.assert_array_almost_equal(actual_probs, expect_probs)
-
-
 def test_PosteriorGenotypeDistribution__allele_frequencies():
     array = np.array(
         [
@@ -201,9 +168,18 @@ def test_PosteriorGenotypeDistribution__allele_frequencies():
             0.1 * (1 / 4),
         ]
     )
-    actual_haps, actual_freqs = dist.allele_frequencies()
+    expect_occur = np.array(
+        [
+            0.05 + 0.65 + 0.2 + 0.1,
+            0.65 + 0.2 + 0.1,
+            0.2 + 0.1,
+            0.1,
+        ]
+    )
+    actual_haps, actual_freqs, actual_occur = dist.allele_frequencies()
     np.testing.assert_array_equal(actual_haps, expect_haps)
     np.testing.assert_array_almost_equal(actual_freqs, expect_freqs)
+    np.testing.assert_array_almost_equal(expect_occur, actual_occur)
 
 
 @pytest.mark.parametrize(

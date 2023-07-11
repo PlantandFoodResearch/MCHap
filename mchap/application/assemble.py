@@ -213,7 +213,7 @@ class program(baseclass.program):
                 # posterior allele frequencies if requested
                 if "AFP" in data.formatfields:
                     frequencies = np.zeros(len(haplotypes))
-                    haps, freqs = sample_posteriors[sample].allele_frequencies()
+                    haps, freqs, _ = sample_posteriors[sample].allele_frequencies()
                     idx = mset.categorize(haplotypes, haps)
                     frequencies[idx >= 0] = freqs[idx[idx >= 0]]
                     data.sampledata["AFP"][sample] = np.round(
