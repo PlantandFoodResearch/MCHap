@@ -404,7 +404,9 @@ class program(object):
 
         manager = mp.Manager()
         queue = manager.Queue()
-        pool = mp.Pool(self.n_cores)
+        # add one core for the nanny process so that specified number of cores
+        # matches the number of compute cores
+        pool = mp.Pool(self.n_cores + 1)
 
         # start writer process
         _ = pool.apply_async(self._writer, (queue,))
