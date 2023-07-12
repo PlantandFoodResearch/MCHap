@@ -522,6 +522,36 @@ cores = Parameter(
     ),
 )
 
+basis_targets = Parameter(
+    "--targets",
+    dict(
+        type=str,
+        nargs=1,
+        default=[None],
+        help=(
+            "Bed file containing genomic intervals. "
+            "Basis SNVs will only be identified from within these intervals. "
+            "The first three columns (contig, start, stop) are mandatory."
+        ),
+    ),
+)
+
+find_snvs_maf = Parameter(
+    "--maf",
+    dict(
+        type=float,
+        nargs=1,
+        default=[0.001],
+        help=(
+            "Minimum allele frequency required to include an allele "
+            "(default = 0.001). "
+            "This is mean of sample allele frequencies where sample "
+            "frequencies are calculated from allelic read depth."
+        ),
+    ),
+)
+
+
 DEFAULT_PARSER_ARGUMENTS = [
     bam,
     ploidy,

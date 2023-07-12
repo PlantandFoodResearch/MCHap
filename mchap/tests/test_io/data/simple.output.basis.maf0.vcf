@@ -1,0 +1,72 @@
+##fileformat=VCFv4.3
+##fileDate=20230710
+##source=mchap v0.8.1
+##commandline="mchap find-snvs --targets simple.bed --reference simple.fasta --bam simple.sample1.bam simple.sample2.bam simple.sample3.bam --maf 0.0"
+##reference=file:/simple.fasta
+##contig=<ID=CHR1,length=60>
+##contig=<ID=CHR2,length=60>
+##contig=<ID=CHR3,length=60>
+##INFO=<ID=REFMASKED,Number=0,Type=Flag,Description="Reference allele is masked">
+##INFO=<ID=AD,Number=R,Type=Integer,Description="Total read depth of each allele within the population">
+##INFO=<ID=ADMF,Number=R,Type=Float,Description="Mean of sample allele frequencies calculated from read depth">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+CHR1	6	.	A	T,G,C	.	.	AD=24,0,0,0;ADMF=1,0,0,0
+CHR1	7	.	A	C,T,G	.	.	AD=20,4,0,0;ADMF=0.833,0.167,0,0
+CHR1	8	.	A	T,G,C	.	.	AD=24,0,0,0;ADMF=1,0,0,0
+CHR1	9	.	A	T,G,C	.	.	AD=24,0,0,0;ADMF=1,0,0,0
+CHR1	10	.	A	T,G,C	.	.	AD=24,0,0,0;ADMF=1,0,0,0
+CHR1	11	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR1	12	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR1	13	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR1	14	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR1	15	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR1	16	.	A	G,T,C	.	.	AD=28,20,0,0;ADMF=0.583,0.417,0,0
+CHR1	17	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	18	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	19	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	20	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	21	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	22	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	23	.	A	T,C,G	.	.	AD=28,12,8,0;ADMF=0.583,0.25,0.167,0
+CHR1	24	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	25	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	31	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	32	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	33	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	34	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	35	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	36	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	37	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	38	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	39	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	40	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	41	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	42	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	43	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	44	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	45	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR1	46	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR1	47	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR1	48	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR1	49	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR1	50	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR2	11	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR2	12	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR2	13	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR2	14	.	A	T,G,C	.	.	AD=36,0,0,0;ADMF=1,0,0,0
+CHR2	15	.	A	T,G,C	.	.	AD=33,3,0,0;ADMF=0.917,0.083,0,0
+CHR2	16	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	17	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	18	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	19	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	20	.	A	G,T,C	.	.	AD=24,16,8,0;ADMF=0.5,0.333,0.167,0
+CHR2	21	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	22	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	23	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	24	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	25	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	26	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	27	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	28	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	29	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
+CHR2	30	.	A	T,G,C	.	.	AD=48,0,0,0;ADMF=1,0,0,0
