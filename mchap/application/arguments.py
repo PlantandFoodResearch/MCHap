@@ -541,12 +541,42 @@ find_snvs_maf = Parameter(
     dict(
         type=float,
         nargs=1,
-        default=[0.001],
+        default=[0.1],
         help=(
             "Minimum allele frequency required to include an allele "
-            "(default = 0.001). "
-            "This is mean of sample allele frequencies where sample "
-            "frequencies are calculated from allelic read depth."
+            "(default = 0.1). "
+            "Alleles will be excluded if their frequency is lower than  "
+            "this value across all samples."
+        ),
+    ),
+)
+
+find_snvs_mad = Parameter(
+    "--mad",
+    dict(
+        type=int,
+        nargs=1,
+        default=[3],
+        help=(
+            "Minimum allele depth required to include an allele "
+            "(default = 3). "
+            "Alleles will be excluded if their depth is lower than  "
+            "this value across all samples."
+        ),
+    ),
+)
+
+find_snvs_allele_frequency_prior = Parameter(
+    "--allele-frequency-prior",
+    dict(
+        type=str,
+        nargs=1,
+        default=["ADMF"],
+        help=(
+            "Values to use as a prior for population allele frequencies. "
+            "Must be one of {'FLAT', 'ADMF'} (default = 'ADMF') "
+            "Where FLAT indicates a flat prior and ADMF use of the mean "
+            "of sample allele frequencies calculated from allele depth."
         ),
     ),
 )
