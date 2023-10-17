@@ -148,7 +148,6 @@ class LocusPrior(Locus):
         use_snvpos=False,
         frequency_tag=None,
         frequency_min=None,
-        frequency_prior=False,
         masked_reference_flag="REFMASKED",
     ):
         """Generate a locusPrior object with reference and variants from
@@ -168,9 +167,6 @@ class LocusPrior(Locus):
             Minimum frequency required to include an alternate allele.
             If the reference allele does not meet this threshold then
             it will be included with a frequency of 0.
-        frequency_prior : bool
-            By default a flat prior is used, if true the observed frequencies
-            will be used in place of the flat prior.
         masked_reference_flag : str
             VCF INFO tag used to indicate that the reference allele should
             not be used.
@@ -230,21 +226,6 @@ class LocusPrior(Locus):
             else:
                 frequencies[:] = np.nan
         assert len(frequencies) == len(sequences)
-
-        # flatten prior if needed
-        if frequency_prior:
-            assert frequency_tag is not None
-            pass
-        else:
-            # flatten prior
-            frequencies = np.ones(len(sequences))
-            if mask_reference_allele:
-                frequencies[0] = 0
-            denom = frequencies.sum()
-            if denom > 0:
-                frequencies /= denom
-            else:
-                frequencies[:] = np.nan
 
         # encoded haplotypes
         haplotypes = np.array([list(var) for var in sequences])

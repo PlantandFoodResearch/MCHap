@@ -84,9 +84,8 @@ class program(call_baseclass.program):
         data.infodata["REFMASKED"] = mask_reference_allele
         data.infodata["AFPRIOR"] = np.round(haplotype_frequencies, self.precision)
 
-        # mask zero frequency haplotypes if using prior
-        if self.use_haplotype_frequencies_prior:
-            mask |= haplotype_frequencies == 0
+        # mask zero frequency haplotypes
+        mask |= haplotype_frequencies == 0
 
         # remove masked haplotypes from mcmc
         if np.any(mask):
@@ -101,7 +100,7 @@ class program(call_baseclass.program):
         invalid_scenario = len(mcmc_haplotypes) == 0
 
         # get prior for allele frequencies
-        if self.use_haplotype_frequencies_prior:
+        if self.haplotype_frequencies_tag:
             prior_frequencies = haplotype_frequencies[~mask]
         else:
             prior_frequencies = None
@@ -112,9 +111,7 @@ class program(call_baseclass.program):
             # must have one or more haplotypes for MCMC
             invalid_scenario = True
             data.columndata["FILTER"].append(vcf.filters.NOA.id)
-        elif self.use_haplotype_frequencies_prior and np.any(
-            np.isnan(prior_frequencies)
-        ):
+        elif (prior_frequencies is not None) and np.any(np.isnan(prior_frequencies)):
             # nan caused by zero freq
             invalid_scenario = True
             data.columndata["FILTER"].append(vcf.filters.AF0.id)

@@ -54,7 +54,6 @@ from mchap.application.call import program
             [
                 "--haplotype-frequencies",
                 "AFP",
-                "--haplotype-frequencies-prior",
                 "--report",
                 "AFPRIOR",
                 "AFP",

@@ -8,7 +8,6 @@ from mchap.io import LocusPrior
 @dataclass
 class program(baseclass.program):
     haplotype_frequencies_tag: str = None
-    use_haplotype_frequencies_prior: bool = False
     skip_rare_haplotypes: float = None
 
     def loci(self):
@@ -18,6 +17,5 @@ class program(baseclass.program):
                     record,
                     frequency_tag=self.haplotype_frequencies_tag,
                     frequency_min=self.skip_rare_haplotypes,
-                    frequency_prior=self.use_haplotype_frequencies_prior,
                 )
                 yield locus

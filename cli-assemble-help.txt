@@ -22,7 +22,7 @@ usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
                                [--mcmc-temperatures [MCMC_TEMPERATURES ...]]
                                [--haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --region REGION       Specify a single target region with the format
                         contig:start-stop. This region will be a single

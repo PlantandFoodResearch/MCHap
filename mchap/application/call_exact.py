@@ -85,7 +85,7 @@ class program(call_baseclass.program):
         data.infodata["AFPRIOR"] = np.round(prior_frequencies, self.precision)
 
         # check prior frequencies arguments
-        if self.use_haplotype_frequencies_prior or self.skip_rare_haplotypes:
+        if self.skip_rare_haplotypes:
             assert self.haplotype_frequencies_tag
         if mask_reference_allele:
             assert (prior_frequencies[0] == 0) or np.isnan(prior_frequencies[0])

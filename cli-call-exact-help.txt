@@ -1,6 +1,5 @@
 usage: Exact haplotype calling [-h] [--haplotypes HAPLOTYPES]
                                [--haplotype-frequencies HAPLOTYPE_FREQUENCIES]
-                               [--haplotype-frequencies-prior]
                                [--skip-rare-haplotypes SKIP_RARE_HAPLOTYPES]
                                [--bam BAM [BAM ...]] [--ploidy PLOIDY]
                                [--inbreeding INBREEDING]
@@ -13,22 +12,17 @@ usage: Exact haplotype calling [-h] [--haplotypes HAPLOTYPES]
                                [--read-group-field READ_GROUP_FIELD]
                                [--report [REPORT ...]] [--cores CORES]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --haplotypes HAPLOTYPES
                         Tabix indexed VCF file containing haplotype/MNP/SNP
                         variants to be re-called among input samples.
   --haplotype-frequencies HAPLOTYPE_FREQUENCIES
                         Optionally specify an INFO field within the input VCF
-                        file to designate as allele frequencies for the input
-                        haplotypes. This can be any numerical field of length
-                        'R' and these values will automatically be normalized.
-                        This parameter has no affect on the output by itself
-                        but is required by some other parameters.
-  --haplotype-frequencies-prior
-                        Flag: Use haplotype frequencies to inform prior
-                        distribution. This requires that the --haplotype-
-                        frequencies parameter is also specified.
+                        file to designate as prior allele frequencies for the
+                        input haplotypes. This can be any numerical field of
+                        length 'R' and these values will automatically be
+                        normalized.
   --skip-rare-haplotypes SKIP_RARE_HAPLOTYPES
                         Optionally ignore haplotypes from the input VCF file
                         if their frequency within that file is less than the
