@@ -25,6 +25,15 @@ from mchap.application.call_exact import program
             ],
             "simple.output.mixed_depth.call-exact.frequencies.vcf",
         ),
+        (
+            "simple.output.mixed_depth.assemble.vcf",
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            [
+                "--report",
+                "AOP",
+            ],
+            "simple.output.mixed_depth.call-exact.occurrence.vcf",
+        ),
         (  # test using mock input will low ref allele frequency at first allele
             "mock.input.frequencies.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],

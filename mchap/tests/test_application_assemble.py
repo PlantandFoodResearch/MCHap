@@ -335,6 +335,11 @@ def test_Program__run(cli_extra, output_vcf):
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--report", "AOP"],
+            "simple.output.mixed_depth.assemble.occurrence.vcf",
+        ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             ["--sample-pool", "POOL", "--report", "AFP"],
             "simple.output.mixed_depth.assemble.pool.frequencies.vcf",
         ),

@@ -202,6 +202,8 @@ downstream analysis.
 
   * ``AFP``: Posterior mean allele frequencies (One value per unique allele for each sample).
     The mean posterior allele frequency across all samples will be reported as an INFO field.
+  * ``AOP``: Posterior probability of allele occurring in a sample (One value per unique allele for each sample).
+    The probability of each allele occurring across all samples will be reported as an INFO field.
   * ``GP``: Genotype posterior probabilities (One value per possible genotype per sample).
   * ``GL``: Genotype Likelihoods (One value per possible genotype per sample).
 

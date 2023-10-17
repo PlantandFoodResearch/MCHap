@@ -37,6 +37,12 @@ AFP = InfoField(
 AFPRIOR = InfoField(
     id="AFPRIOR", number="R", type="Float", descr="Prior allele frequencies"
 )
+AOP = InfoField(
+    id="AOP",
+    number="R",
+    type="Float",
+    descr="Posterior probability of allele occurring across all samples",
+)
 AA = InfoField(id="AA", number=1, type="String", descr="Ancestral allele")
 END = InfoField(id="END", number=1, type="Integer", descr="End position on CHROM")
 NVAR = InfoField(
@@ -78,6 +84,7 @@ HEADER_INFO_FIELDS = dict(
     AF=AF,
     AFP=AFP,
     AFPRIOR=AFPRIOR,
+    AOP=AOP,
     AA=AA,
     END=END,
     NVAR=NVAR,

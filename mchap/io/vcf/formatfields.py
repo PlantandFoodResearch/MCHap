@@ -70,6 +70,12 @@ GP = FormatField(
 AFP = FormatField(
     id="AFP", number="R", type="Float", descr="Posterior mean allele frequencies"
 )
+AOP = FormatField(
+    id="AOP",
+    number="R",
+    type="Float",
+    descr="Posterior probability of allele occurring",
+)
 MCI = FormatField(
     id="MCI",
     number=1,
@@ -107,6 +113,7 @@ HEADER_FORMAT_FIELDS = dict(
     GL=GL,
     GP=GP,
     AFP=AFP,
+    AOP=AOP,
     MCI=MCI,
     KMERCOV=KMERCOV,
     MCAP=MCAP,

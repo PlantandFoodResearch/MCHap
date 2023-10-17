@@ -319,18 +319,21 @@ def test_call_posterior_mode__fuzz(
         inbreeding=inbreeding,
         frequencies=prior_frequencies,
     )
-    freqs = exact.posterior_allele_frequencies(post, ploidy=ploidy, n_alleles=n_haps)
+    freqs, occur = exact.posterior_allele_frequencies(
+        post, ploidy=ploidy, n_alleles=n_haps
+    )
     mode = np.argmax(post)
     alleles = index_as_genotype_alleles(mode, ploidy)
 
     # compute mode using low memory function
-    mode_alleles, mode_llk, mode_post, mean_freqs = exact.posterior_mode(
+    mode_alleles, mode_llk, mode_post, mean_freqs, mean_occur = exact.posterior_mode(
         reads=reads,
         ploidy=ploidy,
         haplotypes=haplotypes,
         inbreeding=inbreeding,
         return_phenotype_prob=False,
         return_posterior_frequencies=True,
+        return_posterior_occurrence=True,
         frequencies=prior_frequencies,
     )
 
@@ -338,6 +341,7 @@ def test_call_posterior_mode__fuzz(
     np.testing.assert_almost_equal(llks[mode], mode_llk, 5)
     np.testing.assert_almost_equal(post[mode], mode_post, 5)
     np.testing.assert_array_almost_equal(freqs, mean_freqs, 5)
+    np.testing.assert_array_almost_equal(occur, mean_occur, 5)
 
 
 @pytest.mark.parametrize(
@@ -360,23 +364,37 @@ def test_call_posterior_mode__flat_frequencies(
     genotype = haplotypes[np.random.randint(0, n_haps, size=ploidy)]
     reads = simulate_reads(genotype, n_reads=n_reads, n_alleles=np.repeat(2, positions))
 
-    mode_alleles_x, mode_llk_x, mode_post_x, mean_freqs_x = exact.posterior_mode(
+    (
+        mode_alleles_x,
+        mode_llk_x,
+        mode_post_x,
+        mean_freqs_x,
+        occur_x,
+    ) = exact.posterior_mode(
         reads=reads,
         ploidy=ploidy,
         haplotypes=haplotypes,
         inbreeding=inbreeding,
         return_phenotype_prob=False,
         return_posterior_frequencies=True,
+        return_posterior_occurrence=True,
         frequencies=None,
     )
 
-    mode_alleles_y, mode_llk_y, mode_post_y, mean_freqs_y = exact.posterior_mode(
+    (
+        mode_alleles_y,
+        mode_llk_y,
+        mode_post_y,
+        mean_freqs_y,
+        occur_y,
+    ) = exact.posterior_mode(
         reads=reads,
         ploidy=ploidy,
         haplotypes=haplotypes,
         inbreeding=inbreeding,
         return_phenotype_prob=False,
         return_posterior_frequencies=True,
+        return_posterior_occurrence=True,
         frequencies=np.ones(n_haps) / n_haps,
     )
 
@@ -384,3 +402,4 @@ def test_call_posterior_mode__flat_frequencies(
     np.testing.assert_almost_equal(mode_llk_x, mode_llk_y)
     np.testing.assert_almost_equal(mode_post_x, mode_post_y)
     np.testing.assert_array_almost_equal(mean_freqs_x, mean_freqs_y)
+    np.testing.assert_array_almost_equal(occur_x, occur_y)

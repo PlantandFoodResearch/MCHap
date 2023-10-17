@@ -71,6 +71,7 @@ class program(call_baseclass.program):
             "GL",
             "GP",
             "AFP",
+            "AOP",
         ]:
             data.sampledata[field] = dict()
         haplotypes = data.locus.encode_haplotypes()
@@ -116,6 +117,7 @@ class program(call_baseclass.program):
                 data.sampledata["PHQ"][sample] = np.nan
                 data.sampledata["MCI"][sample] = np.nan
                 data.sampledata["AFP"][sample] = np.array([np.nan])
+                data.sampledata["AOP"][sample] = np.array([np.nan])
                 data.sampledata["GP"][sample] = np.array([np.nan])
                 data.sampledata["GL"][sample] = np.array([np.nan])
             return data
@@ -154,11 +156,12 @@ class program(call_baseclass.program):
                     phenotype_prob = phenotype_probs.sum()
 
                     # store specified arrays
-                    if "AFP" in data.formatfields:
-                        freqs = posterior_allele_frequencies(
+                    if ("AFP" in data.formatfields) or ("AOP" in data.formatfields):
+                        freqs, occur = posterior_allele_frequencies(
                             probabilities, ploidy, len(haplotypes)
                         )
                         data.sampledata["AFP"][sample] = np.round(freqs, self.precision)
+                        data.sampledata["AOP"][sample] = np.round(occur, self.precision)
                     if "GL" in data.formatfields:
                         data.sampledata["GL"][sample] = np.round(
                             natural_log_to_log10(llks), self.precision
@@ -179,8 +182,13 @@ class program(call_baseclass.program):
                         frequencies=prior_frequencies,
                         return_phenotype_prob=True,
                         return_posterior_frequencies="AFP" in data.formatfields,
+                        return_posterior_occurrence="AOP" in data.formatfields,
                     )
                     alleles, _, genotype_prob, phenotype_prob = mode_results[0:4]
+                    if "AOP" in data.formatfields:
+                        occur = np.round(mode_results[-1], self.precision)
+                        data.sampledata["AOP"][sample] = occur
+                        mode_results = mode_results[0:-1]
                     if "AFP" in data.formatfields:
                         freqs = np.round(mode_results[-1], self.precision)
                         data.sampledata["AFP"][sample] = freqs

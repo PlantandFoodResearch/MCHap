@@ -76,7 +76,7 @@ class program(object):
             "END",
             "NVAR",
             "SNVPOS",
-        ] + [f for f in ["AFPRIOR", "AFP"] if f in self.report_fields]
+        ] + [f for f in ["AFPRIOR", "AFP", "AOP"] if f in self.report_fields]
         return infofields
 
     def format_fields(self):
@@ -92,7 +92,7 @@ class program(object):
             "GPM",
             "PHPM",
             "MCI",
-        ] + [f for f in ["AFP", "DS", "GP", "GL"] if f in self.report_fields]
+        ] + [f for f in ["AFP", "AOP", "DS", "GP", "GL"] if f in self.report_fields]
         return formatfields
 
     def loci(self):
@@ -281,7 +281,7 @@ class program(object):
         data : LocusAssemblyData
             With infodata fields:
             "END", "NVAR", "SNVPOS", "AC", "AN", "NS", "DP", "RCOUNT"
-            and "AFP" if specified.
+            and "AFP" or "AOP" if specified.
         """
         # postions
         data.infodata["END"] = data.locus.stop
@@ -324,6 +324,12 @@ class program(object):
                 pop_ploidy += ploidy
                 pop_total += freqs * ploidy
             data.infodata["AFP"] = (pop_total / pop_ploidy).round(self.precision)
+        if "AOP" in data.infofields:
+            prob_not_occurring = np.ones(len(data.columndata["ALTS"]) + 1, float)
+            for occur in data.sampledata["AOP"].values():
+                prob_not_occurring = prob_not_occurring * (1 - occur)
+            prob_occurring = 1 - prob_not_occurring
+            data.infodata["AOP"] = prob_occurring.round(self.precision)
         return data
 
     def call_locus(self, locus):

@@ -115,6 +115,7 @@ class program(baseclass.program):
             "GL",
             "GP",
             "AFP",
+            "AOP",
         ]:
             data.sampledata[field] = dict()
         # dict to temporarily store posteriors
@@ -210,14 +211,19 @@ class program(baseclass.program):
                 )
                 data.sampledata["alleles"][sample] = alleles
 
-                # posterior allele frequencies if requested
-                if "AFP" in data.formatfields:
+                # posterior allele frequencies/occurrences if requested
+                if ("AFP" in data.formatfields) or ("AOP" in data.formatfields):
                     frequencies = np.zeros(len(haplotypes))
-                    haps, freqs, _ = sample_posteriors[sample].allele_frequencies()
+                    occurrences = np.zeros(len(haplotypes))
+                    haps, freqs, occur = sample_posteriors[sample].allele_frequencies()
                     idx = mset.categorize(haplotypes, haps)
                     frequencies[idx >= 0] = freqs[idx[idx >= 0]]
+                    occurrences[idx >= 0] = occur[idx[idx >= 0]]
                     data.sampledata["AFP"][sample] = np.round(
                         frequencies, self.precision
+                    )
+                    data.sampledata["AOP"][sample] = np.round(
+                        occurrences, self.precision
                     )
 
                 # encode posterior probabilities if requested

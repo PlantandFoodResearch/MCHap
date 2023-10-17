@@ -68,6 +68,7 @@ class program(call_baseclass.program):
             "GL",
             "GP",
             "AFP",
+            "AOP",
         ]:
             data.sampledata[field] = dict()
         # get haplotypes and metadata
@@ -132,6 +133,7 @@ class program(call_baseclass.program):
                 data.sampledata["PHQ"][sample] = np.nan
                 data.sampledata["MCI"][sample] = np.nan
                 data.sampledata["AFP"][sample] = np.array([np.nan])
+                data.sampledata["AOP"][sample] = np.array([np.nan])
                 data.sampledata["GP"][sample] = np.array([np.nan])
                 data.sampledata["GL"][sample] = np.array([np.nan])
             return data
@@ -186,6 +188,15 @@ class program(call_baseclass.program):
                     frequencies[alleles] = counts / counts.sum()
                     data.sampledata["AFP"][sample] = np.round(
                         frequencies, self.precision
+                    )
+
+                # posterior allele occurrence if requested
+                if "AOP" in data.formatfields:
+                    occurrences = np.zeros(len(haplotypes))
+                    alleles, _, occur = posterior.allele_frequencies()
+                    occurrences[alleles] = occur
+                    data.sampledata["AOP"][sample] = np.round(
+                        occurrences, self.precision
                     )
 
                 # genotype posteriors if requested

@@ -260,9 +260,8 @@ class PosteriorGenotypeAllelesDistribution(object):
 
     Attributes
     ----------
-    genotypes : ndarray, int, shape (n_genotypes, ploidy, n_positions)
-        The possible genotypes of an individual of known ploidy at a
-        locus covering n_positions variable positions.
+    genotypes : ndarray, int, shape (n_genotypes, ploidy)
+        The possible genotypes of an individual.
     probabilities : ndarray, float, shape (n_genotypes, )
         Probabilities (summing to 1) of each genotype.
 
@@ -325,3 +324,26 @@ class PosteriorGenotypeAllelesDistribution(object):
         _, ploidy = self.genotypes.shape
         u_genotypes = count_unique_genotypes(n_alleles, ploidy)
         return posterior_as_array(self.genotypes, self.probabilities, u_genotypes)
+
+    def allele_frequencies(self):
+        """Calculate posterior frequency of haplotype alleles.
+
+        Returns
+        -------
+        alleles : ndarray, int, shape (n_alleles, n_base)
+            Unique haplotypes.
+        frequencies : ndarray, float, shape (n_alleles, )
+            Posterior frequencies of haplotype alleles.
+        occurrence : ndarray, float, shape (n_alleles, )
+            Posterior probabilities of haplotype occurrence.
+        """
+        _, ploidy = self.genotypes.shape
+        n_allele = self.genotypes.max() + 1
+        alleles = np.arange(n_allele)
+        frequencies = np.zeros(n_allele)
+        occurrence = np.zeros(n_allele)
+        for gen, prob in zip(self.genotypes, self.probabilities):
+            idx, count = np.unique(gen, return_counts=True)
+            frequencies[idx] += (count / ploidy) * prob
+            occurrence[idx] += prob
+        return alleles, frequencies, occurrence

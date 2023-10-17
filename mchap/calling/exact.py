@@ -115,7 +115,8 @@ def _posterior_allele_frequencies(
     n_alleles = len(haplotypes)
     genotype = np.zeros(ploidy, np.int64)
     freqs = np.zeros(n_alleles, dtype=np.float64)
-    for i in range(n_genotypes):
+    occur = np.zeros(n_alleles, dtype=np.float64)
+    for _ in range(n_genotypes):
         # log likelihood
         llk = log_likelihood(
             reads=reads,
@@ -130,11 +131,19 @@ def _posterior_allele_frequencies(
         ljoint = llk + lpr
         # posterior prob
         prob = np.exp(ljoint - ldenominator)
-        for a in genotype:
+        for i in range(ploidy):
+            a = genotype[i]
             freqs[a] += prob
+            # probability of occurrence
+            if i == 0:
+                occur[a] += prob
+            else:
+                # alleles are sorted ascending
+                if a != genotype[i - 1]:
+                    occur[a] += prob
         # next genotype
         increment_genotype(genotype)
-    return freqs / ploidy
+    return freqs / ploidy, occur
 
 
 def posterior_mode(
@@ -146,6 +155,7 @@ def posterior_mode(
     frequencies=None,
     return_phenotype_prob=False,
     return_posterior_frequencies=False,
+    return_posterior_occurrence=False,
 ):
     """Call posterior mode genotype with statistics from a set of known haplotypes.
 
@@ -170,6 +180,8 @@ def posterior_mode(
         Return the mode phenotype probability (default = false).
     return_posterior_frequencies : bool
         Return posterior mean allele frequencies (default = false).
+    return_posterior_occurrence : bool
+        Return posterior probability of an allele occurring (default = false).
 
     Returns
     -------
@@ -183,6 +195,8 @@ def posterior_mode(
         Sum posterior probability of all genotypes within the mode phenotype.
     mean_allele_frequencies : ndarray, float, shape (n_alleles, )
         Posterior mean allele frequencies.
+    allele_occurrence_probability : ndarray, float, shape (n_alleles, )
+        Posterior probability of alleles occurring at any dosage.
 
     Notes
     -----
@@ -215,8 +229,8 @@ def posterior_mode(
         mode_phenotype_prob = np.exp(phenotype_ljoint - total_ljoint)
         result.append(mode_phenotype_prob)
 
-    if return_posterior_frequencies:
-        mean_frequencies = _posterior_allele_frequencies(
+    if return_posterior_frequencies or return_posterior_occurrence:
+        mean_frequencies, occurrence = _posterior_allele_frequencies(
             ldenominator=total_ljoint,
             reads=reads,
             ploidy=ploidy,
@@ -226,7 +240,10 @@ def posterior_mode(
             inbreeding=inbreeding,
             frequencies=frequencies,
         )
-        result.append(mean_frequencies)
+        if return_posterior_frequencies:
+            result.append(mean_frequencies)
+        if return_posterior_occurrence:
+            result.append(occurrence)
 
     return tuple(result)
 
@@ -331,20 +348,28 @@ def posterior_allele_frequencies(posteriors, ploidy, n_alleles, dosage=False):
 
     Returns
     -------
-    posteriors : ndarray, float, shape(n_genotypes, )
-        VCF ordered posterior probability of each possible genotype.
+    mean_allele_frequencies : ndarray, float, shape (n_alleles, )
+        Posterior mean allele frequencies.
+    allele_occurrence_probability : ndarray, float, shape (n_alleles, )
+        Posterior probability of alleles occurring at any dosage.
     """
     n_genotypes = len(posteriors)
     freqs = np.zeros(n_alleles, dtype=np.float64)
+    occur = np.zeros(n_alleles, dtype=np.float64)
     genotype = np.zeros(ploidy, np.int64)
     for i in range(n_genotypes):
         p = posteriors[i]
         for j in range(ploidy):
-            freqs[genotype[j]] += p
+            a = genotype[j]
+            freqs[a] += p
+            if j == 0:
+                occur[a] += p
+            elif a != genotype[j - 1]:
+                occur[a] += p
         increment_genotype(genotype)
     if dosage is False:
         freqs /= ploidy
-    return freqs
+    return freqs, occur
 
 
 def alternate_dosage_posteriors(genotype_alleles, probabilities):
