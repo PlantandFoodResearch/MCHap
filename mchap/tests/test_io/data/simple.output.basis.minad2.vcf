@@ -1,7 +1,7 @@
 ##fileformat=VCFv4.3
 ##fileDate=20230710
 ##source=mchap v0.8.1
-##commandline="mchap find-snvs --targets simple.bed --reference simple.fasta --bam simple.sample1.bam simple.sample2.bam simple.sample3.bam"
+##commandline="mchap find-snvs --targets simple.bed --reference simple.fasta --bam simple.sample1.bam simple.sample2.bam simple.sample3.bam --minad 2"
 ##reference=file:simple.fasta
 ##contig=<ID=CHR1,length=60>
 ##contig=<ID=CHR2,length=60>
@@ -12,6 +12,7 @@
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Number of reads unambiguously assigned to each allele based on MEC">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1	SAMPLE2	SAMPLE3
+CHR1	7	.	A	C	.	.	AD=20,4;ADMF=0.833,0.167	GT:AD	.:6,2	.:8,0	.:6,2
 CHR1	16	.	A	G	.	.	AD=28,20;ADMF=0.583,0.417	GT:AD	.:8,8	.:8,8	.:12,4
 CHR1	23	.	A	T,C	.	.	AD=28,12,8;ADMF=0.583,0.25,0.167	GT:AD	.:8,4,4	.:8,8,0	.:12,0,4
 CHR2	15	.	A	T	.	.	AD=33,3;ADMF=0.917,0.083	GT:AD	.:12,0	.:12,0	.:9,3

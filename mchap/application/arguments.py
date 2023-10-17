@@ -536,14 +536,14 @@ basis_targets = Parameter(
     ),
 )
 
-find_snvs_maf = Parameter(
-    "--maf",
+find_snvs_minaf = Parameter(
+    "--minaf",
     dict(
         type=float,
         nargs=1,
         default=[0.1],
         help=(
-            "Minimum allele frequency required to include an allele "
+            "Minimum allele frequency of an individual required to include an allele "
             "(default = 0.1). "
             "Alleles will be excluded if their frequency is lower than  "
             "this value across all samples."
@@ -551,14 +551,14 @@ find_snvs_maf = Parameter(
     ),
 )
 
-find_snvs_mad = Parameter(
-    "--mad",
+find_snvs_minad = Parameter(
+    "--minad",
     dict(
         type=int,
         nargs=1,
         default=[3],
         help=(
-            "Minimum allele depth required to include an allele "
+            "Minimum allele depth of an individual required to include an allele "
             "(default = 3). "
             "Alleles will be excluded if their depth is lower than  "
             "this value across all samples."

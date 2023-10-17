@@ -1,9 +1,13 @@
+# NOTE: This file contains commented out functions and for genotype calling.
+# This functionality may be added in a future release after sufficient testing.
+
 import sys
 import argparse
 import pysam
 import numpy as np
 import pandas as pd
-from math import lgamma
+
+# from math import lgamma
 from numba import njit, vectorize, guvectorize
 
 from mchap.application import arguments
@@ -11,168 +15,169 @@ from mchap.io.vcf import headermeta
 from mchap.io.vcf import infofields
 from mchap.io.vcf import formatfields
 from mchap.io.vcf.util import vcfstr
-from mchap.jitutils import (
-    add_log_prob,
-    comb_with_replacement,
-    index_as_genotype_alleles,
-)
+
+# from mchap.jitutils import (
+#     add_log_prob,
+#     comb_with_replacement,
+#     index_as_genotype_alleles,
+# )
 
 
-@njit(cache=True)
-def _increment_allele_counts(allele_count):
-    n_allele = len(allele_count)
-    for i in range(n_allele):
-        if i == n_allele:
-            # final genotype
-            raise (ValueError, "Final genotype")
-        ci = allele_count[i]
-        if ci == 0:
-            pass
-        else:
-            allele_count[i] = 0
-            allele_count[i + 1] += 1
-            allele_count[0] = ci - 1
-            return
+# @njit(cache=True)
+# def _increment_allele_counts(allele_count):
+#     n_allele = len(allele_count)
+#     for i in range(n_allele):
+#         if i == n_allele:
+#             # final genotype
+#             raise (ValueError, "Final genotype")
+#         ci = allele_count[i]
+#         if ci == 0:
+#             pass
+#         else:
+#             allele_count[i] = 0
+#             allele_count[i + 1] += 1
+#             allele_count[0] = ci - 1
+#             return
 
 
-@njit(cache=True)
-def _genotype_log_likelihood(
-    allele_depth,
-    allele_count,
-    error_rate,
-    ploidy,
-    n_allele,
-):
-    llk = 0.0
-    for i in range(n_allele):
-        depth_i = allele_depth[i]
-        if depth_i > 0:
-            # probability of drawing allele i from genotype
-            allele_prob = 0.0
-            for j in range(n_allele):
-                if i == j:
-                    prob = 1 - error_rate
-                else:
-                    prob = error_rate / 4
-                allele_prob += prob * allele_count[j] / ploidy
-            llk += np.log(allele_prob) * depth_i
-    return llk
+# @njit(cache=True)
+# def _genotype_log_likelihood(
+#     allele_depth,
+#     allele_count,
+#     error_rate,
+#     ploidy,
+#     n_allele,
+# ):
+#     llk = 0.0
+#     for i in range(n_allele):
+#         depth_i = allele_depth[i]
+#         if depth_i > 0:
+#             # probability of drawing allele i from genotype
+#             allele_prob = 0.0
+#             for j in range(n_allele):
+#                 if i == j:
+#                     prob = 1 - error_rate
+#                 else:
+#                     prob = error_rate / 4
+#                 allele_prob += prob * allele_count[j] / ploidy
+#             llk += np.log(allele_prob) * depth_i
+#     return llk
 
 
-@njit(cache=True)
-def _log_allele_count_multinomial_prior(allele_count, frequencies, n_allele, ploidy):
-    log_num = lgamma(ploidy + 1)
-    log_denom = 0.0
-    for i in range(n_allele):
-        count = allele_count[i]
-        if count > 0:
-            log_freq = np.log(frequencies[i])
-            log_num += log_freq * count
-            log_denom += lgamma(count + 1)
-    return log_num - log_denom
+# @njit(cache=True)
+# def _log_allele_count_multinomial_prior(allele_count, frequencies, n_allele, ploidy):
+#     log_num = lgamma(ploidy + 1)
+#     log_denom = 0.0
+#     for i in range(n_allele):
+#         count = allele_count[i]
+#         if count > 0:
+#             log_freq = np.log(frequencies[i])
+#             log_num += log_freq * count
+#             log_denom += lgamma(count + 1)
+#     return log_num - log_denom
 
 
-@njit(cache=True)
-def _log_allele_count_dirmul_prior(allele_count, alphas, n_allele, ploidy):
-    # Dirichlet-multinomial
-    # left side of equation in log space
-    sum_alphas = alphas.sum()
-    num = lgamma(ploidy + 1) + lgamma(sum_alphas)
-    denom = lgamma(ploidy + sum_alphas)
-    left = num - denom
+# @njit(cache=True)
+# def _log_allele_count_dirmul_prior(allele_count, alphas, n_allele, ploidy):
+#     # Dirichlet-multinomial
+#     # left side of equation in log space
+#     sum_alphas = alphas.sum()
+#     num = lgamma(ploidy + 1) + lgamma(sum_alphas)
+#     denom = lgamma(ploidy + sum_alphas)
+#     left = num - denom
 
-    # right side of equation
-    prod = 0.0  # log(1.0)
-    for i in range(n_allele):
-        count = allele_count[i]
-        if count > 0:
-            alpha = alphas[i]
-            num = lgamma(count + alpha)
-            denom = lgamma(count + 1) + lgamma(alpha)
-            prod += num - denom
+#     # right side of equation
+#     prod = 0.0  # log(1.0)
+#     for i in range(n_allele):
+#         count = allele_count[i]
+#         if count > 0:
+#             alpha = alphas[i]
+#             num = lgamma(count + alpha)
+#             denom = lgamma(count + 1) + lgamma(alpha)
+#             prod += num - denom
 
-    # return as log probability
-    return left + prod
-
-
-@njit(cache=True)
-def _call_genotype(
-    allele_depth,
-    ploidy,
-    inbreeding,
-    frequencies,
-    n_allele,
-    error_rate,
-):
-    allele_count = np.zeros(len(frequencies), np.int64)
-    allele_count[0] = ploidy  # first genotype
-    n_genotype = comb_with_replacement(n_allele, ploidy)
-    if inbreeding != 0.0:
-        alphas = frequencies * ((1 - inbreeding) / inbreeding)
-        use_drimul = True
-    else:
-        alphas = frequencies  # avoid zero division and typ errors
-        use_drimul = False
-
-    # initial values
-    current_mode = -1
-    current_mode_probability = -np.inf
-    denominator = -np.inf  # normalizing constant
-    i_final = n_genotype - 1
-    for i in range(n_genotype):
-        llk = _genotype_log_likelihood(
-            allele_depth, allele_count, error_rate, ploidy, n_allele
-        )
-        if use_drimul:
-            lprior = _log_allele_count_dirmul_prior(
-                allele_count, alphas, n_allele, ploidy
-            )
-        else:
-            lprior = _log_allele_count_multinomial_prior(
-                allele_count, frequencies, n_allele, ploidy
-            )
-        lprob = llk + lprior
-        if lprob > current_mode_probability:
-            current_mode = i
-            current_mode_probability = lprob
-        denominator = add_log_prob(denominator, lprob)
-        if i < i_final:
-            _increment_allele_counts(allele_count)
-    mode_genotype = index_as_genotype_alleles(current_mode, ploidy)
-    mode_probability = np.exp(current_mode_probability - denominator)
-    return mode_genotype, mode_probability
+#     # return as log probability
+#     return left + prod
 
 
-# avoid caching of guvectorized functions as this seems to result in core dumps when in parallel on HPC
-@guvectorize(
-    [
-        "void(int64[:], int64, float64, float64[:], int64, float64, int64[:], int64[:], float64[:])",
-    ],
-    "(a),(),(),(a),(),(),(k)->(k),()",
-    nopython=True,
-)
-def call_genotype(
-    allele_depth,
-    ploidy,
-    inbreeding,
-    frequencies,
-    n_allele,
-    error_rate,
-    _,
-    mode_genotype,
-    mode_probability,
-):
-    genotype, probability = _call_genotype(
-        allele_depth,
-        ploidy,
-        inbreeding,
-        frequencies,
-        n_allele,
-        error_rate,
-    )
-    mode_genotype[0:ploidy] = genotype
-    mode_genotype[ploidy:] = -2
-    mode_probability[0] = probability
+# @njit(cache=True)
+# def _call_genotype(
+#     allele_depth,
+#     ploidy,
+#     inbreeding,
+#     frequencies,
+#     n_allele,
+#     error_rate,
+# ):
+#     allele_count = np.zeros(len(frequencies), np.int64)
+#     allele_count[0] = ploidy  # first genotype
+#     n_genotype = comb_with_replacement(n_allele, ploidy)
+#     if inbreeding != 0.0:
+#         alphas = frequencies * ((1 - inbreeding) / inbreeding)
+#         use_drimul = True
+#     else:
+#         alphas = frequencies  # avoid zero division and typ errors
+#         use_drimul = False
+
+#     # initial values
+#     current_mode = -1
+#     current_mode_probability = -np.inf
+#     denominator = -np.inf  # normalizing constant
+#     i_final = n_genotype - 1
+#     for i in range(n_genotype):
+#         llk = _genotype_log_likelihood(
+#             allele_depth, allele_count, error_rate, ploidy, n_allele
+#         )
+#         if use_drimul:
+#             lprior = _log_allele_count_dirmul_prior(
+#                 allele_count, alphas, n_allele, ploidy
+#             )
+#         else:
+#             lprior = _log_allele_count_multinomial_prior(
+#                 allele_count, frequencies, n_allele, ploidy
+#             )
+#         lprob = llk + lprior
+#         if lprob > current_mode_probability:
+#             current_mode = i
+#             current_mode_probability = lprob
+#         denominator = add_log_prob(denominator, lprob)
+#         if i < i_final:
+#             _increment_allele_counts(allele_count)
+#     mode_genotype = index_as_genotype_alleles(current_mode, ploidy)
+#     mode_probability = np.exp(current_mode_probability - denominator)
+#     return mode_genotype, mode_probability
+
+
+# # avoid caching of guvectorized functions as this seems to result in core dumps when in parallel on HPC
+# @guvectorize(
+#     [
+#         "void(int64[:], int64, float64, float64[:], int64, float64, int64[:], int64[:], float64[:])",
+#     ],
+#     "(a),(),(),(a),(),(),(k)->(k),()",
+#     nopython=True,
+# )
+# def call_genotype(
+#     allele_depth,
+#     ploidy,
+#     inbreeding,
+#     frequencies,
+#     n_allele,
+#     error_rate,
+#     _,
+#     mode_genotype,
+#     mode_probability,
+# ):
+#     genotype, probability = _call_genotype(
+#         allele_depth,
+#         ploidy,
+#         inbreeding,
+#         frequencies,
+#         n_allele,
+#         error_rate,
+#     )
+#     mode_genotype[0:ploidy] = genotype
+#     mode_genotype[ploidy:] = -2
+#     mode_probability[0] = probability
 
 
 @vectorize(cache=True, nopython=True)
@@ -205,7 +210,8 @@ def _count_alleles(zeros, alleles):
     n = len(alleles)
     for i in range(n):
         a = alleles[i]
-        zeros[a] += 1
+        if a >= 0:
+            zeros[a] += 1
     return
 
 
@@ -256,42 +262,39 @@ def bam_region_depths(
     return depths
 
 
-def write_vcf_header(command, reference, samples):
+def write_vcf_header(
+    command, reference, info_fields=None, format_fields=None, samples=None
+):
     vcfversion_header = str(headermeta.fileformat("v4.3"))
     date_header = str(headermeta.filedate())
     source_header = str(headermeta.source())
     command_header = str(headermeta.commandline(command))
     reference_header = str(headermeta.reference(reference.filename.decode()))
-    info_header = "\n".join(
-        [str(infofields.REFMASKED), str(infofields.AD), str(infofields.ADMF)]
-    )
-    format_header = "\n".join(
-        [str(formatfields.GT), str(formatfields.GPM), str(formatfields.AD)]
-    )
     contig_header = "\n".join(
         str(headermeta.ContigHeader(s, i))
         for s, i in zip(reference.references, reference.lengths)
     )
-    columns_header = "#" + "\t".join(
-        ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
-        + list(samples)
-    )
-    string = (
-        "\n".join(
-            [
-                vcfversion_header,
-                date_header,
-                source_header,
-                command_header,
-                reference_header,
-                contig_header,
-                info_header,
-                format_header,
-                columns_header,
-            ]
-        )
-        + "\n"
-    )
+    components = [
+        vcfversion_header,
+        date_header,
+        source_header,
+        command_header,
+        reference_header,
+        contig_header,
+    ]
+    if info_fields is not None:
+        info_header = "\n".join([str(f) for f in info_fields])
+        components += [info_header]
+    if format_fields is not None:
+        format_header = "\n".join([str(f) for f in format_fields])
+        components += [format_header]
+
+    columns_header = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]
+    if samples is not None:
+        columns_header += ["FORMAT"] + list(samples)
+    columns_header = "#" + "\t".join(columns_header)
+    components += [columns_header]
+    string = "\n".join(components) + "\n"
     sys.stdout.write(string)
 
 
@@ -363,18 +366,34 @@ def format_genotype_calls(calls, sep="/"):
 
 def format_floats(floats, precision=3):
     string = floats.round(precision).astype("U")
-    string = np.char.rstrip(string, ".0")
+    # remove any ".0" from strings
+    string = np.char.rstrip(string, "0")
+    string = np.char.rstrip(string, ".")
     string[np.isnan(floats)] = "."
     return string
 
 
-def format_samples_columns(genotype_calls, genotype_probs, allele_depths, allele_keep):
-    strings = format_genotype_calls(genotype_calls)
-    strings = np.char.add(strings, ":")
-    strings = np.char.add(strings, format_floats(genotype_probs))
-    strings = np.char.add(strings, ":")
-    strings = np.char.add(strings, format_allele_counts(allele_depths, allele_keep))
-    return pd.DataFrame(strings)
+def format_samples_columns(
+    genotype_calls=None, genotype_probs=None, allele_depths=None, allele_keep=None
+):
+    # TODO: minimize unicode dtype sizes
+    fields = "GT"
+    if genotype_calls is None:
+        strings = np.array(["."])
+    else:
+        strings = format_genotype_calls(genotype_calls)
+    if genotype_probs is not None:
+        fields += ":GPM"
+        strings = np.char.add(strings, ":")
+        strings = np.char.add(strings, format_floats(genotype_probs))
+    if allele_depths is not None:
+        fields += ":AD"
+        assert allele_keep is not None
+        strings = np.char.add(strings, ":")
+        strings = np.char.add(strings, format_allele_counts(allele_depths, allele_keep))
+    cols = pd.DataFrame(strings)
+    fields = pd.DataFrame(np.full(len(strings), fields))
+    return pd.concat([fields, cols], axis=1)
 
 
 def write_vcf_block(
@@ -383,12 +402,12 @@ def write_vcf_block(
     stop,
     reference,
     alignment_files,
-    sample_ploidy,
-    sample_inbreeding,
-    base_error_rate,
-    allele_frequency_prior,
-    maf,
-    mad,
+    # sample_ploidy,
+    # sample_inbreeding,
+    # base_error_rate,
+    # allele_frequency_prior,
+    minaf,
+    minad,
     mapping_quality,
     skip_duplicates,
     skip_qcfail,
@@ -426,8 +445,8 @@ def write_vcf_block(
     # frequencies
     with np.errstate(divide="ignore", invalid="ignore"):
         allele_freq = allele_depth / allele_depth.sum(axis=-1, keepdims=True)
-    # filter by MAF and MAD for each sample
-    keep = ((allele_freq >= maf) & (allele_depth >= mad)).any(axis=1)
+    # filter by minaf and minad for each sample
+    keep = ((allele_freq >= minaf) & (allele_depth >= minad)).any(axis=1)
     # remove any monomorphic
     idx = keep.sum(axis=-1) > 1
     if idx.sum() == 0:
@@ -441,11 +460,8 @@ def write_vcf_block(
     allele_freq = allele_freq[idx]
     keep = keep[idx]
 
-    # reset normalize frequencies for retained alleles
+    # zero out non-kept alleles
     allele_freq = np.where(keep[:, None, :], allele_freq, 0.0)
-    # calculate population frequencies
-    # with warnings.catch_warnings():
-    #    warnings.filterwarnings("ignore", message="Mean of empty slice")
     depth_mean_freq = np.nanmean(allele_freq, axis=1)
 
     # sort alleles by pop frequencies
@@ -455,8 +471,8 @@ def write_vcf_block(
     depth_mean_freq = _order_by(depth_mean_freq, order)
     keep = _order_by(keep, order)
 
-    # calculate flat prior, this will be 0 for a masked reference allele
-    flat_prior_frequencies = keep / keep.sum(axis=-1, keepdims=True)
+    # # calculate flat prior, this will be 0 for a masked reference allele
+    # flat_prior_frequencies = keep / keep.sum(axis=-1, keepdims=True)
 
     # mask ref if not identified
     reference_masked = ~keep[:, 0]
@@ -492,31 +508,40 @@ def write_vcf_block(
         }
     )
 
-    # call genotypes
-    variant_unique_alleles = keep.sum(axis=-1)
-    if allele_frequency_prior == "FLAT":
-        frequencies = flat_prior_frequencies
-    elif allele_frequency_prior == "ADMF":
-        frequencies = depth_mean_freq
-    else:
-        raise ValueError("--allele-frequency-prior must be one of {'FLAT', 'ADMF'}")
-    _ = np.empty(sample_ploidy.max(), int)
-    # divide by zero warning expected with any freq of zero
-    with np.errstate(divide="ignore", invalid="ignore"):
-        calls, probs = call_genotype(
-            allele_depth,
-            sample_ploidy,
-            sample_inbreeding,
-            frequencies[:, None, :],
-            variant_unique_alleles[:, None],
-            base_error_rate,
-            _,
-        )
+    # # call genotypes
+    # variant_unique_alleles = keep.sum(axis=-1)
+    # if allele_frequency_prior == "FLAT":
+    #     frequencies = flat_prior_frequencies
+    # elif allele_frequency_prior == "ADMF":
+    #     frequencies = depth_mean_freq
+    # else:
+    #     raise ValueError("--allele-frequency-prior must be one of {'FLAT', 'ADMF'}")
+    # _ = np.empty(sample_ploidy.max(), int)
+    # # divide by zero warning expected with any freq of zero
+    # with np.errstate(divide="ignore", invalid="ignore"):
+    #     calls, probs = call_genotype(
+    #         allele_depth,
+    #         sample_ploidy,
+    #         sample_inbreeding,
+    #         frequencies[:, None, :],
+    #         variant_unique_alleles[:, None],
+    #         base_error_rate,
+    #         _,
+    #     )
+
+    # # Add sample data
+    # sample_cols = format_samples_columns(calls, probs, allele_depth, keep)
+    # table = pd.concat([table, sample_cols], axis=1)
 
     # Add sample data
-    sample_cols = format_samples_columns(calls, probs, allele_depth, keep)
-    table["FORMAT"] = np.full(n, "GT:GPM:AD")
+    sample_cols = format_samples_columns(
+        genotype_calls=None,
+        genotype_probs=None,
+        allele_depths=allele_depth,
+        allele_keep=keep,
+    )
     table = pd.concat([table, sample_cols], axis=1)
+
     # write block
     table.to_csv(sys.stdout, sep="\t", index=False, header=False)
 
@@ -528,12 +553,12 @@ def main(command):
         arguments.basis_targets,
         arguments.reference,
         arguments.bam,
-        arguments.ploidy,
-        arguments.inbreeding,
-        arguments.find_snvs_allele_frequency_prior,
-        arguments.find_snvs_maf,
-        arguments.find_snvs_mad,
-        arguments.base_error_rate,
+        # arguments.ploidy,
+        # arguments.inbreeding,
+        # arguments.find_snvs_allele_frequency_prior,
+        arguments.find_snvs_minaf,
+        arguments.find_snvs_minad,
+        # arguments.base_error_rate,
         arguments.read_group_field,
         arguments.mapping_quality,
         arguments.skip_duplicates,
@@ -554,18 +579,18 @@ def main(command):
     samples, sample_bams = arguments.parse_sample_bam_paths(
         args.bam, None, args.read_group_field[0]
     )
-    sample_ploidy = arguments.parse_sample_value_map(
-        args.ploidy[0],
-        samples,
-        type=int,
-    )
-    sample_ploidy = np.array([sample_ploidy[s] for s in samples])
-    sample_inbreeding = arguments.parse_sample_value_map(
-        args.inbreeding[0],
-        samples,
-        type=float,
-    )
-    sample_inbreeding = np.array([sample_inbreeding[s] for s in samples])
+    # sample_ploidy = arguments.parse_sample_value_map(
+    #     args.ploidy[0],
+    #     samples,
+    #     type=int,
+    # )
+    # sample_ploidy = np.array([sample_ploidy[s] for s in samples])
+    # sample_inbreeding = arguments.parse_sample_value_map(
+    #     args.inbreeding[0],
+    #     samples,
+    #     type=float,
+    # )
+    # sample_inbreeding = np.array([sample_inbreeding[s] for s in samples])
     # validate bam files
     samples = np.array(samples)
     bam_paths = np.array(
@@ -589,7 +614,16 @@ def main(command):
             )
         )
     # generate and write header
-    write_vcf_header(command, reference, samples)
+    info_fields = [infofields.REFMASKED, infofields.AD, infofields.ADMF]
+    format_fields = [formatfields.GT, formatfields.AD]
+    write_vcf_header(
+        command,
+        reference,
+        samples=samples,
+        info_fields=info_fields,
+        format_fields=format_fields,
+    )
+    # generate and write record blocks
     for _, interval in bed.iterrows():
         write_vcf_block(
             interval.contig,
@@ -597,12 +631,12 @@ def main(command):
             interval.stop,
             reference,
             alignment_files,
-            sample_ploidy,
-            sample_inbreeding,
-            base_error_rate=args.base_error_rate[0],
-            allele_frequency_prior=args.allele_frequency_prior[0],
-            maf=args.maf[0],
-            mad=args.mad[0],
+            # sample_ploidy,
+            # sample_inbreeding,
+            # base_error_rate=args.base_error_rate[0],
+            # allele_frequency_prior=args.allele_frequency_prior[0],
+            minaf=args.minaf[0],
+            minad=args.minad[0],
             mapping_quality=args.mapping_quality[0],
             skip_duplicates=args.skip_duplicates,
             skip_qcfail=args.skip_qcfail,
