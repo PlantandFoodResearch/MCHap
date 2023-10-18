@@ -61,7 +61,7 @@ AD = InfoField(
     id="AD",
     number="R",
     type="Integer",
-    descr="Total read depth of each allele within the population",
+    descr="Total read depth for each allele",
 )
 ADMF = InfoField(
     id="ADMF",

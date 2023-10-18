@@ -1,0 +1,52 @@
+usage: WARNING this tool is experimental [-h] [--targets TARGETS]
+                                         [--reference REFERENCE]
+                                         [--bam BAM [BAM ...]] [--minaf MINAF]
+                                         [--minad MINAD]
+                                         [--read-group-field READ_GROUP_FIELD]
+                                         [--mapping-quality MAPPING_QUALITY]
+                                         [--keep-duplicate-reads]
+                                         [--keep-qcfail-reads]
+                                         [--keep-supplementary-reads]
+
+options:
+  -h, --help            show this help message and exit
+  --targets TARGETS     Bed file containing genomic intervals. Basis SNVs will
+                        only be identified from within these intervals. The
+                        first three columns (contig, start, stop) are
+                        mandatory.
+  --reference REFERENCE
+                        Indexed fasta file containing the reference genome.
+  --bam BAM [BAM ...]   Bam file(s) to use in analysis. This may be (1) a list
+                        of one or more bam filepaths, (2) a plain-text file
+                        containing a single bam filepath on each line, (3) a
+                        plain-text file containing a sample identifier and its
+                        corresponding bam filepath on each line separated by a
+                        tab. If options (1) or (2) are used then all samples
+                        within each bam will be used within the analysis. If
+                        option (3) is used then only the specified sample will
+                        be extracted from each bam file and An error will be
+                        raised if a sample is not found within its specified
+                        bam file.
+  --minaf MINAF         Minimum allele frequency of an individual required to
+                        include an allele (default = 0.1). Alleles will be
+                        excluded if their frequency is lower than this value
+                        across all samples.
+  --minad MINAD         Minimum allele depth of an individual required to
+                        include an allele (default = 3). Alleles will be
+                        excluded if their depth is lower than this value
+                        across all samples.
+  --read-group-field READ_GROUP_FIELD
+                        Read group field to use as sample id (default = "SM").
+                        The chosen field determines tha sample ids required in
+                        other input files e.g. the --sample-list argument.
+  --mapping-quality MAPPING_QUALITY
+                        Minimum mapping quality of reads used in assembly
+                        (default = 20).
+  --keep-duplicate-reads
+                        Flag: Use reads marked as duplicates in the assembly
+                        (these are skipped by default).
+  --keep-qcfail-reads   Flag: Use reads marked as qcfail in the assembly
+                        (these are skipped by default).
+  --keep-supplementary-reads
+                        Flag: Use reads marked as supplementary in the
+                        assembly (these are skipped by default).

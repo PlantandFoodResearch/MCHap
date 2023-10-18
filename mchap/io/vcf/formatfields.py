@@ -61,7 +61,7 @@ AD = FormatField(
     id="AD",
     number="R",
     type="Integer",
-    descr="Number of reads unambiguously assigned to each allele based on MEC",
+    descr="Read depth for each allele",
 )
 GL = FormatField(id="GL", number="G", type="Float", descr="Genotype likelihoods")
 GP = FormatField(

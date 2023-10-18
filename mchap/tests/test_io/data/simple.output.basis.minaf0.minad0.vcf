@@ -7,10 +7,10 @@
 ##contig=<ID=CHR2,length=60>
 ##contig=<ID=CHR3,length=60>
 ##INFO=<ID=REFMASKED,Number=0,Type=Flag,Description="Reference allele is masked">
-##INFO=<ID=AD,Number=R,Type=Integer,Description="Total read depth of each allele within the population">
+##INFO=<ID=AD,Number=R,Type=Integer,Description="Total read depth for each allele">
 ##INFO=<ID=ADMF,Number=R,Type=Float,Description="Mean of sample allele frequencies calculated from read depth">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Number of reads unambiguously assigned to each allele based on MEC">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Read depth for each allele">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1	SAMPLE2	SAMPLE3
 CHR1	6	.	A	T,G,C	.	.	AD=24,0,0,0;ADMF=1,0,0,0	GT:AD	.:8,0,0,0	.:8,0,0,0	.:8,0,0,0
 CHR1	7	.	A	C,T,G	.	.	AD=20,4,0,0;ADMF=0.833,0.167,0,0	GT:AD	.:6,2,0,0	.:8,0,0,0	.:6,2,0,0
