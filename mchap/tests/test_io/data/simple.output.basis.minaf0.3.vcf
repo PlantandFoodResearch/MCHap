@@ -1,0 +1,17 @@
+##fileformat=VCFv4.3
+##fileDate=20230710
+##source=mchap v0.8.1
+##commandline="mchap find-snvs --targets simple.bed --reference simple.fasta --bam simple.sample1.bam simple.sample2.bam simple.sample3.bam --minaf 0.3"
+##reference=file:simple.fasta
+##contig=<ID=CHR1,length=60>
+##contig=<ID=CHR2,length=60>
+##contig=<ID=CHR3,length=60>
+##INFO=<ID=REFMASKED,Number=0,Type=Flag,Description="Reference allele is masked">
+##INFO=<ID=AD,Number=R,Type=Integer,Description="Total read depth of each allele within the population">
+##INFO=<ID=ADMF,Number=R,Type=Float,Description="Mean of sample allele frequencies calculated from read depth">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Number of reads unambiguously assigned to each allele based on MEC">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1	SAMPLE2	SAMPLE3
+CHR1	16	.	A	G	.	.	AD=28,20;ADMF=0.583,0.417	GT:AD	.:8,8	.:8,8	.:12,4
+CHR1	23	.	A	T	.	.	AD=28,12;ADMF=0.583,0.25	GT:AD	.:8,4	.:8,8	.:12,0
+CHR2	20	.	A	G	.	.	AD=24,16;ADMF=0.5,0.333	GT:AD	.:12,0	.:8,4	.:4,12

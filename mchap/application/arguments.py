@@ -508,6 +508,66 @@ cores = Parameter(
     ),
 )
 
+basis_targets = Parameter(
+    "--targets",
+    dict(
+        type=str,
+        nargs=1,
+        default=[None],
+        help=(
+            "Bed file containing genomic intervals. "
+            "Basis SNVs will only be identified from within these intervals. "
+            "The first three columns (contig, start, stop) are mandatory."
+        ),
+    ),
+)
+
+find_snvs_minaf = Parameter(
+    "--minaf",
+    dict(
+        type=float,
+        nargs=1,
+        default=[0.1],
+        help=(
+            "Minimum allele frequency of an individual required to include an allele "
+            "(default = 0.1). "
+            "Alleles will be excluded if their frequency is lower than  "
+            "this value across all samples."
+        ),
+    ),
+)
+
+find_snvs_minad = Parameter(
+    "--minad",
+    dict(
+        type=int,
+        nargs=1,
+        default=[3],
+        help=(
+            "Minimum allele depth of an individual required to include an allele "
+            "(default = 3). "
+            "Alleles will be excluded if their depth is lower than  "
+            "this value across all samples."
+        ),
+    ),
+)
+
+find_snvs_allele_frequency_prior = Parameter(
+    "--allele-frequency-prior",
+    dict(
+        type=str,
+        nargs=1,
+        default=["ADMF"],
+        help=(
+            "Values to use as a prior for population allele frequencies. "
+            "Must be one of {'FLAT', 'ADMF'} (default = 'ADMF') "
+            "Where FLAT indicates a flat prior and ADMF use of the mean "
+            "of sample allele frequencies calculated from allele depth."
+        ),
+    ),
+)
+
+
 DEFAULT_PARSER_ARGUMENTS = [
     bam,
     ploidy,

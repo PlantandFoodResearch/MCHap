@@ -61,7 +61,13 @@ AD = InfoField(
     id="AD",
     number="R",
     type="Integer",
-    descr="Total number of reads unambiguously assigned to each allele based on MEC",
+    descr="Total read depth of each allele within the population",
+)
+ADMF = InfoField(
+    id="ADMF",
+    number="R",
+    type="Float",
+    descr="Mean of sample allele frequencies calculated from read depth",
 )
 RCOUNT = InfoField(
     id="RCOUNT",
