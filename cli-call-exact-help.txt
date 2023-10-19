@@ -4,6 +4,7 @@ usage: Exact haplotype calling [-h] [--haplotypes HAPLOTYPES]
                                [--bam BAM [BAM ...]] [--ploidy PLOIDY]
                                [--inbreeding INBREEDING]
                                [--sample-pool SAMPLE_POOL]
+                               [--reference REFERENCE]
                                [--base-error-rate BASE_ERROR_RATE]
                                [--use-base-phred-scores]
                                [--mapping-quality MAPPING_QUALITY]
@@ -59,6 +60,8 @@ options:
   --sample-pool SAMPLE_POOL
                         A name used to pool all sample reads into a single
                         sample. WARNING: this is an experimental feature.
+  --reference REFERENCE
+                        Indexed fasta file containing the reference genome.
   --base-error-rate BASE_ERROR_RATE
                         Expected base error rate of read sequences (default =
                         0.0024). The default value comes from Pfeiffer et al

@@ -573,6 +573,7 @@ DEFAULT_PARSER_ARGUMENTS = [
     ploidy,
     inbreeding,
     sample_pool,
+    reference,
     base_error_rate,
     ignore_base_phred_scores,
     mapping_quality,
@@ -608,7 +609,6 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
         region_id,
         targets,
         variants,
-        reference,
     ]
     + DEFAULT_MCMC_PARSER_ARGUMENTS
     + [
@@ -799,6 +799,7 @@ def collect_default_program_arguments(arguments):
         sample_bams=sample_bams,
         sample_ploidy=sample_ploidy,
         sample_inbreeding=sample_inbreeding,
+        ref=arguments.reference[0],
         read_group_field=arguments.read_group_field[0],
         base_error_rate=arguments.base_error_rate[0],
         ignore_base_phred_scores=arguments.ignore_base_phred_scores,
@@ -854,7 +855,6 @@ def collect_assemble_mcmc_program_arguments(arguments):
         dict(
             bed=arguments.targets[0],
             vcf=arguments.variants[0],
-            ref=arguments.reference[0],
             sample_mcmc_temperatures=sample_mcmc_temperatures,
             region=arguments.region[0],
             region_id=arguments.region_id,

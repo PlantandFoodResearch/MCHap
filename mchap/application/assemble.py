@@ -34,7 +34,6 @@ from .arguments import (
 @dataclass
 class program(baseclass.program):
     bed: str = ""
-    ref: str = ""
     region: str = None
     region_id: str = None
     haplotype_posterior_threshold: float = 0.2

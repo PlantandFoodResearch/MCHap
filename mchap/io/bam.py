@@ -53,7 +53,7 @@ def extract_sample_ids(bam_paths, id="SM"):
 
 def extract_read_variants(
     locus,
-    path,
+    alignment_file,
     samples=None,
     id="SM",
     min_quality=20,
@@ -68,8 +68,8 @@ def extract_read_variants(
     ----------
     locus : Locus
         A locus object defining a genomic locus with known variants.
-    path : str
-        Path to an indexed bam file.
+    alignment_file : AlignmentFile
+        Instance of pysam.AlignmentFile.
     samples : list, str
         List of samples to extract from bam (default is to extract all samples).
     id : str
@@ -106,12 +106,10 @@ def extract_read_variants(
 
     data = {}
 
-    bam = pysam.AlignmentFile(path)
-
     # store sample ids in dict for easy access
     # sample_keys is a map of RG ID to ID or SM
     sample_keys = {}
-    for dictionary in bam.header["RG"]:
+    for dictionary in alignment_file.header["RG"]:
 
         # sample key based on a user defined readgroup field
         sample_key = dictionary[id]
@@ -128,7 +126,7 @@ def extract_read_variants(
             data[sample_key] = {}
 
     # iterate through reads
-    reads = bam.fetch(locus.contig, locus.start, locus.stop)
+    reads = alignment_file.fetch(locus.contig, locus.start, locus.stop)
     for read in reads:
 
         if read.is_unmapped:

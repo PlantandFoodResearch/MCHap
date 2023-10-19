@@ -40,6 +40,7 @@ class SampleAssemblyError(Exception):
 @dataclass
 class program(object):
     vcf: str
+    ref: str
     samples: list
     sample_bams: dict
     sample_ploidy: dict
@@ -98,6 +99,16 @@ class program(object):
     def loci(self):
         raise NotImplementedError()
 
+    def alignment_files(self):
+        out = {}
+        for pool, pairs in self.sample_bams.items():
+            pairs = [
+                (sample, pysam.AlignmentFile(path, reference_filename=self.ref))
+                for sample, path in pairs
+            ]
+            out[pool] = pairs
+        return out
+
     def header_contigs(self):
         with pysam.VariantFile(self.vcf) as f:
             contigs = f.header.contigs.values()
@@ -124,7 +135,7 @@ class program(object):
         header = meta_fields + contigs + filters + info_fields + format_fields + columns
         return [str(line) for line in header]
 
-    def _locus_data(self, locus):
+    def _locus_data(self, locus, alignment_files):
         """Generate a LocusAssemblyData object for a given locus
         to be populated with data relating to a single vcf record.
         """
@@ -133,7 +144,7 @@ class program(object):
         return LocusAssemblyData(
             locus=locus,
             samples=self.samples,
-            sample_bams=self.sample_bams,
+            sample_bams=alignment_files,
             sample_ploidy=self.sample_ploidy,
             sample_inbreeding=self.sample_inbreeding,
             infofields=infofields,
@@ -175,10 +186,10 @@ class program(object):
                 # of bam sample-path pairs.
                 pairs = data.sample_bams[sample]
                 read_chars, read_quals = [], []
-                for name, path in pairs:
+                for name, alignment_file in pairs:
                     chars, quals = extract_read_variants(
                         data.locus,
-                        path=path,
+                        alignment_file=alignment_file,
                         samples=name,
                         id=self.read_group_field,
                         min_quality=self.mapping_quality,
@@ -332,7 +343,7 @@ class program(object):
             data.infodata["AOP"] = prob_occurring.round(self.precision)
         return data
 
-    def call_locus(self, locus):
+    def call_locus(self, locus, alignment_files):
         """Call samples at a locus and formats resulting data
         into a VCF record line.
 
@@ -355,34 +366,39 @@ class program(object):
             VCF variant line.
 
         """
-        data = self._locus_data(locus)
+        data = self._locus_data(locus, alignment_files)
         self.encode_sample_reads(data)
         self.call_sample_genotypes(data)
         self.sumarise_sample_genotypes(data)
         self.sumarise_vcf_record(data)
         return data.format_vcf_record()
 
-    def _assemble_locus_wrapped(self, locus):
-        try:
-            result = self.call_locus(locus)
-        except Exception as e:
-            message = LOCUS_ASSEMBLY_ERROR.format(
-                name=locus.name, contig=locus.contig, start=locus.start, stop=locus.stop
-            )
-            raise LocusAssemblyError(message) from e
-        return result
+    def _assemble_loci_wrapped(self, loci):
+        # create single set of alignment files to use for every locus in the job
+        alignment_files = self.alignment_files()
+        for locus in loci:
+            try:
+                result = self.call_locus(locus, alignment_files)
+            except Exception as e:
+                message = LOCUS_ASSEMBLY_ERROR.format(
+                    name=locus.name,
+                    contig=locus.contig,
+                    start=locus.start,
+                    stop=locus.stop,
+                )
+                raise LocusAssemblyError(message) from e
+            yield result
 
-    def run(self):
+    def _run_stdout_single_core(self):
         header = self.header()
-        pool = mp.Pool(self.n_cores)
-        jobs = ((locus,) for locus in self.loci())
-        records = pool.starmap(self._assemble_locus_wrapped, jobs)
-        return header + records
+        for line in header:
+            sys.stdout.write(line + "\n")
+        for line in self._assemble_loci_wrapped(self.loci()):
+            sys.stdout.write(line + "\n")
 
-    def _worker(self, locus, queue):
-        line = str(self._assemble_locus_wrapped(locus))
-        queue.put(line)
-        return line
+    def _worker(self, loci, queue):
+        for line in self._assemble_loci_wrapped(loci):
+            queue.put(str(line))
 
     def _writer(self, queue):
         while True:
@@ -391,14 +407,6 @@ class program(object):
                 break
             sys.stdout.write(line + "\n")
             sys.stdout.flush()
-
-    def _run_stdout_single_core(self):
-        header = self.header()
-        for line in header:
-            sys.stdout.write(line + "\n")
-        for locus in self.loci():
-            line = self._assemble_locus_wrapped(locus)
-            sys.stdout.write(line + "\n")
 
     def _run_stdout_multi_core(self):
 
@@ -417,9 +425,11 @@ class program(object):
         # start writer process
         _ = pool.apply_async(self._writer, (queue,))
 
+        loci = list(self.loci())
+        blocks = np.array_split(loci, self.n_cores)
         jobs = []
-        for locus in self.loci():
-            job = pool.apply_async(self._worker, (locus, queue))
+        for block in blocks:
+            job = pool.apply_async(self._worker, (block, queue))
             jobs.append(job)
 
         for job in jobs:

@@ -7,9 +7,31 @@ import pytest
 from mchap.application.call import program
 
 
+def reference_path():
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / "test_io/data/simple.fasta"
+    return str(path)
+
+
 @pytest.mark.parametrize(
     "input_vcf,bams,cli_extra,output_vcf",
     [
+        (
+            "simple.output.assemble.vcf",
+            ["simple.sample1.bam", "simple.sample2.bam", "simple.sample3.bam"],
+            [],
+            "simple.output.call.vcf",
+        ),
+        (
+            "simple.output.assemble.vcf",
+            [
+                "simple.sample1.broken.cram",
+                "simple.sample2.broken.cram",
+                "simple.sample3.broken.cram",
+            ],
+            ["--reference", reference_path()],
+            "simple.output.call.vcf",
+        ),
         (
             "simple.output.mixed_depth.assemble.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],

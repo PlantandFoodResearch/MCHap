@@ -1,6 +1,7 @@
 import numpy as np
 import pathlib
 import pytest
+import pysam
 
 from mchap.io import loci
 from mchap.io import bam
@@ -88,12 +89,13 @@ def test_extract_read_variants():
     expect_quals = np.zeros(expect_chars.shape, dtype=np.int16)
     expect_quals[expect_chars != "-"] = 50
 
-    actual = bam.extract_read_variants(
-        locus,
-        path,
-        samples=sample,
-        id="SM",
-    )
+    with pysam.AlignmentFile(path) as alignment_file:
+        actual = bam.extract_read_variants(
+            locus,
+            alignment_file,
+            samples=sample,
+            id="SM",
+        )
     assert sample in actual
     np.testing.assert_array_equal(actual[sample][0], expect_chars)
     np.testing.assert_array_equal(actual[sample][1], expect_quals)
