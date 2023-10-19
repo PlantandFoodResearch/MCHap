@@ -3,7 +3,7 @@ MCHap call
 
 Calling genotypes from known haplotypes.
 
-*(Last updated for MCHap version 0.8.1)*
+*(Last updated for MCHap version 0.9.0)*
 
 Background
 ----------
@@ -158,6 +158,11 @@ Sample parameters are used to specify information about each sample.
 Some of parameters such as ploidy have obvious importance when calling genotypes,
 however, other parameters such as expected inbreeding coefficients can have more subtle 
 effects on the results.
+
+- ``--reference``: Specify a reference genome. This is optional but highly recommended when
+  working with CRAM files instead of BAM files. Specifying the reference genome speeds up
+  reading data from CRAM files. It also may be necessary if the CRAM files link to a missing
+  reference genome.
 
 - ``--ploidy``: The ploidy of all samples in the analysis (default = ``2``, must be a 
   positive integer).
@@ -326,6 +331,8 @@ This can be achieved with a combination of the parameters ``--haplotype-frequenc
 and ``--skip-rare-haplotypes``.
 The ``--haplotype-frequencies`` parameter is used to specify an INFO field within
 the input VCF which contains relative frequencies of each haplotype.
+Note that these frequencies will be used to inform the prior distribution as described
+above.
 The ``--skip-rare-haplotypes`` parameter is then used to specify a threshold (between
 0 and 1) bellow which a haplotype will be excluded from the analysis.
 

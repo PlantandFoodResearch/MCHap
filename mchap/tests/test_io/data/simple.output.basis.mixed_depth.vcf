@@ -1,6 +1,6 @@
 ##fileformat=VCFv4.3
 ##fileDate=20230710
-##source=mchap v0.8.1
+##source=mchap v0.9.0
 ##commandline="mchap find-snvs --targets simple.bed --reference simple.fasta --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam"
 ##reference=file:simple.fasta
 ##contig=<ID=CHR1,length=60>

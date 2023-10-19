@@ -9,7 +9,7 @@ RUN apt-get update \
 
 RUN git clone  https://github.com/PlantandFoodResearch/MCHap.git   \
     && cd MCHap \
-    && git checkout v0.8.1 \
+    && git checkout v0.9.0 \
     && pip install -r requirements.txt \
     && python3 setup.py sdist \
     && python3 -m pip install dist/mchap-*tar.gz

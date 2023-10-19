@@ -1,6 +1,6 @@
 ##fileformat=VCFv4.3
 ##fileDate=20220406
-##source=mchap v0.8.1
+##source=mchap v0.9.0
 ##phasing=None
 ##commandline="mchap call-exact --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --haplotypes mock.input.frequencies.vcf --haplotype-frequencies AFP --skip-rare-haplotypes 0.1 --report AFPRIOR AFP"
 ##randomseed=None

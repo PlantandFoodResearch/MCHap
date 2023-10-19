@@ -4,7 +4,7 @@
 
 
 
-## Beta v0.8.1
+## Beta v0.9.0
 
 Bug Fixes:
 - Fixed integer overflow bug when calculating the total number of unique haplotypes in mchap assemble #157
