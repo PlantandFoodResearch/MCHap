@@ -62,8 +62,8 @@ def reference_path():
             [
                 "--haplotype-frequencies",
                 "AFP",
-                "--skip-rare-haplotypes",
-                "0.1",
+                "--filter-input-haplotypes",
+                "AFP>=0.1",
                 "--report",
                 "AFPRIOR",
                 "AFP",
@@ -76,8 +76,8 @@ def reference_path():
             [
                 "--haplotype-frequencies",
                 "AFP",
-                "--skip-rare-haplotypes",
-                "0.1",
+                "--filter-input-haplotypes",
+                "AFP>=0.1",
                 "--report",
                 "AFP",
                 "GP",

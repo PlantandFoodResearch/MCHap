@@ -1,6 +1,6 @@
 usage: MCMC haplotype calling [-h] [--haplotypes HAPLOTYPES]
                               [--haplotype-frequencies HAPLOTYPE_FREQUENCIES]
-                              [--skip-rare-haplotypes SKIP_RARE_HAPLOTYPES]
+                              [--filter-input-haplotypes FILTER_INPUT_HAPLOTYPES]
                               [--bam BAM [BAM ...]] [--ploidy PLOIDY]
                               [--inbreeding INBREEDING]
                               [--sample-pool SAMPLE_POOL]
@@ -28,11 +28,12 @@ options:
                         input haplotypes. This can be any numerical field of
                         length 'R' and these values will automatically be
                         normalized.
-  --skip-rare-haplotypes SKIP_RARE_HAPLOTYPES
-                        Optionally ignore haplotypes from the input VCF file
-                        if their frequency within that file is less than the
-                        specified value. This requires that the --haplotype-
-                        frequencies parameter is also specified.
+  --filter-input-haplotypes FILTER_INPUT_HAPLOTYPES
+                        Optionally filter input haplotypes using a string of
+                        the form '<field><operator><value>' where <field> is a
+                        numerical INFO field with length 'A' or 'R',
+                        <operator> is one of =|>|<|>=|<=|!=, and <value> is a
+                        numerical value.
   --bam BAM [BAM ...]   Bam file(s) to use in analysis. This may be (1) a list
                         of one or more bam filepaths, (2) a plain-text file
                         containing a single bam filepath on each line, (3) a

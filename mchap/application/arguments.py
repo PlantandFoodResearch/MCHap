@@ -262,16 +262,17 @@ haplotype_frequencies = Parameter(
     ),
 )
 
-skip_rare_haplotypes = Parameter(
-    "--skip-rare-haplotypes",
+filter_input_haplotypes = Parameter(
+    "--filter-input-haplotypes",
     dict(
-        type=float,
+        type=str,
         nargs=1,
         default=[None],
         help=(
-            "Optionally ignore haplotypes from the input VCF file if their frequency "
-            "within that file is less than the specified value. "
-            "This requires that the --haplotype-frequencies parameter is also specified."
+            "Optionally filter input haplotypes using a string of the "
+            "form '<field><operator><value>' where <field> is a numerical "
+            "INFO field with length 'A' or 'R', <operator> is one of "
+            "=|>|<|>=|<=|!=, and <value> is a numerical value."
         ),
     ),
 )
@@ -588,7 +589,7 @@ DEFAULT_PARSER_ARGUMENTS = [
 KNOWN_HAPLOTYPES_ARGUMENTS = [
     haplotypes,
     haplotype_frequencies,
-    skip_rare_haplotypes,
+    filter_input_haplotypes,
 ]
 
 CALL_EXACT_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_PARSER_ARGUMENTS
@@ -817,7 +818,7 @@ def collect_call_exact_program_arguments(arguments):
     data["vcf"] = arguments.haplotypes[0]
     data["random_seed"] = None
     data["haplotype_frequencies_tag"] = arguments.haplotype_frequencies[0]
-    data["skip_rare_haplotypes"] = arguments.skip_rare_haplotypes[0]
+    data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
     return data
 
 
@@ -839,7 +840,7 @@ def collect_call_mcmc_program_arguments(arguments):
     data = collect_default_mcmc_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
     data["haplotype_frequencies_tag"] = arguments.haplotype_frequencies[0]
-    data["skip_rare_haplotypes"] = arguments.skip_rare_haplotypes[0]
+    data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
     return data
 
 

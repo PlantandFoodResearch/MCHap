@@ -318,8 +318,8 @@ that will be removed as burn-in with ``--mcmc-burn``.
 It is recommended to remove at least ``100`` steps as burn-in and that
 at least ``1000`` steps should be kept to calculate posterior probabilities.
 
-Excluding rare haplotypes
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Excluding input haplotypes
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The speed of each MCMC step in ``mchap assemble`` is largely dependant on the
 ploidy of an individual and the number of unique haplotypes in the input VCF file.
@@ -327,14 +327,17 @@ Therefore, the speed of analysis can be improved by minimizing unnecessary
 haplotypes from the input VCF file.
 Depending on population structure and how that input file was generated,
 it can be sensible to remove rare haplotypes that are likely to be erroneous.
-This can be achieved with a combination of the parameters ``--haplotype-frequencies``
-and ``--skip-rare-haplotypes``.
-The ``--haplotype-frequencies`` parameter is used to specify an INFO field within
-the input VCF which contains relative frequencies of each haplotype.
-Note that these frequencies will be used to inform the prior distribution as described
-above.
-The ``--skip-rare-haplotypes`` parameter is then used to specify a threshold (between
-0 and 1) bellow which a haplotype will be excluded from the analysis.
+This can be achieved with the ``--filter-input-haplotypes`` argument.
+This argument expects a string which is used to define a filter for alleles.
+This string takes the form ``"<field><operator><value>"`` where ``<field>``
+is the name of an INFO field, ``<operator>`` is one of {``=``, ``<``, ``>``,
+``<=``, ``>=``, ``!=``}, and ``<value>`` is a numerical value.
+The  INFO field must be a numerical field with a length of ``R`` (alleles) or
+``A`` (alternate alleles).
+If reference allele is filtered, then it is included in the output with the
+``REFMASKED`` tag.
+If the filter field has length ``A`` (alternate alleles), then the filter is not
+applied to the reference allele.
 
 An example of using these parameters to exclude rare haplotypes may look like:
 
@@ -345,13 +348,10 @@ An example of using these parameters to exclude rare haplotypes may look like:
         --haplotypes haplotypes.vcf.gz \
         --ploidy 4 \
         --inbreeding 0.1 \
-        --haplotype-frequencies AFP \
-        --skip-rare-haplotypes 0.01 \
+        --filter-input-haplotypes 'AFP>=0.01' \
         | bgzip > recalled-haplotypes.vcf.gz
 
-In the above example we specify the posterior allele frequencies (``AFP``)
-field that can be optionally output from ``mchap assemble`` and exclude any
-haplotypes with a frequency of less than ``0.01``.
+which will exclude any haplotypes with a frequency of less than ``0.01``.
 
 .. _`full list of arguments`: ../cli-call-help.txt
 .. _`mchap assemble`: assemble.rst

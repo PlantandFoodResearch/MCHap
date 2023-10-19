@@ -8,7 +8,7 @@ from mchap.io import LocusPrior
 @dataclass
 class program(baseclass.program):
     haplotype_frequencies_tag: str = None
-    skip_rare_haplotypes: float = None
+    filter_input_haplotypes: str = None
 
     def loci(self):
         with pysam.VariantFile(self.vcf) as f:
@@ -16,6 +16,6 @@ class program(baseclass.program):
                 locus = LocusPrior.from_variant_record(
                     record,
                     frequency_tag=self.haplotype_frequencies_tag,
-                    frequency_min=self.skip_rare_haplotypes,
+                    allele_filter=self.filter_input_haplotypes,
                 )
                 yield locus
