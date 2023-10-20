@@ -3,8 +3,34 @@
 ## Unreleased 
 
 
-
 ## Beta v0.9.0
+
+New Features:
+- Added tool `mchap find-snvs` to generate a template VCF for assembly #166
+- Option to report posterior probability of allele occurrence #162
+- Added generic option to filter input haplotypes #168
+
+Bug Fixes:
+- Allow samples with multiple read groups #164
+- Correct number of cores used when specifying multiple cores #150
+- Simplify specification of prior allele frequencies #154
+- Improve performance when working with CRAM files #167
+
+CLI Changes:
+- Added `mchap find-snvs` tool #166
+- Added optional `--reference` argument to call and call-exact tools #167
+- Replaced `--skip-rare-haplotypes` argument with `--filter-input-haplotypes` #168
+- Replaced `--haplotype-frequencies` and `--haplotype-frequencies-prior` with `--prior-frequencies` #154
+
+VCF Changes:
+- Added `AOP` field to record posterior probability of an allele occurring at any copy number #162
+
+Internal Changes:
+- Changes to using multiple process to minimize file handel creation #167
+
+
+
+## Beta v0.8.1
 
 Bug Fixes:
 - Fixed integer overflow bug when calculating the total number of unique haplotypes in mchap assemble #157

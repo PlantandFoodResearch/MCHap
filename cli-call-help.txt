@@ -96,8 +96,9 @@ options:
   --report [REPORT ...]
                         Extra fields to report within the output VCF: AFPRIOR
                         = prior allele frequencies; AFP = posterior mean
-                        allele frequencies; GP = genotype posterior
-                        probabilities; GL = genotype likelihoods.
+                        allele frequencies; AOP = posterior probability of
+                        allele occurring at any copy number; GP = genotype
+                        posterior probabilities; GL = genotype likelihoods.
   --cores CORES         Number of cpu cores to use (default = 1).
   --mcmc-chains MCMC_CHAINS
                         Number of independent MCMC chains per assembly
