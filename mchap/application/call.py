@@ -73,7 +73,7 @@ class program(call_baseclass.program):
             data.sampledata[field] = dict()
         # get haplotypes and metadata
         haplotypes = data.locus.encode_haplotypes()
-        haplotype_frequencies = data.locus.frequencies
+        prior_frequencies = data.locus.frequencies
         mask_reference_allele = data.locus.mask_reference_allele
         mask = np.zeros(len(haplotypes), bool)
         mask[0] = mask_reference_allele
@@ -82,10 +82,10 @@ class program(call_baseclass.program):
         data.columndata["REF"] = data.locus.sequence
         data.columndata["ALTS"] = data.locus.alts
         data.infodata["REFMASKED"] = mask_reference_allele
-        data.infodata["AFPRIOR"] = np.round(haplotype_frequencies, self.precision)
+        data.infodata["AFPRIOR"] = np.round(prior_frequencies, self.precision)
 
         # mask zero frequency haplotypes
-        mask |= haplotype_frequencies == 0
+        mask |= prior_frequencies == 0
 
         # remove masked haplotypes from mcmc
         if np.any(mask):
@@ -100,8 +100,8 @@ class program(call_baseclass.program):
         invalid_scenario = len(mcmc_haplotypes) == 0
 
         # get prior for allele frequencies
-        if self.haplotype_frequencies_tag:
-            prior_frequencies = haplotype_frequencies[~mask]
+        if self.prior_frequencies_tag:
+            prior_frequencies = prior_frequencies[~mask]
         else:
             prior_frequencies = None
 

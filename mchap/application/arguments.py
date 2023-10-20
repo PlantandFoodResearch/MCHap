@@ -247,8 +247,8 @@ haplotype_posterior_threshold = Parameter(
     ),
 )
 
-haplotype_frequencies = Parameter(
-    "--haplotype-frequencies",
+prior_frequencies = Parameter(
+    "--prior-frequencies",
     dict(
         type=str,
         nargs=1,
@@ -588,7 +588,7 @@ DEFAULT_PARSER_ARGUMENTS = [
 
 KNOWN_HAPLOTYPES_ARGUMENTS = [
     haplotypes,
-    haplotype_frequencies,
+    prior_frequencies,
     filter_input_haplotypes,
 ]
 
@@ -817,7 +817,7 @@ def collect_call_exact_program_arguments(arguments):
     data = collect_default_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
     data["random_seed"] = None
-    data["haplotype_frequencies_tag"] = arguments.haplotype_frequencies[0]
+    data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
     data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
     return data
 
@@ -839,7 +839,7 @@ def collect_default_mcmc_program_arguments(arguments):
 def collect_call_mcmc_program_arguments(arguments):
     data = collect_default_mcmc_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
-    data["haplotype_frequencies_tag"] = arguments.haplotype_frequencies[0]
+    data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
     data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
     return data
 

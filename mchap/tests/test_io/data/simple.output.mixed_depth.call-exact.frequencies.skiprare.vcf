@@ -2,7 +2,7 @@
 ##fileDate=20220406
 ##source=mchap v0.9.0
 ##phasing=None
-##commandline="mchap call-exact --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --haplotypes mock.input.frequencies.vcf --haplotype-frequencies AFP --filter-input-haplotypes AFP>=0.1 --report AFPRIOR AFP"
+##commandline="mchap call-exact --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --haplotypes mock.input.frequencies.vcf --prior-frequencies AFP --filter-input-haplotypes AFP>=0.1 --report AFPRIOR AFP"
 ##randomseed=None
 ##contig=<ID=CHR1,length=60>
 ##contig=<ID=CHR2,length=60>

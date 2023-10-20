@@ -60,7 +60,7 @@ def reference_path():
             "mock.input.frequencies.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
-                "--haplotype-frequencies",
+                "--prior-frequencies",
                 "AFP",
                 "--filter-input-haplotypes",
                 "AFP>=0.1",
@@ -74,7 +74,7 @@ def reference_path():
             "mock.input.frequencies.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
-                "--haplotype-frequencies",
+                "--prior-frequencies",
                 "AFP",
                 "--filter-input-haplotypes",
                 "AFP>=0.1",
@@ -88,7 +88,7 @@ def reference_path():
             "mock.input.frequencies.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
-                "--haplotype-frequencies",
+                "--prior-frequencies",
                 "AFP",
                 "--report",
                 "AFPRIOR",

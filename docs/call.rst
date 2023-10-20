@@ -247,8 +247,8 @@ By default a flat prior is used for allele frequencies.
 That is, an assumption that all of the haplotypes recorded in the input VCF file are equally
 frequent within the sample population.
 A different prior for allele frequencies can be specified by using the
-``--haplotype-frequencies`` parameter.
-The ``--haplotype-frequencies`` parameter is used to specify an INFO filed within the input VCF
+``--prior-frequencies`` parameter.
+The ``--prior-frequencies`` parameter is used to specify an INFO filed within the input VCF
 file that can be interpreted prior allele frequencies.
 This field must contain a single numerical value for each allele (including the reference allele)
 and those values will be normalized to sum to 1.
@@ -262,7 +262,7 @@ An example of using these parameters to specify the prior distribution may look 
         --haplotypes haplotypes.vcf.gz \
         --ploidy 4 \
         --inbreeding 0.1 \
-        --haplotype-frequencies AFP \
+        --prior-frequencies AFP \
         | bgzip > recalled-haplotypes.vcf.gz
 
 In the above example we specify the posterior allele frequencies (``AFP``) field that

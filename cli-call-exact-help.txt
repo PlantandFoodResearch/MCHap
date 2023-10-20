@@ -1,5 +1,5 @@
 usage: Exact haplotype calling [-h] [--haplotypes HAPLOTYPES]
-                               [--haplotype-frequencies HAPLOTYPE_FREQUENCIES]
+                               [--prior-frequencies PRIOR_FREQUENCIES]
                                [--filter-input-haplotypes FILTER_INPUT_HAPLOTYPES]
                                [--bam BAM [BAM ...]] [--ploidy PLOIDY]
                                [--inbreeding INBREEDING]
@@ -18,7 +18,7 @@ options:
   --haplotypes HAPLOTYPES
                         Tabix indexed VCF file containing haplotype/MNP/SNP
                         variants to be re-called among input samples.
-  --haplotype-frequencies HAPLOTYPE_FREQUENCIES
+  --prior-frequencies PRIOR_FREQUENCIES
                         Optionally specify an INFO field within the input VCF
                         file to designate as prior allele frequencies for the
                         input haplotypes. This can be any numerical field of
