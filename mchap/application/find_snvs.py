@@ -314,7 +314,7 @@ def _order_by(values, order, out):
 
 def _vcf_sort_alleles(frequencies, reference_index):
     n_variants, n_alleles = frequencies.shape
-    order = np.argsort(frequencies, axis=-1)[:, ::-1].astype(int)
+    order = np.argsort(frequencies, axis=-1, kind="stable")[:, ::-1].astype(int)
     reference_index = reference_index[:, None]
     not_ref = order != reference_index
     alt_order = order.ravel()[not_ref.ravel()].reshape(n_variants, n_alleles - 1)
