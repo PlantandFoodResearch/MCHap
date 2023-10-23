@@ -524,8 +524,34 @@ basis_targets = Parameter(
     ),
 )
 
-find_snvs_minaf = Parameter(
-    "--minaf",
+find_snvs_maf = Parameter(
+    "--maf",
+    dict(
+        type=float,
+        nargs=1,
+        default=[0.0],
+        help=(
+            "Minimum sample population allele frequency required to include an allele "
+            "(default = 0.0). "
+        ),
+    ),
+)
+
+find_snvs_mad = Parameter(
+    "--mad",
+    dict(
+        type=int,
+        nargs=1,
+        default=[0],
+        help=(
+            "Minimum sample population allele depth required to include an allele "
+            "(default = 0). "
+        ),
+    ),
+)
+
+find_snvs_ind_maf = Parameter(
+    "--ind-maf",
     dict(
         type=float,
         nargs=1,
@@ -539,8 +565,8 @@ find_snvs_minaf = Parameter(
     ),
 )
 
-find_snvs_minad = Parameter(
-    "--minad",
+find_snvs_ind_mad = Parameter(
+    "--ind-mad",
     dict(
         type=int,
         nargs=1,
@@ -554,20 +580,33 @@ find_snvs_minad = Parameter(
     ),
 )
 
-find_snvs_allele_frequency_prior = Parameter(
-    "--allele-frequency-prior",
+find_snvs_min_ind = Parameter(
+    "--min-ind",
     dict(
-        type=str,
+        type=int,
         nargs=1,
-        default=["ADMF"],
+        default=[1],
         help=(
-            "Values to use as a prior for population allele frequencies. "
-            "Must be one of {'FLAT', 'ADMF'} (default = 'ADMF') "
-            "Where FLAT indicates a flat prior and ADMF use of the mean "
-            "of sample allele frequencies calculated from allele depth."
+            "Minimum number of individuals required to meet the --ind-maf and --ind-mad thresholds "
+            "(default = 1). "
         ),
     ),
 )
+
+# find_snvs_allele_frequency_prior = Parameter(
+#     "--allele-frequency-prior",
+#     dict(
+#         type=str,
+#         nargs=1,
+#         default=["ADMF"],
+#         help=(
+#             "Values to use as a prior for population allele frequencies. "
+#             "Must be one of {'FLAT', 'ADMF'} (default = 'ADMF') "
+#             "Where FLAT indicates a flat prior and ADMF use of the mean "
+#             "of sample allele frequencies calculated from allele depth."
+#         ),
+#     ),
+# )
 
 
 DEFAULT_PARSER_ARGUMENTS = [

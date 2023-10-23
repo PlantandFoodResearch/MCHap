@@ -1,7 +1,9 @@
 usage: WARNING this tool is experimental [-h] [--targets TARGETS]
                                          [--reference REFERENCE]
-                                         [--bam BAM [BAM ...]] [--minaf MINAF]
-                                         [--minad MINAD]
+                                         [--bam BAM [BAM ...]] [--maf MAF]
+                                         [--mad MAD] [--ind-maf IND_MAF]
+                                         [--ind-mad IND_MAD]
+                                         [--min-ind MIN_IND]
                                          [--read-group-field READ_GROUP_FIELD]
                                          [--mapping-quality MAPPING_QUALITY]
                                          [--keep-duplicate-reads]
@@ -27,14 +29,20 @@ options:
                         be extracted from each bam file and An error will be
                         raised if a sample is not found within its specified
                         bam file.
-  --minaf MINAF         Minimum allele frequency of an individual required to
+  --maf MAF             Minimum sample population allele frequency required to
+                        include an allele (default = 0.0).
+  --mad MAD             Minimum sample population allele depth required to
+                        include an allele (default = 0).
+  --ind-maf IND_MAF     Minimum allele frequency of an individual required to
                         include an allele (default = 0.1). Alleles will be
                         excluded if their frequency is lower than this value
                         across all samples.
-  --minad MINAD         Minimum allele depth of an individual required to
+  --ind-mad IND_MAD     Minimum allele depth of an individual required to
                         include an allele (default = 3). Alleles will be
                         excluded if their depth is lower than this value
                         across all samples.
+  --min-ind MIN_IND     Minimum number of individuals required to meet the
+                        --ind-maf and --ind-mad thresholds (default = 1).
   --read-group-field READ_GROUP_FIELD
                         Read group field to use as sample id (default = "SM").
                         The chosen field determines tha sample ids required in

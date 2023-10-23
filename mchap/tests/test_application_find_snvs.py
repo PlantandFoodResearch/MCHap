@@ -42,18 +42,28 @@ from mchap.application.find_snvs import (
             "simple.output.basis.mixed_depth.vcf",  # NOTE: ADMF identical to "simple.output.basis.vcf"
         ),
         (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--ind-maf", "0", "--ind-mad", "0", "--maf", "0.1"],
+            "simple.output.basis.mixed_depth.maf0.1.vcf",
+        ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--ind-maf", "0", "--ind-mad", "0", "--mad", "10"],
+            "simple.output.basis.mixed_depth.mad10.vcf",
+        ),
+        (
             ["simple.sample1.bam", "simple.sample2.bam", "simple.sample3.bam"],
-            ["--minaf", "0.3"],
+            ["--ind-maf", "0.3"],
             "simple.output.basis.minaf0.3.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.bam", "simple.sample3.bam"],
-            ["--minad", "2"],
+            ["--ind-mad", "2"],
             "simple.output.basis.minad2.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.bam", "simple.sample3.bam"],
-            ["--minaf", "0.0", "--minad", "0"],
+            ["--ind-maf", "0.0", "--ind-mad", "0"],
             "simple.output.basis.minaf0.minad0.vcf",
         ),
     ],

@@ -406,8 +406,11 @@ def write_vcf_block(
     # sample_inbreeding,
     # base_error_rate,
     # allele_frequency_prior,
-    minaf,
-    minad,
+    maf,
+    mad,
+    ind_maf,
+    ind_mad,
+    min_ind,
     mapping_quality,
     skip_duplicates,
     skip_qcfail,
@@ -445,9 +448,15 @@ def write_vcf_block(
     # frequencies
     with np.errstate(divide="ignore", invalid="ignore"):
         allele_freq = allele_depth / allele_depth.sum(axis=-1, keepdims=True)
-    # filter by minaf and minad for each sample
-    keep = ((allele_freq >= minaf) & (allele_depth >= minad)).any(axis=1)
-    # remove any monomorphic
+    # filter by ind-maf and ind-mad for each sample
+    keep = ((allele_freq >= ind_maf) & (allele_depth >= ind_mad)).sum(axis=1) >= min_ind
+    # filter by maf
+    if maf > 0.0:
+        keep &= np.mean(allele_freq, axis=1) >= maf
+    # filter by mad
+    if mad > 0:
+        keep &= np.sum(allele_depth, axis=1) >= mad
+    # remove any monomorphic/missing
     idx = keep.sum(axis=-1) > 1
     if idx.sum() == 0:
         # no segregating variants
@@ -556,8 +565,11 @@ def main(command):
         # arguments.ploidy,
         # arguments.inbreeding,
         # arguments.find_snvs_allele_frequency_prior,
-        arguments.find_snvs_minaf,
-        arguments.find_snvs_minad,
+        arguments.find_snvs_maf,
+        arguments.find_snvs_mad,
+        arguments.find_snvs_ind_maf,
+        arguments.find_snvs_ind_mad,
+        arguments.find_snvs_min_ind,
         # arguments.base_error_rate,
         arguments.read_group_field,
         arguments.mapping_quality,
@@ -635,8 +647,11 @@ def main(command):
             # sample_inbreeding,
             # base_error_rate=args.base_error_rate[0],
             # allele_frequency_prior=args.allele_frequency_prior[0],
-            minaf=args.minaf[0],
-            minad=args.minad[0],
+            maf=args.maf[0],
+            mad=args.mad[0],
+            ind_maf=args.ind_maf[0],
+            ind_mad=args.ind_mad[0],
+            min_ind=args.min_ind[0],
             mapping_quality=args.mapping_quality[0],
             skip_duplicates=args.skip_duplicates,
             skip_qcfail=args.skip_qcfail,
