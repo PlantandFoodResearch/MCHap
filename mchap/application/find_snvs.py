@@ -180,7 +180,7 @@ from mchap.io.vcf.util import vcfstr
 #     mode_probability[0] = probability
 
 
-@vectorize(cache=True, nopython=True)
+@vectorize(nopython=True)
 def _ord_to_index(a):
     if (a == 65) or (a == 97):
         # A
@@ -298,6 +298,7 @@ def write_vcf_header(
     sys.stdout.write(string)
 
 
+# avoid caching of guvectorized functions as this seems to result in core dumps when in parallel on HPC
 @guvectorize(
     [
         "void(boolean[:], int64[:], boolean[:])",
@@ -305,7 +306,6 @@ def write_vcf_header(
         "void(float64[:], int64[:], float64[:])",
     ],
     "(n),(n)->(n)",
-    cache=True,
     nopython=True,
 )
 def _order_by(values, order, out):
