@@ -58,11 +58,10 @@ MCHap find-snvs
 
 ``mchap find-snvs`` is a simple tool for identifying putative SNVs to use as the basis for
 haplotype assembly.
-Putative SNVs are identified based on minimum thresholds for allele frequencies (``--ind-maf``)
-and allele depths (``--ind-mad``).
-A putative SNV is reported if it meets those thresholds in one or more samples.
-The output is reported as a simple VCF file which includes allele depths and frequencies, but
-no genotype calls.
+Putative SNVs are identified based on minimum thresholds for allele depths and/or frequencies
+estimated from depths.
+The output is reported as a simple VCF file which includes allele depths and population allele
+frequencies (estimated from the mean of individual frequencies), but no genotype calls.
 
 Example notebook
 ----------------
