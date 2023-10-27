@@ -1,10 +1,10 @@
 usage: MCMC haplotype calling [-h] [--haplotypes HAPLOTYPES]
-                              [--haplotype-frequencies HAPLOTYPE_FREQUENCIES]
-                              [--haplotype-frequencies-prior]
-                              [--skip-rare-haplotypes SKIP_RARE_HAPLOTYPES]
+                              [--prior-frequencies PRIOR_FREQUENCIES]
+                              [--filter-input-haplotypes FILTER_INPUT_HAPLOTYPES]
                               [--bam BAM [BAM ...]] [--ploidy PLOIDY]
                               [--inbreeding INBREEDING]
                               [--sample-pool SAMPLE_POOL]
+                              [--reference REFERENCE]
                               [--base-error-rate BASE_ERROR_RATE]
                               [--use-base-phred-scores]
                               [--mapping-quality MAPPING_QUALITY]
@@ -17,27 +17,23 @@ usage: MCMC haplotype calling [-h] [--haplotypes HAPLOTYPES]
                               [--mcmc-burn MCMC_BURN] [--mcmc-seed MCMC_SEED]
                               [--mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --haplotypes HAPLOTYPES
                         Tabix indexed VCF file containing haplotype/MNP/SNP
                         variants to be re-called among input samples.
-  --haplotype-frequencies HAPLOTYPE_FREQUENCIES
+  --prior-frequencies PRIOR_FREQUENCIES
                         Optionally specify an INFO field within the input VCF
-                        file to designate as allele frequencies for the input
-                        haplotypes. This can be any numerical field of length
-                        'R' and these values will automatically be normalized.
-                        This parameter has no affect on the output by itself
-                        but is required by some other parameters.
-  --haplotype-frequencies-prior
-                        Flag: Use haplotype frequencies to inform prior
-                        distribution. This requires that the --haplotype-
-                        frequencies parameter is also specified.
-  --skip-rare-haplotypes SKIP_RARE_HAPLOTYPES
-                        Optionally ignore haplotypes from the input VCF file
-                        if their frequency within that file is less than the
-                        specified value. This requires that the --haplotype-
-                        frequencies parameter is also specified.
+                        file to designate as prior allele frequencies for the
+                        input haplotypes. This can be any numerical field of
+                        length 'R' and these values will automatically be
+                        normalized.
+  --filter-input-haplotypes FILTER_INPUT_HAPLOTYPES
+                        Optionally filter input haplotypes using a string of
+                        the form '<field><operator><value>' where <field> is a
+                        numerical INFO field with length 'A' or 'R',
+                        <operator> is one of =|>|<|>=|<=|!=, and <value> is a
+                        numerical value.
   --bam BAM [BAM ...]   Bam file(s) to use in analysis. This may be (1) a list
                         of one or more bam filepaths, (2) a plain-text file
                         containing a single bam filepath on each line, (3) a
@@ -69,6 +65,8 @@ optional arguments:
   --sample-pool SAMPLE_POOL
                         A name used to pool all sample reads into a single
                         sample. WARNING: this is an experimental feature.
+  --reference REFERENCE
+                        Indexed fasta file containing the reference genome.
   --base-error-rate BASE_ERROR_RATE
                         Expected base error rate of read sequences (default =
                         0.0024). The default value comes from Pfeiffer et al
@@ -98,8 +96,9 @@ optional arguments:
   --report [REPORT ...]
                         Extra fields to report within the output VCF: AFPRIOR
                         = prior allele frequencies; AFP = posterior mean
-                        allele frequencies; GP = genotype posterior
-                        probabilities; GL = genotype likelihoods.
+                        allele frequencies; AOP = posterior probability of
+                        allele occurring at any copy number; GP = genotype
+                        posterior probabilities; GL = genotype likelihoods.
   --cores CORES         Number of cpu cores to use (default = 1).
   --mcmc-chains MCMC_CHAINS
                         Number of independent MCMC chains per assembly

@@ -6,6 +6,7 @@ import numpy as np
 from dataclasses import dataclass
 
 from mchap.encoding import integer, character
+from mchap.io.filter_alleles import parse_allele_filter, apply_allele_filter
 
 
 __all__ = [
@@ -147,8 +148,7 @@ class LocusPrior(Locus):
         record,
         use_snvpos=False,
         frequency_tag=None,
-        frequency_min=None,
-        frequency_prior=False,
+        allele_filter=None,
         masked_reference_flag="REFMASKED",
     ):
         """Generate a locusPrior object with reference and variants from
@@ -164,13 +164,8 @@ class LocusPrior(Locus):
             them directly from the ref and alt sequences.
         frequency_tag : str
             VCF INFO tag to estimate allele frequencies from.
-        frequency_min : float
-            Minimum frequency required to include an alternate allele.
-            If the reference allele does not meet this threshold then
-            it will be included with a frequency of 0.
-        frequency_prior : bool
-            By default a flat prior is used, if true the observed frequencies
-            will be used in place of the flat prior.
+        allele_filter : float
+            Filter string used to filter out alleles.
         masked_reference_flag : str
             VCF INFO tag used to indicate that the reference allele should
             not be used.
@@ -181,70 +176,59 @@ class LocusPrior(Locus):
             A locus object with populated sequence and variants fields.
         """
         ref_length = len(record.ref)
-        sequences = (record.ref,)
         if record.alts:
             assert all(ref_length == len(alt) for alt in record.alts)
             alts = record.alts
         else:
             alts = ()
-        sequences += alts
+
+        # check if ref allele is masked
+        mask_reference_allele = masked_reference_flag in record.info
+
+        # apply a filter if used
+        # TODO: this only needs to be parsed once rather than for every record
+        if allele_filter is not None:
+            filter_args = parse_allele_filter(allele_filter)
+            keep = apply_allele_filter(record, *filter_args)
+            if keep[0]:
+                pass
+            else:
+                # mask the reference allele instead of filtering it
+                mask_reference_allele = True
+                keep[0] = True
 
         # prior allele frequencies
+        n_alleles = len(alts) + 1
         if frequency_tag:
-            frequencies = np.array(record.info[frequency_tag])
-            assert len(frequencies) == len(sequences)
+            frequencies = record.info.get(frequency_tag, ())
+            if len(frequencies) != n_alleles:
+                raise ValueError(
+                    f"Field '{frequency_tag}' does not match number of alleles 'n_alleles'."
+                )
+            frequencies = np.array(frequencies)
         else:
             # flat prior
-            frequencies = np.ones(len(sequences)) / len(sequences)
+            frequencies = np.ones(n_alleles) / n_alleles
+        if mask_reference_allele:
+            frequencies[0] = 0
 
-        # check if ref allele is masked and make frequency match
-        if masked_reference_flag in record.info:
-            mask_reference_allele = record.info[masked_reference_flag]
-            if mask_reference_allele:
-                frequencies[0] = 0
-        else:
-            mask_reference_allele = False
+        # tuple of all sequences
+        sequences = (record.ref,)
+        sequences += alts
 
-        # normalise frequencies
+        # apply filter to sequences and frequencies
+        if allele_filter is not None:
+            assert keep[0]
+            sequences = tuple(s for s, k in zip(sequences, keep) if k)
+            frequencies = frequencies[keep]
+            n_alleles = keep.sum()
+
+        # ensure frequencies are normalized
         denom = frequencies.sum()
         if denom > 0:
             frequencies /= denom
         else:
             frequencies[:] = np.nan
-
-        # mask rare haplotypes
-        if frequency_min:
-            keep = frequencies >= frequency_min
-            if not keep[0]:
-                # must keep ref so mask
-                mask_reference_allele = True
-                frequencies[0] = 0
-                keep[0] = True
-            # drop alts
-            sequences = tuple(a for a, k in zip(sequences, keep) if k)
-            frequencies = frequencies[keep]
-            # re-normalise frequencies
-            denom = frequencies.sum()
-            if denom > 0:
-                frequencies /= denom
-            else:
-                frequencies[:] = np.nan
-        assert len(frequencies) == len(sequences)
-
-        # flatten prior if needed
-        if frequency_prior:
-            assert frequency_tag is not None
-            pass
-        else:
-            # flatten prior
-            frequencies = np.ones(len(sequences))
-            if mask_reference_allele:
-                frequencies[0] = 0
-            denom = frequencies.sum()
-            if denom > 0:
-                frequencies /= denom
-            else:
-                frequencies[:] = np.nan
 
         # encoded haplotypes
         haplotypes = np.array([list(var) for var in sequences])

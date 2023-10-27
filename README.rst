@@ -53,6 +53,16 @@ It is often beneficial to re-call genotypes with ``mchap call`` using the micro-
 reported by ``mchap assemble``, particularly in populations of related samples.
 See the `MCHap call documentation`_ for further information.
 
+MCHap find-snvs
+---------------
+
+``mchap find-snvs`` is a simple tool for identifying putative SNVs to use as the basis for
+haplotype assembly.
+Putative SNVs are identified based on minimum thresholds for allele depths and/or frequencies
+estimated from depths.
+The output is reported as a simple VCF file which includes allele depths and population allele
+frequencies (estimated from the mean of individual frequencies), but no genotype calls.
+
 Example notebook
 ----------------
 

@@ -7,9 +7,31 @@ import pytest
 from mchap.application.call import program
 
 
+def reference_path():
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / "test_io/data/simple.fasta"
+    return str(path)
+
+
 @pytest.mark.parametrize(
     "input_vcf,bams,cli_extra,output_vcf",
     [
+        (
+            "simple.output.assemble.vcf",
+            ["simple.sample1.bam", "simple.sample2.bam", "simple.sample3.bam"],
+            [],
+            "simple.output.call.vcf",
+        ),
+        (
+            "simple.output.assemble.vcf",
+            [
+                "simple.sample1.broken.cram",
+                "simple.sample2.broken.cram",
+                "simple.sample3.broken.cram",
+            ],
+            ["--reference", reference_path()],
+            "simple.output.call.vcf",
+        ),
         (
             "simple.output.mixed_depth.assemble.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
@@ -25,14 +47,23 @@ from mchap.application.call import program
             ],
             "simple.output.mixed_depth.call.frequencies.vcf",
         ),
+        (
+            "simple.output.mixed_depth.assemble.vcf",
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            [
+                "--report",
+                "AOP",
+            ],
+            "simple.output.mixed_depth.call.occurrence.vcf",
+        ),
         (  # test using mock input will low ref allele frequency at first allele
             "mock.input.frequencies.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
-                "--haplotype-frequencies",
+                "--prior-frequencies",
                 "AFP",
-                "--skip-rare-haplotypes",
-                "0.1",
+                "--filter-input-haplotypes",
+                "AFP>=0.1",
                 "--report",
                 "AFPRIOR",
                 "AFP",
@@ -43,9 +74,8 @@ from mchap.application.call import program
             "mock.input.frequencies.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
-                "--haplotype-frequencies",
+                "--prior-frequencies",
                 "AFP",
-                "--haplotype-frequencies-prior",
                 "--report",
                 "AFPRIOR",
                 "AFP",

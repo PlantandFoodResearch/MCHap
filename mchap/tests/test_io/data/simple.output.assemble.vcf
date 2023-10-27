@@ -1,0 +1,37 @@
+##fileformat=VCFv4.3
+##fileDate=20230710
+##source=mchap v0.9.0
+##phasing=None
+##commandline="mchap assemble --bam simple.sample1.bam simple.sample2.bam simple.sample3.bam --ploidy 4 --targets simple.bed.gz --variants simple.vcf.gz --reference simple.fasta --mcmc-steps 500 --mcmc-burn 100 --mcmc-seed 11"
+##randomseed=11
+##contig=<ID=CHR1,length=60>
+##contig=<ID=CHR2,length=60>
+##contig=<ID=CHR3,length=60>
+##FILTER=<ID=PASS,Description="All filters passed">
+##FILTER=<ID=NOA,Description="No observed alleles at locus">
+##FILTER=<ID=AF0,Description="All alleles have prior allele frequency of zero">
+##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
+##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=REFMASKED,Number=0,Type=Flag,Description="Reference allele is masked">
+##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of samples with data">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Combined depth across samples">
+##INFO=<ID=RCOUNT,Number=1,Type=Integer,Description="Total number of observed reads across all samples">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position on CHROM">
+##INFO=<ID=NVAR,Number=1,Type=Integer,Description="Number of input variants within assembly locus">
+##INFO=<ID=SNVPOS,Number=.,Type=Integer,Description="Relative (1-based) positions of SNVs within haplotypes">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality">
+##FORMAT=<ID=PHQ,Number=1,Type=Integer,Description="Phenotype quality">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">
+##FORMAT=<ID=RCOUNT,Number=1,Type=Integer,Description="Total count of read pairs within haplotype interval">
+##FORMAT=<ID=RCALLS,Number=1,Type=Integer,Description="Total count of read base calls matching a known variant">
+##FORMAT=<ID=MEC,Number=1,Type=Integer,Description="Minimum error correction">
+##FORMAT=<ID=MECP,Number=1,Type=Float,Description="Minimum error correction proportion">
+##FORMAT=<ID=GPM,Number=1,Type=Float,Description="Genotype posterior mode probability">
+##FORMAT=<ID=PHPM,Number=1,Type=Float,Description="Phenotype posterior mode probability">
+##FORMAT=<ID=MCI,Number=1,Type=Integer,Description="Replicate Markov-chain incongruence, 0 = none, 1 = incongruence, 2 = putative CNV">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1	SAMPLE2	SAMPLE3
+CHR1	6	CHR1_05_25	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	PASS	AN=3;AC=3,2;NS=3;DP=39;RCOUNT=60;END=25;NVAR=3;SNVPOS=2,11,18	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI	0/0/1/2:7:8:13:20:40:0:0:0.785:0.835:0	0/0/1/1:4:5:13:20:40:0:0:0.636:0.678:0	0/0/0/2:4:5:13:20:40:0:0:0.619:0.698:0
+CHR1	31	CHR1_30_50	AAAAAAAAAAAAAAAAAAAA	.	.	PASS	AN=1;AC=.;NS=3;DP=.;RCOUNT=72;END=50;NVAR=0;SNVPOS=.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI	0/0/0/0:60:60:.:24:0:0:.:1:1:0	0/0/0/0:60:60:.:24:0:0:.:1:1:0	0/0/0/0:60:60:.:24:0:0:.:1:1:0
+CHR2	11	CHR2_10_30	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAGAAAAAAAAAA,AAAAAAAAATAAAAAAAAAA,AAAATAAAAGAAAAAAAAAA	.	PASS	AN=4;AC=3,2,1;NS=3;DP=42;RCOUNT=72;END=30;NVAR=2;SNVPOS=5,10	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI	0/0/0/2:6:8:14:24:28:0:0:0.72:0.84:0	0/0/1/2:7:11:14:24:28:0:0:0.815:0.929:0	0/1/1/3:7:13:14:24:28:0:0:0.801:0.949:0
+CHR3	21	CHR3_20_40	AAAAAAAAAAAAAAAAAAAA	.	.	PASS	AN=1;AC=.;NS=3;DP=.;RCOUNT=0;END=40;NVAR=0;SNVPOS=.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI	0/0/0/0:60:60:.:0:0:0:.:1:1:0	0/0/0/0:60:60:.:0:0:0:.:1:1:0	0/0/0/0:60:60:.:0:0:0:.:1:1:0

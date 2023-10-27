@@ -3,7 +3,7 @@ MCHap call
 
 Calling genotypes from known haplotypes.
 
-*(Last updated for MCHap version 0.8.1)*
+*(Last updated for MCHap version 0.9.0)*
 
 Background
 ----------
@@ -159,6 +159,11 @@ Some of parameters such as ploidy have obvious importance when calling genotypes
 however, other parameters such as expected inbreeding coefficients can have more subtle 
 effects on the results.
 
+- ``--reference``: Specify a reference genome. This is optional but highly recommended when
+  working with CRAM files instead of BAM files. Specifying the reference genome speeds up
+  reading data from CRAM files. It also may be necessary if the CRAM files link to a missing
+  reference genome.
+
 - ``--ploidy``: The ploidy of all samples in the analysis (default = ``2``, must be a 
   positive integer).
   The ploidy determines the number of alleles called for each sample within the output VCF.
@@ -202,6 +207,8 @@ downstream analysis.
 
   * ``AFP``: Posterior mean allele frequencies (One value per unique allele for each sample).
     The mean posterior allele frequency across all samples will be reported as an INFO field.
+  * ``AOP``: Posterior probability of allele occurring in a sample (One value per unique allele for each sample).
+    The probability of each allele occurring across all samples will be reported as an INFO field.
   * ``GP``: Genotype posterior probabilities (One value per possible genotype per sample).
   * ``GL``: Genotype Likelihoods (One value per possible genotype per sample).
 
@@ -239,14 +246,12 @@ as described above.
 By default a flat prior is used for allele frequencies. 
 That is, an assumption that all of the haplotypes recorded in the input VCF file are equally
 frequent within the sample population.
-A different prior for allele frequencies can be specified by combining the
-``--haplotype-frequencies`` parameter and the ``--haplotype-frequencies-prior`` flag.
-The ``--haplotype-frequencies`` parameter is used to specify an INFO filed within the input VCF
-file that can be interpreted allele frequencies.
+A different prior for allele frequencies can be specified by using the
+``--prior-frequencies`` parameter.
+The ``--prior-frequencies`` parameter is used to specify an INFO filed within the input VCF
+file that can be interpreted prior allele frequencies.
 This field must contain a single numerical value for each allele (including the reference allele)
 and those values will be normalized to sum to 1.
-The ``--haplotype-frequencies-prior`` flag does not take any arguments but tells MCHap to use
-the frequencies specified by ``--haplotype-frequencies`` as the prior frequencies for all samples.
 
 An example of using these parameters to specify the prior distribution may look like:
 
@@ -257,8 +262,7 @@ An example of using these parameters to specify the prior distribution may look 
         --haplotypes haplotypes.vcf.gz \
         --ploidy 4 \
         --inbreeding 0.1 \
-        --haplotype-frequencies AFP \
-        --haplotype-frequencies-prior \
+        --prior-frequencies AFP \
         | bgzip > recalled-haplotypes.vcf.gz
 
 In the above example we specify the posterior allele frequencies (``AFP``) field that
@@ -314,8 +318,8 @@ that will be removed as burn-in with ``--mcmc-burn``.
 It is recommended to remove at least ``100`` steps as burn-in and that
 at least ``1000`` steps should be kept to calculate posterior probabilities.
 
-Excluding rare haplotypes
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Excluding input haplotypes
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The speed of each MCMC step in ``mchap assemble`` is largely dependant on the
 ploidy of an individual and the number of unique haplotypes in the input VCF file.
@@ -323,12 +327,17 @@ Therefore, the speed of analysis can be improved by minimizing unnecessary
 haplotypes from the input VCF file.
 Depending on population structure and how that input file was generated,
 it can be sensible to remove rare haplotypes that are likely to be erroneous.
-This can be achieved with a combination of the parameters ``--haplotype-frequencies``
-and ``--skip-rare-haplotypes``.
-The ``--haplotype-frequencies`` parameter is used to specify an INFO field within
-the input VCF which contains relative frequencies of each haplotype.
-The ``--skip-rare-haplotypes`` parameter is then used to specify a threshold (between
-0 and 1) bellow which a haplotype will be excluded from the analysis.
+This can be achieved with the ``--filter-input-haplotypes`` argument.
+This argument expects a string which is used to define a filter for alleles.
+This string takes the form ``"<field><operator><value>"`` where ``<field>``
+is the name of an INFO field, ``<operator>`` is one of {``=``, ``<``, ``>``,
+``<=``, ``>=``, ``!=``}, and ``<value>`` is a numerical value.
+The  INFO field must be a numerical field with a length of ``R`` (alleles) or
+``A`` (alternate alleles).
+If reference allele is filtered, then it is included in the output with the
+``REFMASKED`` tag.
+If the filter field has length ``A`` (alternate alleles), then the filter is not
+applied to the reference allele.
 
 An example of using these parameters to exclude rare haplotypes may look like:
 
@@ -339,13 +348,10 @@ An example of using these parameters to exclude rare haplotypes may look like:
         --haplotypes haplotypes.vcf.gz \
         --ploidy 4 \
         --inbreeding 0.1 \
-        --haplotype-frequencies AFP \
-        --skip-rare-haplotypes 0.01 \
+        --filter-input-haplotypes 'AFP>=0.01' \
         | bgzip > recalled-haplotypes.vcf.gz
 
-In the above example we specify the posterior allele frequencies (``AFP``)
-field that can be optionally output from ``mchap assemble`` and exclude any
-haplotypes with a frequency of less than ``0.01``.
+which will exclude any haplotypes with a frequency of less than ``0.01``.
 
 .. _`full list of arguments`: ../cli-call-help.txt
 .. _`mchap assemble`: assemble.rst

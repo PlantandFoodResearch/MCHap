@@ -61,7 +61,7 @@ AD = FormatField(
     id="AD",
     number="R",
     type="Integer",
-    descr="Number of reads unambiguously assigned to each allele based on MEC",
+    descr="Read depth for each allele",
 )
 GL = FormatField(id="GL", number="G", type="Float", descr="Genotype likelihoods")
 GP = FormatField(
@@ -69,6 +69,12 @@ GP = FormatField(
 )
 AFP = FormatField(
     id="AFP", number="R", type="Float", descr="Posterior mean allele frequencies"
+)
+AOP = FormatField(
+    id="AOP",
+    number="R",
+    type="Float",
+    descr="Posterior probability of allele occurring",
 )
 MCI = FormatField(
     id="MCI",
@@ -107,6 +113,7 @@ HEADER_FORMAT_FIELDS = dict(
     GL=GL,
     GP=GP,
     AFP=AFP,
+    AOP=AOP,
     MCI=MCI,
     KMERCOV=KMERCOV,
     MCAP=MCAP,

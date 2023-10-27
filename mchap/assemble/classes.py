@@ -1,6 +1,7 @@
 import numpy as np
 from dataclasses import dataclass
 from functools import reduce
+from collections import Counter
 
 from mchap import mset
 from mchap.encoding import integer
@@ -142,34 +143,6 @@ class PosteriorGenotypeDistribution(object):
             Unique haplotypes.
         frequencies : ndarray, float, shape (n_haplotypes, )
             Posterior frequencies of haplotype alleles.
-        """
-        n_gen, ploidy, n_base = self.genotypes.shape
-        haps = self.genotypes.reshape(n_gen * ploidy, n_base)
-        uhaps = mset.unique(haps)
-        ufreqs = np.zeros(len(uhaps), float)
-        freqs = {h.tobytes(): 0.0 for h in uhaps}
-        for gen, prob in zip(self.genotypes, self.probabilities):
-            for hap in gen:
-                freqs[hap.tobytes()] += prob
-        for i, hap in enumerate(uhaps):
-            ufreqs[i] = freqs[hap.tobytes()]
-        if dosage is False:
-            ufreqs /= ploidy
-        return uhaps, ufreqs
-
-    def allele_occurrence(self):
-        """Calculate posterior probability of haplotype occurrence.
-
-        Parameters
-        ----------
-        dosage : bool
-            If true then frequencies will be multiplied by ploidy
-            resulting in the posterior allele dosage.
-
-        Returns
-        -------
-        haplotypes : ndarray, int, shape (n_haplotypes, n_base)
-            Unique haplotypes.
         occurrence : ndarray, float, shape (n_haplotypes, )
             Posterior probabilities of haplotype occurrence.
         """
@@ -177,14 +150,21 @@ class PosteriorGenotypeDistribution(object):
         haps = self.genotypes.reshape(n_gen * ploidy, n_base)
         uhaps = mset.unique(haps)
         ufreqs = np.zeros(len(uhaps), float)
+        uoccur = np.zeros(len(uhaps), float)
         freqs = {h.tobytes(): 0.0 for h in uhaps}
+        occur = {h.tobytes(): 0.0 for h in uhaps}
         for gen, prob in zip(self.genotypes, self.probabilities):
-            phen = set([hap.tobytes() for hap in gen])
-            for hap in phen:
-                freqs[hap] += prob
+            counts = Counter(hap.tobytes() for hap in gen)
+            for key, dose in counts.items():
+                freqs[key] += prob * dose
+                occur[key] += prob
         for i, hap in enumerate(uhaps):
-            ufreqs[i] = freqs[hap.tobytes()]
-        return uhaps, ufreqs
+            key = hap.tobytes()
+            ufreqs[i] = freqs[key]
+            uoccur[i] = occur[key]
+        if dosage is False:
+            ufreqs /= ploidy
+        return uhaps, ufreqs, uoccur
 
 
 @dataclass

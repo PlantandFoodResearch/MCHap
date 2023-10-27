@@ -311,6 +311,27 @@ def test_PosteriorGenotypeAllelesDistribution__mode():
     assert phenotype_prob == observed_probabilities[1:4].sum()
 
 
+def test_PosteriorGenotypeAllelesDistribution__allele_frequencies():
+    observed_genotypes = np.array(
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 2],
+            [0, 0, 2, 2],
+            [0, 2, 2, 2],
+            [0, 0, 1, 2],
+            [0, 1, 2, 2],
+        ]
+    )
+    observed_probabilities = np.array([0.05, 0.08, 0.22, 0.45, 0.05, 0.15])
+    posterior = PosteriorGenotypeAllelesDistribution(
+        observed_genotypes, observed_probabilities
+    )
+    actual_alleles, actual_freqs, actual_occur = posterior.allele_frequencies()
+    np.testing.assert_array_equal(actual_alleles, [0, 1, 2])
+    np.testing.assert_array_almost_equal(actual_freqs, [0.395, 0.05, 0.555])
+    np.testing.assert_array_almost_equal(actual_occur, [1.0, 0.2, 0.95])
+
+
 @pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 1)])
 def test_GenotypeAllelesMultiTrace__replicate_incongruence_1(threshold, expect):
     g0 = [0, 0, 1, 2]  # phenotype 1

@@ -1,8 +1,9 @@
 usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
                                [--targets TARGETS] [--variants VARIANTS]
-                               [--reference REFERENCE] [--bam BAM [BAM ...]]
-                               [--ploidy PLOIDY] [--inbreeding INBREEDING]
+                               [--bam BAM [BAM ...]] [--ploidy PLOIDY]
+                               [--inbreeding INBREEDING]
                                [--sample-pool SAMPLE_POOL]
+                               [--reference REFERENCE]
                                [--base-error-rate BASE_ERROR_RATE]
                                [--use-base-phred-scores]
                                [--mapping-quality MAPPING_QUALITY]
@@ -22,7 +23,7 @@ usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
                                [--mcmc-temperatures [MCMC_TEMPERATURES ...]]
                                [--haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --region REGION       Specify a single target region with the format
                         contig:start-stop. This region will be a single
@@ -42,8 +43,6 @@ optional arguments:
                         used in assembly. Assembled haplotypes will only
                         contain the reference and alternate alleles specified
                         within this file.
-  --reference REFERENCE
-                        Indexed fasta file containing the reference genome.
   --bam BAM [BAM ...]   Bam file(s) to use in analysis. This may be (1) a list
                         of one or more bam filepaths, (2) a plain-text file
                         containing a single bam filepath on each line, (3) a
@@ -75,6 +74,8 @@ optional arguments:
   --sample-pool SAMPLE_POOL
                         A name used to pool all sample reads into a single
                         sample. WARNING: this is an experimental feature.
+  --reference REFERENCE
+                        Indexed fasta file containing the reference genome.
   --base-error-rate BASE_ERROR_RATE
                         Expected base error rate of read sequences (default =
                         0.0024). The default value comes from Pfeiffer et al
@@ -104,8 +105,9 @@ optional arguments:
   --report [REPORT ...]
                         Extra fields to report within the output VCF: AFPRIOR
                         = prior allele frequencies; AFP = posterior mean
-                        allele frequencies; GP = genotype posterior
-                        probabilities; GL = genotype likelihoods.
+                        allele frequencies; AOP = posterior probability of
+                        allele occurring at any copy number; GP = genotype
+                        posterior probabilities; GL = genotype likelihoods.
   --cores CORES         Number of cpu cores to use (default = 1).
   --mcmc-chains MCMC_CHAINS
                         Number of independent MCMC chains per assembly

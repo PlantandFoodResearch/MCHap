@@ -247,45 +247,32 @@ haplotype_posterior_threshold = Parameter(
     ),
 )
 
-haplotype_frequencies = Parameter(
-    "--haplotype-frequencies",
+prior_frequencies = Parameter(
+    "--prior-frequencies",
     dict(
         type=str,
         nargs=1,
         default=[None],
         help=(
             "Optionally specify an INFO field within the input VCF file to "
-            "designate as allele frequencies for the input haplotypes. "
+            "designate as prior allele frequencies for the input haplotypes. "
             "This can be any numerical field of length 'R' and these "
             "values will automatically be normalized. "
-            "This parameter has no affect on the output by itself but "
-            "is required by some other parameters."
         ),
     ),
 )
 
-haplotype_frequencies_prior = BooleanFlag(
-    "--haplotype-frequencies-prior",
+filter_input_haplotypes = Parameter(
+    "--filter-input-haplotypes",
     dict(
-        dest="haplotype_frequencies_prior",
-        action="store_true",
-        help=(
-            "Flag: Use haplotype frequencies to inform prior distribution. "
-            "This requires that the --haplotype-frequencies parameter is also specified."
-        ),
-    ),
-)
-
-skip_rare_haplotypes = Parameter(
-    "--skip-rare-haplotypes",
-    dict(
-        type=float,
+        type=str,
         nargs=1,
         default=[None],
         help=(
-            "Optionally ignore haplotypes from the input VCF file if their frequency "
-            "within that file is less than the specified value. "
-            "This requires that the --haplotype-frequencies parameter is also specified."
+            "Optionally filter input haplotypes using a string of the "
+            "form '<field><operator><value>' where <field> is a numerical "
+            "INFO field with length 'A' or 'R', <operator> is one of "
+            "=|>|<|>=|<=|!=, and <value> is a numerical value."
         ),
     ),
 )
@@ -300,6 +287,7 @@ report = Parameter(
             "Extra fields to report within the output VCF: "
             "AFPRIOR = prior allele frequencies; "
             "AFP = posterior mean allele frequencies; "
+            "AOP = posterior probability of allele occurring at any copy number; "
             "GP = genotype posterior probabilities; "
             "GL = genotype likelihoods."
         ),
@@ -522,11 +510,111 @@ cores = Parameter(
     ),
 )
 
+basis_targets = Parameter(
+    "--targets",
+    dict(
+        type=str,
+        nargs=1,
+        default=[None],
+        help=(
+            "Bed file containing genomic intervals. "
+            "Basis SNVs will only be identified from within these intervals. "
+            "The first three columns (contig, start, stop) are mandatory."
+        ),
+    ),
+)
+
+find_snvs_maf = Parameter(
+    "--maf",
+    dict(
+        type=float,
+        nargs=1,
+        default=[0.0],
+        help=(
+            "Minimum sample population allele frequency required to include an allele "
+            "(default = 0.0). "
+        ),
+    ),
+)
+
+find_snvs_mad = Parameter(
+    "--mad",
+    dict(
+        type=int,
+        nargs=1,
+        default=[0],
+        help=(
+            "Minimum sample population allele depth required to include an allele "
+            "(default = 0). "
+        ),
+    ),
+)
+
+find_snvs_ind_maf = Parameter(
+    "--ind-maf",
+    dict(
+        type=float,
+        nargs=1,
+        default=[0.1],
+        help=(
+            "Minimum allele frequency of an individual required to include an allele "
+            "(default = 0.1). "
+            "Alleles will be excluded if their frequency is lower than  "
+            "this value across all samples."
+        ),
+    ),
+)
+
+find_snvs_ind_mad = Parameter(
+    "--ind-mad",
+    dict(
+        type=int,
+        nargs=1,
+        default=[3],
+        help=(
+            "Minimum allele depth of an individual required to include an allele "
+            "(default = 3). "
+            "Alleles will be excluded if their depth is lower than  "
+            "this value across all samples."
+        ),
+    ),
+)
+
+find_snvs_min_ind = Parameter(
+    "--min-ind",
+    dict(
+        type=int,
+        nargs=1,
+        default=[1],
+        help=(
+            "Minimum number of individuals required to meet the --ind-maf and --ind-mad thresholds "
+            "(default = 1). "
+        ),
+    ),
+)
+
+# find_snvs_allele_frequency_prior = Parameter(
+#     "--allele-frequency-prior",
+#     dict(
+#         type=str,
+#         nargs=1,
+#         default=["ADMF"],
+#         help=(
+#             "Values to use as a prior for population allele frequencies. "
+#             "Must be one of {'FLAT', 'ADMF'} (default = 'ADMF') "
+#             "Where FLAT indicates a flat prior and ADMF use of the mean "
+#             "of sample allele frequencies calculated from allele depth."
+#         ),
+#     ),
+# )
+
+
 DEFAULT_PARSER_ARGUMENTS = [
     bam,
     ploidy,
     inbreeding,
     sample_pool,
+    reference,
     base_error_rate,
     ignore_base_phred_scores,
     mapping_quality,
@@ -540,9 +628,8 @@ DEFAULT_PARSER_ARGUMENTS = [
 
 KNOWN_HAPLOTYPES_ARGUMENTS = [
     haplotypes,
-    haplotype_frequencies,
-    haplotype_frequencies_prior,
-    skip_rare_haplotypes,
+    prior_frequencies,
+    filter_input_haplotypes,
 ]
 
 CALL_EXACT_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_PARSER_ARGUMENTS
@@ -563,7 +650,6 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
         region_id,
         targets,
         variants,
-        reference,
     ]
     + DEFAULT_MCMC_PARSER_ARGUMENTS
     + [
@@ -754,6 +840,7 @@ def collect_default_program_arguments(arguments):
         sample_bams=sample_bams,
         sample_ploidy=sample_ploidy,
         sample_inbreeding=sample_inbreeding,
+        ref=arguments.reference[0],
         read_group_field=arguments.read_group_field[0],
         base_error_rate=arguments.base_error_rate[0],
         ignore_base_phred_scores=arguments.ignore_base_phred_scores,
@@ -770,9 +857,8 @@ def collect_call_exact_program_arguments(arguments):
     data = collect_default_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
     data["random_seed"] = None
-    data["use_haplotype_frequencies_prior"] = arguments.haplotype_frequencies_prior
-    data["haplotype_frequencies_tag"] = arguments.haplotype_frequencies[0]
-    data["skip_rare_haplotypes"] = arguments.skip_rare_haplotypes[0]
+    data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
+    data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
     return data
 
 
@@ -793,9 +879,8 @@ def collect_default_mcmc_program_arguments(arguments):
 def collect_call_mcmc_program_arguments(arguments):
     data = collect_default_mcmc_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
-    data["use_haplotype_frequencies_prior"] = arguments.haplotype_frequencies_prior
-    data["haplotype_frequencies_tag"] = arguments.haplotype_frequencies[0]
-    data["skip_rare_haplotypes"] = arguments.skip_rare_haplotypes[0]
+    data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
+    data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
     return data
 
 
@@ -811,7 +896,6 @@ def collect_assemble_mcmc_program_arguments(arguments):
         dict(
             bed=arguments.targets[0],
             vcf=arguments.variants[0],
-            ref=arguments.reference[0],
             sample_mcmc_temperatures=sample_mcmc_temperatures,
             region=arguments.region[0],
             region_id=arguments.region_id,

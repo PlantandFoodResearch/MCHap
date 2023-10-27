@@ -68,11 +68,12 @@ class program(call_baseclass.program):
             "GL",
             "GP",
             "AFP",
+            "AOP",
         ]:
             data.sampledata[field] = dict()
         # get haplotypes and metadata
         haplotypes = data.locus.encode_haplotypes()
-        haplotype_frequencies = data.locus.frequencies
+        prior_frequencies = data.locus.frequencies
         mask_reference_allele = data.locus.mask_reference_allele
         mask = np.zeros(len(haplotypes), bool)
         mask[0] = mask_reference_allele
@@ -81,11 +82,10 @@ class program(call_baseclass.program):
         data.columndata["REF"] = data.locus.sequence
         data.columndata["ALTS"] = data.locus.alts
         data.infodata["REFMASKED"] = mask_reference_allele
-        data.infodata["AFPRIOR"] = np.round(haplotype_frequencies, self.precision)
+        data.infodata["AFPRIOR"] = np.round(prior_frequencies, self.precision)
 
-        # mask zero frequency haplotypes if using prior
-        if self.use_haplotype_frequencies_prior:
-            mask |= haplotype_frequencies == 0
+        # mask zero frequency haplotypes
+        mask |= prior_frequencies == 0
 
         # remove masked haplotypes from mcmc
         if np.any(mask):
@@ -100,8 +100,8 @@ class program(call_baseclass.program):
         invalid_scenario = len(mcmc_haplotypes) == 0
 
         # get prior for allele frequencies
-        if self.use_haplotype_frequencies_prior:
-            prior_frequencies = haplotype_frequencies[~mask]
+        if self.prior_frequencies_tag:
+            prior_frequencies = prior_frequencies[~mask]
         else:
             prior_frequencies = None
 
@@ -111,9 +111,7 @@ class program(call_baseclass.program):
             # must have one or more haplotypes for MCMC
             invalid_scenario = True
             data.columndata["FILTER"].append(vcf.filters.NOA.id)
-        elif self.use_haplotype_frequencies_prior and np.any(
-            np.isnan(prior_frequencies)
-        ):
+        elif (prior_frequencies is not None) and np.any(np.isnan(prior_frequencies)):
             # nan caused by zero freq
             invalid_scenario = True
             data.columndata["FILTER"].append(vcf.filters.AF0.id)
@@ -132,6 +130,7 @@ class program(call_baseclass.program):
                 data.sampledata["PHQ"][sample] = np.nan
                 data.sampledata["MCI"][sample] = np.nan
                 data.sampledata["AFP"][sample] = np.array([np.nan])
+                data.sampledata["AOP"][sample] = np.array([np.nan])
                 data.sampledata["GP"][sample] = np.array([np.nan])
                 data.sampledata["GL"][sample] = np.array([np.nan])
             return data
@@ -186,6 +185,15 @@ class program(call_baseclass.program):
                     frequencies[alleles] = counts / counts.sum()
                     data.sampledata["AFP"][sample] = np.round(
                         frequencies, self.precision
+                    )
+
+                # posterior allele occurrence if requested
+                if "AOP" in data.formatfields:
+                    occurrences = np.zeros(len(haplotypes))
+                    alleles, _, occur = posterior.allele_frequencies()
+                    occurrences[alleles] = occur
+                    data.sampledata["AOP"][sample] = np.round(
+                        occurrences, self.precision
                     )
 
                 # genotype posteriors if requested

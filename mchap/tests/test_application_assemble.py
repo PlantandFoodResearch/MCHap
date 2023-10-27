@@ -246,74 +246,26 @@ def test_Program__header():
 
 
 @pytest.mark.parametrize(
-    "cli_extra,output_vcf",
-    [
-        ([], "simple.output.deep.assemble.vcf"),
-        (
-            [
-                "--base-error-rate",
-                "0.001",
-            ],
-            "simple.output.deep.assemble.vcf",
-        ),
-    ],
-)
-def test_Program__run(cli_extra, output_vcf):
-    path = pathlib.Path(__file__).parent.absolute()
-    path = path / "test_io/data"
-
-    BED = str(path / "simple.bed.gz")
-    VCF = str(path / "simple.vcf.gz")
-    REF = str(path / "simple.fasta")
-    BAMS = [
-        str(path / "simple.sample1.deep.bam"),
-        str(path / "simple.sample2.deep.bam"),
-        str(path / "simple.sample3.deep.bam"),
-    ]
-
-    command = [
-        "mchap",
-        "assemble",
-        "--bam",
-        BAMS[0],
-        BAMS[1],
-        BAMS[2],
-        "--ploidy",
-        "4",
-        "--targets",
-        BED,
-        "--variants",
-        VCF,
-        "--reference",
-        REF,
-        "--mcmc-steps",
-        "500",
-        "--mcmc-burn",
-        "100",
-        "--mcmc-seed",
-        "11",
-    ] + cli_extra
-
-    prog = program.cli(command)
-    result = prog.run()
-
-    # compare to expected VCF
-    with open(str(path / output_vcf), "r") as f:
-        for i, line in enumerate(f):
-            line = line.strip()
-            if line.startswith("##commandline"):
-                # file paths will differ
-                pass
-            elif line.startswith("##fileDate"):
-                # new date should be greater than test vcf date
-                assert result[i] > line
-            else:
-                assert result[i] == line
-
-
-@pytest.mark.parametrize(
     "bams,cli_extra,output_vcf",
     [
+        (
+            [
+                "simple.sample1.bam",
+                "simple.sample2.bam",
+                "simple.sample3.bam",
+            ],
+            [],
+            "simple.output.assemble.vcf",
+        ),
+        (
+            [
+                "simple.sample1.broken.cram",
+                "simple.sample2.broken.cram",
+                "simple.sample3.broken.cram",
+            ],
+            [],
+            "simple.output.assemble.vcf",  # identical results from bam/cram
+        ),
         (
             [
                 "simple.sample1.deep.bam",
@@ -332,6 +284,11 @@ def test_Program__run(cli_extra, output_vcf):
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             ["--report", "AFP"],
             "simple.output.mixed_depth.assemble.frequencies.vcf",
+        ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--report", "AOP"],
+            "simple.output.mixed_depth.assemble.occurrence.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
