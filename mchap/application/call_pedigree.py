@@ -83,7 +83,7 @@ class program(call_baseclass.program):
             data.sampledata[field] = dict()
         # get haplotypes and metadata
         haplotypes = data.locus.encode_haplotypes()
-        haplotype_frequencies = data.locus.frequencies
+        prior_frequencies = data.locus.frequencies
         mask_reference_allele = data.locus.mask_reference_allele
         mask = np.zeros(len(haplotypes), bool)
         mask[0] = mask_reference_allele
@@ -92,11 +92,10 @@ class program(call_baseclass.program):
         data.columndata["REF"] = data.locus.sequence
         data.columndata["ALTS"] = data.locus.alts
         data.infodata["REFMASKED"] = mask_reference_allele
-        data.infodata["AFPRIOR"] = np.round(haplotype_frequencies, self.precision)
+        data.infodata["AFPRIOR"] = np.round(prior_frequencies, self.precision)
 
         # mask zero frequency haplotypes if using prior
-        if self.use_haplotype_frequencies_prior:
-            mask |= haplotype_frequencies == 0
+        mask |= prior_frequencies == 0
 
         # remove masked haplotypes from mcmc
         if np.any(mask):
@@ -111,8 +110,8 @@ class program(call_baseclass.program):
         invalid_scenario = len(mcmc_haplotypes) == 0
 
         # get prior for allele frequencies
-        if self.use_haplotype_frequencies_prior:
-            prior_frequencies = haplotype_frequencies[~mask]
+        if self.prior_frequencies_tag:
+            prior_frequencies = prior_frequencies[~mask]
         else:
             prior_frequencies = None
 
@@ -122,9 +121,7 @@ class program(call_baseclass.program):
             # must have one or more haplotypes for MCMC
             invalid_scenario = True
             data.columndata["FILTER"].append(vcf.filters.NOA.id)
-        elif self.use_haplotype_frequencies_prior and np.any(
-            np.isnan(prior_frequencies)
-        ):
+        elif (prior_frequencies is not None) and np.any(np.isnan(prior_frequencies)):
             # nan caused by zero freq
             invalid_scenario = True
             data.columndata["FILTER"].append(vcf.filters.AF0.id)
