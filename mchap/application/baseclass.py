@@ -192,9 +192,16 @@ class program(object):
                         )[name]
                         read_chars.append(chars)
                         read_quals.append(quals)
-                # TODO: handle case of no bams (empty list)
-                read_chars = np.concatenate(read_chars)
-                read_quals = np.concatenate(read_quals)
+                # merge bams
+                if len(pairs) > 0:
+                    # one or more bam files
+                    read_chars = np.concatenate(read_chars)
+                    read_quals = np.concatenate(read_quals)
+                else:
+                    # handle case of no bams (empty list)
+                    shape = (0, len(locus.variants))
+                    read_chars = np.empty(shape, dtype="U1")
+                    read_quals = np.empty(shape, dtype=np.int16)
 
                 # get read stats
                 read_count = read_chars.shape[0]
