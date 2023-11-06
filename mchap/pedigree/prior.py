@@ -1004,17 +1004,33 @@ def markov_blanket_log_allele_probability(
                 error_q = 1.0
                 genotype_q = np.array([-1], dtype=sample_genotypes.dtype)
             genotype_i = sample_genotypes[i, 0 : sample_ploidy[i]]
-            log_joint += trio_allele_log_pmf(
-                allele_index=allele_index,
-                progeny=genotype_i,
-                parent_p=genotype_p,
-                parent_q=genotype_q,
-                tau_p=gamete_tau[i, 0],
-                tau_q=gamete_tau[i, 1],
-                lambda_p=gamete_lambda[i, 0],
-                lambda_q=gamete_lambda[i, 1],
-                error_p=error_p,
-                error_q=error_q,
-                n_alleles=n_alleles,
-            )
+            if target_index == i:
+                # the target is the progeny
+                log_joint += trio_allele_log_pmf(
+                    allele_index=allele_index,
+                    progeny=genotype_i,
+                    parent_p=genotype_p,
+                    parent_q=genotype_q,
+                    tau_p=gamete_tau[i, 0],
+                    tau_q=gamete_tau[i, 1],
+                    lambda_p=gamete_lambda[i, 0],
+                    lambda_q=gamete_lambda[i, 1],
+                    error_p=error_p,
+                    error_q=error_q,
+                    n_alleles=n_alleles,
+                )
+            else:
+                # the target is a parent
+                log_joint += trio_log_pmf(
+                    genotype_i,
+                    genotype_p,
+                    genotype_q,
+                    tau_p=gamete_tau[i, 0],
+                    tau_q=gamete_tau[i, 1],
+                    lambda_p=gamete_lambda[i, 0],
+                    lambda_q=gamete_lambda[i, 1],
+                    error_p=error_p,
+                    error_q=error_q,
+                    n_alleles=n_alleles,
+                )
     return log_joint
