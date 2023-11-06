@@ -9,7 +9,7 @@ from mchap.jitutils import comb, add_log_prob, ln_equivalent_permutations
 def log_unknown_dosage_prior(dosage, n_alleles, frequencies=None):
     lperms = ln_equivalent_permutations(dosage)
     if frequencies is None:
-        lperm_prob = np.log(1/n_alleles) * dosage.sum()
+        lperm_prob = np.log(1 / n_alleles) * dosage.sum()
     else:
         lperm_prob = 0.0
         for i in range(len(dosage)):
@@ -20,10 +20,8 @@ def log_unknown_dosage_prior(dosage, n_alleles, frequencies=None):
 
 
 @njit(cache=True)
-def log_unknown_const_prior(
-    dosage, allele_index, n_alleles, frequencies=None
-):
-    if  dosage[allele_index] >= 0:
+def log_unknown_const_prior(dosage, allele_index, n_alleles, frequencies=None):
+    if dosage[allele_index] > 0:
         dosage[allele_index] -= 1
         lprob = log_unknown_dosage_prior(dosage, n_alleles, frequencies=frequencies)
         dosage[allele_index] += 1
@@ -485,7 +483,10 @@ def trio_log_pmf(
             lprob = add_log_prob(lprob, lprob_pq)
             # assuming p valid and q invalid (avoids iterating gametes of p twice)
             # probability of gamete_q
-            lprob_q = log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None) + lerror_q
+            lprob_q = (
+                log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None)
+                + lerror_q
+            )
             lprob_pq = lprob_p + lprob_q
             lprob = add_log_prob(lprob, lprob_pq)
             # increment by gamete of p
@@ -512,8 +513,11 @@ def trio_log_pmf(
                 )
                 + lcorrect_p
             )
-            # probability of gamete_q 
-            lprob_q = log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None) + lerror_q
+            # probability of gamete_q
+            lprob_q = (
+                log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None)
+                + lerror_q
+            )
             lprob_pq = lprob_p + lprob_q
             lprob = add_log_prob(lprob, lprob_pq)
             # increment by gamete of p
@@ -531,7 +535,10 @@ def trio_log_pmf(
         gamete_p = dosage - gamete_q
         while True:
             # probability of gamete_p
-            lprob_p = log_unknown_dosage_prior(gamete_p, n_alleles, frequencies=None) + lerror_p
+            lprob_p = (
+                log_unknown_dosage_prior(gamete_p, n_alleles, frequencies=None)
+                + lerror_p
+            )
             lprob_q = (
                 gamete_log_pmf(
                     gamete_dose=gamete_q,
@@ -554,7 +561,11 @@ def trio_log_pmf(
                     gamete_p[i] = dosage[i] - gamete_q[i]
 
     # assuming both parents are invalid
-    lprob_pq = log_unknown_dosage_prior(dosage, n_alleles, frequencies=None) + lerror_p + lerror_q
+    lprob_pq = (
+        log_unknown_dosage_prior(dosage, n_alleles, frequencies=None)
+        + lerror_p
+        + lerror_q
+    )
     lprob = add_log_prob(lprob, lprob_pq)
     return lprob
 
@@ -800,9 +811,13 @@ def trio_allele_log_pmf(
             lprob = add_log_prob(lprob, lprob_pq)
 
             # assuming p valid and q invalid (avoids iterating gametes of p twice)
-            lprob_gamete_q = log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None)
-            lprob_const_q = log_unknown_const_prior(gamete_q, allele_index, n_alleles, frequencies=None)
-            lprob_allele_q = np.log(1/n_alleles)  # log frequency of allele
+            lprob_gamete_q = log_unknown_dosage_prior(
+                gamete_q, n_alleles, frequencies=None
+            )
+            lprob_const_q = log_unknown_const_prior(
+                gamete_q, allele_index, n_alleles, frequencies=None
+            )
+            lprob_allele_q = np.log(1 / n_alleles)  # log frequency of allele
             lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
             lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
             lprob_pq = add_log_prob(lprob_p, lprob_q) + lcorrect_p + lerror_q
@@ -845,9 +860,13 @@ def trio_allele_log_pmf(
                 parent_ploidy=ploidy_p,
                 gamete_lambda=lambda_p,
             )
-            lprob_gamete_q = log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None)
-            lprob_const_q = log_unknown_const_prior(gamete_q, allele_index, n_alleles, frequencies=None)
-            lprob_allele_q = np.log(1/n_alleles)  # log frequency of allele
+            lprob_gamete_q = log_unknown_dosage_prior(
+                gamete_q, n_alleles, frequencies=None
+            )
+            lprob_const_q = log_unknown_const_prior(
+                gamete_q, allele_index, n_alleles, frequencies=None
+            )
+            lprob_allele_q = np.log(1 / n_alleles)  # log frequency of allele
             lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
             lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
             lprob_pq = add_log_prob(lprob_p, lprob_q) + lcorrect_p + lerror_q
@@ -889,9 +908,13 @@ def trio_allele_log_pmf(
                 parent_ploidy=ploidy_q,
                 gamete_lambda=lambda_q,
             )
-            lprob_gamete_p = log_unknown_dosage_prior(gamete_p, n_alleles, frequencies=None)
-            lprob_const_p = log_unknown_const_prior(gamete_p, allele_index, n_alleles, frequencies=None)
-            lprob_allele_p = np.log(1/n_alleles)  # log frequency of allele
+            lprob_gamete_p = log_unknown_dosage_prior(
+                gamete_p, n_alleles, frequencies=None
+            )
+            lprob_const_p = log_unknown_const_prior(
+                gamete_p, allele_index, n_alleles, frequencies=None
+            )
+            lprob_allele_p = np.log(1 / n_alleles)  # log frequency of allele
             lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
             lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
             lprob_pq = add_log_prob(lprob_p, lprob_q) + lerror_p + lcorrect_q
@@ -907,8 +930,10 @@ def trio_allele_log_pmf(
 
     # assuming both parents are invalid
     # p(constant) * p(allele | constant) * 2
-    lprob_const = log_unknown_const_prior(dosage, allele_index, n_alleles, frequencies=None)
-    lprob_allele = - np.log(n_alleles) + np.log(2)  # log frequency of allele * 2
+    lprob_const = log_unknown_const_prior(
+        dosage, allele_index, n_alleles, frequencies=None
+    )
+    lprob_allele = -np.log(n_alleles) + np.log(2)  # log frequency of allele * 2
     lprob_pq = lprob_const + lprob_allele + lerror_p + lerror_q
     lprob = add_log_prob(lprob, lprob_pq)
     assert not np.isnan(lprob)
