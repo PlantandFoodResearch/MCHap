@@ -116,10 +116,55 @@ def test_duplicate_permutations(gamete_dosage, parent_dosage, expect):
 
 
 @pytest.mark.parametrize(
+    "parent_dosage, parent_ploidy, gamete_dosage, gamete_ploidy, lambda_, expect",
+    [
+        ([2, 0], 2, [1, 0], 1, 0.0, 1.0),
+        ([1, 1], 2, [1, 0], 1, 0.0, 0.5),
+        ([1, 0], 2, [1, 0], 1, 0.0, 0.5),
+        ([0, 2], 2, [1, 0], 1, 0.0, 0.0),
+        ([1, 1], 2, [1, 1], 2, 0.0, 1.0),  # WGD
+        ([0, 2], 2, [0, 2], 2, 0.0, 1.0),  # WGD
+        ([1, 1], 2, [1, 1], 2, 0.2, 0.8),  # S/FDR
+        ([1, 1], 2, [0, 2], 2, 1.0, 0.5),  # PMR
+        ([1, 1], 2, [0, 2], 2, 0.5, 0.25),  # PMR
+        ([4, 0, 0, 0], 4, [2, 0, 0, 0], 2, 0.0, 1.0),
+        ([0, 0, 4, 0], 4, [0, 0, 2, 0], 2, 0.0, 1.0),
+        ([0, 1, 3, 0], 4, [0, 0, 2, 0], 2, 0.0, 0.5),
+        ([0, 0, 3, 0], 4, [0, 0, 2, 0], 2, 0.0, 0.5),
+        ([0, 2, 2, 0], 4, [0, 1, 1, 0], 2, 0.0, 8 / 12),
+        ([0, 2, 0, 1], 4, [0, 1, 1, 0], 2, 0.0, 0.0),
+        ([0, 1, 1, 1], 4, [0, 0, 2, 0], 2, 0.0, 0.0),
+        ([4, 0, 0, 0], 4, [2, 0, 0, 0], 2, 0.5, 1.0),
+        ([1, 1, 1, 1], 4, [2, 0, 0, 0], 2, 0.5, 0.125),
+        ([2, 0, 0, 0], 4, [2, 0, 0, 0], 2, 0.5, (2 / 12 + 0.5 * 4 / 12)),
+        ([2, 0, 0, 0], 4, [2, 0, 0, 0], 2, 0.1, (2 / 12 + 0.1 * 4 / 12)),
+        ([1, 3, 0, 0], 4, [0, 2, 0, 0], 2, 0.5, (6 / 12 + 0.5 * 3 / 12)),
+        ([1, 1, 1, 1, 1, 1], 6, [0, 0, 0, 1, 1, 1], 3, 0.0, 6 / 120),
+        ([2, 2, 1, 1, 0, 0], 6, [1, 1, 1, 0, 0, 0], 3, 0.0, 24 / 120),
+        ([2, 2, 1, 1, 0, 0], 6, [2, 0, 1, 0, 0, 0], 3, 0.0, 6 / 120),
+        ([2, 2, 1, 1, 0, 0], 6, [2, 1, 0, 0, 0, 0], 3, 0.0, 12 / 120),
+    ],
+)
+def test_gamete_log_pmf(
+    parent_dosage, parent_ploidy, gamete_dosage, gamete_ploidy, lambda_, expect
+):
+    gamete_dosage = np.array(gamete_dosage)
+    parent_dosage = np.array(parent_dosage)
+    actual = gamete_log_pmf(
+        gamete_dose=gamete_dosage,
+        gamete_ploidy=gamete_ploidy,
+        parent_dose=parent_dosage,
+        parent_ploidy=parent_ploidy,
+        gamete_lambda=lambda_,
+    )
+    np.testing.assert_almost_equal(expect, np.exp(actual))
+
+
+@pytest.mark.parametrize(
     "seed",
     np.arange(10),
 )
-def test_log_gamete_pmf__sum_to_one(seed):
+def test_gamete_log_pmf__sum_to_one(seed):
     np.random.seed(seed)
     n_alleles = np.random.randint(1, 10)
     gamete_ploidy = np.random.randint(1, 3)
@@ -147,9 +192,92 @@ def test_log_gamete_pmf__sum_to_one(seed):
 
 @pytest.mark.parametrize(
     "seed",
+    np.arange(10),
+)
+def test_gamete_log_pmf__sum_to_one_lambda(seed):
+    np.random.seed(seed)
+    n_alleles = np.random.randint(1, 10)
+    gamete_ploidy = 2
+    parent_ploidy = np.random.randint(2, 4)
+    parent_genotype = np.random.randint(n_alleles, size=parent_ploidy)
+    n_gametes = comb_with_replacement(n_alleles, gamete_ploidy)
+    total_prob = 0.0
+    lambda_ = np.random.rand()
+    gamete_genotype = np.zeros(gamete_ploidy, int)
+    for _ in range(n_gametes):
+        gamete_dosage = allelic_dosage(gamete_genotype)
+        parent_dosage = parental_copies(parent_genotype, gamete_genotype)
+        prob = np.exp(
+            gamete_log_pmf(
+                gamete_dose=gamete_dosage,
+                gamete_ploidy=gamete_ploidy,
+                parent_dose=parent_dosage,
+                parent_ploidy=parent_ploidy,
+                gamete_lambda=lambda_,
+            )
+        )
+        total_prob += prob
+        increment_genotype(gamete_genotype)
+    np.testing.assert_almost_equal(total_prob, 1.0)
+
+
+def test_gamete_log_pmf__raise_on_non_diploid_lambda():
+    with pytest.raises(
+        ValueError, match="Lambda parameter is only supported for diploid gametes"
+    ):
+        gamete_log_pmf(
+            gamete_dose=np.array([2, 1, 0]),
+            gamete_ploidy=3,
+            parent_dose=np.array([2, 2, 2]),
+            parent_ploidy=6,
+            gamete_lambda=0.01,
+        )
+
+
+@pytest.mark.parametrize(
+    "parent_count, parent_ploidy, gamete_count, gamete_ploidy, lambda_, expect",
+    [
+        (2, 2, 1, 1, 0.0, 1.0),
+        (1, 2, 1, 1, 0.0, 0.5),
+        (0, 2, 1, 1, 0.0, 0.0),
+        (1, 2, 1, 2, 0.0, 1.0),  # WGD
+        (1, 2, 1, 2, 0.5, 0.5),  # FDR/SDR
+        (2, 2, 2, 2, 0.5, 1.0),  # FDR/SDR
+        (1, 2, 1, 2, 1.0, 0.0),  # PMR
+        (4, 4, 2, 2, 0.0, 1.0),
+        (1, 4, 1, 2, 0.0, 1 / 3),
+        (2, 4, 1, 2, 0.0, 2 / 3),
+        (3, 4, 1, 2, 0.0, 3 / 3),
+        (1, 4, 2, 2, 0.0, 0 / 3),
+        (2, 4, 2, 2, 0.0, 1 / 3),
+        (3, 4, 2, 2, 0.0, 2 / 3),
+        (4, 4, 2, 2, 0.0, 3 / 3),
+        (0, 4, 2, 2, 0.5, 0.0),  # DR
+        (1, 4, 2, 2, 0.5, 0.5),  # DR
+        (2, 4, 2, 2, 0.5, (1 / 3 * 0.5 + 0.5)),  # DR
+        (2, 4, 2, 2, 0.1, (1 / 3 * 0.9 + 0.1)),  # DR
+        (3, 4, 2, 2, 0.1, (2 / 3 * 0.9 + 0.1)),  # DR
+        (4, 4, 2, 2, 0.1, 1.0),  # DR
+    ],
+)
+def test_gamete_allele_log_pmf(
+    parent_count, parent_ploidy, gamete_count, gamete_ploidy, lambda_, expect
+):
+    actual = gamete_allele_log_pmf(
+        gamete_count=gamete_count,
+        gamete_ploidy=gamete_ploidy,
+        parent_count=parent_count,
+        parent_ploidy=parent_ploidy,
+        gamete_lambda=lambda_,
+    )
+    np.testing.assert_almost_equal(expect, np.exp(actual))
+
+
+@pytest.mark.parametrize(
+    "seed",
     np.arange(20),
 )
-def test_log_gamete_allele_pmf__sum_to_one(seed):
+def test_gamete_allele_log_pmf__sum_to_one(seed):
     np.random.seed(seed)
     n_alleles = np.random.randint(15)
     parent_ploidy = np.random.randint(2, 7)
@@ -179,45 +307,89 @@ def test_log_gamete_allele_pmf__sum_to_one(seed):
 
 @pytest.mark.parametrize(
     "seed",
-    np.arange(10),
+    np.arange(20),
 )
-def test_log_gamete_pmf__sum_to_one_lambda(seed):
+def test_gamete_allele_log_pmf__sum_to_one_lambda(seed):
     np.random.seed(seed)
-    n_alleles = np.random.randint(1, 10)
+    n_alleles = np.random.randint(15)
+    gamete_lambda = np.random.rand()
+    parent_ploidy = np.random.randint(2, 7)
     gamete_ploidy = 2
-    parent_ploidy = np.random.randint(2, 4)
     parent_genotype = np.random.randint(n_alleles, size=parent_ploidy)
-    n_gametes = comb_with_replacement(n_alleles, gamete_ploidy)
-    total_prob = 0.0
-    lambda_ = np.random.rand()
-    gamete_genotype = np.zeros(gamete_ploidy, int)
-    for _ in range(n_gametes):
-        gamete_dosage = allelic_dosage(gamete_genotype)
-        parent_dosage = parental_copies(parent_genotype, gamete_genotype)
+    gamete_genotype = np.random.choice(
+        parent_genotype, size=gamete_ploidy, replace=False
+    )
+    variable_index = np.random.randint(gamete_ploidy)
+    total = 0.0
+    for i in range(n_alleles):
+        gamete_genotype[variable_index] = i
+        gamete_count = count_allele(gamete_genotype, i)
+        parent_count = count_allele(parent_genotype, i)
         prob = np.exp(
-            gamete_log_pmf(
-                gamete_dose=gamete_dosage,
+            gamete_allele_log_pmf(
+                gamete_count=gamete_count,
                 gamete_ploidy=gamete_ploidy,
-                parent_dose=parent_dosage,
+                parent_count=parent_count,
                 parent_ploidy=parent_ploidy,
-                gamete_lambda=lambda_,
+                gamete_lambda=gamete_lambda,
             )
         )
-        total_prob += prob
-        increment_genotype(gamete_genotype)
-    np.testing.assert_almost_equal(total_prob, 1.0)
+        total += prob
+    np.testing.assert_almost_equal(total, 1.0)
 
 
-def test_log_gamete_pmf__raise_on_non_diploid_lambda():
-    with pytest.raises(
-        ValueError, match="Lambda parameter is only supported for diploid gametes"
-    ):
-        gamete_log_pmf(
-            gamete_dose=np.array([2, 1, 0]),
+def test_gamete_allele_log_pmf__raise_zero_count():
+    with pytest.raises(AssertionError):
+        gamete_allele_log_pmf(
+            gamete_count=0,
+            gamete_ploidy=1,
+            parent_count=2,
+            parent_ploidy=2,
+            gamete_lambda=0.0,
+        )
+
+
+def test_gamete_allele_log_pmf__raise_on_count_greater_than_tau():
+    with pytest.raises(AssertionError):
+        gamete_allele_log_pmf(
+            gamete_count=2,
+            gamete_ploidy=1,
+            parent_count=2,
+            parent_ploidy=2,
+            gamete_lambda=0.0,
+        )
+
+
+def test_gamete_allele_log_pmf__raise_on_count_greater_than_ploidy():
+    with pytest.raises(AssertionError):
+        gamete_allele_log_pmf(
+            gamete_count=1,
+            gamete_ploidy=1,
+            parent_count=3,
+            parent_ploidy=2,
+            gamete_lambda=0.0,
+        )
+
+
+def test_gamete_allele_log_pmf__raise_on_diploid_lambda():
+    with pytest.raises(ValueError):
+        gamete_allele_log_pmf(
+            gamete_count=1,
+            gamete_ploidy=1,
+            parent_count=1,
+            parent_ploidy=2,
+            gamete_lambda=0.1,
+        )
+
+
+def test_gamete_allele_log_pmf__raise_on_hexaploid_lambda():
+    with pytest.raises(ValueError):
+        gamete_allele_log_pmf(
+            gamete_count=1,
             gamete_ploidy=3,
-            parent_dose=np.array([2, 2, 2]),
+            parent_count=1,
             parent_ploidy=6,
-            gamete_lambda=0.01,
+            gamete_lambda=0.1,
         )
 
 
