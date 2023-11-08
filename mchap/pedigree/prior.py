@@ -296,7 +296,9 @@ def gamete_const_log_pmf(
     parent_ploidy,
     gamete_lambda=0.0,
 ):
-    assert gamete_dose[allele_index] >= 1
+    if gamete_dose[allele_index] < 1:
+        # ensure prob is zero in invalid cases
+        return -np.inf
     gamete_dose[allele_index] -= 1
     if gamete_ploidy == 2:
         # the ploidy of the constant portion is 1 so lambda is ignored
@@ -349,7 +351,9 @@ def gamete_allele_log_pmf(
     """
     assert gamete_count <= gamete_ploidy
     assert parent_count <= parent_ploidy
-    assert gamete_count >= 1
+    if gamete_count < 1:
+        # ensure prob of zero in invalid cases
+        return -np.inf
     if parent_count == 0:
         return -np.inf
     const_count = gamete_count - 1

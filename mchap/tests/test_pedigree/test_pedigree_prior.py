@@ -339,17 +339,6 @@ def test_gamete_allele_log_pmf__sum_to_one_lambda(seed):
     np.testing.assert_almost_equal(total, 1.0)
 
 
-def test_gamete_allele_log_pmf__raise_zero_count():
-    with pytest.raises(AssertionError):
-        gamete_allele_log_pmf(
-            gamete_count=0,
-            gamete_ploidy=1,
-            parent_count=2,
-            parent_ploidy=2,
-            gamete_lambda=0.0,
-        )
-
-
 def test_gamete_allele_log_pmf__raise_on_count_greater_than_tau():
     with pytest.raises(AssertionError):
         gamete_allele_log_pmf(
