@@ -349,8 +349,7 @@ def gamete_allele_log_pmf(
     """
     assert gamete_count <= gamete_ploidy
     assert parent_count <= parent_ploidy
-    if gamete_count == 0:
-        return -np.inf
+    assert gamete_count >= 1
     if parent_count == 0:
         return -np.inf
     const_count = gamete_count - 1
