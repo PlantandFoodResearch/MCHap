@@ -296,20 +296,20 @@ def gamete_const_log_pmf(
     parent_ploidy,
     gamete_lambda=0.0,
 ):
-    if gamete_dose[allele_index] > 0:
-        gamete_dose[allele_index] -= 1
-        if gamete_ploidy == 2:
-            gamete_lambda = 0.0
-        lprob = gamete_log_pmf(
-            gamete_dose=gamete_dose,
-            gamete_ploidy=gamete_ploidy - 1,
-            parent_dose=parent_dose,
-            parent_ploidy=parent_ploidy,
-            gamete_lambda=gamete_lambda,
-        )
-        gamete_dose[allele_index] += 1
-    else:
-        lprob = -np.inf
+    assert gamete_dose[allele_index] >= 1
+    gamete_dose[allele_index] -= 1
+    if gamete_ploidy == 2:
+        # the ploidy of the constant portion is 1 so lambda is ignored
+        # (i.e., the constant is the first allele of the pair)
+        gamete_lambda = 0.0
+    lprob = gamete_log_pmf(
+        gamete_dose=gamete_dose,
+        gamete_ploidy=gamete_ploidy - 1,
+        parent_dose=parent_dose,
+        parent_ploidy=parent_ploidy,
+        gamete_lambda=gamete_lambda,
+    )
+    gamete_dose[allele_index] += 1
     return lprob
 
 

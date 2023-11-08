@@ -11,6 +11,7 @@ from mchap.pedigree.prior import (
     duplicate_permutations,
     gamete_log_pmf,
     gamete_allele_log_pmf,
+    gamete_const_log_pmf,
     trio_log_pmf,
 )
 
@@ -391,6 +392,64 @@ def test_gamete_allele_log_pmf__raise_on_hexaploid_lambda():
             parent_ploidy=6,
             gamete_lambda=0.1,
         )
+
+
+@pytest.mark.parametrize(
+    "index, parent_dosage, parent_ploidy, gamete_dosage, gamete_ploidy, lambda_, expect",
+    [
+        (0, [2, 0], 2, [1, 0], 1, 0.0, 1.0),  # haploid gamete has no constant
+        (0, [1, 1], 2, [1, 0], 1, 0.0, 1.0),  # haploid gamete has no constant
+        (0, [0, 0], 2, [1, 0], 1, 0.0, 1.0),  # haploid gamete has no constant
+        (0, [4, 0, 0, 0], 4, [2, 0, 0, 0], 2, 0.0, 1.0),
+        (0, [2, 2, 0, 0], 4, [2, 0, 0, 0], 2, 0.0, 2 / 4),
+        (0, [1, 1, 0, 0], 4, [1, 1, 0, 0], 2, 0.0, 0.25),
+        (1, [1, 1, 0, 0], 4, [1, 1, 0, 0], 2, 0.0, 0.25),
+        (
+            1,
+            [1, 1, 0, 0],
+            4,
+            [1, 1, 0, 0],
+            2,
+            0.9,
+            0.25,
+        ),  # lambda has no effect on haploid constant
+        (
+            0,
+            [1, 1, 0, 0],
+            4,
+            [2, 0, 0, 0],
+            2,
+            0.0,
+            0.25,
+        ),  # invalid gamete with valid constant
+        (1, [1, 1, 1, 0, 0, 0], 6, [1, 1, 1, 0, 0, 0], 3, 0.0, (2 * 1 / 6 * 1 / 5)),
+        (1, [1, 4, 1, 0, 0, 0], 6, [1, 1, 1, 0, 0, 0], 3, 0.0, (2 * 1 / 6 * 1 / 5)),
+        (
+            1,
+            [2, 1, 1, 0, 0, 0],
+            6,
+            [1, 1, 1, 0, 0, 0],
+            3,
+            0.0,
+            (2 / 6 * 1 / 5 + 1 / 6 * 2 / 5),
+        ),
+        (1, [2, 1, 1, 0, 0, 0], 6, [2, 1, 0, 0, 0, 0], 3, 0.0, (2 / 6 * 1 / 5)),
+    ],
+)
+def test_gamete_const_log_pmf(
+    index, parent_dosage, parent_ploidy, gamete_dosage, gamete_ploidy, lambda_, expect
+):
+    gamete_dosage = np.array(gamete_dosage)
+    parent_dosage = np.array(parent_dosage)
+    actual = gamete_const_log_pmf(
+        allele_index=index,
+        gamete_dose=gamete_dosage,
+        gamete_ploidy=gamete_ploidy,
+        parent_dose=parent_dosage,
+        parent_ploidy=parent_ploidy,
+        gamete_lambda=lambda_,
+    )
+    np.testing.assert_almost_equal(expect, np.exp(actual))
 
 
 @pytest.mark.parametrize(
