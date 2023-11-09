@@ -103,7 +103,7 @@ HAMILTON_KERR_PEDIGREE = {
 }
 
 
-@pytest.mark.parametrize("gamete_error", [0.1, 0.5, 1.0])
+@pytest.mark.parametrize("gamete_error", [0.1, 0.5, 1.0, "random"])
 @pytest.mark.parametrize("read_depth", [4, 8])
 @pytest.mark.parametrize(
     "pedigree",
@@ -135,7 +135,11 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
     gamete_tau = np.array(pedigree["tau"], int)
     gamete_lambda = np.array(pedigree["lambda"], float)
     n_samples = len(genotypes)
-    gamete_error = np.full((n_samples, 2), gamete_error, float)
+    if gamete_error == "random":
+        np.random.seed(0)
+        gamete_error = np.random.rand(n_samples * 2).reshape(n_samples, 2)
+    else:
+        gamete_error = np.full((n_samples, 2), gamete_error, float)
     sample_ploidy = gamete_tau.sum(axis=-1)
 
     # simulate reads from genotypes

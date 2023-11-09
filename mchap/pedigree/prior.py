@@ -665,6 +665,17 @@ def trio_allele_log_pmf(
 ):
     """Log probability of allele within a trio of genotypes.
 
+    Warning
+    -------
+    This function is proportional, but not equal, to the true PMF.
+    It is out by a constant which can be computed with some complexity.
+    In short, this function returns P(a | c, p, q, ...) * P(c | p, q, ...)
+    where 'c' is the set of progeny alleles held as constant and hence
+    P(c | p, q, ...) is a constant.
+    This is easier to calculate than the true PMF of P(a | c, p, q, ...)
+    due to the implementation details of iterating over gametes.
+
+
     Parameters
     ----------
     allele_index : int
@@ -743,15 +754,16 @@ def trio_allele_log_pmf(
     # accumulate log-probabilities
     # for Gibbs sampling these are calculated as probability
     # of proposed allele given other alleles held as constant
-    # p(a | c)
+    # p(a | c).
+    # here we actually calculate p(a | c) * p(c | p, q) for simplicity.
     # to do this we iterate over all possible gamete combinations
     # and model the probability of the allele in question coming from
     # each gamete in a pair.
-    # therefore the alleles held as constant usually includes alleles
+    # therefore, the alleles held as constant usually includes alleles
     # from both gametes.
-    # we need to weight each gamete constant combination by its probability
-    # of occurring and then multiply this by the probability of the allele
-    # given the constant.
+    # we need to weight for each constant combination by its probability
+    # of occurring (p(c | p, q)) and then multiply this by the probability
+    # of the allele given the constant (p(a | c)).
     # This effectively involves calculating three probabilities:
     # p(gamete_p | parent_p)
     # p(gamete_q_constant | parent_q, gamete_p)
