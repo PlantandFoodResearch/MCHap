@@ -29,6 +29,33 @@ DIPLOID_TRIO_PEDIGREE = {
 }
 
 
+TETRAPLOID_DUO_PEDIGREE = {
+    "parent": [
+        [-1, -1],
+        [0, -1],  # unknown parent
+    ],
+    "tau": [
+        [2, 2],
+        [2, 2],
+    ],
+    "lambda": [
+        [0.1, 0.1],
+        [0.1, 0.1],
+    ],
+    "genotype": [
+        [1, 1, 2, 3],
+        [1, 1, 2, 1],
+    ],
+}
+
+
+TETRAPLOID_DUO_PEDIGREE_INCONGRUENT = TETRAPLOID_DUO_PEDIGREE.copy()
+TETRAPLOID_DUO_PEDIGREE_INCONGRUENT["genotype"] = [
+    [1, 1, 2, 3],
+    [0, 0, 2, 4],  # incongruent progeny
+]
+
+
 TETRAPLOID_TRIO_PEDIGREE = {
     "parent": [
         [-1, -1],
@@ -51,6 +78,14 @@ TETRAPLOID_TRIO_PEDIGREE = {
         [1, 1, 2, 1],
     ],
 }
+
+
+TETRAPLOID_TRIO_PEDIGREE_INCONGRUENT = TETRAPLOID_TRIO_PEDIGREE.copy()
+TETRAPLOID_TRIO_PEDIGREE_INCONGRUENT["genotype"] = [
+    [0, 0, 1, 2],
+    [1, 1, 2, 3],
+    [0, 0, 0, 4],  # incongruent progeny
+]
 
 
 UNBALANCED_TRIO_PEDIGREE = {
@@ -103,15 +138,33 @@ HAMILTON_KERR_PEDIGREE = {
 }
 
 
-@pytest.mark.parametrize("gamete_error", [0.1, 0.5, 1.0, "random"])
+# The same pedigree but with some incongruent genotypes
+HAMILTON_KERR_PEDIGREE_INCONGRUENT = HAMILTON_KERR_PEDIGREE.copy()
+HAMILTON_KERR_PEDIGREE_INCONGRUENT["genotype"] = [
+    [0, 1, -2, -2],
+    [0, 2, 2, 3],
+    [0, 2, -2, -2],
+    [0, 1, -2, -2],
+    [1, 1, -2, -2],  # only one parent has a '1'
+    [0, 0, 0, 2],
+    [0, 0, 2, 5],  # novel allele
+    [0, 2, 2, 3],
+]
+
+
+@pytest.mark.parametrize("gamete_error", [0.001, 0.1, 0.5, 1.0, "random"])
 @pytest.mark.parametrize("read_depth", [4, 8])
 @pytest.mark.parametrize(
     "pedigree",
     [
         DIPLOID_TRIO_PEDIGREE,
+        TETRAPLOID_DUO_PEDIGREE,
+        TETRAPLOID_DUO_PEDIGREE_INCONGRUENT,
         TETRAPLOID_TRIO_PEDIGREE,
+        TETRAPLOID_TRIO_PEDIGREE_INCONGRUENT,
         UNBALANCED_TRIO_PEDIGREE,
         HAMILTON_KERR_PEDIGREE,
+        HAMILTON_KERR_PEDIGREE_INCONGRUENT,
     ],
 )
 def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
@@ -197,5 +250,5 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
                 mtx.append(probs)
             mtx = np.array(mtx)
             longrun = np.linalg.matrix_power(mtx, 100)[0]
-
+            assert not np.isnan(gibbs).any()
             np.testing.assert_almost_equal(longrun, gibbs)
