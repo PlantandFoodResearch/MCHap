@@ -2,6 +2,7 @@ import sys
 import argparse
 import numpy as np
 from dataclasses import dataclass
+import warnings
 
 from mchap.application import call_baseclass
 from mchap.application.baseclass import SampleAssemblyError, SAMPLE_ASSEMBLY_ERROR
@@ -14,6 +15,10 @@ from mchap.calling.exact import genotype_likelihoods
 from mchap.jitutils import natural_log_to_log10
 
 from mchap.io import qual_of_prob, vcf
+
+
+class ExperimentalFeatureWarning(UserWarning):
+    pass
 
 
 @dataclass
@@ -33,9 +38,11 @@ class program(call_baseclass.program):
 
         e.g. `program.cli(sys.argv)`
         """
+        warnings.warn(
+            "THIS PROGRAM IS HIGHLY EXPERIMENTAL!!!", ExperimentalFeatureWarning
+        )
         parser = argparse.ArgumentParser(
             "MCMC haplotype calling via pedigree-annealing. "
-            "WARNING THIS TOOL IS HIGHLY EXPERIMENTAL!!!"
         )
         for arg in CALL_PEDIGREE_MCMC_PARSER_ARGUMENTS:
             arg.add_to(parser)
