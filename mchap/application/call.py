@@ -90,20 +90,16 @@ class program(call_baseclass.program):
         # remove masked haplotypes from mcmc
         if np.any(mask):
             mcmc_haplotypes = haplotypes[~mask]
+            mcmc_prior_frequencies = prior_frequencies[~mask]
             mcmc_haplotype_labels = np.where(~mask)[0]
         else:
             # use all haplotypes
             mcmc_haplotype_labels = None
+            mcmc_prior_frequencies = prior_frequencies
             mcmc_haplotypes = haplotypes
 
         # must have one or more haplotypes for MCMC
         invalid_scenario = len(mcmc_haplotypes) == 0
-
-        # get prior for allele frequencies
-        if self.prior_frequencies_tag:
-            prior_frequencies = prior_frequencies[~mask]
-        else:
-            prior_frequencies = None
 
         # handle invalid scenarios
         # TODO: handle this more elegantly?
@@ -111,7 +107,7 @@ class program(call_baseclass.program):
             # must have one or more haplotypes for MCMC
             invalid_scenario = True
             data.columndata["FILTER"].append(vcf.filters.NOA.id)
-        elif (prior_frequencies is not None) and np.any(np.isnan(prior_frequencies)):
+        elif np.any(np.isnan(prior_frequencies)):
             # nan caused by zero freq
             invalid_scenario = True
             data.columndata["FILTER"].append(vcf.filters.AF0.id)
@@ -147,7 +143,7 @@ class program(call_baseclass.program):
                         ploidy=data.sample_ploidy[sample],
                         haplotypes=mcmc_haplotypes,
                         inbreeding=data.sample_inbreeding[sample],
-                        frequencies=prior_frequencies,
+                        frequencies=mcmc_prior_frequencies,
                         steps=self.mcmc_steps,
                         chains=self.mcmc_chains,
                         random_seed=self.random_seed,
