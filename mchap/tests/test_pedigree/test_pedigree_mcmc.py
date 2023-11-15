@@ -5,6 +5,22 @@ from mchap.testing import simulate_reads
 from mchap.pedigree.mcmc import metropolis_hastings_probabilities, gibbs_probabilities
 
 
+SINGLETON_PEDIGREE = {
+    "parent": [
+        [-1, -1],
+    ],
+    "tau": [
+        [1, 1],
+    ],
+    "lambda": [
+        [0, 0],
+    ],
+    "genotype": [
+        [0, 0],
+    ],
+}
+
+
 DIPLOID_TRIO_PEDIGREE = {
     "parent": [
         [-1, -1],
@@ -157,6 +173,7 @@ HAMILTON_KERR_PEDIGREE_INCONGRUENT["genotype"] = [
 @pytest.mark.parametrize(
     "pedigree",
     [
+        SINGLETON_PEDIGREE,
         DIPLOID_TRIO_PEDIGREE,
         TETRAPLOID_DUO_PEDIGREE,
         TETRAPLOID_DUO_PEDIGREE_INCONGRUENT,
@@ -181,6 +198,9 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
         ]
     )
     n_alleles, n_pos = haplotypes.shape
+    np.random.seed(0)
+    frequencies = np.random.rand(n_alleles)
+    print("Freqs:", frequencies)
 
     # pedigree and genotype data
     genotypes = np.array(pedigree["genotype"])
@@ -189,7 +209,6 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
     gamete_lambda = np.array(pedigree["lambda"], float)
     n_samples = len(genotypes)
     if gamete_error == "random":
-        np.random.seed(0)
         gamete_error = np.random.rand(n_samples * 2).reshape(n_samples, 2)
     else:
         gamete_error = np.full((n_samples, 2), gamete_error, float)
@@ -226,6 +245,7 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
                 sample_read_dists,  # array (n_samples, n_reads, n_pos, n_nucl)
                 sample_read_counts,  # array (n_samples, n_reads)
                 haplotypes,  # (n_haplotypes, n_pos)
+                log_frequencies=np.log(frequencies),
                 llk_cache=None,
             )
 
@@ -245,6 +265,7 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
                     sample_read_dists,  # array (n_samples, n_reads, n_pos, n_nucl)
                     sample_read_counts,  # array (n_samples, n_reads)
                     haplotypes,  # (n_haplotypes, n_pos)
+                    log_frequencies=np.log(frequencies),
                     llk_cache=None,
                 )
                 mtx.append(probs)
