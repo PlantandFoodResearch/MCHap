@@ -68,8 +68,12 @@ def trio_valid(
     while True:
         match = True
         for i in range(len(dosage)):
+            if gamete_q[i] > constraint_q[i]:
+                match = False
+                break
             if gamete_p[i] + gamete_q[i] != dosage[i]:
                 match = False
+                break
         if match:
             return True
         try:

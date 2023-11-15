@@ -11,7 +11,7 @@ from mchap.jitutils import (
 )
 from mchap.pedigree.prior import trio_log_pmf
 from mchap.pedigree.likelihood import log_likelihood_alleles_cached
-from mchap.pedigree.classes import PedigreeCallingMCMC
+from mchap.pedigree.classes import PedigreeCallingMCMC, PedigreeAllelesMultiTrace
 
 
 @pytest.mark.parametrize(
@@ -222,3 +222,78 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
                 actual.round(5),
             )
             assert np.allclose(expect, actual, atol=tolerance)
+
+
+def test_PedigreeAllelesMultiTrace_burn():
+    trace_0 = [
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+    ]
+    trace_1 = [
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
+    ]
+    trace = PedigreeAllelesMultiTrace(np.array([trace_0, trace_1]))
+    actual = trace.burn(2).genotypes
+    expect = [trace_0[2:], trace_1[2:]]
+    np.testing.assert_array_equal(expect, actual)
+
+
+def test_PedigreeAllelesMultiTrace_individual():
+    trace_0 = [
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+    ]
+    trace_1 = [
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
+    ]
+    trace = PedigreeAllelesMultiTrace(np.array([trace_0, trace_1]))
+    actual = trace.individual(2).genotypes
+    expect = [np.array(trace_0)[:, 2], np.array(trace_1)[:, 2]]
+    np.testing.assert_array_equal(expect, actual)
+
+
+def test_PedigreeAllelesMultiTrace_incongruence():
+    sample_ploidy = np.array([4, 4, 4])
+    sample_parents = np.array(
+        [
+            [-1, -1],
+            [0, -1],
+            [0, 1],
+        ]
+    )
+    gamete_tau = np.full((3, 2), 2, int)
+    gamete_lambda = np.zeros((3, 2), float)
+    trace_0 = [
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+    ]
+    trace_1 = [
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 2]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
+        [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
+    ]
+    trace = PedigreeAllelesMultiTrace(np.array([trace_0, trace_1]))
+    expect = [0.0, 0.0, 3 / 10]
+    actual = trace.incongruence(
+        sample_ploidy, sample_parents, gamete_tau, gamete_lambda
+    )
+    np.testing.assert_array_equal(expect, actual)
