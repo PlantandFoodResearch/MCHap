@@ -20,6 +20,7 @@ def metropolis_hastings_probabilities(
     sample_read_dists,  # array (n_samples, n_reads, n_pos, n_nucl)
     sample_read_counts,  # array (n_samples, n_reads)
     haplotypes,  # (n_haplotypes, n_pos)
+    log_frequencies,  # (n_haplotypes,)
     llk_cache,
 ):
     n_alleles = len(haplotypes)
@@ -49,7 +50,7 @@ def metropolis_hastings_probabilities(
         gamete_tau=gamete_tau,
         gamete_lambda=gamete_lambda,
         gamete_error=gamete_error,
-        n_alleles=n_alleles,
+        log_frequencies=log_frequencies,
     )
 
     # store MH acceptance probability for each allele
@@ -83,7 +84,7 @@ def metropolis_hastings_probabilities(
                 gamete_tau=gamete_tau,
                 gamete_lambda=gamete_lambda,
                 gamete_error=gamete_error,
-                n_alleles=n_alleles,
+                log_frequencies=log_frequencies,
             )
             lprior_ratio = lprior_i - lprior
 
@@ -124,6 +125,7 @@ def gibbs_probabilities(
     sample_read_dists,  # array (n_samples, n_reads, n_pos, n_nucl)
     sample_read_counts,  # array (n_samples, n_reads)
     haplotypes,  # (n_haplotypes, n_pos)
+    log_frequencies,  # (n_haplotypes,)
     llk_cache,
 ):
     n_alleles = len(haplotypes)
@@ -161,7 +163,7 @@ def gibbs_probabilities(
             gamete_tau=gamete_tau,
             gamete_lambda=gamete_lambda,
             gamete_error=gamete_error,
-            n_alleles=n_alleles,
+            log_frequencies=log_frequencies,
         )
         log_probabilities[i] = llk_i + lprior_i
 
@@ -184,10 +186,11 @@ def allele_step(
     sample_read_dists,  # array (n_samples, n_reads, n_pos, n_nucl)
     sample_read_counts,  # array (n_samples, n_reads)
     haplotypes,  # (n_haplotypes, n_pos)
+    log_frequencies,
     llk_cache,
     step_type=0,  # 0=Gibbs, 1=MH
 ):
-    if step_type==0:
+    if step_type == 0:
         probabilities = gibbs_probabilities(
             target_index=target_index,
             allele_index=allele_index,
@@ -200,6 +203,7 @@ def allele_step(
             sample_read_dists=sample_read_dists,
             sample_read_counts=sample_read_counts,
             haplotypes=haplotypes,
+            log_frequencies=log_frequencies,
             llk_cache=llk_cache,
         )
     elif step_type == 1:
@@ -215,6 +219,7 @@ def allele_step(
             sample_read_dists=sample_read_dists,
             sample_read_counts=sample_read_counts,
             haplotypes=haplotypes,
+            log_frequencies=log_frequencies,
             llk_cache=llk_cache,
         )
     else:
@@ -236,6 +241,7 @@ def sample_step(
     sample_read_dists,
     sample_read_counts,
     haplotypes,
+    log_frequencies,
     llk_cache,
     step_type=0,
 ):
@@ -254,6 +260,7 @@ def sample_step(
             sample_read_dists=sample_read_dists,
             sample_read_counts=sample_read_counts,
             haplotypes=haplotypes,
+            log_frequencies=log_frequencies,
             llk_cache=llk_cache,
             step_type=step_type,
         )
@@ -270,6 +277,7 @@ def compound_step(
     sample_read_dists,
     sample_read_counts,
     haplotypes,
+    log_frequencies,
     llk_cache,
     step_type=0,
 ):
@@ -287,6 +295,7 @@ def compound_step(
             sample_read_dists=sample_read_dists,
             sample_read_counts=sample_read_counts,
             haplotypes=haplotypes,
+            log_frequencies=log_frequencies,
             llk_cache=llk_cache,
             step_type=step_type,
         )
@@ -303,6 +312,7 @@ def mcmc_sampler(
     sample_read_dists,
     sample_read_counts,
     haplotypes,
+    log_frequencies,
     n_steps=2000,
     annealing=1000,
     step_type=0,
@@ -330,6 +340,8 @@ def mcmc_sampler(
         Number of observations of each read for each samples.
     haplotypes : ndarray, int, shape (n_haplotypes, n_pos)
         Integer encoded haplotypes.
+    log_frequencies : ndarray, float, shape (n_haplotypes,)
+        Log of prior frequencies for haplotypes.
     n_steps : int
         Number of (compound) steps to simulate.
     annealing : int
@@ -371,6 +383,7 @@ def mcmc_sampler(
             sample_read_dists=sample_read_dists,
             sample_read_counts=sample_read_counts,
             haplotypes=haplotypes,
+            log_frequencies=log_frequencies,
             llk_cache=llk_cache,
             step_type=step_type,
         )

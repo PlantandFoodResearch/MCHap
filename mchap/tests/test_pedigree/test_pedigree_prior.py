@@ -456,6 +456,8 @@ def test_trio_log_pmf__sum_to_one(seed):
     tau_q = np.random.randint(1, ploidy_q)
     error_p = np.random.rand()
     error_q = np.random.rand()
+    frequencies = np.random.rand(n_alleles)
+    frequencies /= frequencies.sum()
 
     ploidy = tau_p + tau_q
     n_genotypes = comb_with_replacement(n_alleles, ploidy)
@@ -474,7 +476,7 @@ def test_trio_log_pmf__sum_to_one(seed):
                 lambda_q=0.0,
                 error_p=error_p,
                 error_q=error_q,
-                n_alleles=n_alleles,
+                log_frequencies=np.log(frequencies),
             )
         )
         total_prob += prob
@@ -502,6 +504,8 @@ def test_trio_log_pmf__sum_to_one_lambda(seed, use_lambda_p, use_lambda_q):
     lambda_q = np.random.rand() if use_lambda_q else 0.0
     error_p = np.random.rand()
     error_q = np.random.rand()
+    frequencies = np.random.rand(n_alleles)
+    frequencies /= frequencies.sum()
 
     ploidy = tau_p + tau_q
     n_genotypes = comb_with_replacement(n_alleles, ploidy)
@@ -520,7 +524,7 @@ def test_trio_log_pmf__sum_to_one_lambda(seed, use_lambda_p, use_lambda_q):
                 lambda_q=lambda_q,
                 error_p=error_p,
                 error_q=error_q,
-                n_alleles=n_alleles,
+                log_frequencies=np.log(frequencies),
             )
         )
         total_prob += prob

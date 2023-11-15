@@ -75,12 +75,15 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
             [0, 1, 1, 0, 0, 1, 1],
         ]
     )
+    np.random.seed(seed)
+    frequencies = np.random.rand(len(haplotypes))
+    frequencies /= frequencies.sum()
+    print("Frequencies:", frequencies)
 
     # simulate reads from genotypes
     n_samples = len(sample_parent)
     n_alleles, n_pos = haplotypes.shape
     sample_read_dists = np.empty((n_samples, read_depth, n_pos, 2))
-    np.random.seed(seed)
     for i, g in enumerate(true_genotype):
         sample_read_dists[i] = simulate_reads(
             haplotypes[g],
@@ -143,7 +146,7 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
                             lambda_q=gamete_lambda[j, 1],
                             error_p=error_p,
                             error_q=error_q,
-                            n_alleles=n_alleles,
+                            log_frequencies=np.log(frequencies),
                         )
                         # likelihood
                         log_like += log_likelihood_alleles_cached(
@@ -192,7 +195,8 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
         gamete_lambda=gamete_lambda,
         gamete_error=gamete_error,
         haplotypes=haplotypes,
-        steps=2000,
+        frequencies=frequencies,
+        steps=3000,
         annealing=1000,
         chains=2,
         random_seed=seed,
@@ -210,9 +214,11 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
                 "Sample:",
                 i,
                 g,
+                "tolerance:",
+                tolerance,
                 "expected:",
-                expect.round(3),
+                expect.round(5),
                 "actual:",
-                actual.round(3),
+                actual.round(5),
             )
             assert np.allclose(expect, actual, atol=tolerance)

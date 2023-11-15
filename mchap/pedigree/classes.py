@@ -20,6 +20,7 @@ class PedigreeCallingMCMC(Assembler):
     gamete_lambda: np.ndarray
     gamete_error: np.ndarray
     haplotypes: np.ndarray
+    frequencies: np.ndarray = None
     steps: int = 2000
     annealing: int = 1000
     chains: int = 2
@@ -47,7 +48,6 @@ class PedigreeCallingMCMC(Assembler):
                 )
                 initial[i][0 : self.sample_ploidy[i]] = genotype
 
-
         # step type
         if self.step_type == "Gibbs":
             step_type = 0
@@ -55,6 +55,14 @@ class PedigreeCallingMCMC(Assembler):
             step_type = 1
         else:
             raise ValueError('MCMC step type must be "Gibbs" or "Metropolis-Hastings"')
+
+        # prior for haplotype frequencies
+        if self.frequencies is None:
+            n_haplotypes = len(self.haplotypes)
+            log_frequencies = np.log(np.full(n_haplotypes, 1 / n_haplotypes))
+        else:
+            log_frequencies = np.log(self.frequencies)
+            assert len(log_frequencies) == len(self.haplotypes)
 
         shape = (self.chains, self.steps, n_samples, max_ploidy)
         trace = np.empty(shape=shape, dtype=np.int16)
@@ -69,6 +77,7 @@ class PedigreeCallingMCMC(Assembler):
                 sample_read_dists=sample_reads,
                 sample_read_counts=sample_read_counts,
                 haplotypes=self.haplotypes,
+                log_frequencies=log_frequencies,
                 n_steps=self.steps,
                 annealing=self.annealing,
                 step_type=step_type,

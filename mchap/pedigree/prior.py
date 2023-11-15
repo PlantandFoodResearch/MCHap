@@ -6,24 +6,31 @@ from mchap.jitutils import comb, add_log_prob, ln_equivalent_permutations
 
 
 @njit(cache=True)
-def log_unknown_dosage_prior(dosage, n_alleles, frequencies=None):
+def log_unknown_dosage_prior(dosage, log_frequencies):
+    """
+
+    Parameters
+    ----------
+    dosage
+        Dosage array
+    log_frequencies
+        Prior frequencies corresponding to dosage
+    """
     lperms = ln_equivalent_permutations(dosage)
-    if frequencies is None:
-        lperm_prob = np.log(1 / n_alleles) * dosage.sum()
-    else:
-        lperm_prob = 0.0
-        for i in range(len(dosage)):
-            d = dosage[i]
-            if d > 0:
-                lperm_prob += np.log(frequencies[i]) * d
+    assert len(dosage) == len(log_frequencies)
+    lperm_prob = 0.0
+    for i in range(len(dosage)):
+        d = dosage[i]
+        if d > 0:
+            lperm_prob += log_frequencies[i] * d
     return lperms + lperm_prob
 
 
 @njit(cache=True)
-def log_unknown_const_prior(dosage, allele_index, n_alleles, frequencies=None):
+def log_unknown_const_prior(dosage, allele_index, log_frequencies):
     if dosage[allele_index] > 0:
         dosage[allele_index] -= 1
-        lprob = log_unknown_dosage_prior(dosage, n_alleles, frequencies=frequencies)
+        lprob = log_unknown_dosage_prior(dosage, log_frequencies)
         dosage[allele_index] += 1
     else:
         lprob = -np.inf
@@ -384,7 +391,7 @@ def trio_log_pmf(
     lambda_q,
     error_p,
     error_q,
-    n_alleles,
+    log_frequencies,
 ):
     """Log probability of a trio of genotypes.
 
@@ -406,8 +413,8 @@ def trio_log_pmf(
     error_q : float
         Probability that parent_q is not the correct
         parental genotype.
-    n_alleles : int
-        Number of possible alleles at this locus.
+    log_frequencies : ndarray, float, shape (n_alleles)
+        Log of prior for allele frequencies.
 
     Returns
     -------
@@ -421,6 +428,9 @@ def trio_log_pmf(
     lerror_q = np.log(error_q)
     lcorrect_p = np.log(1 - error_p)
     lcorrect_q = np.log(1 - error_q)
+
+    # ensure frequencies correspond to dosage frequencies
+    log_frequencies = log_frequencies[progeny]
 
     dosage = allelic_dosage(progeny)
     dosage_p = parental_copies(parent_p, progeny)
@@ -486,10 +496,7 @@ def trio_log_pmf(
             lprob = add_log_prob(lprob, lprob_pq)
             # assuming p valid and q invalid (avoids iterating gametes of p twice)
             # probability of gamete_q
-            lprob_q = (
-                log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None)
-                + lerror_q
-            )
+            lprob_q = log_unknown_dosage_prior(gamete_q, log_frequencies) + lerror_q
             lprob_pq = lprob_p + lprob_q
             lprob = add_log_prob(lprob, lprob_pq)
             # increment by gamete of p
@@ -517,10 +524,7 @@ def trio_log_pmf(
                 + lcorrect_p
             )
             # probability of gamete_q
-            lprob_q = (
-                log_unknown_dosage_prior(gamete_q, n_alleles, frequencies=None)
-                + lerror_q
-            )
+            lprob_q = log_unknown_dosage_prior(gamete_q, log_frequencies) + lerror_q
             lprob_pq = lprob_p + lprob_q
             lprob = add_log_prob(lprob, lprob_pq)
             # increment by gamete of p
@@ -538,10 +542,7 @@ def trio_log_pmf(
         gamete_p = dosage - gamete_q
         while True:
             # probability of gamete_p
-            lprob_p = (
-                log_unknown_dosage_prior(gamete_p, n_alleles, frequencies=None)
-                + lerror_p
-            )
+            lprob_p = log_unknown_dosage_prior(gamete_p, log_frequencies) + lerror_p
             lprob_q = (
                 gamete_log_pmf(
                     gamete_dose=gamete_q,
@@ -564,11 +565,7 @@ def trio_log_pmf(
                     gamete_p[i] = dosage[i] - gamete_q[i]
 
     # assuming both parents are invalid
-    lprob_pq = (
-        log_unknown_dosage_prior(dosage, n_alleles, frequencies=None)
-        + lerror_p
-        + lerror_q
-    )
+    lprob_pq = log_unknown_dosage_prior(dosage, log_frequencies) + lerror_p + lerror_q
     lprob = add_log_prob(lprob, lprob_pq)
     return lprob
 
@@ -582,7 +579,7 @@ def markov_blanket_log_probability(
     gamete_tau,
     gamete_lambda,
     gamete_error,
-    n_alleles,
+    log_frequencies,
 ):
     """Joint probability of pedigree items that fall within the
     Markov blanket of the specified target sample.
@@ -604,8 +601,8 @@ def markov_blanket_log_probability(
         Excess IBDy associated with each pedigree edge.
     gamete_error : float, shape (n_samples, 2)
         Error rate associated with each pedigree edge.
-    n_alleles : int
-        Number of possible haplotype alleles at this locus.
+    log_frequencies : ndarray, float, shape (n_alleles)
+        Log of prior for allele frequencies.
 
     Returns
     -------
@@ -644,7 +641,7 @@ def markov_blanket_log_probability(
                 lambda_q=gamete_lambda[i, 1],
                 error_p=error_p,
                 error_q=error_q,
-                n_alleles=n_alleles,
+                log_frequencies=log_frequencies,
             )
     return log_joint
 
@@ -661,7 +658,7 @@ def trio_allele_log_pmf(
     lambda_q,
     error_p,
     error_q,
-    n_alleles,
+    log_frequencies,
 ):
     """Log probability of allele within a trio of genotypes.
 
@@ -696,8 +693,8 @@ def trio_allele_log_pmf(
     error_q : float
         Probability that parent_q is not the correct
         parental genotype.
-    n_alleles : int
-        Number of possible alleles at this locus.
+    log_frequencies : ndarray, float, shape (n_alleles)
+        Log of prior for allele frequencies.
 
     Returns
     -------
@@ -719,6 +716,9 @@ def trio_allele_log_pmf(
         if progeny[i] == progeny[allele_index]:
             allele_index = i
             break
+
+    # ensure frequencies correspond to dosage frequencies
+    log_frequencies = log_frequencies[progeny]
 
     dosage = allelic_dosage(progeny)
     dosage_p = parental_copies(parent_p, progeny)
@@ -826,13 +826,11 @@ def trio_allele_log_pmf(
             lprob = add_log_prob(lprob, lprob_pq)
 
             # assuming p valid and q invalid (avoids iterating gametes of p twice)
-            lprob_gamete_q = log_unknown_dosage_prior(
-                gamete_q, n_alleles, frequencies=None
-            )
+            lprob_gamete_q = log_unknown_dosage_prior(gamete_q, log_frequencies)
             lprob_const_q = log_unknown_const_prior(
-                gamete_q, allele_index, n_alleles, frequencies=None
+                gamete_q, allele_index, log_frequencies
             )
-            lprob_allele_q = np.log(1 / n_alleles)  # log frequency of allele
+            lprob_allele_q = log_frequencies[allele_index]
             lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
             lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
             lprob_pq = add_log_prob(lprob_p, lprob_q) + lcorrect_p + lerror_q
@@ -875,13 +873,11 @@ def trio_allele_log_pmf(
                 parent_ploidy=ploidy_p,
                 gamete_lambda=lambda_p,
             )
-            lprob_gamete_q = log_unknown_dosage_prior(
-                gamete_q, n_alleles, frequencies=None
-            )
+            lprob_gamete_q = log_unknown_dosage_prior(gamete_q, log_frequencies)
             lprob_const_q = log_unknown_const_prior(
-                gamete_q, allele_index, n_alleles, frequencies=None
+                gamete_q, allele_index, log_frequencies
             )
-            lprob_allele_q = np.log(1 / n_alleles)  # log frequency of allele
+            lprob_allele_q = log_frequencies[allele_index]
             lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
             lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
             lprob_pq = add_log_prob(lprob_p, lprob_q) + lcorrect_p + lerror_q
@@ -923,13 +919,11 @@ def trio_allele_log_pmf(
                 parent_ploidy=ploidy_q,
                 gamete_lambda=lambda_q,
             )
-            lprob_gamete_p = log_unknown_dosage_prior(
-                gamete_p, n_alleles, frequencies=None
-            )
+            lprob_gamete_p = log_unknown_dosage_prior(gamete_p, log_frequencies)
             lprob_const_p = log_unknown_const_prior(
-                gamete_p, allele_index, n_alleles, frequencies=None
+                gamete_p, allele_index, log_frequencies
             )
-            lprob_allele_p = np.log(1 / n_alleles)  # log frequency of allele
+            lprob_allele_p = log_frequencies[allele_index]
             lprob_p = lprob_gamete_q + lprob_const_p + lprob_allele_p
             lprob_q = lprob_gamete_p + lprob_const_q + lprob_allele_q
             lprob_pq = add_log_prob(lprob_p, lprob_q) + lerror_p + lcorrect_q
@@ -945,10 +939,10 @@ def trio_allele_log_pmf(
 
     # assuming both parents are invalid
     # p(constant) * p(allele | constant) * 2
-    lprob_const = log_unknown_const_prior(
-        dosage, allele_index, n_alleles, frequencies=None
-    )
-    lprob_allele = -np.log(n_alleles) + np.log(2)  # log frequency of allele * 2
+    lprob_const = log_unknown_const_prior(dosage, allele_index, log_frequencies)
+    lprob_allele = (
+        log_frequencies[allele_index] + 0.6931471805599453
+    )  # log frequency of allele * 2
     lprob_pq = lprob_const + lprob_allele + lerror_p + lerror_q
     lprob = add_log_prob(lprob, lprob_pq)
     assert not np.isnan(lprob)
@@ -965,7 +959,7 @@ def markov_blanket_log_allele_probability(
     gamete_tau,
     gamete_lambda,
     gamete_error,
-    n_alleles,
+    log_frequencies,
 ):
     """Joint probability of pedigree items that fall within the
     Markov blanket of the specified target sample.
@@ -989,8 +983,8 @@ def markov_blanket_log_allele_probability(
         Excess IBDy associated with each pedigree edge.
     gamete_error : float, shape (n_samples, 2)
         Error rate associated with each pedigree edge.
-    n_alleles : int
-        Number of possible haplotype alleles at this locus.
+    log_frequencies : ndarray, float, shape (n_alleles)
+        Log of prior for allele frequencies.
 
     Returns
     -------
@@ -1032,7 +1026,7 @@ def markov_blanket_log_allele_probability(
                     lambda_q=gamete_lambda[i, 1],
                     error_p=error_p,
                     error_q=error_q,
-                    n_alleles=n_alleles,
+                    log_frequencies=log_frequencies,
                 )
             else:
                 # the target is a parent
@@ -1046,6 +1040,6 @@ def markov_blanket_log_allele_probability(
                     lambda_q=gamete_lambda[i, 1],
                     error_p=error_p,
                     error_q=error_q,
-                    n_alleles=n_alleles,
+                    log_frequencies=log_frequencies,
                 )
     return log_joint
