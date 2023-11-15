@@ -752,9 +752,14 @@ PEDIGREE_PARSER_ARGUMENTS = [
 
 CALL_MCMC_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_MCMC_PARSER_ARGUMENTS
 
+# insert pedigree arguments in appropriate place and remove inbreeding which is currently unsupported
+assert CALL_MCMC_PARSER_ARGUMENTS[5] == inbreeding
 CALL_PEDIGREE_MCMC_PARSER_ARGUMENTS = (
-    CALL_MCMC_PARSER_ARGUMENTS + PEDIGREE_PARSER_ARGUMENTS
+    CALL_MCMC_PARSER_ARGUMENTS[0:5]
+    + PEDIGREE_PARSER_ARGUMENTS
+    + CALL_MCMC_PARSER_ARGUMENTS[6:]
 )
+
 
 ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
     [
@@ -923,7 +928,6 @@ def parse_pedigree_arguments(
     samples,
     sample_bams,
     ploidy_argument,
-    inbreeding_argument,
     sample_parents_argument,
     gamete_ploidy_argument,
     gamete_ibd_argument,
@@ -990,11 +994,7 @@ def parse_pedigree_arguments(
         samples,
         type=int,
     )
-    sample_inbreeding = parse_sample_value_map(
-        inbreeding_argument,
-        samples,
-        type=float,
-    )
+    sample_inbreeding = {s: 0.0 for s in samples}
 
     # gamete ploidy
     gamete_ploidy = dict()
@@ -1126,7 +1126,7 @@ def parse_report_fields(report_argument):
     return info_fields, format_fields
 
 
-def collect_default_program_arguments(arguments):
+def collect_default_program_arguments(arguments, skip_inbreeding=False):
     # must have some source of error in reads
     if arguments.ignore_base_phred_scores:
         if arguments.base_error_rate[0] == 0.0:
@@ -1145,12 +1145,14 @@ def collect_default_program_arguments(arguments):
         samples,
         type=int,
     )
-    sample_inbreeding = parse_sample_value_map(
-        arguments.inbreeding[0],
-        samples,
-        type=float,
-    )
-    info_fields, format_fields = parse_report_fields(arguments.report)
+    if skip_inbreeding:
+        sample_inbreeding = None
+    else:
+        sample_inbreeding = parse_sample_value_map(
+            arguments.inbreeding[0],
+            samples,
+            type=float,
+        )
     return dict(
         samples=samples,
         sample_bams=sample_bams,
@@ -1180,21 +1182,18 @@ def collect_call_exact_program_arguments(arguments):
 
 
 def collect_default_mcmc_program_arguments(arguments):
-    data = collect_default_program_arguments(arguments)
-    data.update(
-        dict(
-            mcmc_chains=arguments.mcmc_chains[0],
-            mcmc_steps=arguments.mcmc_steps[0],
-            mcmc_burn=arguments.mcmc_burn[0],
-            mcmc_incongruence_threshold=arguments.mcmc_chain_incongruence_threshold[0],
-            random_seed=arguments.mcmc_seed[0],
-        )
+    return dict(
+        mcmc_chains=arguments.mcmc_chains[0],
+        mcmc_steps=arguments.mcmc_steps[0],
+        mcmc_burn=arguments.mcmc_burn[0],
+        mcmc_incongruence_threshold=arguments.mcmc_chain_incongruence_threshold[0],
+        random_seed=arguments.mcmc_seed[0],
     )
-    return data
 
 
 def collect_call_mcmc_program_arguments(arguments):
-    data = collect_default_mcmc_program_arguments(arguments)
+    data = collect_default_program_arguments(arguments)
+    data.update(collect_default_mcmc_program_arguments(arguments))
     data["vcf"] = arguments.haplotypes[0]
     data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
     data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
@@ -1202,13 +1201,18 @@ def collect_call_mcmc_program_arguments(arguments):
 
 
 def collect_call_pedigree_mcmc_program_arguments(arguments):
-    data = collect_call_mcmc_program_arguments(arguments)
+    # TODO: re-add the inbreeding option when supported
+    data = collect_default_program_arguments(arguments, skip_inbreeding=True)
+    data.update(collect_default_mcmc_program_arguments(arguments))
+    data["vcf"] = arguments.haplotypes[0]
+    data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
+    data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
+    assert data["sample_inbreeding"] is None
     data.update(
         parse_pedigree_arguments(
             samples=data["samples"],
             sample_bams=data["sample_bams"],
             ploidy_argument=arguments.ploidy[0],
-            inbreeding_argument=arguments.inbreeding[0],
             sample_parents_argument=arguments.sample_parents[0],
             gamete_ploidy_argument=arguments.gamete_ploidy[0],
             gamete_ibd_argument=arguments.gamete_ibd[0],
@@ -1222,7 +1226,8 @@ def collect_assemble_mcmc_program_arguments(arguments):
     # target and regions cant be combined
     if (arguments.targets[0] is not None) and (arguments.region[0] is not None):
         raise ValueError("Cannot combine --targets and --region arguments.")
-    data = collect_default_mcmc_program_arguments(arguments)
+    data = collect_default_program_arguments(arguments)
+    data.update(collect_default_mcmc_program_arguments(arguments))
     sample_mcmc_temperatures = parse_sample_temperatures(
         arguments.mcmc_temperatures, samples=data["samples"]
     )
