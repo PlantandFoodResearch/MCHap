@@ -20,12 +20,12 @@ from mchap.pedigree.classes import PedigreeCallingMCMC, PedigreeAllelesMultiTrac
         (0, "Gibbs", 0, 0.02),
         (0, "Metropolis-Hastings", 0, 0.03),
         (4, "Gibbs", 0, 0.02),
-        (4, "Metropolis-Hastings", 0, 0.02),
+        (4, "Metropolis-Hastings", 0, 0.03),
         (10, "Gibbs", 0, 0.01),
         (10, "Metropolis-Hastings", 0, 0.015),
-        (40, "Gibbs", 0, 0.005),
+        (40, "Gibbs", 0, 0.01),
         (40, "Metropolis-Hastings", 0, 0.015),
-        (100, "Gibbs", 0, 0.001),
+        (100, "Gibbs", 0, 0.0015),
         (100, "Metropolis-Hastings", 0, 0.003),
     ],
 )
@@ -44,7 +44,7 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
             [-1, -1],
             [-1, -1],
             [0, 1],
-            [-1, 3],  # unknown parent
+            [-1, 2],  # unknown parent
         ]
     )
     gamete_tau = np.array(

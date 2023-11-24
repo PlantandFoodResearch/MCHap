@@ -14,6 +14,7 @@ def metropolis_hastings_probabilities(
     sample_genotypes,
     sample_ploidy,
     sample_parents,
+    sample_children,
     gamete_tau,
     gamete_lambda,
     gamete_error,
@@ -47,6 +48,7 @@ def metropolis_hastings_probabilities(
         sample_genotypes=sample_genotypes,
         sample_ploidy=sample_ploidy,
         sample_parents=sample_parents,
+        sample_children=sample_children,
         gamete_tau=gamete_tau,
         gamete_lambda=gamete_lambda,
         gamete_error=gamete_error,
@@ -81,6 +83,7 @@ def metropolis_hastings_probabilities(
                 sample_genotypes=sample_genotypes,
                 sample_ploidy=sample_ploidy,
                 sample_parents=sample_parents,
+                sample_children=sample_children,
                 gamete_tau=gamete_tau,
                 gamete_lambda=gamete_lambda,
                 gamete_error=gamete_error,
@@ -119,6 +122,7 @@ def gibbs_probabilities(
     sample_genotypes,
     sample_ploidy,
     sample_parents,
+    sample_children,
     gamete_tau,
     gamete_lambda,
     gamete_error,
@@ -160,6 +164,7 @@ def gibbs_probabilities(
             sample_genotypes=sample_genotypes,
             sample_ploidy=sample_ploidy,
             sample_parents=sample_parents,
+            sample_children=sample_children,
             gamete_tau=gamete_tau,
             gamete_lambda=gamete_lambda,
             gamete_error=gamete_error,
@@ -180,6 +185,7 @@ def allele_step(
     sample_genotypes,
     sample_ploidy,
     sample_parents,
+    sample_children,
     gamete_tau,
     gamete_lambda,
     gamete_error,
@@ -197,6 +203,7 @@ def allele_step(
             sample_genotypes=sample_genotypes,
             sample_ploidy=sample_ploidy,
             sample_parents=sample_parents,
+            sample_children=sample_children,
             gamete_tau=gamete_tau,
             gamete_lambda=gamete_lambda,
             gamete_error=gamete_error,
@@ -213,6 +220,7 @@ def allele_step(
             sample_genotypes=sample_genotypes,
             sample_ploidy=sample_ploidy,
             sample_parents=sample_parents,
+            sample_children=sample_children,
             gamete_tau=gamete_tau,
             gamete_lambda=gamete_lambda,
             gamete_error=gamete_error,
@@ -235,6 +243,7 @@ def sample_step(
     sample_genotypes,
     sample_ploidy,
     sample_parents,
+    sample_children,
     gamete_tau,
     gamete_lambda,
     gamete_error,
@@ -254,6 +263,7 @@ def sample_step(
             sample_genotypes=sample_genotypes,
             sample_ploidy=sample_ploidy,
             sample_parents=sample_parents,
+            sample_children=sample_children,
             gamete_tau=gamete_tau,
             gamete_lambda=gamete_lambda,
             gamete_error=gamete_error,
@@ -271,6 +281,7 @@ def compound_step(
     sample_genotypes,
     sample_ploidy,
     sample_parents,
+    sample_children,
     gamete_tau,
     gamete_lambda,
     gamete_error,
@@ -289,6 +300,7 @@ def compound_step(
             sample_genotypes=sample_genotypes,
             sample_ploidy=sample_ploidy,
             sample_parents=sample_parents,
+            sample_children=sample_children,
             gamete_tau=gamete_tau,
             gamete_lambda=gamete_lambda,
             gamete_error=gamete_error,
@@ -299,6 +311,51 @@ def compound_step(
             llk_cache=llk_cache,
             step_type=step_type,
         )
+
+
+@njit(cache=True)
+def sample_children_matrix(sample_parents):
+    """Identify the children of each sample
+
+    Parameters
+    ----------
+    sample_parents : ndarray, int, shape (n_samples, 2)
+        Integer indices of parents with -1 indicating unknown.
+
+    Returns
+    -------
+    sample_children : ndarray, int, shape (n_samples, max_children)
+        Integer indices of children padded by -1.
+    """
+    n_samples, n_parents = sample_parents.shape
+    assert n_parents == 2
+    next_child_index = np.zeros(n_samples, dtype=np.int64)
+    # first loop through is to count the number of children
+    # this is 2x iteration but avoids the creation of an n*n matrix
+    for i in range(n_samples):
+        for j in range(n_parents):
+            p = sample_parents[i, j]
+            assert p != i  # can't be your own parent!
+            if p >= 0:
+                if j == 1:
+                    # check for selfing
+                    if p == sample_parents[i, 0]:
+                        break
+                next_child_index[p] += 1
+    max_children = next_child_index.max()
+    sample_children = np.full((n_samples, max_children), -1, dtype=np.int64)
+    next_child_index[:] = 0
+    for i in range(n_samples):
+        for j in range(n_parents):
+            p = sample_parents[i, j]
+            if p >= 0:
+                if j == 1:
+                    # check for selfing
+                    if p == sample_parents[i, 0]:
+                        break
+                sample_children[p, next_child_index[p]] = i
+                next_child_index[p] += 1
+    return sample_children
 
 
 @njit(cache=True)
@@ -369,6 +426,7 @@ def mcmc_sampler(
     if annealing:
         error_weight[0:annealing] = np.linspace(0.0, 1.0, annealing)
 
+    sample_children = sample_children_matrix(sample_parents)
     sample_genotypes = sample_genotypes.copy()
     n_samples, max_ploidy = sample_genotypes.shape
     trace = np.empty((n_steps, n_samples, max_ploidy), dtype=sample_genotypes.dtype)
@@ -377,6 +435,7 @@ def mcmc_sampler(
             sample_genotypes=sample_genotypes,
             sample_ploidy=sample_ploidy,
             sample_parents=sample_parents,
+            sample_children=sample_children,
             gamete_tau=gamete_tau,
             gamete_lambda=gamete_lambda,
             gamete_error=gamete_error,

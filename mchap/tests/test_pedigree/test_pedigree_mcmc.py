@@ -2,7 +2,11 @@ import pytest
 import numpy as np
 
 from mchap.testing import simulate_reads
-from mchap.pedigree.mcmc import metropolis_hastings_probabilities, gibbs_probabilities
+from mchap.pedigree.mcmc import (
+    metropolis_hastings_probabilities,
+    gibbs_probabilities,
+    sample_children_matrix,
+)
 
 
 SINGLETON_PEDIGREE = {
@@ -128,6 +132,34 @@ UNBALANCED_TRIO_PEDIGREE = {
 }
 
 
+MIXED_QUARTET_PEDIGREE = {
+    "parent": [
+        [-1, -1],
+        [-1, -1],
+        [0, 1],
+        [-1, 2],  # unknown parent
+    ],
+    "tau": [
+        [1, 1],
+        [2, 2],
+        [2, 2],
+        [2, 2],
+    ],
+    "lambda": [
+        [0.0, 0.0],
+        [0.01, 0.01],
+        [0.345, 0.01],
+        [0.01, 0.01],
+    ],
+    "genotype": [
+        [0, 1, -2, -2],
+        [0, 0, 0, 2],
+        [0, 1, 1, 2],
+        [0, 0, 1, 2],
+    ],
+}
+
+
 HAMILTON_KERR_PEDIGREE = {
     "parent": [[-1, -1], [-1, -1], [-1, 1], [0, -1], [0, 2], [0, 2], [5, 1], [5, 1]],
     "tau": [[1, 1], [2, 2], [0, 2], [2, 0], [1, 1], [2, 2], [2, 2], [2, 2]],
@@ -180,6 +212,7 @@ HAMILTON_KERR_PEDIGREE_INCONGRUENT["genotype"] = [
         TETRAPLOID_TRIO_PEDIGREE,
         TETRAPLOID_TRIO_PEDIGREE_INCONGRUENT,
         UNBALANCED_TRIO_PEDIGREE,
+        MIXED_QUARTET_PEDIGREE,
         HAMILTON_KERR_PEDIGREE,
         HAMILTON_KERR_PEDIGREE_INCONGRUENT,
     ],
@@ -205,6 +238,7 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
     # pedigree and genotype data
     genotypes = np.array(pedigree["genotype"])
     sample_parents = np.array(pedigree["parent"], int)
+    sample_children = sample_children_matrix(sample_parents)
     gamete_tau = np.array(pedigree["tau"], int)
     gamete_lambda = np.array(pedigree["lambda"], float)
     n_samples = len(genotypes)
@@ -239,6 +273,7 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
                 genotypes,
                 sample_ploidy,
                 sample_parents,
+                sample_children,
                 gamete_tau,
                 gamete_lambda,
                 gamete_error,
@@ -259,6 +294,7 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
                     genotypes,
                     sample_ploidy,
                     sample_parents,
+                    sample_children,
                     gamete_tau,
                     gamete_lambda,
                     gamete_error,
@@ -273,3 +309,74 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
             longrun = np.linalg.matrix_power(mtx, 100)[0]
             assert not np.isnan(gibbs).any()
             np.testing.assert_almost_equal(longrun, gibbs)
+
+
+@pytest.mark.parametrize(
+    "parent, children",
+    [
+        (
+            [
+                [-1, -1],
+                [-1, -1],
+                [0, 1],
+                [-1, 2],
+            ],
+            [
+                [2],
+                [2],
+                [3],
+                [-1],
+            ],
+        ),
+        (
+            [
+                [-1, -1],
+                [-1, -1],
+                [-1, -1],
+                [-1, -1],
+                [0, 1],
+                [0, 1],
+                [0, 1],
+                [0, 1],
+                [0, 1],
+                [2, 3],
+                [2, 3],
+                [2, 3],
+                [2, 3],
+                [2, 3],
+                [2, 3],
+                [0, 3],
+                [0, 3],
+                [0, 3],
+                [0, 3],
+                [0, 3],
+            ],
+            [
+                [4, 5, 6, 7, 8, 15, 16, 17, 18, 19, -1],
+                [4, 5, 6, 7, 8, -1, -1, -1, -1, -1, -1],
+                [9, 10, 11, 12, 13, 14, -1, -1, -1, -1, -1],
+                [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+            ],
+        ),
+    ],
+)
+def test_sample_children_matrix(parent, children):
+    parent = np.array(parent)
+    children = np.array(children)
+    np.testing.assert_array_equal(sample_children_matrix(parent), children)

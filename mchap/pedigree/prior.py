@@ -576,6 +576,7 @@ def markov_blanket_log_probability(
     sample_genotypes,
     sample_ploidy,
     sample_parents,
+    sample_children,
     gamete_tau,
     gamete_lambda,
     gamete_error,
@@ -611,38 +612,46 @@ def markov_blanket_log_probability(
         Markov blanket of the specified target sample.
 
     """
-    n_samples, _ = sample_genotypes.shape
+    n_samples, max_children = sample_children.shape
     assert 0 <= target_index < n_samples
     log_joint = 0.0
-    for i in range(n_samples):
+    for idx in range(-1, max_children):
+        if idx < 0:
+            # start with trio in which target is the child
+            i = target_index
+        else:
+            # iterate through children
+            i = sample_children[target_index, idx]
+            if i < 0:
+                # no more children
+                break
         p = sample_parents[i, 0]
         q = sample_parents[i, 1]
-        if (target_index == i) or (target_index == p) or (target_index == q):
-            if p >= 0:
-                error_p = gamete_error[i, 0]
-                genotype_p = sample_genotypes[p, 0 : sample_ploidy[p]]
-            else:
-                error_p = 1.0
-                genotype_p = np.array([-1], dtype=sample_genotypes.dtype)
-            if q >= 0:
-                error_q = gamete_error[i, 1]
-                genotype_q = sample_genotypes[q, 0 : sample_ploidy[q]]
-            else:
-                error_q = 1.0
-                genotype_q = np.array([-1], dtype=sample_genotypes.dtype)
-            genotype_i = sample_genotypes[i, 0 : sample_ploidy[i]]
-            log_joint += trio_log_pmf(
-                genotype_i,
-                genotype_p,
-                genotype_q,
-                tau_p=gamete_tau[i, 0],
-                tau_q=gamete_tau[i, 1],
-                lambda_p=gamete_lambda[i, 0],
-                lambda_q=gamete_lambda[i, 1],
-                error_p=error_p,
-                error_q=error_q,
-                log_frequencies=log_frequencies,
-            )
+        if p >= 0:
+            error_p = gamete_error[i, 0]
+            genotype_p = sample_genotypes[p, 0 : sample_ploidy[p]]
+        else:
+            error_p = 1.0
+            genotype_p = np.array([-1], dtype=sample_genotypes.dtype)
+        if q >= 0:
+            error_q = gamete_error[i, 1]
+            genotype_q = sample_genotypes[q, 0 : sample_ploidy[q]]
+        else:
+            error_q = 1.0
+            genotype_q = np.array([-1], dtype=sample_genotypes.dtype)
+        genotype_i = sample_genotypes[i, 0 : sample_ploidy[i]]
+        log_joint += trio_log_pmf(
+            genotype_i,
+            genotype_p,
+            genotype_q,
+            tau_p=gamete_tau[i, 0],
+            tau_q=gamete_tau[i, 1],
+            lambda_p=gamete_lambda[i, 0],
+            lambda_q=gamete_lambda[i, 1],
+            error_p=error_p,
+            error_q=error_q,
+            log_frequencies=log_frequencies,
+        )
     return log_joint
 
 
@@ -956,6 +965,7 @@ def markov_blanket_log_allele_probability(
     sample_genotypes,
     sample_ploidy,
     sample_parents,
+    sample_children,
     gamete_tau,
     gamete_lambda,
     gamete_error,
@@ -993,53 +1003,72 @@ def markov_blanket_log_allele_probability(
         Markov blanket of the specified target sample.
 
     """
-    n_samples, _ = sample_genotypes.shape
+    n_samples, max_children = sample_children.shape
     assert 0 <= target_index < n_samples
-    log_joint = 0.0
-    for i in range(n_samples):
+
+    # start with trio where target is progeny
+    p = sample_parents[target_index, 0]
+    q = sample_parents[target_index, 1]
+    if p >= 0:
+        error_p = gamete_error[target_index, 0]
+        genotype_p = sample_genotypes[p, 0 : sample_ploidy[p]]
+    else:
+        error_p = 1.0
+        genotype_p = np.array([-1], dtype=sample_genotypes.dtype)
+    if q >= 0:
+        error_q = gamete_error[target_index, 1]
+        genotype_q = sample_genotypes[q, 0 : sample_ploidy[q]]
+    else:
+        error_q = 1.0
+        genotype_q = np.array([-1], dtype=sample_genotypes.dtype)
+    genotype_i = sample_genotypes[target_index, 0 : sample_ploidy[target_index]]
+    log_joint = trio_allele_log_pmf(
+        allele_index=allele_index,
+        progeny=genotype_i,
+        parent_p=genotype_p,
+        parent_q=genotype_q,
+        tau_p=gamete_tau[target_index, 0],
+        tau_q=gamete_tau[target_index, 1],
+        lambda_p=gamete_lambda[target_index, 0],
+        lambda_q=gamete_lambda[target_index, 1],
+        error_p=error_p,
+        error_q=error_q,
+        log_frequencies=log_frequencies,
+    )
+
+    # loop through children
+    for idx in range(max_children):
+        i = sample_children[target_index, idx]
+        if i < 0:
+            # no more children
+            break
         p = sample_parents[i, 0]
         q = sample_parents[i, 1]
-        if (target_index == i) or (target_index == p) or (target_index == q):
-            if p >= 0:
-                error_p = gamete_error[i, 0]
-                genotype_p = sample_genotypes[p, 0 : sample_ploidy[p]]
-            else:
-                error_p = 1.0
-                genotype_p = np.array([-1], dtype=sample_genotypes.dtype)
-            if q >= 0:
-                error_q = gamete_error[i, 1]
-                genotype_q = sample_genotypes[q, 0 : sample_ploidy[q]]
-            else:
-                error_q = 1.0
-                genotype_q = np.array([-1], dtype=sample_genotypes.dtype)
-            genotype_i = sample_genotypes[i, 0 : sample_ploidy[i]]
-            if target_index == i:
-                # the target is the progeny
-                log_joint += trio_allele_log_pmf(
-                    allele_index=allele_index,
-                    progeny=genotype_i,
-                    parent_p=genotype_p,
-                    parent_q=genotype_q,
-                    tau_p=gamete_tau[i, 0],
-                    tau_q=gamete_tau[i, 1],
-                    lambda_p=gamete_lambda[i, 0],
-                    lambda_q=gamete_lambda[i, 1],
-                    error_p=error_p,
-                    error_q=error_q,
-                    log_frequencies=log_frequencies,
-                )
-            else:
-                # the target is a parent
-                log_joint += trio_log_pmf(
-                    genotype_i,
-                    genotype_p,
-                    genotype_q,
-                    tau_p=gamete_tau[i, 0],
-                    tau_q=gamete_tau[i, 1],
-                    lambda_p=gamete_lambda[i, 0],
-                    lambda_q=gamete_lambda[i, 1],
-                    error_p=error_p,
-                    error_q=error_q,
-                    log_frequencies=log_frequencies,
-                )
+        if p >= 0:
+            error_p = gamete_error[i, 0]
+            genotype_p = sample_genotypes[p, 0 : sample_ploidy[p]]
+        else:
+            error_p = 1.0
+            genotype_p = np.array([-1], dtype=sample_genotypes.dtype)
+        if q >= 0:
+            error_q = gamete_error[i, 1]
+            genotype_q = sample_genotypes[q, 0 : sample_ploidy[q]]
+        else:
+            error_q = 1.0
+            genotype_q = np.array([-1], dtype=sample_genotypes.dtype)
+        genotype_i = sample_genotypes[i, 0 : sample_ploidy[i]]
+        # the target is a parent
+        log_joint += trio_log_pmf(
+            genotype_i,
+            genotype_p,
+            genotype_q,
+            tau_p=gamete_tau[i, 0],
+            tau_q=gamete_tau[i, 1],
+            lambda_p=gamete_lambda[i, 0],
+            lambda_q=gamete_lambda[i, 1],
+            error_p=error_p,
+            error_q=error_q,
+            log_frequencies=log_frequencies,
+        )
+
     return log_joint
