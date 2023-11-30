@@ -8,12 +8,15 @@ from mchap.pedigree.prior import (
     set_parental_copies,
     dosage_permutations,
     set_initial_dosage,
+    set_complimentary_gamete,
     increment_dosage,
-    duplicate_permutations,
+    double_reduction_permutations,
     gamete_log_pmf,
     gamete_allele_log_pmf,
     gamete_const_log_pmf,
     trio_log_pmf,
+    log_unknown_dosage_prior,
+    log_unknown_const_prior,
 )
 
 
@@ -105,6 +108,25 @@ def test_increment_dosage__raise_on_final():
 
 
 @pytest.mark.parametrize(
+    "dosage, gamete, expect",
+    [
+        ([2, 0, 2, 0], [1, 0, 1, 0], [1, 0, 1, 0]),
+        ([1, 0, 1, 0], [0, 0, 1, 0], [1, 0, 0, 0]),
+        ([1, 2, 1, 0], [1, 1, 0, 0], [0, 1, 1, 0]),
+        ([1, 0, 1, 0, 1, 3], [1, 0, 1, 0, 0, 1], [0, 0, 0, 0, 1, 2]),
+    ],
+)
+def test_set_complimentary_gamete(dosage, gamete, expect):
+    dosage = np.array(dosage)
+    gamete = np.array(gamete)
+    expect = np.array(expect)
+    compliment = np.zeros_like(dosage)
+    set_complimentary_gamete(dosage, gamete, compliment)
+    np.testing.assert_array_equal(dosage, gamete + compliment)
+    np.testing.assert_array_equal(compliment, expect)
+
+
+@pytest.mark.parametrize(
     "gamete_dosage, parent_dosage, expect",
     [
         ([1, 1], [1, 1], 0),
@@ -113,10 +135,10 @@ def test_increment_dosage__raise_on_final():
         ([2, 0], [2, 0], 2),
     ],
 )
-def test_duplicate_permutations(gamete_dosage, parent_dosage, expect):
+def test_double_reduction_permutations(gamete_dosage, parent_dosage, expect):
     gamete_dosage = np.array(gamete_dosage)
     parent_dosage = np.array(parent_dosage)
-    observed = duplicate_permutations(gamete_dosage, parent_dosage)
+    observed = double_reduction_permutations(gamete_dosage, parent_dosage)
     assert expect == observed
 
 
@@ -392,49 +414,39 @@ def test_gamete_allele_log_pmf__raise_on_hexaploid_lambda():
 
 
 @pytest.mark.parametrize(
-    "index, parent_dosage, parent_ploidy, gamete_dosage, gamete_ploidy, lambda_, expect",
+    "index, parent_dosage, parent_ploidy, gamete_dosage, gamete_ploidy, expect",
     [
-        (0, [2, 0], 2, [1, 0], 1, 0.0, 1.0),  # haploid gamete has no constant
-        (0, [1, 1], 2, [1, 0], 1, 0.0, 1.0),  # haploid gamete has no constant
-        (0, [0, 0], 2, [1, 0], 1, 0.0, 1.0),  # haploid gamete has no constant
-        (0, [4, 0, 0, 0], 4, [2, 0, 0, 0], 2, 0.0, 1.0),
-        (0, [2, 2, 0, 0], 4, [2, 0, 0, 0], 2, 0.0, 2 / 4),
-        (0, [1, 1, 0, 0], 4, [1, 1, 0, 0], 2, 0.0, 0.25),
-        (1, [1, 1, 0, 0], 4, [1, 1, 0, 0], 2, 0.0, 0.25),
-        (
-            1,
-            [1, 1, 0, 0],
-            4,
-            [1, 1, 0, 0],
-            2,
-            0.9,
-            0.25,
-        ),  # lambda has no effect on haploid constant
+        (0, [2, 0], 2, [1, 0], 1, 1.0),  # haploid gamete has no constant
+        (0, [1, 1], 2, [1, 0], 1, 1.0),  # haploid gamete has no constant
+        (0, [0, 0], 2, [1, 0], 1, 1.0),  # haploid gamete has no constant
+        (0, [4, 0, 0, 0], 4, [2, 0, 0, 0], 2, 1.0),
+        (0, [2, 2, 0, 0], 4, [2, 0, 0, 0], 2, 2 / 4),
+        (0, [1, 1, 0, 0], 4, [1, 1, 0, 0], 2, 0.25),
+        (1, [1, 1, 0, 0], 4, [1, 1, 0, 0], 2, 0.25),
+        (1, [1, 1, 0, 0], 4, [1, 1, 0, 0], 2, 0.25),
         (
             0,
             [1, 1, 0, 0],
             4,
             [2, 0, 0, 0],
             2,
-            0.0,
             0.25,
         ),  # invalid gamete with valid constant
-        (1, [1, 1, 1, 0, 0, 0], 6, [1, 1, 1, 0, 0, 0], 3, 0.0, (2 * 1 / 6 * 1 / 5)),
-        (1, [1, 4, 1, 0, 0, 0], 6, [1, 1, 1, 0, 0, 0], 3, 0.0, (2 * 1 / 6 * 1 / 5)),
+        (1, [1, 1, 1, 0, 0, 0], 6, [1, 1, 1, 0, 0, 0], 3, (2 * 1 / 6 * 1 / 5)),
+        (1, [1, 4, 1, 0, 0, 0], 6, [1, 1, 1, 0, 0, 0], 3, (2 * 1 / 6 * 1 / 5)),
         (
             1,
             [2, 1, 1, 0, 0, 0],
             6,
             [1, 1, 1, 0, 0, 0],
             3,
-            0.0,
             (2 / 6 * 1 / 5 + 1 / 6 * 2 / 5),
         ),
-        (1, [2, 1, 1, 0, 0, 0], 6, [2, 1, 0, 0, 0, 0], 3, 0.0, (2 / 6 * 1 / 5)),
+        (1, [2, 1, 1, 0, 0, 0], 6, [2, 1, 0, 0, 0, 0], 3, (2 / 6 * 1 / 5)),
     ],
 )
 def test_gamete_const_log_pmf(
-    index, parent_dosage, parent_ploidy, gamete_dosage, gamete_ploidy, lambda_, expect
+    index, parent_dosage, parent_ploidy, gamete_dosage, gamete_ploidy, expect
 ):
     gamete_dosage = np.array(gamete_dosage)
     parent_dosage = np.array(parent_dosage)
@@ -444,9 +456,43 @@ def test_gamete_const_log_pmf(
         gamete_ploidy=gamete_ploidy,
         parent_dose=parent_dosage,
         parent_ploidy=parent_ploidy,
-        gamete_lambda=lambda_,
     )
     np.testing.assert_almost_equal(expect, np.exp(actual))
+
+
+@pytest.mark.parametrize(
+    "dosage, frequencies, expect",
+    [
+        ([4, 0, 0, 0], [1 / 4, 1 / 4, 1 / 4, 1 / 4], 1 / (4**4)),
+        ([3, 0, 1, 0], [1 / 4, 1 / 4, 1 / 4, 1 / 4], 4 / (4**4)),
+        ([1, 0, 1, 0], [1 / 4, 1 / 4, 1 / 4, 1 / 4], 2 / (4**2)),
+        ([1, 0, 1, 0], [0.6, 0.1, 0.1, 0.2], 2 * 0.6 * 0.1),
+    ],
+)
+def test_log_unknown_dosage_prior(dosage, frequencies, expect):
+    dosage = np.array(dosage)
+    frequencies = np.array(frequencies)
+    log_frequencies = np.log(frequencies)
+    actual = log_unknown_dosage_prior(dosage, log_frequencies)
+    np.testing.assert_almost_equal(np.exp(actual), expect)
+
+
+@pytest.mark.parametrize(
+    "dosage, allele_index, frequencies, expect",
+    [
+        ([4, 0, 0, 0], 0, [1 / 4, 1 / 4, 1 / 4, 1 / 4], 1 / (4**3)),
+        ([4, 0, 0, 0], 1, [1 / 4, 1 / 4, 1 / 4, 1 / 4], 0.0),  # imposable const
+        ([3, 0, 1, 0], 0, [1 / 4, 1 / 4, 1 / 4, 1 / 4], 3 / (4**3)),
+        ([1, 0, 1, 0], 2, [1 / 4, 1 / 4, 1 / 4, 1 / 4], 1 / 4),
+        ([0, 0, 1, 1], 2, [0.6, 0.1, 0.1, 0.2], 0.2),
+    ],
+)
+def test_log_unknown_const_prior(dosage, allele_index, frequencies, expect):
+    dosage = np.array(dosage)
+    frequencies = np.array(frequencies)
+    log_frequencies = np.log(frequencies)
+    actual = log_unknown_const_prior(dosage, allele_index, log_frequencies)
+    np.testing.assert_almost_equal(np.exp(actual), expect)
 
 
 def test_trio_log_pmf__sum_to_one__tetraploid():
