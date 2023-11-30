@@ -117,6 +117,7 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
     gamete_q = np.zeros(max_ploidy, dtype=np.int64)
     constraint_p = np.zeros(max_ploidy, dtype=np.int64)
     constraint_q = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_log_frequencies = np.zeros(max_ploidy, dtype=np.float64)
 
     # brute force exact posterior by iteration over all combinations of genotypes
     current_genotype = np.zeros((4, 4), int)
@@ -163,6 +164,7 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
                             gamete_q=gamete_q,
                             constraint_p=constraint_p,
                             constraint_q=constraint_q,
+                            dosage_log_frequencies=dosage_log_frequencies,
                         )
                         # likelihood
                         log_like += log_likelihood_alleles_cached(

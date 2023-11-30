@@ -30,6 +30,7 @@ def metropolis_hastings_probabilities(
     gamete_q,
     constraint_p,
     constraint_q,
+    dosage_log_frequencies,
 ):
     n_alleles = len(haplotypes)
     ploidy = sample_ploidy[target_index]
@@ -67,6 +68,7 @@ def metropolis_hastings_probabilities(
         gamete_q=gamete_q,
         constraint_p=constraint_p,
         constraint_q=constraint_q,
+        dosage_log_frequencies=dosage_log_frequencies,
     )
 
     # store MH acceptance probability for each allele
@@ -109,6 +111,7 @@ def metropolis_hastings_probabilities(
                 gamete_q=gamete_q,
                 constraint_p=constraint_p,
                 constraint_q=constraint_q,
+                dosage_log_frequencies=dosage_log_frequencies,
             )
             lprior_ratio = lprior_i - lprior
 
@@ -159,6 +162,7 @@ def gibbs_probabilities(
     gamete_q,
     constraint_p,
     constraint_q,
+    dosage_log_frequencies,
 ):
     n_alleles = len(haplotypes)
     ploidy = sample_ploidy[target_index]
@@ -204,6 +208,7 @@ def gibbs_probabilities(
             gamete_q=gamete_q,
             constraint_p=constraint_p,
             constraint_q=constraint_q,
+            dosage_log_frequencies=dosage_log_frequencies,
         )
         log_probabilities[i] = llk_i + lprior_i
 
@@ -237,6 +242,7 @@ def allele_step(
     gamete_q,
     constraint_p,
     constraint_q,
+    dosage_log_frequencies,
 ):
     if step_type == 0:
         probabilities = gibbs_probabilities(
@@ -261,6 +267,7 @@ def allele_step(
             gamete_q=gamete_q,
             constraint_p=constraint_p,
             constraint_q=constraint_q,
+            dosage_log_frequencies=dosage_log_frequencies,
         )
     elif step_type == 1:
         probabilities = metropolis_hastings_probabilities(
@@ -285,6 +292,7 @@ def allele_step(
             gamete_q=gamete_q,
             constraint_p=constraint_p,
             constraint_q=constraint_q,
+            dosage_log_frequencies=dosage_log_frequencies,
         )
     else:
         raise ValueError
@@ -316,6 +324,7 @@ def sample_step(
     gamete_q,
     constraint_p,
     constraint_q,
+    dosage_log_frequencies,
 ):
     allele_indices = np.arange(sample_ploidy[target_index])
     np.random.shuffle(allele_indices)
@@ -343,6 +352,7 @@ def sample_step(
             gamete_q=gamete_q,
             constraint_p=constraint_p,
             constraint_q=constraint_q,
+            dosage_log_frequencies=dosage_log_frequencies,
         )
 
 
@@ -368,6 +378,7 @@ def compound_step(
     gamete_q,
     constraint_p,
     constraint_q,
+    dosage_log_frequencies,
 ):
     target_indices = np.arange(len(sample_genotypes))
     np.random.shuffle(target_indices)
@@ -394,6 +405,7 @@ def compound_step(
             gamete_q=gamete_q,
             constraint_p=constraint_p,
             constraint_q=constraint_q,
+            dosage_log_frequencies=dosage_log_frequencies,
         )
 
 
@@ -519,6 +531,7 @@ def mcmc_sampler(
     gamete_q = np.zeros(max_ploidy, dtype=np.int64)
     constraint_p = np.zeros(max_ploidy, dtype=np.int64)
     constraint_q = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_log_frequencies = np.zeros(max_ploidy, dtype=np.float64)
 
     sample_children = sample_children_matrix(sample_parents)
     sample_genotypes = sample_genotypes.copy()
@@ -545,6 +558,7 @@ def mcmc_sampler(
             gamete_q=gamete_q,
             constraint_p=constraint_p,
             constraint_q=constraint_q,
+            dosage_log_frequencies=dosage_log_frequencies,
         )
         trace[i] = sample_genotypes.copy()
 

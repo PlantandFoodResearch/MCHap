@@ -286,6 +286,7 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
     gamete_q = np.zeros(max_ploidy, dtype=np.int64)
     constraint_p = np.zeros(max_ploidy, dtype=np.int64)
     constraint_q = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_log_frequencies = np.zeros(max_ploidy, dtype=np.float64)
 
     # test over all alleles of all samples
     for target_index in range(n_samples):
@@ -315,6 +316,7 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
                 gamete_q=gamete_q,
                 constraint_p=constraint_p,
                 constraint_q=constraint_q,
+                dosage_log_frequencies=dosage_log_frequencies,
             )
 
             # MH probs
@@ -343,6 +345,7 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
                     gamete_q=gamete_q,
                     constraint_p=constraint_p,
                     constraint_q=constraint_q,
+                    dosage_log_frequencies=dosage_log_frequencies,
                 )
                 mtx.append(probs)
             mtx = np.array(mtx)

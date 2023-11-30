@@ -518,6 +518,7 @@ def test_trio_log_pmf__sum_to_one__tetraploid():
     gamete_q = np.zeros(max_ploidy, dtype=np.int64)
     constraint_p = np.zeros(max_ploidy, dtype=np.int64)
     constraint_q = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_log_frequencies = np.zeros(max_ploidy, dtype=np.float64)
 
     ploidy = tau_p + tau_q
     n_genotypes = comb_with_replacement(n_alleles, ploidy)
@@ -546,6 +547,7 @@ def test_trio_log_pmf__sum_to_one__tetraploid():
                 gamete_q=gamete_q,
                 constraint_p=constraint_p,
                 constraint_q=constraint_q,
+                dosage_log_frequencies=dosage_log_frequencies,
             )
         )
         total_prob += prob
@@ -587,6 +589,7 @@ def test_trio_log_pmf__sum_to_one(seed):
     gamete_q = np.zeros(max_ploidy, dtype=np.int64)
     constraint_p = np.zeros(max_ploidy, dtype=np.int64)
     constraint_q = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_log_frequencies = np.zeros(max_ploidy, dtype=np.float64)
 
     n_genotypes = comb_with_replacement(n_alleles, ploidy)
 
@@ -615,6 +618,7 @@ def test_trio_log_pmf__sum_to_one(seed):
                 gamete_q=gamete_q,
                 constraint_p=constraint_p,
                 constraint_q=constraint_q,
+                dosage_log_frequencies=dosage_log_frequencies,
             )
         )
         total_prob += prob
@@ -656,6 +660,7 @@ def test_trio_log_pmf__sum_to_one_lambda(seed, use_lambda_p, use_lambda_q):
     gamete_q = np.zeros(max_ploidy, dtype=np.int64)
     constraint_p = np.zeros(max_ploidy, dtype=np.int64)
     constraint_q = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_log_frequencies = np.zeros(max_ploidy, dtype=np.float64)
 
     ploidy = tau_p + tau_q
     n_genotypes = comb_with_replacement(n_alleles, ploidy)
@@ -685,6 +690,7 @@ def test_trio_log_pmf__sum_to_one_lambda(seed, use_lambda_p, use_lambda_q):
                 gamete_q=gamete_q,
                 constraint_p=constraint_p,
                 constraint_q=constraint_q,
+                dosage_log_frequencies=dosage_log_frequencies,
             )
         )
         total_prob += prob
