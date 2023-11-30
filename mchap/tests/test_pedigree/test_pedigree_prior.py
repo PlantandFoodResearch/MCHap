@@ -2,11 +2,12 @@ import numpy as np
 import pytest
 
 from mchap.jitutils import increment_genotype, comb_with_replacement
-from mchap.calling.utils import allelic_dosage, count_allele
+from mchap.calling.utils import count_allele
 from mchap.pedigree.prior import (
-    parental_copies,
+    set_allelic_dosage,
+    set_parental_copies,
     dosage_permutations,
-    initial_dosage,
+    set_initial_dosage,
     increment_dosage,
     duplicate_permutations,
     gamete_log_pmf,
@@ -19,17 +20,18 @@ from mchap.pedigree.prior import (
 @pytest.mark.parametrize(
     "parent, progeny, expect",
     [
-        ([0, 0, 0, 0], [0, 0], [4, 0]),
-        ([0, 1, 1, 2], [0, 2], [1, 1]),
-        ([0, 1, 2, 3, 4, 5], [6, 7, 8], [0, 0, 0]),
+        ([0, 0, 0, 0], [0, 0, -2, -2], [4, 0, 0, 0]),
+        ([0, 1, 1, 2], [0, 2, -2, -2], [1, 1, 0, 0]),
+        ([0, 1, 2, 3, 4, 5], [6, 7, 8, -2, -2, -2], [0, 0, 0, 0, 0, 0]),
         ([0, 1], [1, 1], [1, 0]),
     ],
 )
-def test_parental_copies(parent, progeny, expect):
+def test_set_parental_copies(parent, progeny, expect):
     progeny = np.array(progeny)
     parent = np.array(parent)
     expect = np.array(expect)
-    observed = parental_copies(parent, progeny)
+    observed = np.zeros_like(progeny)
+    set_parental_copies(parent, progeny, observed)
     np.testing.assert_array_equal(observed, expect)
 
 
@@ -62,18 +64,20 @@ def test_dosage_permutations(gamete_dosage, parent_dosage, expect):
         (3, [1, 2, 1, 0], [1, 2, 0, 0]),
     ],
 )
-def test_initial_dosage(ploidy, constraint, expect):
+def test_set_initial_dosage(ploidy, constraint, expect):
     constraint = np.array(constraint)
     expect = np.array(expect)
-    observed = initial_dosage(ploidy, constraint)
+    observed = np.zeros_like(constraint)
+    set_initial_dosage(ploidy, constraint, observed)
     np.testing.assert_array_equal(observed, expect)
 
 
 def test_initial_dosage__raise_on_ploidy():
     ploidy = 2
     constraint = np.array([1, 0, 0, 0])
+    observed = np.zeros_like(constraint)
     with pytest.raises(ValueError, match="Ploidy does not fit within constraint"):
-        initial_dosage(ploidy, constraint)
+        set_initial_dosage(ploidy, constraint, observed)
 
 
 @pytest.mark.parametrize(
@@ -174,9 +178,11 @@ def test_gamete_log_pmf__sum_to_one(seed):
     n_gametes = comb_with_replacement(n_alleles, gamete_ploidy)
     total_prob = 0.0
     gamete_genotype = np.zeros(gamete_ploidy, int)
+    gamete_dosage = np.zeros_like(gamete_genotype)
+    parent_dosage = np.zeros_like(gamete_genotype)
     for _ in range(n_gametes):
-        gamete_dosage = allelic_dosage(gamete_genotype)
-        parent_dosage = parental_copies(parent_genotype, gamete_genotype)
+        set_allelic_dosage(gamete_genotype, gamete_dosage)
+        set_parental_copies(parent_genotype, gamete_genotype, parent_dosage)
         prob = np.exp(
             gamete_log_pmf(
                 gamete_dose=gamete_dosage,
@@ -205,9 +211,11 @@ def test_gamete_log_pmf__sum_to_one_lambda(seed):
     total_prob = 0.0
     lambda_ = np.random.rand()
     gamete_genotype = np.zeros(gamete_ploidy, int)
+    gamete_dosage = np.zeros_like(gamete_genotype)
+    parent_dosage = np.zeros_like(gamete_genotype)
     for _ in range(n_gametes):
-        gamete_dosage = allelic_dosage(gamete_genotype)
-        parent_dosage = parental_copies(parent_genotype, gamete_genotype)
+        set_allelic_dosage(gamete_genotype, gamete_dosage)
+        set_parental_copies(parent_genotype, gamete_genotype, parent_dosage)
         prob = np.exp(
             gamete_log_pmf(
                 gamete_dose=gamete_dosage,
@@ -441,35 +449,43 @@ def test_gamete_const_log_pmf(
     np.testing.assert_almost_equal(expect, np.exp(actual))
 
 
-@pytest.mark.parametrize(
-    "seed",
-    np.arange(50),
-)
-def test_trio_log_pmf__sum_to_one(seed):
-    np.random.seed(seed)
-    n_alleles = np.random.randint(1, 10)
-    ploidy_p = np.random.randint(2, 7)
-    ploidy_q = np.random.randint(2, 7)
-    parent_p = np.random.randint(n_alleles, size=ploidy_p)
-    parent_q = np.random.randint(n_alleles, size=ploidy_q)
-    tau_p = np.random.randint(1, ploidy_p)
-    tau_q = np.random.randint(1, ploidy_q)
-    error_p = np.random.rand()
-    error_q = np.random.rand()
+def test_trio_log_pmf__sum_to_one__tetraploid():
+    np.random.seed(0)
+    max_ploidy = 4
+    n_alleles = 3
+    ploidy_p = 4
+    ploidy_q = 4
+    parent_p = np.random.randint(n_alleles, size=max_ploidy)
+    parent_q = np.random.randint(n_alleles, size=max_ploidy)
+    tau_p = 2
+    tau_q = 2
+    error_p = 0.1
+    error_q = 0.1
     frequencies = np.random.rand(n_alleles)
     frequencies /= frequencies.sum()
+
+    # scratch variables
+    dosage = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_p = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_q = np.zeros(max_ploidy, dtype=np.int64)
+    gamete_p = np.zeros(max_ploidy, dtype=np.int64)
+    gamete_q = np.zeros(max_ploidy, dtype=np.int64)
+    constraint_p = np.zeros(max_ploidy, dtype=np.int64)
+    constraint_q = np.zeros(max_ploidy, dtype=np.int64)
 
     ploidy = tau_p + tau_q
     n_genotypes = comb_with_replacement(n_alleles, ploidy)
 
     total_prob = 0.0
-    genotype = np.zeros(ploidy, int)
+    genotype = np.zeros(max_ploidy, dtype=np.int64)
     for _ in range(n_genotypes):
         prob = np.exp(
             trio_log_pmf(
                 progeny=genotype,
                 parent_p=parent_p,
                 parent_q=parent_q,
+                ploidy_p=ploidy_p,
+                ploidy_q=ploidy_q,
                 tau_p=tau_p,
                 tau_q=tau_q,
                 lambda_p=0.0,
@@ -477,10 +493,86 @@ def test_trio_log_pmf__sum_to_one(seed):
                 error_p=error_p,
                 error_q=error_q,
                 log_frequencies=np.log(frequencies),
+                dosage=dosage,
+                dosage_p=dosage_p,
+                dosage_q=dosage_q,
+                gamete_p=gamete_p,
+                gamete_q=gamete_q,
+                constraint_p=constraint_p,
+                constraint_q=constraint_q,
             )
         )
         total_prob += prob
         increment_genotype(genotype)
+    np.testing.assert_almost_equal(total_prob, 1.0)
+
+
+@pytest.mark.parametrize(
+    "seed",
+    np.arange(50),
+)
+def test_trio_log_pmf__sum_to_one(seed):
+    np.random.seed(seed)
+    max_ploidy = 7
+    n_alleles = np.random.randint(1, 10)
+    ploidy_p = np.random.randint(2, max_ploidy)
+    ploidy_q = np.random.randint(2, max_ploidy)
+    tau_p = np.random.randint(1, ploidy_p)
+    tau_q = np.random.randint(1, ploidy_q)
+
+    # adjust max ploidy if exceeded by progeny ploidy
+    ploidy = tau_p + tau_q
+    max_ploidy = max(max_ploidy, ploidy)
+
+    parent_p = np.random.randint(n_alleles, size=max_ploidy)
+    parent_q = np.random.randint(n_alleles, size=max_ploidy)
+    parent_p[ploidy_p:] = -2
+    parent_q[ploidy_q:] = -2
+    error_p = np.random.rand()
+    error_q = np.random.rand()
+    frequencies = np.random.rand(n_alleles)
+    frequencies /= frequencies.sum()
+
+    # scratch variables
+    dosage = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_p = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_q = np.zeros(max_ploidy, dtype=np.int64)
+    gamete_p = np.zeros(max_ploidy, dtype=np.int64)
+    gamete_q = np.zeros(max_ploidy, dtype=np.int64)
+    constraint_p = np.zeros(max_ploidy, dtype=np.int64)
+    constraint_q = np.zeros(max_ploidy, dtype=np.int64)
+
+    n_genotypes = comb_with_replacement(n_alleles, ploidy)
+
+    total_prob = 0.0
+    genotype = np.zeros(max_ploidy, dtype=np.int64)
+    genotype[ploidy:] = -2
+    for _ in range(n_genotypes):
+        prob = np.exp(
+            trio_log_pmf(
+                progeny=genotype,
+                parent_p=parent_p,
+                parent_q=parent_q,
+                ploidy_p=ploidy_p,
+                ploidy_q=ploidy_q,
+                tau_p=tau_p,
+                tau_q=tau_q,
+                lambda_p=0.0,
+                lambda_q=0.0,
+                error_p=error_p,
+                error_q=error_q,
+                log_frequencies=np.log(frequencies),
+                dosage=dosage,
+                dosage_p=dosage_p,
+                dosage_q=dosage_q,
+                gamete_p=gamete_p,
+                gamete_q=gamete_q,
+                constraint_p=constraint_p,
+                constraint_q=constraint_q,
+            )
+        )
+        total_prob += prob
+        increment_genotype(genotype[0:ploidy])
     np.testing.assert_almost_equal(total_prob, 1.0)
 
 
@@ -494,12 +586,15 @@ def test_trio_log_pmf__sum_to_one(seed):
 )
 def test_trio_log_pmf__sum_to_one_lambda(seed, use_lambda_p, use_lambda_q):
     np.random.seed(seed)
+    max_ploidy = 4
     n_alleles = np.random.randint(1, 10)
-    ploidy_p = np.random.randint(2, 4)
-    ploidy_q = np.random.randint(2, 4)
-    parent_p = np.random.randint(n_alleles, size=ploidy_p)
-    parent_q = np.random.randint(n_alleles, size=ploidy_q)
-    tau_p, tau_q = 2, 2
+    ploidy_p = np.random.randint(2, max_ploidy)
+    ploidy_q = np.random.randint(2, max_ploidy)
+    parent_p = np.random.randint(n_alleles, size=max_ploidy)
+    parent_q = np.random.randint(n_alleles, size=max_ploidy)
+    parent_p[ploidy_p:] = -2
+    parent_q[ploidy_q:] = -2
+    tau_p, tau_q = 2, 2  # progeny ploidy = max_ploidy
     lambda_p = np.random.rand() if use_lambda_p else 0.0
     lambda_q = np.random.rand() if use_lambda_q else 0.0
     error_p = np.random.rand()
@@ -507,17 +602,29 @@ def test_trio_log_pmf__sum_to_one_lambda(seed, use_lambda_p, use_lambda_q):
     frequencies = np.random.rand(n_alleles)
     frequencies /= frequencies.sum()
 
+    # scratch variables
+    dosage = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_p = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_q = np.zeros(max_ploidy, dtype=np.int64)
+    gamete_p = np.zeros(max_ploidy, dtype=np.int64)
+    gamete_q = np.zeros(max_ploidy, dtype=np.int64)
+    constraint_p = np.zeros(max_ploidy, dtype=np.int64)
+    constraint_q = np.zeros(max_ploidy, dtype=np.int64)
+
     ploidy = tau_p + tau_q
     n_genotypes = comb_with_replacement(n_alleles, ploidy)
 
     total_prob = 0.0
-    genotype = np.zeros(ploidy, int)
+    genotype = np.zeros(max_ploidy, int)
+    genotype[ploidy:] = -2
     for _ in range(n_genotypes):
         prob = np.exp(
             trio_log_pmf(
                 progeny=genotype,
                 parent_p=parent_p,
                 parent_q=parent_q,
+                ploidy_p=ploidy_p,
+                ploidy_q=ploidy_q,
                 tau_p=tau_p,
                 tau_q=tau_q,
                 lambda_p=lambda_p,
@@ -525,8 +632,15 @@ def test_trio_log_pmf__sum_to_one_lambda(seed, use_lambda_p, use_lambda_q):
                 error_p=error_p,
                 error_q=error_q,
                 log_frequencies=np.log(frequencies),
+                dosage=dosage,
+                dosage_p=dosage_p,
+                dosage_q=dosage_q,
+                gamete_p=gamete_p,
+                gamete_q=gamete_q,
+                constraint_p=constraint_p,
+                constraint_q=constraint_q,
             )
         )
         total_prob += prob
-        increment_genotype(genotype)
+        increment_genotype(genotype[0:ploidy])
     np.testing.assert_almost_equal(total_prob, 1.0)

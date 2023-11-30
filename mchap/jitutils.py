@@ -210,7 +210,7 @@ def _comb(n: int, k: int) -> int:
     return r
 
 
-_COMB_CACHE = np.zeros((100, 20), np.int64)
+_COMB_CACHE = np.zeros((100, 12), np.int64)
 for n in range(_COMB_CACHE.shape[0]):
     for k in range(_COMB_CACHE.shape[1]):
         _COMB_CACHE[n, k] = _comb(n, k)
@@ -235,7 +235,7 @@ def _comb_with_replacement(n: int, k: int) -> int:
     return comb(n, k)
 
 
-_COMB_WITH_REPLACEMENT_CACHE = np.zeros((100, 20), np.int64)
+_COMB_WITH_REPLACEMENT_CACHE = np.zeros((100, 12), np.int64)
 for n in range(_COMB_WITH_REPLACEMENT_CACHE.shape[0]):
     for k in range(_COMB_WITH_REPLACEMENT_CACHE.shape[1]):
         _COMB_WITH_REPLACEMENT_CACHE[n, k] = _comb_with_replacement(n, k)

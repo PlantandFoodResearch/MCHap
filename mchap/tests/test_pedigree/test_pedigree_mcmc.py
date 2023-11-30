@@ -25,6 +25,18 @@ SINGLETON_PEDIGREE = {
 }
 
 
+SINGLETON_CLONE_PEDIGREE = {
+    "parent": [[-1, -1]],
+    "tau": [[2, 0]],
+    "lambda": [
+        [0.0, 0.0],
+    ],
+    "genotype": [
+        [0, 2],
+    ],
+}
+
+
 DIPLOID_TRIO_PEDIGREE = {
     "parent": [
         [-1, -1],
@@ -206,6 +218,7 @@ HAMILTON_KERR_PEDIGREE_INCONGRUENT["genotype"] = [
     "pedigree",
     [
         SINGLETON_PEDIGREE,
+        SINGLETON_CLONE_PEDIGREE,
         DIPLOID_TRIO_PEDIGREE,
         TETRAPLOID_DUO_PEDIGREE,
         TETRAPLOID_DUO_PEDIGREE_INCONGRUENT,
@@ -239,9 +252,13 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
     genotypes = np.array(pedigree["genotype"])
     sample_parents = np.array(pedigree["parent"], int)
     sample_children = sample_children_matrix(sample_parents)
+    print(sample_children)
     gamete_tau = np.array(pedigree["tau"], int)
     gamete_lambda = np.array(pedigree["lambda"], float)
-    n_samples = len(genotypes)
+    n_samples, max_ploidy = genotypes.shape
+    assert sample_parents.shape == (n_samples, 2)
+    assert gamete_tau.shape == (n_samples, 2)
+    assert gamete_lambda.shape == (n_samples, 2)
     if gamete_error == "random":
         gamete_error = np.random.rand(n_samples * 2).reshape(n_samples, 2)
     else:
@@ -260,6 +277,15 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
             uniform_sample=False,
         )
     sample_read_counts = np.ones((n_samples, read_depth), dtype=int)
+
+    # scratch variables
+    dosage = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_p = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_q = np.zeros(max_ploidy, dtype=np.int64)
+    gamete_p = np.zeros(max_ploidy, dtype=np.int64)
+    gamete_q = np.zeros(max_ploidy, dtype=np.int64)
+    constraint_p = np.zeros(max_ploidy, dtype=np.int64)
+    constraint_q = np.zeros(max_ploidy, dtype=np.int64)
 
     # test over all alleles of all samples
     for target_index in range(n_samples):
@@ -282,6 +308,13 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
                 haplotypes,  # (n_haplotypes, n_pos)
                 log_frequencies=np.log(frequencies),
                 llk_cache=None,
+                dosage=dosage,
+                dosage_p=dosage_p,
+                dosage_q=dosage_q,
+                gamete_p=gamete_p,
+                gamete_q=gamete_q,
+                constraint_p=constraint_p,
+                constraint_q=constraint_q,
             )
 
             # MH probs
@@ -303,6 +336,13 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
                     haplotypes,  # (n_haplotypes, n_pos)
                     log_frequencies=np.log(frequencies),
                     llk_cache=None,
+                    dosage=dosage,
+                    dosage_p=dosage_p,
+                    dosage_q=dosage_q,
+                    gamete_p=gamete_p,
+                    gamete_q=gamete_q,
+                    constraint_p=constraint_p,
+                    constraint_q=constraint_q,
                 )
                 mtx.append(probs)
             mtx = np.array(mtx)

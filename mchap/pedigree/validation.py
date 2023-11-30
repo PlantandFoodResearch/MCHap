@@ -1,14 +1,21 @@
 import numpy as np
 from numba import njit
 
-from mchap.calling.utils import allelic_dosage
-from .prior import parental_copies, initial_dosage, increment_dosage
+from .prior import (
+    set_allelic_dosage,
+    set_parental_copies,
+    set_initial_dosage,
+    increment_dosage,
+)
 
 
 @njit(cache=True)
 def duo_valid(progeny, parent, tau, lambda_):
-    dosage = allelic_dosage(progeny)
-    dosage_p = parental_copies(parent, progeny)
+    ploidy = len(progeny)
+    dosage = np.zeros(ploidy, dtype=np.int64)
+    dosage_p = np.zeros(ploidy, dtype=np.int64)
+    set_allelic_dosage(progeny, dosage)
+    set_parental_copies(parent, progeny, dosage_p)
     constraint_p = np.minimum(dosage, dosage_p)
 
     # handle lambda parameter (diploid gametes only)
@@ -34,9 +41,15 @@ def trio_valid(
     lambda_p,
     lambda_q,
 ):
-    dosage = allelic_dosage(progeny)
-    dosage_p = parental_copies(parent_p, progeny)
-    dosage_q = parental_copies(parent_q, progeny)
+    ploidy = len(progeny)
+    dosage = np.zeros(ploidy, dtype=np.int64)
+    dosage_p = np.zeros(ploidy, dtype=np.int64)
+    dosage_q = np.zeros(ploidy, dtype=np.int64)
+    gamete_p = np.zeros(ploidy, dtype=np.int64)
+    gamete_q = np.zeros(ploidy, dtype=np.int64)
+    set_allelic_dosage(progeny, dosage)
+    set_parental_copies(parent_p, progeny, dosage_p)
+    set_parental_copies(parent_q, progeny, dosage_q)
 
     constraint_p = np.minimum(dosage, dosage_p)
     constraint_q = np.minimum(dosage, dosage_q)
@@ -63,8 +76,8 @@ def trio_valid(
 
     if (constraint_p.sum() < tau_p) or (constraint_q.sum() < tau_q):
         return False
-    gamete_p = initial_dosage(tau_p, constraint_p)
-    gamete_q = dosage - gamete_p
+    set_initial_dosage(tau_p, constraint_p, gamete_p)
+    gamete_q[:] = dosage - gamete_p
     while True:
         match = True
         for i in range(len(dosage)):
