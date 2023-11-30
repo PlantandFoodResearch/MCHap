@@ -5,18 +5,22 @@ from mchap.jitutils import comb, add_log_prob, ln_equivalent_permutations
 
 
 @njit(cache=True)
-def set_allelic_dosage(genotype_alleles, genotype_dosage):
+def set_allelic_dosage(genotype_alleles, out):
     """Return the dosage of genotype alleles encoded as integers.
 
     Parameters
     ----------
     genotype_alleles : ndarray, int, shape (ploidy, )
-        Genotype alleles encoded as integers
-    genotype_dosage : ndarray, int, shape (ploidy, )
-        Array to collect dosage
+        Genotype alleles encoded as integers.
+    out : ndarray, int, shape (ploidy, )
+        Array to collect dosage.
+
+    Warnings
+    --------
+    Mutates the ``out`` array in place.
     """
     max_ploidy = len(genotype_alleles)
-    genotype_dosage[:] = 0
+    out[:] = 0
     for i in range(max_ploidy):
         a = genotype_alleles[i]
         if a < 0:
@@ -25,14 +29,14 @@ def set_allelic_dosage(genotype_alleles, genotype_dosage):
         j = 0
         while searching:
             if a == genotype_alleles[j]:
-                genotype_dosage[j] += 1
+                out[j] += 1
                 searching = False
             else:
                 j += 1
 
 
 @njit(cache=True)
-def set_parental_copies(parent_alleles, progeny_alleles, parent_copies):
+def set_parental_copies(parent_alleles, progeny_alleles, out):
     """Count the number of parental copies of each allele present
     with a progeny genotype.
 
@@ -42,7 +46,7 @@ def set_parental_copies(parent_alleles, progeny_alleles, parent_copies):
         Alleles observed within parent.
     progeny_alleles : ndarray, int, shape (ploidy,)
         Alleles observed within progeny.
-    parent_copies : ndarray, int, shape (ploidy,)
+    out : ndarray, int, shape (ploidy,)
         Array to collect counts
 
     Notes
@@ -50,23 +54,41 @@ def set_parental_copies(parent_alleles, progeny_alleles, parent_copies):
     Counts correspond to the first instance of each progeny
     allele and subsequent copies of that allele will
     correspond to a count of zero.
+
+    Warnings
+    --------
+    Mutates the ``out`` array in place.
     """
-    parent_copies[:] = 0
+    out[:] = 0
     for i in range(len(parent_alleles)):
         a = parent_alleles[i]
         if a < 0:
             continue
         for j in range(len(progeny_alleles)):
             if a == progeny_alleles[j]:
-                parent_copies[j] += 1
+                out[j] += 1
                 break
-    return parent_copies
 
 
 @njit(cache=True)
-def set_inverse_gamete(dosage, gamete, inverse_gamete):
+def set_complimentary_gamete(dosage, gamete, out):
+    """Set the complimentary gamete to complete the dosage.
+
+    Parameters
+    ----------
+    dosage : ndarray, int, shape (ploidy,)
+        Dosage array of genotype.
+    gamete : ndarray, int, shape (ploidy,)
+        Dosage array of first gamete.
+    out : ndarray, int, shape (ploidy,)
+        Array used to collect dosage of complimentary gamete.
+
+    Warnings
+    --------
+    Mutates the ``out`` array in place.
+    """
     for i in range(len(dosage)):
-        inverse_gamete[i] = dosage[i] - gamete[i]
+        out[i] = dosage[i] - gamete[i]
 
 
 @njit(cache=True)
@@ -83,14 +105,19 @@ def dosage_frequencies(genotype, frequencies):  # TODO: reuse array
 
 @njit(cache=True)
 def log_unknown_dosage_prior(dosage, log_frequencies):
-    """
+    """Prior for dosage array of unknown origin assuming a multinomial distribution.
 
     Parameters
     ----------
-    dosage
-        Dosage array
-    log_frequencies
-        Prior frequencies corresponding to dosage
+    dosage : ndarray, int, shape (ploidy,)
+        Dosage array.
+    log_frequencies : ndarray, float, shape (ploidy,)
+        Prior frequencies corresponding to dosage.
+
+    Returns
+    -------
+    log_prior : float
+        Log-transformed prior probability.
     """
     lperms = ln_equivalent_permutations(dosage)
     assert len(dosage) == len(log_frequencies)
@@ -104,6 +131,23 @@ def log_unknown_dosage_prior(dosage, log_frequencies):
 
 @njit(cache=True)
 def log_unknown_const_prior(dosage, allele_index, log_frequencies):
+    """Prior for the alleles held a s constant in a dosage array of
+    unknown origin assuming a multinomial distribution.
+
+    Parameters
+    ----------
+    dosage : ndarray, int, shape (ploidy,)
+        Dosage array.
+    allele_index : int
+        Integer idex specify the allele not held as constant in the dosage array.
+    log_frequencies : ndarray, float, shape (ploidy,)
+        Prior frequencies corresponding to dosage.
+
+    Returns
+    -------
+    log_prior : float
+        Log-transformed prior probability.
+    """
     if dosage[allele_index] > 0:
         dosage[allele_index] -= 1
         lprob = log_unknown_dosage_prior(dosage, log_frequencies)
@@ -144,7 +188,7 @@ def dosage_permutations(gamete_dosage, parent_dosage):
 
 
 @njit(cache=True)
-def set_initial_dosage(ploidy, constraint, dosage):
+def set_initial_dosage(ploidy, constraint, out):
     """Calculate the initial dosage that fits within a constraint.
 
     Parameters
@@ -153,37 +197,19 @@ def set_initial_dosage(ploidy, constraint, dosage):
         Number of alleles in dosage array.
     constraint : ndarray, int, shape (ploidy,)
         Max count of each allele.
-    dosage : ndarray, int, shape (ploidy,)
-        Array to collect counts
+    out : ndarray, int, shape (ploidy,)
+        Array to collect dosage.
+
+    Warnings
+    --------
+    Mutates the ``out`` array in place.
     """
-    for i in range(len(dosage)):
+    for i in range(len(out)):
         count = min(ploidy, constraint[i])
-        dosage[i] = count
+        out[i] = count
         ploidy -= count
     if ploidy > 0:
         raise ValueError("Ploidy does not fit within constraint")
-
-
-@njit(cache=True)
-def valid_dosage(dosage, constraint):
-    """Validate that dosage is possible given constraint.
-
-    Parameters
-    ----------
-    dosage : ndarray, int, shape (ploidy,)
-        Counts of each unique allele in a genotype.
-    constraint : ndarray, int, shape (ploidy,)
-        Max count of each allele.
-
-    Returns
-    -------
-    valid : bool
-        True if dosage is valid
-    """
-    for i in range(len(dosage)):
-        if dosage[i] > constraint[i]:
-            return False
-    return True
 
 
 @njit(cache=True)
@@ -203,9 +229,9 @@ def increment_dosage(dosage, constraint):
     ValueError
         If there are no further dosage options.
 
-    Notes
-    -----
-    The dosage is incremented in place.
+    Warnings
+    --------
+    The ``dosage`` array is incremented in place.
     """
     max_ploidy = len(dosage)
     i = max_ploidy - 1
@@ -254,7 +280,7 @@ def increment_dosage(dosage, constraint):
 
 
 @njit(cache=True)
-def duplicate_permutations(gamete_dosage, parent_dosage):
+def double_reduction_permutations(gamete_dosage, parent_dosage):
     """Count the number of possible permutations in which the
     observed gamete dosage can be drawn from a parent dosage
     assuming double reduction.
@@ -271,8 +297,8 @@ def duplicate_permutations(gamete_dosage, parent_dosage):
     n : int
         Number of permutations.
 
-    Notes
-    -----
+    Warnings
+    --------
     This function is only valid for diploid gametes!
     """
     n = 0
@@ -324,7 +350,7 @@ def gamete_log_pmf(
         if gamete_ploidy != 2:
             raise ValueError("Lambda parameter is only supported for diploid gametes")
         prob += (
-            duplicate_permutations(gamete_dose, parent_dose) / parent_ploidy
+            double_reduction_permutations(gamete_dose, parent_dose) / parent_ploidy
         ) * gamete_lambda
     if prob == 0.0:
         return -np.inf
@@ -339,22 +365,41 @@ def gamete_const_log_pmf(
     gamete_ploidy,
     parent_dose,
     parent_ploidy,
-    gamete_lambda=0.0,
 ):
+    """Log probability of a the alleles held as constant in a gamete of known origin.
+
+    Parameters
+    ----------
+    allele_index : int
+        Integer idex specify the allele not held as constant in the dosage array.
+    gamete_dose : ndarray, int
+        Counts of each unique allele in the gamete.
+    gamete_ploidy : int
+        Ploidy (tau) of the gamete.
+    parent_dose : ndarray, int
+        Counts of each unique gamete allele within the parent genotype.
+    parent_ploidy : int
+        Ploidy of the parent.
+
+    Returns
+    -------
+    Log-transformed probability of gamete being derived from parental genotype.
+
+    Notes
+    -----
+    This function does not support the lambda parameter as a non-zero lambda
+    value is only supported for diploid gametes. In the case of a diploid
+    gamete the ploidy of the constant portion is 1 so lambda has no effect.
+    """
     if gamete_dose[allele_index] < 1:
         # ensure prob is zero in invalid cases
         return -np.inf
     gamete_dose[allele_index] -= 1
-    if gamete_ploidy == 2:
-        # the ploidy of the constant portion is 1 so lambda is ignored
-        # (i.e., the constant is the first allele of the pair)
-        gamete_lambda = 0.0
     lprob = gamete_log_pmf(
         gamete_dose=gamete_dose,
         gamete_ploidy=gamete_ploidy - 1,
         parent_dose=parent_dose,
         parent_ploidy=parent_ploidy,
-        gamete_lambda=gamete_lambda,
     )
     gamete_dose[allele_index] += 1
     return lprob
@@ -453,6 +498,10 @@ def trio_log_pmf(
         Integer encoded alleles in the first parental genotype.
     parent_q : ndarray, int, shape (ploidy,)
         Integer encoded alleles in the second parental genotype.
+    ploidy_p : int
+        Ploidy of the first parent (p).
+    ploidy_q : int
+        Ploidy of the second parent (q).
     tau_p : int
         Number of alleles inherited from parent_p.
     tau_q : int
@@ -465,6 +514,20 @@ def trio_log_pmf(
         parental genotype.
     log_frequencies : ndarray, float, shape (n_alleles)
         Log of prior for allele frequencies.
+    dosage : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the progenies dosage.
+    dosage_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the first parents (p) dosage.
+    dosage_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the second parents (q) dosage.
+    gamete_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the first gametes (p) dosage.
+    gamete_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the second gametes (q) dosage.
+    constraint_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the dosage limits of first gamete (p).
+    constraint_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the dosage limits of second gamete (q).
 
     Returns
     -------
@@ -534,7 +597,7 @@ def trio_log_pmf(
     # assuming both parents are valid
     if valid_p and valid_q:
         set_initial_dosage(tau_p, constraint_p, gamete_p)
-        set_inverse_gamete(dosage, gamete_p, gamete_q)
+        set_complimentary_gamete(dosage, gamete_p, gamete_q)
         while True:
             # assuming both parents are valid
             lprob_p = (
@@ -578,7 +641,7 @@ def trio_log_pmf(
     # assuming p valid and q invalid (unless already done in previous loop)
     elif valid_p:
         set_initial_dosage(tau_p, constraint_p, gamete_p)
-        set_inverse_gamete(dosage, gamete_p, gamete_q)
+        set_complimentary_gamete(dosage, gamete_p, gamete_q)
         while True:
             lprob_p = (
                 gamete_log_pmf(
@@ -608,7 +671,7 @@ def trio_log_pmf(
     # assuming p invalid and q valid
     if valid_q:
         set_initial_dosage(tau_q, constraint_q, gamete_q)
-        set_inverse_gamete(dosage, gamete_q, gamete_p)
+        set_complimentary_gamete(dosage, gamete_q, gamete_p)
         while True:
             # probability of gamete_p
             lprob_p = (
@@ -684,6 +747,20 @@ def markov_blanket_log_probability(
         Error rate associated with each pedigree edge.
     log_frequencies : ndarray, float, shape (n_alleles)
         Log of prior for allele frequencies.
+    dosage : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the progenies dosage.
+    dosage_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the first parents (p) dosage.
+    dosage_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the second parents (q) dosage.
+    gamete_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the first gametes (p) dosage.
+    gamete_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the second gametes (q) dosage.
+    constraint_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the dosage limits of first gamete (p).
+    constraint_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the dosage limits of second gamete (q).
 
     Returns
     -------
@@ -789,6 +866,10 @@ def trio_allele_log_pmf(
         Integer encoded alleles in the first parental genotype.
     parent_q : ndarray, int, shape (ploidy,)
         Integer encoded alleles in the second parental genotype.
+    ploidy_p : int
+        Ploidy of the first parent (p).
+    ploidy_q : int
+        Ploidy of the second parent (q).
     tau_p : int
         Number of alleles inherited from parent_p.
     tau_q : int
@@ -801,6 +882,20 @@ def trio_allele_log_pmf(
         parental genotype.
     log_frequencies : ndarray, float, shape (n_alleles)
         Log of prior for allele frequencies.
+    dosage : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the progenies dosage.
+    dosage_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the first parents (p) dosage.
+    dosage_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the second parents (q) dosage.
+    gamete_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the first gametes (p) dosage.
+    gamete_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the second gametes (q) dosage.
+    constraint_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the dosage limits of first gamete (p).
+    constraint_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the dosage limits of second gamete (q).
 
     Returns
     -------
@@ -894,7 +989,7 @@ def trio_allele_log_pmf(
     # assuming both parents are valid
     if valid_p and valid_q:
         set_initial_dosage(tau_p, constraint_p, gamete_p)
-        set_inverse_gamete(dosage, gamete_p, gamete_q)
+        set_complimentary_gamete(dosage, gamete_p, gamete_q)
         while True:
             # probability of each gamete given parent
             lprob_gamete_p = gamete_log_pmf(
@@ -910,7 +1005,6 @@ def trio_allele_log_pmf(
                 gamete_ploidy=tau_p,
                 parent_dose=dosage_p,
                 parent_ploidy=ploidy_p,
-                gamete_lambda=lambda_p,
             )
             lprob_allele_p = gamete_allele_log_pmf(
                 gamete_count=gamete_p[allele_index],
@@ -932,7 +1026,6 @@ def trio_allele_log_pmf(
                 gamete_ploidy=tau_q,
                 parent_dose=dosage_q,
                 parent_ploidy=ploidy_q,
-                gamete_lambda=lambda_q,
             )
             lprob_allele_q = gamete_allele_log_pmf(
                 gamete_count=gamete_q[allele_index],
@@ -969,7 +1062,7 @@ def trio_allele_log_pmf(
     # assuming p valid and q invalid (unless already done in previous loop)
     elif valid_p:
         set_initial_dosage(tau_p, constraint_p, gamete_p)
-        set_inverse_gamete(dosage, gamete_p, gamete_q)
+        set_complimentary_gamete(dosage, gamete_p, gamete_q)
         while True:
             # assuming p valid and q invalid
             lprob_gamete_p = gamete_log_pmf(
@@ -985,7 +1078,6 @@ def trio_allele_log_pmf(
                 gamete_ploidy=tau_p,
                 parent_dose=dosage_p,
                 parent_ploidy=ploidy_p,
-                gamete_lambda=lambda_p,
             )
             lprob_allele_p = gamete_allele_log_pmf(
                 gamete_count=gamete_p[allele_index],
@@ -1015,7 +1107,7 @@ def trio_allele_log_pmf(
     # assuming p invalid and q valid
     if valid_q:
         set_initial_dosage(tau_q, constraint_q, gamete_q)
-        set_inverse_gamete(dosage, gamete_q, gamete_p)
+        set_complimentary_gamete(dosage, gamete_q, gamete_p)
         while True:
             assert gamete_p.sum() == tau_p
             assert gamete_q.sum() == tau_q
@@ -1033,7 +1125,6 @@ def trio_allele_log_pmf(
                 gamete_ploidy=tau_q,
                 parent_dose=dosage_q,
                 parent_ploidy=ploidy_q,
-                gamete_lambda=lambda_q,
             )
             lprob_allele_q = gamete_allele_log_pmf(
                 gamete_count=gamete_q[allele_index],
@@ -1116,6 +1207,20 @@ def markov_blanket_log_allele_probability(
         Error rate associated with each pedigree edge.
     log_frequencies : ndarray, float, shape (n_alleles)
         Log of prior for allele frequencies.
+    dosage : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the progenies dosage.
+    dosage_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the first parents (p) dosage.
+    dosage_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the second parents (q) dosage.
+    gamete_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the first gametes (p) dosage.
+    gamete_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the second gametes (q) dosage.
+    constraint_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the dosage limits of first gamete (p).
+    constraint_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the dosage limits of second gamete (q).
 
     Returns
     -------
