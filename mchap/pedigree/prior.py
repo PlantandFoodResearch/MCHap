@@ -92,15 +92,30 @@ def set_complimentary_gamete(dosage, gamete, out):
 
 
 @njit(cache=True)
-def dosage_frequencies(genotype, frequencies):  # TODO: reuse array
+def set_dosage_frequencies(genotype, frequencies, out):
+    """Store allele frequencies in the same order as alleles in a dosage array.
+
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy,)
+        Genotype allele indices padded by negative numbers.
+    frequencies : ndarray, float, shape (alleles,)
+        Allele (log) frequencies.
+    out : ndarray, int, shape (ploidy,)
+        Array used to collect frequencies corresponding to gamete.
+
+    Warnings
+    --------
+    Mutates the ``out`` array in place.
+    """
     max_ploidy = len(genotype)
-    out = np.full(max_ploidy, np.nan, dtype=np.float64)
     for i in range(max_ploidy):
         a = genotype[i]
         if a >= 0:
             assert a < len(frequencies)
             out[i] = frequencies[a]
-    return out
+        else:
+            out[i] = np.nan
 
 
 @njit(cache=True)
@@ -487,6 +502,7 @@ def trio_log_pmf(
     gamete_q,
     constraint_p,
     constraint_q,
+    dosage_log_frequencies,
 ):
     """Log probability of a trio of genotypes.
 
@@ -528,6 +544,8 @@ def trio_log_pmf(
         Scratch array to used to populate with the dosage limits of first gamete (p).
     constraint_q : ndarray, int, shape (ploidy,)
         Scratch array to used to populate with the dosage limits of second gamete (q).
+    dosage_log_frequencies : ndarray, float, shape (ploidy,)
+        Scratch array to used to populate with allele frequencies corresponding to dosage.
 
     Returns
     -------
@@ -544,11 +562,9 @@ def trio_log_pmf(
     lcorrect_p = np.log(1 - error_p) if error_p < 1.0 else -np.inf
     lcorrect_q = np.log(1 - error_q) if error_q < 1.0 else -np.inf
 
-    # ensure frequencies correspond to dosage frequencies
-    dosage_log_frequencies = dosage_frequencies(progeny, log_frequencies)
-
     # ploidy of 0 indicates unknown parent
     set_allelic_dosage(progeny, dosage)
+    set_dosage_frequencies(progeny, log_frequencies, dosage_log_frequencies)
     assert dosage.sum() == tau_p + tau_q  # sanity
     if ploidy_p == 0:
         dosage_p[:] = 0
@@ -724,6 +740,7 @@ def markov_blanket_log_probability(
     gamete_q,
     constraint_p,
     constraint_q,
+    dosage_log_frequencies,
 ):
     """Joint probability of pedigree items that fall within the
     Markov blanket of the specified target sample.
@@ -761,6 +778,8 @@ def markov_blanket_log_probability(
         Scratch array to used to populate with the dosage limits of first gamete (p).
     constraint_q : ndarray, int, shape (ploidy,)
         Scratch array to used to populate with the dosage limits of second gamete (q).
+    dosage_log_frequencies : ndarray, float, shape (ploidy,)
+        Scratch array to used to populate with allele frequencies corresponding to dosage.
 
     Returns
     -------
@@ -816,6 +835,7 @@ def markov_blanket_log_probability(
             gamete_q=gamete_q,
             constraint_p=constraint_p,
             constraint_q=constraint_q,
+            dosage_log_frequencies=dosage_log_frequencies,
         )
     return log_joint
 
@@ -842,6 +862,7 @@ def trio_allele_log_pmf(
     gamete_q,
     constraint_p,
     constraint_q,
+    dosage_log_frequencies,
 ):
     """Log probability of allele within a trio of genotypes.
 
@@ -896,6 +917,8 @@ def trio_allele_log_pmf(
         Scratch array to used to populate with the dosage limits of first gamete (p).
     constraint_q : ndarray, int, shape (ploidy,)
         Scratch array to used to populate with the dosage limits of second gamete (q).
+    dosage_log_frequencies : ndarray, float, shape (ploidy,)
+        Scratch array to used to populate with allele frequencies corresponding to dosage.
 
     Returns
     -------
@@ -920,11 +943,9 @@ def trio_allele_log_pmf(
             allele_index = i
             break
 
-    # ensure frequencies correspond to dosage frequencies
-    dosage_log_frequencies = dosage_frequencies(progeny, log_frequencies)
-
     # ploidy of 0 indicates unknown parent
     set_allelic_dosage(progeny, dosage)
+    set_dosage_frequencies(progeny, log_frequencies, dosage_log_frequencies)
     assert dosage.sum() == tau_p + tau_q  # sanity
     if ploidy_p == 0:
         dosage_p[:] = 0
@@ -1182,6 +1203,7 @@ def markov_blanket_log_allele_probability(
     gamete_q,
     constraint_p,
     constraint_q,
+    dosage_log_frequencies,
 ):
     """Joint probability of pedigree items that fall within the
     Markov blanket of the specified target sample.
@@ -1221,6 +1243,8 @@ def markov_blanket_log_allele_probability(
         Scratch array to used to populate with the dosage limits of first gamete (p).
     constraint_q : ndarray, int, shape (ploidy,)
         Scratch array to used to populate with the dosage limits of second gamete (q).
+    dosage_log_frequencies : ndarray, float, shape (ploidy,)
+        Scratch array to used to populate with allele frequencies corresponding to dosage.
 
     Returns
     -------
@@ -1268,6 +1292,7 @@ def markov_blanket_log_allele_probability(
         gamete_q=gamete_q,
         constraint_p=constraint_p,
         constraint_q=constraint_q,
+        dosage_log_frequencies=dosage_log_frequencies,
     )
     # loop through children
     for idx in range(max_children):
@@ -1310,6 +1335,7 @@ def markov_blanket_log_allele_probability(
             gamete_q=gamete_q,
             constraint_p=constraint_p,
             constraint_q=constraint_q,
+            dosage_log_frequencies=dosage_log_frequencies,
         )
 
     return log_joint
