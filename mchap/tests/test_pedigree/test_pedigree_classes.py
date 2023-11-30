@@ -108,6 +108,16 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
         -np.inf,
     )
 
+    # scratch variables
+    _, max_ploidy = true_genotype.shape
+    dosage = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_p = np.zeros(max_ploidy, dtype=np.int64)
+    dosage_q = np.zeros(max_ploidy, dtype=np.int64)
+    gamete_p = np.zeros(max_ploidy, dtype=np.int64)
+    gamete_q = np.zeros(max_ploidy, dtype=np.int64)
+    constraint_p = np.zeros(max_ploidy, dtype=np.int64)
+    constraint_q = np.zeros(max_ploidy, dtype=np.int64)
+
     # brute force exact posterior by iteration over all combinations of genotypes
     current_genotype = np.zeros((4, 4), int)
     current_genotype[0, 2:] = -2  # first sample is diploid
@@ -120,26 +130,25 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
                     log_like = np.log(1.0)
                     for j in range(n_samples):
                         # prior
-                        genotype_i = current_genotype[j, 0 : sample_ploidy[j]]
-                        actual, q = sample_parent[j]
-                        if actual >= 0:
-                            genotype_p = current_genotype[
-                                actual, 0 : sample_ploidy[actual]
-                            ]
+                        p, q = sample_parent[j]
+                        if p >= 0:
                             error_p = gamete_error[j, 0]
+                            ploidy_p = sample_ploidy[p]
                         else:
-                            genotype_p = np.array([-1])
                             error_p = 1.0
+                            ploidy_p = 0
                         if q >= 0:
-                            genotype_q = current_genotype[q, 0 : sample_ploidy[q]]
                             error_q = gamete_error[j, 1]
+                            ploidy_q = sample_ploidy[q]
                         else:
-                            genotype_q = np.array([-1])
                             error_q = 1.0
+                            ploidy_q = 0
                         log_prior += trio_log_pmf(
-                            genotype_i,
-                            genotype_p,
-                            genotype_q,
+                            current_genotype[j],
+                            current_genotype[p],
+                            current_genotype[q],
+                            ploidy_p=ploidy_p,
+                            ploidy_q=ploidy_q,
                             tau_p=gamete_tau[j, 0],
                             tau_q=gamete_tau[j, 1],
                             lambda_p=gamete_lambda[j, 0],
@@ -147,6 +156,13 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
                             error_p=error_p,
                             error_q=error_q,
                             log_frequencies=np.log(frequencies),
+                            dosage=dosage,
+                            dosage_p=dosage_p,
+                            dosage_q=dosage_q,
+                            gamete_p=gamete_p,
+                            gamete_q=gamete_q,
+                            constraint_p=constraint_p,
+                            constraint_q=constraint_q,
                         )
                         # likelihood
                         log_like += log_likelihood_alleles_cached(
@@ -154,7 +170,7 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
                             read_counts=sample_read_counts[j],
                             haplotypes=haplotypes,
                             sample=j,
-                            genotype_alleles=genotype_i,
+                            genotype_alleles=current_genotype[j, 0 : sample_ploidy[j]],
                             cache=None,
                         )
                     log_post = log_like + log_prior
