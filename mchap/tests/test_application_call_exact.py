@@ -7,9 +7,9 @@ import pytest
 from mchap.application.call_exact import program
 
 
-def reference_path():
+def local_file_path(name):
     path = pathlib.Path(__file__).parent.absolute()
-    path = path / "test_io/data/simple.fasta"
+    path = path / ("test_io/data/" + name)
     return str(path)
 
 
@@ -29,7 +29,7 @@ def reference_path():
                 "simple.sample2.broken.cram",
                 "simple.sample3.broken.cram",
             ],
-            ["--reference", reference_path()],
+            ["--reference", local_file_path("simple.fasta")],
             "simple.output.call-exact.vcf",
         ),
         (
@@ -119,6 +119,21 @@ def reference_path():
                 "--use-base-phred-scores",
             ],
             "simple.output.mixed_depth.call-exact.posteriors.vcf",
+        ),
+        (
+            "simple.output.assemble.vcf",
+            [
+                "simple.sample1.deep.bam",
+                "simple.sample2.deep.bam",
+                "simple.sample3.deep.bam",
+            ],
+            [
+                "--ploidy",
+                local_file_path("simple.pools-ploidy"),
+                "--sample-pool",
+                local_file_path("simple.pools"),
+            ],
+            "simple.output.deep.call-exact.pools.vcf",
         ),
     ],
 )

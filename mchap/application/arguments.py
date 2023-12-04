@@ -1,5 +1,6 @@
 import copy
 import pysam
+import os
 from dataclasses import dataclass
 
 from mchap.constant import PFEIFFER_ERROR
@@ -190,8 +191,18 @@ sample_pool = Parameter(
         nargs=1,
         default=[None],
         help=(
-            "A name used to pool all sample reads into a single sample. "
-            "WARNING: this is an experimental feature."
+            "WARNING: this is an experimental feature!!! "
+            "Pool samples together into a single genotype. "
+            "This may be (1) the name of a single pool for all samples or "
+            "(2) a file containing a list of all samples and their assigned pool. "
+            "If option (2) is used then each line of the plaintext file must "
+            "contain a single sample identifier and the name of a pool separated by a tab."
+            "Samples may be assigned to multiple pools by using the same sample name on "
+            "multiple lines."
+            "Each pool will treated as a single genotype by combining "
+            "all reads from its constituent samples. "
+            "Note that the pool names should be used in place of the samples names when "
+            "assigning other per-sample parameters such as ploidy or inbreeding coefficients."
         ),
     ),
 )
@@ -664,6 +675,48 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
 )
 
 
+def parse_sample_pools(samples, sample_bams, sample_pool_argument):
+    if sample_pool_argument is None:
+        # pools of single samples
+        sample_bams = {k: [(k, v)] for k, v in sample_bams.items()}
+        return samples, sample_bams
+    if not os.path.isfile(sample_pool_argument):
+        # pool of all samples
+        samples = [sample_pool_argument]
+        sample_bams = {sample_pool_argument: [(k, v) for k, v in sample_bams.items()]}
+        return samples, sample_bams
+    else:
+        # custom pools
+        with open(sample_pool_argument) as f:
+            lines = [line.strip().split("\t") for line in f.readlines()]
+        pools = list()
+        pool_bams = dict()
+        samples_in_pools = set()
+        for sample, pool in lines:
+            samples_in_pools.add(sample)
+            bam = sample_bams[sample]
+            if pool not in pools:
+                # start new pool
+                pools.append(pool)
+                pool_bams[pool] = [(sample, bam)]
+            else:
+                # add sample to pool
+                pool_bams[pool].append((sample, bam))
+        # validation
+        sample_with_bams = set(samples)
+        diff = sample_with_bams - samples_in_pools
+        if diff:
+            raise ValueError(
+                f"The following samples have not been assigned to a pool: {diff}"
+            )
+        diff = samples_in_pools - sample_with_bams
+        if diff:
+            raise ValueError(
+                f"The following names in the sample-pool file do not match a known sample : {diff}"
+            )
+        return pools, pool_bams
+
+
 def parse_sample_bam_paths(bam_argument, sample_pool_argument, read_group_field):
     """Combine arguments relating to sample bam file specification.
 
@@ -718,14 +771,9 @@ def parse_sample_bam_paths(bam_argument, sample_pool_argument, read_group_field)
             raise ValueError("Too many fields")
 
     # handle sample pooling
-    if sample_pool_argument is None:
-        # pools of 1
-        sample_bams = {k: [(k, v)] for k, v in sample_bams.items()}
-    else:
-        # pool all samples
-        samples = [sample_pool_argument]
-        sample_bams = {sample_pool_argument: [(k, v) for k, v in sample_bams.items()]}
-    # TODO: multiple pools
+    samples, sample_bams = parse_sample_pools(
+        samples, sample_bams, sample_pool_argument
+    )
 
     return samples, sample_bams
 

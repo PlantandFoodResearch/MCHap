@@ -12,6 +12,12 @@ from mchap.io.vcf.headermeta import filedate, columns
 from mchap.application.assemble import program, _genotype_as_alleles
 
 
+def local_file_path(name):
+    path = pathlib.Path(__file__).parent.absolute()
+    path = path / ("test_io/data/" + name)
+    return str(path)
+
+
 def test_Program__cli():
     samples = ["SAMPLE1", "SAMPLE2", "SAMPLE3"]
 
@@ -305,6 +311,20 @@ def test_Program__header():
                 "--use-base-phred-scores",
             ],
             "simple.output.nullallele.assemble.vcf",
+        ),
+        (
+            [
+                "simple.sample1.deep.bam",
+                "simple.sample2.deep.bam",
+                "simple.sample3.deep.bam",
+            ],
+            [
+                "--ploidy",
+                local_file_path("simple.pools-ploidy"),
+                "--sample-pool",
+                local_file_path("simple.pools"),
+            ],
+            "simple.output.deep.assemble.pools.vcf",
         ),
     ],
 )
