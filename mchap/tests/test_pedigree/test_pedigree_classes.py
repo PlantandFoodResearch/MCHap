@@ -21,11 +21,11 @@ from mchap.pedigree.classes import PedigreeCallingMCMC, PedigreeAllelesMultiTrac
         (0, "Metropolis-Hastings", 0, 0.03),
         (4, "Gibbs", 0, 0.02),
         (4, "Metropolis-Hastings", 0, 0.03),
-        (10, "Gibbs", 0, 0.01),
+        (10, "Gibbs", 0, 0.015),
         (10, "Metropolis-Hastings", 0, 0.015),
         (40, "Gibbs", 0, 0.01),
         (40, "Metropolis-Hastings", 0, 0.015),
-        (100, "Gibbs", 0, 0.0015),
+        (100, "Gibbs", 0, 0.002),
         (100, "Metropolis-Hastings", 0, 0.003),
     ],
 )
@@ -315,3 +315,275 @@ def test_PedigreeAllelesMultiTrace_incongruence():
         sample_ploidy, sample_parents, gamete_tau, gamete_lambda
     )
     np.testing.assert_array_equal(expect, actual)
+
+
+def test_PedigreeCallingMCMC__swap_parental_alleles_example():
+    read_depth = 50
+    steps = 1000
+    annealing = 0
+    step_type = "Gibbs"
+    seed = 0
+
+    # pedigree details
+    n_samples = 43
+    sample_parent = np.full((n_samples, 2), -1, int)
+    sample_parent[3:23] = [0, 1]
+    sample_parent[23:43] = [1, 2]
+    gamete_tau = np.full_like(sample_parent, 2, dtype=int)
+    gamete_lambda = np.zeros_like(sample_parent, dtype=float)
+    gamete_error = np.full_like(sample_parent, 0.00001, dtype=float)
+    sample_ploidy = gamete_tau.sum(axis=-1)
+
+    # we want
+    true_genotype = np.array(
+        [
+            [0, 0, 1, 1],  # parent 0
+            [0, 0, 1, 1],  # parent 1
+            [0, 0, 1, 2],  # parent 2 is source of unique allele
+            [0, 0, 1, 1],  # progeny of 0 and 1
+            [0, 1, 1, 1],
+            [0, 0, 0, 1],
+            [0, 0, 1, 1],
+            [0, 0, 1, 1],
+            [0, 0, 0, 0],
+            [0, 1, 1, 1],
+            [0, 0, 1, 1],
+            [0, 0, 1, 1],
+            [0, 0, 1, 1],
+            [0, 0, 1, 1],
+            [0, 1, 1, 1],
+            [0, 0, 0, 1],
+            [0, 0, 1, 1],
+            [0, 0, 1, 1],
+            [0, 0, 0, 0],
+            [0, 1, 1, 1],
+            [0, 0, 1, 1],
+            [0, 0, 1, 1],
+            [0, 0, 1, 1],
+            [0, 0, 1, 2],  # progeny of 1 and 2
+            [0, 1, 1, 2],
+            [0, 0, 0, 1],
+            [0, 0, 1, 1],
+            [0, 0, 1, 2],
+            [0, 0, 0, 0],
+            [0, 1, 1, 2],
+            [0, 0, 1, 1],
+            [0, 0, 1, 2],
+            [0, 0, 1, 1],
+            [0, 0, 1, 2],
+            [0, 1, 1, 1],
+            [0, 0, 0, 1],
+            [0, 0, 1, 1],
+            [0, 0, 1, 2],
+            [0, 0, 0, 0],
+            [0, 1, 1, 2],
+            [0, 0, 1, 1],
+            [0, 0, 1, 2],
+            [0, 0, 1, 2],
+        ]
+    )
+    assert len(true_genotype) == n_samples
+    assert np.sum(true_genotype[np.any(sample_parent == 2, axis=-1)] == 2) == 10
+    assert np.sum(true_genotype[np.any(sample_parent == 0, axis=-1)] == 2) == 0
+
+    # start in an incorrect sub_mode
+    initial_genotype = true_genotype.copy()
+    initial_genotype[1] = true_genotype[2]
+    initial_genotype[2] = true_genotype[1]
+
+    # haplotypes (few to limit complexity)
+    haplotypes = np.array(
+        [
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 1],
+            [0, 1, 1, 0, 0, 1, 1],
+            [1, 0, 0, 0, 1, 1, 1],
+        ]
+    )
+    frequencies = np.ones(len(haplotypes))
+    frequencies /= frequencies.sum()
+
+    # simulate reads from genotypes
+    n_samples = len(sample_parent)
+    n_alleles, n_pos = haplotypes.shape
+    sample_read_dists = np.empty((n_samples, read_depth, n_pos, 2))
+    for i, g in enumerate(true_genotype):
+        sample_read_dists[i] = simulate_reads(
+            haplotypes[g],
+            n_alleles=2,
+            n_reads=read_depth,
+            errors=False,
+            uniform_sample=False,
+        )
+    sample_read_counts = np.ones((n_samples, read_depth), dtype=int) * 10
+    sample_read_counts[0:3] = 0  # parents have zero count
+
+    # check that disabling the parental allele swap results in being stuck in the incorrect mode
+    model_a = PedigreeCallingMCMC(
+        sample_ploidy=sample_ploidy,
+        sample_inbreeding=np.zeros(n_samples),
+        sample_parents=sample_parent,
+        gamete_tau=gamete_tau,
+        gamete_lambda=gamete_lambda,
+        gamete_error=gamete_error,
+        haplotypes=haplotypes,
+        frequencies=frequencies,
+        steps=steps,
+        annealing=annealing,
+        chains=2,
+        random_seed=seed,
+        step_type=step_type,
+        swap_parental_alleles=False,
+    )
+    trace_a = model_a.fit(
+        sample_read_dists, sample_read_counts, initial=initial_genotype
+    ).burn(annealing)
+    genotype_1a, prob_1a = trace_a.individual(1).posterior().mode()
+    np.testing.assert_array_equal(genotype_1a, [0, 0, 1, 2])
+    assert prob_1a > 0.9
+    genotype_2a, prob_2a = trace_a.individual(2).posterior().mode()
+    np.testing.assert_array_equal(genotype_2a, [0, 0, 1, 1])
+    assert prob_2a > 0.9
+
+    # check that enabling the parental allele swap has allowed a transition to the correct genotypes
+    model_b = PedigreeCallingMCMC(
+        sample_ploidy=sample_ploidy,
+        sample_inbreeding=np.zeros(n_samples),
+        sample_parents=sample_parent,
+        gamete_tau=gamete_tau,
+        gamete_lambda=gamete_lambda,
+        gamete_error=gamete_error,
+        haplotypes=haplotypes,
+        frequencies=frequencies,
+        steps=steps,
+        annealing=annealing,  # no annealing !
+        chains=2,
+        random_seed=seed,
+        step_type=step_type,
+        swap_parental_alleles=True,
+    )
+    trace_b = model_b.fit(
+        sample_read_dists, sample_read_counts, initial=initial_genotype
+    ).burn(annealing)
+    genotype_1b, prob_1b = trace_b.individual(1).posterior().mode()
+    np.testing.assert_array_equal(genotype_1b, [0, 0, 1, 1])
+    assert prob_1b > 0.9
+    genotype_2b, prob_2b = trace_b.individual(2).posterior().mode()
+    np.testing.assert_array_equal(genotype_2b, [0, 0, 1, 2])
+    assert prob_2b > 0.9
+
+
+@pytest.mark.parametrize(
+    "read_depth, step_type, seed, tolerance",
+    [
+        (0, "Gibbs", 0, 0.02),
+        (4, "Gibbs", 0, 0.035),
+        (10, "Gibbs", 0, 0.02),
+        (10, "Metropolis-Hastings", 0, 0.02),
+        (40, "Gibbs", 0, 0.01),
+    ],
+)
+def test_PedigreeCallingMCMC__swap_parental_alleles_bias(
+    read_depth, step_type, seed, tolerance
+):
+    # pedigree details
+    sample_parent = np.array(
+        [
+            [-1, -1],
+            [-1, -1],
+            [0, 1],
+            [-1, 2],  # unknown parent
+        ]
+    )
+    gamete_tau = np.array(
+        [
+            [1, 1],
+            [2, 2],
+            [2, 2],
+            [2, 2],
+        ]
+    )
+    gamete_lambda = np.array([[0.0, 0.0], [0.01, 0.01], [0.345, 0.01], [0.01, 0.01]])
+    gamete_error = np.array([[0.01, 0.01], [0.01, 0.01], [0.01, 0.01], [0.01, 0.01]])
+    true_genotype = np.array(
+        [
+            [0, 1, -2, -2],
+            [0, 0, 0, 2],
+            [0, 1, 1, 2],
+            [0, 0, 1, 2],
+        ]
+    )
+    sample_ploidy = gamete_tau.sum(axis=-1)
+
+    # haplotypes (few to limit complexity)
+    haplotypes = np.array(
+        [
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 1],
+            [0, 1, 1, 0, 0, 1, 1],
+            [1, 0, 0, 0, 1, 1, 1],
+        ]
+    )
+    np.random.seed(seed)
+    frequencies = np.random.rand(len(haplotypes))
+    frequencies /= frequencies.sum()
+    print("Frequencies:", frequencies)
+
+    # simulate reads from genotypes
+    n_samples = len(sample_parent)
+    n_alleles, n_pos = haplotypes.shape
+    sample_read_dists = np.empty((n_samples, read_depth, n_pos, 2))
+    for i, g in enumerate(true_genotype):
+        sample_read_dists[i] = simulate_reads(
+            haplotypes[g],
+            n_alleles=2,
+            n_reads=read_depth,
+            errors=False,
+            uniform_sample=False,
+        )
+    sample_read_counts = np.ones((n_samples, read_depth), dtype=int)
+
+    # without allele swapping
+    model_1 = PedigreeCallingMCMC(
+        sample_ploidy=sample_ploidy,
+        sample_inbreeding=np.zeros(n_samples),
+        sample_parents=sample_parent,
+        gamete_tau=gamete_tau,
+        gamete_lambda=gamete_lambda,
+        gamete_error=gamete_error,
+        haplotypes=haplotypes,
+        frequencies=frequencies,
+        steps=3000,
+        annealing=1000,
+        chains=2,
+        random_seed=seed,
+        step_type=step_type,
+        swap_parental_alleles=False,
+    )
+    trace_1 = model_1.fit(sample_read_dists, sample_read_counts).burn(1000)
+
+    # with allele swapping
+    model_2 = PedigreeCallingMCMC(
+        sample_ploidy=sample_ploidy,
+        sample_inbreeding=np.zeros(n_samples),
+        sample_parents=sample_parent,
+        gamete_tau=gamete_tau,
+        gamete_lambda=gamete_lambda,
+        gamete_error=gamete_error,
+        haplotypes=haplotypes,
+        frequencies=frequencies,
+        steps=3000,
+        annealing=1000,
+        chains=2,
+        random_seed=seed,
+        step_type=step_type,
+        swap_parental_alleles=True,
+    )
+    trace_2 = model_2.fit(sample_read_dists, sample_read_counts).burn(1000)
+
+    for i in range(n_samples):
+        print("Tolerance:", tolerance)
+        post_1 = trace_1.individual(i).posterior().as_array(n_alleles)
+        post_2 = trace_2.individual(i).posterior().as_array(n_alleles)
+        print("Max absolute difference:", np.max(np.abs(post_1 - post_2)))
+        assert np.allclose(post_1, post_2, atol=tolerance)

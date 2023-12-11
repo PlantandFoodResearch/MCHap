@@ -6,6 +6,7 @@ from mchap.pedigree.mcmc import (
     metropolis_hastings_probabilities,
     gibbs_probabilities,
     sample_children_matrix,
+    parental_pair_markov_blankets,
 )
 
 
@@ -384,13 +385,13 @@ def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
                 [0, 1],
                 [2, 3],
                 [2, 3],
-                [2, 3],
+                [3, 2],
                 [2, 3],
                 [2, 3],
                 [2, 3],
                 [0, 3],
                 [0, 3],
-                [0, 3],
+                [3, 0],
                 [0, 3],
                 [0, 3],
             ],
@@ -423,3 +424,64 @@ def test_sample_children_matrix(parent, children):
     parent = np.array(parent)
     children = np.array(children)
     np.testing.assert_array_equal(sample_children_matrix(parent), children)
+
+
+@pytest.mark.parametrize(
+    "parent, pairs, blankets",
+    [
+        (
+            [
+                [-1, -1],
+                [-1, -1],
+                [0, 1],
+                [-1, 2],
+            ],
+            [
+                [0, 1],
+            ],
+            [[0, 1, 2]],
+        ),
+        (
+            [
+                [-1, -1],
+                [-1, -1],
+                [-1, -1],
+                [-1, -1],
+                [0, 1],
+                [0, 1],
+                [0, 1],
+                [0, 1],
+                [0, 1],
+                [2, 3],
+                [2, 3],
+                [3, 2],
+                [2, 3],
+                [2, 3],
+                [2, 3],
+                [0, 3],
+                [0, 3],
+                [3, 0],
+                [0, 3],
+                [0, 3],
+            ],
+            [
+                [0, 1],
+                [2, 3],
+                [0, 3],
+            ],
+            [
+                [0, 1, 4, 5, 6, 7, 8, 15, 16, 17, 18, 19, -1, -1, -1, -1, -1, -1],
+                [2, 3, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, -1, -1, -1, -1, -1],
+                [0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+            ],
+        ),
+    ],
+)
+def test_parental_pair_markov_blankets(parent, pairs, blankets):
+    parent = np.array(parent)
+    pairs = np.array(pairs)
+    blankets = np.array(blankets)
+    children = sample_children_matrix(parent)
+    actual_pairs, actual_blankets = parental_pair_markov_blankets(parent, children)
+    np.testing.assert_array_equal(pairs, actual_pairs)
+    np.testing.assert_array_equal(blankets, actual_blankets)
