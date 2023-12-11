@@ -4,7 +4,11 @@ from numba import njit
 from mchap.jitutils import random_choice, normalise_log_probs
 from mchap.calling.utils import count_allele
 from .likelihood import log_likelihood_alleles_cached
-from .prior import markov_blanket_log_probability, markov_blanket_log_allele_probability
+from .prior import (
+    markov_blanket_log_probability,
+    markov_blanket_log_allele_probability,
+    generic_markov_blanket_log_probability,
+)
 
 
 @njit(cache=True)
@@ -455,6 +459,204 @@ def sample_children_matrix(sample_parents):
 
 
 @njit(cache=True)
+def parental_pair_markov_blankets(sample_parents, sample_children):
+    n_samples = len(sample_parents)
+    _, max_children = sample_children.shape
+    max_blanket_size = 0
+    n_pairs = 0
+    pairs = {}
+    for i in range(n_samples):
+        p, q = sample_parents[i, 0], sample_parents[i, 1]
+        # ensure ordering
+        if p > q:
+            p, q = q, p
+        if p < 0 or q < 0:
+            pass
+        elif (p, q) in pairs:
+            pass
+        else:
+            # new pair
+            in_blanket = np.zeros(n_samples, dtype=np.bool8)
+            in_blanket[p] = True
+            in_blanket[q] = True
+            for j in range(max_children):
+                c = sample_children[p, j]
+                if c >= 0:
+                    in_blanket[c] = True
+                c = sample_children[q, j]
+                if c >= 0:
+                    in_blanket[c] = True
+            blanket = np.where(in_blanket)[0]
+            max_blanket_size = max(max_blanket_size, len(blanket))
+            pairs[(p, q)] = blanket
+            n_pairs += 1
+    parental_pairs = np.zeros((n_pairs, 2), dtype=np.int64)
+    parental_pair_blankets = np.full((n_pairs, max_blanket_size), -1, dtype=np.int64)
+    i = 0
+    for (p, q), blanket in pairs.items():
+        parental_pairs[i, 0] = p
+        parental_pairs[i, 1] = q
+        parental_pair_blankets[i, 0 : len(blanket)] = blanket
+        i += 1
+    return parental_pairs, parental_pair_blankets
+
+
+@njit
+def pair_allele_swap_step(
+    p,
+    q,
+    markov_blanket,
+    sample_genotypes,
+    sample_ploidy,
+    sample_parents,
+    gamete_tau,
+    gamete_lambda,
+    gamete_error,
+    sample_read_dists,  # array (n_samples, n_reads, n_pos, n_nucl)
+    sample_read_counts,  # array (n_samples, n_reads)
+    haplotypes,  # (n_haplotypes, n_pos)
+    log_frequencies,  # (n_haplotypes,)
+    llk_cache,
+    dosage,
+    dosage_p,
+    dosage_q,
+    gamete_p,
+    gamete_q,
+    constraint_p,
+    constraint_q,
+    dosage_log_frequencies,
+):
+    ploidy_p = sample_ploidy[p]
+    ploidy_q = sample_ploidy[q]
+    index_p = np.random.randint(ploidy_p)
+    index_q = np.random.randint(ploidy_q)
+    allele_p = sample_genotypes[p, index_p]
+    allele_q = sample_genotypes[q, index_q]
+    assert allele_p >= 0
+    assert allele_q >= 0
+    idx = sample_read_counts[p] > 0
+    read_dists_p = sample_read_dists[p][idx]
+    read_counts_p = sample_read_counts[p][idx]
+    read_dists_q = sample_read_dists[q][idx]
+    read_counts_q = sample_read_counts[q][idx]
+
+    # check if a new state is proposed
+    if allele_p == allele_q:
+        # return that no decision to make for testing etc
+        return np.nan, False
+
+    # calculate proposal ratio = g(G|G') / g(G'|G)
+    proposal = count_allele(sample_genotypes[p], allele_p) * count_allele(
+        sample_genotypes[q], allele_q
+    )
+    reversal = (1 + count_allele(sample_genotypes[p], allele_q)) * (
+        1 + count_allele(sample_genotypes[q], allele_p)
+    )
+    lproposal_ratio = np.log(
+        reversal / proposal
+    )  # denominator is identical in both cases
+
+    # current likelihood
+    llk_current = 0.0
+    llk_current += log_likelihood_alleles_cached(
+        reads=read_dists_p,
+        read_counts=read_counts_p,
+        haplotypes=haplotypes,
+        sample=p,
+        genotype_alleles=np.sort(sample_genotypes[p, 0:ploidy_p]),
+        cache=llk_cache,
+    )
+    llk_current += log_likelihood_alleles_cached(
+        reads=read_dists_q,
+        read_counts=read_counts_q,
+        haplotypes=haplotypes,
+        sample=q,
+        genotype_alleles=np.sort(sample_genotypes[q, 0:ploidy_q]),
+        cache=llk_cache,
+    )
+
+    # current prior
+    lprior_current = generic_markov_blanket_log_probability(
+        markov_blanket,
+        sample_genotypes,
+        sample_ploidy,
+        sample_parents,
+        gamete_tau,
+        gamete_lambda,
+        gamete_error,
+        log_frequencies,
+        dosage,
+        dosage_p,
+        dosage_q,
+        gamete_p,
+        gamete_q,
+        constraint_p,
+        constraint_q,
+        dosage_log_frequencies,
+    )
+
+    # swap alleles
+    sample_genotypes[p, index_p] = allele_q
+    sample_genotypes[q, index_q] = allele_p
+
+    # proposal likelihood
+    llk_proposal = 0.0
+    llk_proposal += log_likelihood_alleles_cached(
+        reads=read_dists_p,
+        read_counts=read_counts_p,
+        haplotypes=haplotypes,
+        sample=p,
+        genotype_alleles=np.sort(sample_genotypes[p, 0:ploidy_p]),
+        cache=llk_cache,
+    )
+    llk_proposal += log_likelihood_alleles_cached(
+        reads=read_dists_q,
+        read_counts=read_counts_q,
+        haplotypes=haplotypes,
+        sample=q,
+        genotype_alleles=np.sort(sample_genotypes[q, 0:ploidy_q]),
+        cache=llk_cache,
+    )
+
+    # proposal prior
+    lprior_proposal = generic_markov_blanket_log_probability(
+        markov_blanket,
+        sample_genotypes,
+        sample_ploidy,
+        sample_parents,
+        gamete_tau,
+        gamete_lambda,
+        gamete_error,
+        log_frequencies,
+        dosage,
+        dosage_p,
+        dosage_q,
+        gamete_p,
+        gamete_q,
+        constraint_p,
+        constraint_q,
+        dosage_log_frequencies,
+    )
+
+    # calculate Metropolis-Hastings acceptance probability
+    # ln(min(1, (P(G'|R)P(G')g(G|G')) / (P(G|R)P(G)g(G'|G)))
+    llk_ratio = llk_proposal - llk_current
+    lprior_ratio = lprior_proposal - lprior_current
+    log_accept = np.minimum(0.0, llk_ratio + lprior_ratio + lproposal_ratio)
+    prob_accept = np.exp(log_accept)
+
+    # make decision
+    accept = np.random.rand() < prob_accept
+    if not accept:
+        # put things back where you found them!
+        sample_genotypes[p, index_p] = allele_p
+        sample_genotypes[q, index_q] = allele_q
+
+    # return the decision made for testing etc
+    return prob_accept, accept
+
+
+@njit(cache=True)
 def mcmc_sampler(
     sample_genotypes,
     sample_ploidy,
@@ -469,6 +671,7 @@ def mcmc_sampler(
     n_steps=2000,
     annealing=1000,
     step_type=0,
+    swap_parental_alleles=True,
 ):
     """MCMC simulation for calling alleles in pedigreed genotypes from a set of known haplotypes.
 
@@ -502,6 +705,9 @@ def mcmc_sampler(
     step_type : int
         Step type with 0 for a Gibbs-step and 1 for a
         Metropolis-Hastings step.
+    swap_parental_alleles : bool
+        If True (the default), then an allele swap step will be performed
+        between each parental pairing.
 
     Notes
     -----
@@ -513,6 +719,18 @@ def mcmc_sampler(
     genotype_alleles_trace : ndarray, int, shape (n_samples, n_steps, ploidy)
         Genotype alleles trace for each sample.
     """
+    # copy genotypes
+    sample_genotypes = sample_genotypes.copy()
+
+    # identify sample children
+    sample_children = sample_children_matrix(sample_parents)
+
+    # identify parental pairs and their Markov blankets
+    parental_pairs, parental_pair_blankets = parental_pair_markov_blankets(
+        sample_parents, sample_children
+    )
+    n_pairs = len(parental_pairs)
+
     # set up caches
     llk_cache = {}
     llk_cache[(-1, -1)] = np.nan
@@ -533,8 +751,7 @@ def mcmc_sampler(
     constraint_q = np.zeros(max_ploidy, dtype=np.int64)
     dosage_log_frequencies = np.zeros(max_ploidy, dtype=np.float64)
 
-    sample_children = sample_children_matrix(sample_parents)
-    sample_genotypes = sample_genotypes.copy()
+    # MCMC iterations
     trace = np.empty((n_steps, n_samples, max_ploidy), dtype=sample_genotypes.dtype)
     for i in range(n_steps):
         compound_step(
@@ -560,6 +777,32 @@ def mcmc_sampler(
             constraint_q=constraint_q,
             dosage_log_frequencies=dosage_log_frequencies,
         )
+        if swap_parental_alleles:
+            for j in range(n_pairs):
+                pair_allele_swap_step(
+                    p=parental_pairs[j, 0],
+                    q=parental_pairs[j, 1],
+                    markov_blanket=parental_pair_blankets[j],
+                    sample_genotypes=sample_genotypes,
+                    sample_ploidy=sample_ploidy,
+                    sample_parents=sample_parents,
+                    gamete_tau=gamete_tau,
+                    gamete_lambda=gamete_lambda,
+                    gamete_error=gamete_error,
+                    sample_read_dists=sample_read_dists,
+                    sample_read_counts=sample_read_counts,
+                    haplotypes=haplotypes,
+                    log_frequencies=log_frequencies,
+                    llk_cache=llk_cache,
+                    dosage=dosage,
+                    dosage_p=dosage_p,
+                    dosage_q=dosage_q,
+                    gamete_p=gamete_p,
+                    gamete_q=gamete_q,
+                    constraint_p=constraint_p,
+                    constraint_q=constraint_q,
+                    dosage_log_frequencies=dosage_log_frequencies,
+                )
         trace[i] = sample_genotypes.copy()
 
     # sort trace allowing for mixed ploidy

@@ -840,6 +840,119 @@ def markov_blanket_log_probability(
     return log_joint
 
 
+# TODO: merge this with `markov_blanket_log_probability`
+# and create a similar API for `markov_blanket_log_allele_probability`
+@njit(cache=True)
+def generic_markov_blanket_log_probability(
+    markov_blanket,
+    sample_genotypes,
+    sample_ploidy,
+    sample_parents,
+    gamete_tau,
+    gamete_lambda,
+    gamete_error,
+    log_frequencies,
+    dosage,
+    dosage_p,
+    dosage_q,
+    gamete_p,
+    gamete_q,
+    constraint_p,
+    constraint_q,
+    dosage_log_frequencies,
+):
+    """Joint probability of pedigree items that fall within the
+    Markov blanket of the specified target sample.
+
+    Parameters
+    ----------
+    markov_blanket : nd.array, int
+        Indices of samples within the Markov blanket. Padded with negative values.
+    sample_genotypes : ndarray, int, shape (n_sample, max_ploidy)
+        Genotype of each sample padded by negative values.
+    sample_ploidy  : ndarray, int, shape (n_sample,)
+        Sample ploidy
+    sample_parents : ndarray, int, shape (n_samples, 2)
+        Parent indices of each sample with -1 indicating
+        unknown parents.
+    gamete_tau : int, shape (n_samples, 2)
+        Gamete ploidy associated with each pedigree edge.
+    gamete_lambda : float, shape (n_samples, 2)
+        Excess IBDy associated with each pedigree edge.
+    gamete_error : float, shape (n_samples, 2)
+        Error rate associated with each pedigree edge.
+    log_frequencies : ndarray, float, shape (n_alleles)
+        Log of prior for allele frequencies.
+    dosage : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the progenies dosage.
+    dosage_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the first parents (p) dosage.
+    dosage_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the second parents (q) dosage.
+    gamete_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the first gametes (p) dosage.
+    gamete_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the second gametes (q) dosage.
+    constraint_p : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the dosage limits of first gamete (p).
+    constraint_q : ndarray, int, shape (ploidy,)
+        Scratch array to used to populate with the dosage limits of second gamete (q).
+    dosage_log_frequencies : ndarray, float, shape (ploidy,)
+        Scratch array to used to populate with allele frequencies corresponding to dosage.
+
+    Returns
+    -------
+    log_probability : float
+        Joint log probability of pedigree items that fall within the
+        Markov blanket of the specified target sample.
+
+    """
+    max_size = len(markov_blanket)
+    log_joint = 0.0
+    for idx in range(max_size):
+        i = markov_blanket[idx]
+        if i < 0:
+            # start of padding
+            break
+        p = sample_parents[i, 0]
+        q = sample_parents[i, 1]
+        if p >= 0:
+            error_p = gamete_error[i, 0]
+            ploidy_p = sample_ploidy[p]
+        else:
+            error_p = 1.0
+            ploidy_p = 0
+        if q >= 0:
+            error_q = gamete_error[i, 1]
+            ploidy_q = sample_ploidy[q]
+        else:
+            error_q = 1.0
+            ploidy_q = 0
+        log_joint += trio_log_pmf(
+            sample_genotypes[i],
+            sample_genotypes[p],
+            sample_genotypes[q],
+            ploidy_p=ploidy_p,
+            ploidy_q=ploidy_q,
+            tau_p=gamete_tau[i, 0],
+            tau_q=gamete_tau[i, 1],
+            lambda_p=gamete_lambda[i, 0],
+            lambda_q=gamete_lambda[i, 1],
+            error_p=error_p,
+            error_q=error_q,
+            log_frequencies=log_frequencies,
+            dosage=dosage,
+            dosage_p=dosage_p,
+            dosage_q=dosage_q,
+            gamete_p=gamete_p,
+            gamete_q=gamete_q,
+            constraint_p=constraint_p,
+            constraint_q=constraint_q,
+            dosage_log_frequencies=dosage_log_frequencies,
+        )
+    return log_joint
+
+
 @njit(cache=True)
 def trio_allele_log_pmf(
     allele_index,

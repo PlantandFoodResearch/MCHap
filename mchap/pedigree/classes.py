@@ -26,6 +26,7 @@ class PedigreeCallingMCMC(Assembler):
     chains: int = 2
     random_seed: int = None
     step_type: str = "Gibbs"
+    swap_parental_alleles: bool = True
 
     def fit(self, sample_reads, sample_read_counts, initial=None):
         n_samples = len(self.sample_ploidy)
@@ -47,6 +48,8 @@ class PedigreeCallingMCMC(Assembler):
                     inbreeding=self.sample_inbreeding[i],
                 )
                 initial[i][0 : self.sample_ploidy[i]] = genotype
+        else:
+            initial = np.array(initial).copy()
 
         # step type
         if self.step_type == "Gibbs":
@@ -81,6 +84,7 @@ class PedigreeCallingMCMC(Assembler):
                 n_steps=self.steps,
                 annealing=self.annealing,
                 step_type=step_type,
+                swap_parental_alleles=self.swap_parental_alleles,
             )
         return PedigreeAllelesMultiTrace(trace)
 
