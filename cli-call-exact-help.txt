@@ -59,8 +59,20 @@ options:
                         identifier and the inbreeding coefficient of that
                         sample separated by a tab.
   --sample-pool SAMPLE_POOL
-                        A name used to pool all sample reads into a single
-                        sample. WARNING: this is an experimental feature.
+                        WARNING: this is an experimental feature!!! Pool
+                        samples together into a single genotype. This may be
+                        (1) the name of a single pool for all samples or (2) a
+                        file containing a list of all samples and their
+                        assigned pool. If option (2) is used then each line of
+                        the plaintext file must contain a single sample
+                        identifier and the name of a pool separated by a
+                        tab.Samples may be assigned to multiple pools by using
+                        the same sample name on multiple lines.Each pool will
+                        treated as a single genotype by combining all reads
+                        from its constituent samples. Note that the pool names
+                        should be used in place of the samples names when
+                        assigning other per-sample parameters such as ploidy
+                        or inbreeding coefficients.
   --reference REFERENCE
                         Indexed fasta file containing the reference genome.
   --base-error-rate BASE_ERROR_RATE
