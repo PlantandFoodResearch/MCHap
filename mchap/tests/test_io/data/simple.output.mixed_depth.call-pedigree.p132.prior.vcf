@@ -1,6 +1,6 @@
 ##fileformat=VCFv4.3
 ##fileDate=20210420
-##source=mchap v0.9.0
+##source=mchap v0.9.1
 ##phasing=None
 ##commandline="mchap call-pedigree --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --sample-parents simple.pedigree.132.txt --ploidy 4 --haplotypes mock.input.frequencies.vcf --prior-frequencies AFP --mcmc-steps 500 --mcmc-burn 100 --mcmc-seed 11"
 ##randomseed=11
