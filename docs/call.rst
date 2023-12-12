@@ -3,7 +3,7 @@ MCHap call
 
 Calling genotypes from known haplotypes.
 
-*(Last updated for MCHap version 0.9.0)*
+*(Last updated for MCHap version 0.9.1)*
 
 Background
 ----------
@@ -194,6 +194,26 @@ effects on the results.
   file and the location of that file is then passed to the ``--inbreeding`` argument.
   Each line of this file must contain the identifier of a sample and its inbreeding 
   coefficient separated by a tab.
+
+Sample pooling
+~~~~~~~~~~~~~~
+
+MCHap allows you to define 'pools' of samples using the ``--sample-pools`` parameter.
+A sample pool will combine the reads of its constituent samples but otherwise is treated
+identically to a regular sample. Sample parameters relating to the sample pool including
+``--ploidy`` and ``--inbreeding`` must be set using the name of the sample pool rather
+than its constituent samples. Uses for sample pools include:
+
+- Combining the replicates into a single sample
+- Renaming samples (using a pool per sample)
+- Combining a set samples that are expected to contain a known number of haplotypes (e.g.,
+  the progeny of a bi-parental cross)
+
+The ``--sample-pools`` parameter can specify either the name of a single 'pool' containing
+all of the samples, or a tabular file assigning samples to pools. If a tabular fle is used,
+each line must contain the name of a sample followed by the name of the pool that sample is
+assigned to. All samples must be specified in this file but they can be assigned to a pool
+of the same name (i.e., a pool per sample). Samples may be assigned to more than one pool. 
 
 Output parameters
 ~~~~~~~~~~~~~~~~~

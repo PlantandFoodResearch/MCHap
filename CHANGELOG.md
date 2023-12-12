@@ -3,6 +3,12 @@
 ## Unreleased 
 
 
+## Beta v0.9.1
+
+New Features:
+- Allow complex sample pooling via a tabular file
+
+
 ## Beta v0.9.0
 
 New Features:
