@@ -19,7 +19,7 @@ __all__ = [
 ID_TAGS = {"ID", "SM"}
 
 
-def extract_sample_ids(bam_paths, id="SM"):
+def extract_sample_ids(bam_paths, id="SM", reference_path=None):
     """Extract sample id's from a list of bam files.
 
     Parameters
@@ -38,7 +38,7 @@ def extract_sample_ids(bam_paths, id="SM"):
     assert id in ID_TAGS
     data = {}
     for path in bam_paths:
-        bam = pysam.AlignmentFile(path)
+        bam = pysam.AlignmentFile(path, reference_filename=reference_path)
         # allow multiple read groups for a single sample within a bam file
         # but guard against duplicate sample identifier across multiple bams
         bam_data = {read_group[id]: path for read_group in bam.header["RG"]}

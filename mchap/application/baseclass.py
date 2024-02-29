@@ -99,16 +99,6 @@ class program(object):
     def loci(self):
         raise NotImplementedError()
 
-    def alignment_files(self):
-        out = {}
-        for pool, pairs in self.sample_bams.items():
-            pairs = [
-                (sample, pysam.AlignmentFile(path, reference_filename=self.ref))
-                for sample, path in pairs
-            ]
-            out[pool] = pairs
-        return out
-
     def header_contigs(self):
         with pysam.VariantFile(self.vcf) as f:
             contigs = f.header.contigs.values()
@@ -135,7 +125,7 @@ class program(object):
         header = meta_fields + contigs + filters + info_fields + format_fields + columns
         return [str(line) for line in header]
 
-    def _locus_data(self, locus, alignment_files):
+    def _locus_data(self, locus, sample_bams):
         """Generate a LocusAssemblyData object for a given locus
         to be populated with data relating to a single vcf record.
         """
@@ -144,7 +134,7 @@ class program(object):
         return LocusAssemblyData(
             locus=locus,
             samples=self.samples,
-            sample_bams=alignment_files,
+            sample_bams=sample_bams,
             sample_ploidy=self.sample_ploidy,
             sample_inbreeding=self.sample_inbreeding,
             infofields=infofields,
@@ -186,19 +176,22 @@ class program(object):
                 # of bam sample-path pairs.
                 pairs = data.sample_bams[sample]
                 read_chars, read_quals = [], []
-                for name, alignment_file in pairs:
-                    chars, quals = extract_read_variants(
-                        data.locus,
-                        alignment_file=alignment_file,
-                        samples=name,
-                        id=self.read_group_field,
-                        min_quality=self.mapping_quality,
-                        skip_duplicates=self.skip_duplicates,
-                        skip_qcfail=self.skip_qcfail,
-                        skip_supplementary=self.skip_supplementary,
-                    )[name]
-                    read_chars.append(chars)
-                    read_quals.append(quals)
+                for name, path in pairs:
+                    with pysam.AlignmentFile(
+                        path, reference_filename=self.ref
+                    ) as alignment_file:
+                        chars, quals = extract_read_variants(
+                            data.locus,
+                            alignment_file=alignment_file,
+                            samples=name,
+                            id=self.read_group_field,
+                            min_quality=self.mapping_quality,
+                            skip_duplicates=self.skip_duplicates,
+                            skip_qcfail=self.skip_qcfail,
+                            skip_supplementary=self.skip_supplementary,
+                        )[name]
+                        read_chars.append(chars)
+                        read_quals.append(quals)
                 read_chars = np.concatenate(read_chars)
                 read_quals = np.concatenate(read_quals)
 
@@ -343,7 +336,7 @@ class program(object):
             data.infodata["AOP"] = prob_occurring.round(self.precision)
         return data
 
-    def call_locus(self, locus, alignment_files):
+    def call_locus(self, locus, sample_bams):
         """Call samples at a locus and formats resulting data
         into a VCF record line.
 
@@ -366,7 +359,7 @@ class program(object):
             VCF variant line.
 
         """
-        data = self._locus_data(locus, alignment_files)
+        data = self._locus_data(locus, sample_bams)
         self.encode_sample_reads(data)
         self.call_sample_genotypes(data)
         self.sumarise_sample_genotypes(data)
@@ -374,11 +367,9 @@ class program(object):
         return data.format_vcf_record()
 
     def _assemble_loci_wrapped(self, loci):
-        # create single set of alignment files to use for every locus in the job
-        alignment_files = self.alignment_files()
         for locus in loci:
             try:
-                result = self.call_locus(locus, alignment_files)
+                result = self.call_locus(locus, self.sample_bams)
             except Exception as e:
                 message = LOCUS_ASSEMBLY_ERROR.format(
                     name=locus.name,

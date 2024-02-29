@@ -717,7 +717,9 @@ def parse_sample_pools(samples, sample_bams, sample_pool_argument):
         return pools, pool_bams
 
 
-def parse_sample_bam_paths(bam_argument, sample_pool_argument, read_group_field):
+def parse_sample_bam_paths(
+    bam_argument, sample_pool_argument, read_group_field, reference_path
+):
     """Combine arguments relating to sample bam file specification.
 
     Parameters
@@ -738,7 +740,7 @@ def parse_sample_bam_paths(bam_argument, sample_pool_argument, read_group_field)
     textfile = False
     if len(bam_argument) == 1:
         try:
-            pysam.AlignmentFile(bam_argument[0])
+            pysam.AlignmentFile(bam_argument[0], reference_filename=reference_path)
         except ValueError:
             # not a bam
             textfile = True
@@ -747,7 +749,9 @@ def parse_sample_bam_paths(bam_argument, sample_pool_argument, read_group_field)
     else:
         bams = bam_argument
     if not textfile:
-        sample_bams = extract_sample_ids(bams, id=read_group_field)
+        sample_bams = extract_sample_ids(
+            bams, id=read_group_field, reference_path=reference_path
+        )
         samples = list(sample_bams)
 
     # case of plain-text filepath
@@ -761,7 +765,9 @@ def parse_sample_bam_paths(bam_argument, sample_pool_argument, read_group_field)
         if n_fields == 1:
             # list of bam paths
             bams = [line[0] for line in lines]
-            sample_bams = extract_sample_ids(bams, id=read_group_field)
+            sample_bams = extract_sample_ids(
+                bams, id=read_group_field, reference_path=reference_path
+            )
             samples = list(sample_bams)
         elif n_fields == 2:
             # list of sample-bam pairs
@@ -871,7 +877,10 @@ def collect_default_program_arguments(arguments):
             )
     # merge sample specific data with defaults
     samples, sample_bams = parse_sample_bam_paths(
-        arguments.bam, arguments.sample_pool[0], arguments.read_group_field[0]
+        arguments.bam,
+        arguments.sample_pool[0],
+        arguments.read_group_field[0],
+        reference_path=arguments.reference[0],
     )
     sample_ploidy = parse_sample_value_map(
         arguments.ploidy[0],
