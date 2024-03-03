@@ -215,65 +215,69 @@ def _count_alleles(zeros, alleles):
     return
 
 
-def bam_samples(alignment_files, tag="SM"):
-    out = [None] * len(alignment_files)
-    for i, bam in enumerate(alignment_files):
-        read_groups = bam.header["RG"]
-        sample_id = read_groups[0][tag]
-        if len(read_groups) > 1:
-            for rg in read_groups:
-                if rg[tag] != sample_id:
-                    raise ValueError(
-                        "Expected one sample per bam but found {} and {} in {}".format(
-                            sample_id, rg[tag], bam.filename.decode()
+def bam_samples(bam_paths, reference_path, tag="SM"):
+    out = [None] * len(bam_paths)
+    for i, path in enumerate(bam_paths):
+        with pysam.AlignmentFile(path, reference_filename=reference_path) as bam:
+            read_groups = bam.header["RG"]
+            sample_id = read_groups[0][tag]
+            if len(read_groups) > 1:
+                for rg in read_groups:
+                    if rg[tag] != sample_id:
+                        raise ValueError(
+                            "Expected one sample per bam but found {} and {} in {}".format(
+                                sample_id, rg[tag], bam.filename.decode()
+                            )
                         )
-                    )
-        out[i] = sample_id
+            out[i] = sample_id
     return np.array(out)
 
 
 def bam_region_depths(
-    alignment_files,
+    bam_paths,
+    reference_path,
     contig,
     start,
     stop,
     dtype=np.int64,
     **kwargs,
 ):
-    n_samples = len(alignment_files)
+    n_samples = len(bam_paths)
     n_pos = stop - start
     shape = (n_pos, n_samples, 4)
     depths = np.zeros(shape, dtype=dtype)
-    for j, bam in enumerate(alignment_files):
-        for column in bam.pileup(
-            contig=contig,
-            start=start,
-            stop=stop,
-            truncate=True,
-            multiple_iterators=False,
-            **kwargs,
-        ):
-            # if start <= column.pos < stop:
-            i = column.pos - start
-            alleles = column.get_query_sequences()
-            if isinstance(alleles, list):
-                alleles = bases_to_indices(alleles)
-                _count_alleles(depths[i, j], alleles)
+    for j, path in enumerate(bam_paths):
+        with pysam.AlignmentFile(path, reference_filename=reference_path) as bam:
+            for column in bam.pileup(
+                contig=contig,
+                start=start,
+                stop=stop,
+                truncate=True,
+                multiple_iterators=False,
+                **kwargs,
+            ):
+                # if start <= column.pos < stop:
+                i = column.pos - start
+                alleles = column.get_query_sequences()
+                if isinstance(alleles, list):
+                    alleles = bases_to_indices(alleles)
+                    _count_alleles(depths[i, j], alleles)
     return depths
 
 
 def write_vcf_header(
-    command, reference, info_fields=None, format_fields=None, samples=None
+    command, reference_path, info_fields=None, format_fields=None, samples=None
 ):
     vcfversion_header = str(headermeta.fileformat("v4.3"))
     date_header = str(headermeta.filedate())
     source_header = str(headermeta.source())
     command_header = str(headermeta.commandline(command))
-    reference_header = str(headermeta.reference(reference.filename.decode()))
-    contig_header = "\n".join(
-        str(headermeta.ContigHeader(s, i))
-        for s, i in zip(reference.references, reference.lengths)
-    )
+    with pysam.FastaFile(reference_path) as reference:
+        reference_header = str(headermeta.reference(reference.filename.decode()))
+        contig_header = "\n".join(
+            str(headermeta.ContigHeader(s, i))
+            for s, i in zip(reference.references, reference.lengths)
+        )
     components = [
         vcfversion_header,
         date_header,
@@ -400,8 +404,8 @@ def write_vcf_block(
     contig,
     start,
     stop,
-    reference,
-    alignment_files,
+    reference_path,
+    bam_paths,
     # sample_ploidy,
     # sample_inbreeding,
     # base_error_rate,
@@ -420,10 +424,12 @@ def write_vcf_block(
     assert start < stop
     variant_position = np.arange(start, stop)
     variant_contig = np.full(len(variant_position), contig)
-    variant_reference = np.array(list(reference.fetch(contig, start, stop).upper()))
+    with pysam.FastaFile(reference_path) as reference:
+        variant_reference = np.array(list(reference.fetch(contig, start, stop).upper()))
     variant_reference_index = bases_to_indices(variant_reference)
     allele_depth = bam_region_depths(
-        alignment_files,
+        bam_paths,
+        reference_path,
         contig,
         start,
         stop,
@@ -587,9 +593,8 @@ def main(command):
     bed = pd.read_table(bed_path, header=None)[[0, 1, 2]]
     bed.columns = ["contig", "start", "stop"]
     reference_path = args.reference[0]
-    reference = pysam.Fastafile(reference_path)
     samples, sample_bams = arguments.parse_sample_bam_paths(
-        args.bam, None, args.read_group_field[0]
+        args.bam, None, args.read_group_field[0], reference_path=reference_path
     )
     # sample_ploidy = arguments.parse_sample_value_map(
     #     args.ploidy[0],
@@ -611,13 +616,9 @@ def main(command):
     # create alignment file objects and reuse them throughout
     # this is important for cram performance!
     # also pass reference name explicitly for robustness
-    alignment_files = [
-        pysam.AlignmentFile(path, reference_filename=reference_path)
-        for path in bam_paths
-    ]
-    samples_found = bam_samples(alignment_files, tag=args.read_group_field[0]).astype(
-        "U"
-    )
+    samples_found = bam_samples(
+        bam_paths, reference_path, tag=args.read_group_field[0]
+    ).astype("U")
     mismatch = samples_found != samples
     if np.any(mismatch):
         raise IOError(
@@ -630,7 +631,7 @@ def main(command):
     format_fields = [formatfields.GT, formatfields.AD]
     write_vcf_header(
         command,
-        reference,
+        reference_path,
         samples=samples,
         info_fields=info_fields,
         format_fields=format_fields,
@@ -641,8 +642,8 @@ def main(command):
             interval.contig,
             interval.start,
             interval.stop,
-            reference,
-            alignment_files,
+            reference_path,
+            bam_paths,
             # sample_ploidy,
             # sample_inbreeding,
             # base_error_rate=args.base_error_rate[0],

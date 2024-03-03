@@ -3,7 +3,7 @@ MCHap call
 
 Calling genotypes from known haplotypes.
 
-*(Last updated for MCHap version 0.9.1)*
+*(Last updated for MCHap version 0.9.2)*
 
 Background
 ----------

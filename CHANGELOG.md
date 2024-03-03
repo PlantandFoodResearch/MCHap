@@ -3,6 +3,12 @@
 ## Unreleased 
 
 
+## Beta v0.9.2
+
+Bug Fixes:
+- Avoid holding alignment file handles open #173
+
+
 ## Beta v0.9.1
 
 New Features:
