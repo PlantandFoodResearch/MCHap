@@ -250,11 +250,11 @@ gamete_error = Parameter(
     dict(
         type=str,
         nargs=1,
-        default=["0.1"],
+        default=["0.01"],
         help=(
             "An error term associated with each parent-child pair indicating the "
             "probability that that gamete was not derived from the specified parent. "
-            "By default this variable is 0.1 for all parent-child pairs. "
+            "By default this variable is 0.01 for all parent-child pairs. "
             "This value must be in the interval [0, 1] and should generally be > 0 and < 1."
             "If a single value is specified then this will be applied to all parent-child pairs. "
             "If this value varies between gametes then it must be specified with a "
