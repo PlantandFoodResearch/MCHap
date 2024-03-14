@@ -3,6 +3,12 @@
 ## Unreleased 
 
 
+## Beta v0.9.3
+
+Bug Fixes:
+- Correct usage of the `AN` field #176
+- Improved error messages for io #163 #177
+
 ## Beta v0.9.2
 
 Bug Fixes:

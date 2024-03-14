@@ -1,6 +1,6 @@
 ##fileformat=VCFv4.3
 ##fileDate=20210420
-##source=mchap v0.9.2
+##source=mchap v0.9.3
 ##phasing=None
 ##commandline="mchap assemble --bam simple.sample1.deep.bam simple.sample2.deep.bam simple.sample3.deep.bam --ploidy simple.pools-ploidy --targets simple.bed.gz --variants simple.vcf.gz --reference simple.fasta --mcmc-steps 500 --mcmc-burn 100 --mcmc-seed 11 --sample-pool simple.pools"
 ##randomseed=11
