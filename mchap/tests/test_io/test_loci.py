@@ -1,4 +1,5 @@
 import pathlib
+import pytest
 import numpy as np
 
 from mchap.io import loci
@@ -125,6 +126,38 @@ def test_Locus__set_sequence():
     expect = "A" * 20
     locus = locus.set_sequence(ref)
     assert locus.sequence == expect
+
+
+def test_Locus__set_sequence__raise_on_ref():
+    path = pathlib.Path(__file__).parent.absolute()
+    ref = str(path / "data/wrong.fasta")
+    vcf = str(path / "data/simple.vcf.gz")
+
+    locus = loci.Locus(
+        contig="CHR1", start=5, stop=25, name="CHR1_05_25", sequence=None, variants=None
+    )
+    locus = locus.set_variants(vcf)
+    with pytest.raises(
+        ValueError,
+        match="Reference allele of variant 'A' does not match reference sequence 'T' at 'CHR1:7' in target 'CHR1_05_25'",
+    ):
+        locus = locus.set_sequence(ref)
+
+
+def test_Locus__set_variants__raise_on_ref():
+    path = pathlib.Path(__file__).parent.absolute()
+    ref = str(path / "data/wrong.fasta")
+    vcf = str(path / "data/simple.vcf.gz")
+
+    locus = loci.Locus(
+        contig="CHR1", start=5, stop=25, name="CHR1_05_25", sequence=None, variants=None
+    )
+    locus = locus.set_sequence(ref)
+    with pytest.raises(
+        ValueError,
+        match="Reference allele of variant 'A' does not match reference sequence 'T' at 'CHR1:7' in target 'CHR1_05_25'",
+    ):
+        locus = locus.set_variants(vcf)
 
 
 def test_Locus__set_variants__empty():

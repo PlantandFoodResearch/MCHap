@@ -66,28 +66,73 @@ class Locus:
         data.update(kwargs)
         return type(self)(**data)
 
+    def validate_reference_alleles(self):
+        sequence_chars = list(self.sequence)
+        ref_alleles = (tup[0] for tup in self.alleles)
+        for pos, char in zip(self.positions, ref_alleles):
+            idx = pos - self.start
+            seq_char = sequence_chars[idx]
+            if seq_char != char:
+                contig = self.contig
+                name = self.name
+                vcf_pos = pos + 1
+                if name:
+                    loc = f"'{contig}:{vcf_pos}' in target '{name}'"
+                else:
+                    loc = f"'{contig}:{vcf_pos}'"
+                raise ValueError(
+                    f"Reference allele of variant '{char}' does not match reference sequence '{seq_char}' at {loc}"
+                )
+
     def set_sequence(self, fasta):
         with pysam.FastaFile(fasta) as f:
-            return _set_locus_sequence(self, f)
+            sequence = f.fetch(self.contig, self.start, self.stop).upper()
+            locus = self.set(sequence=sequence)
+            if locus.variants:
+                locus.validate_reference_alleles()
+            return locus
 
     def set_variants(self, vcf):
         with pysam.VariantFile(vcf) as f:
-            return _set_locus_variants(self, f)
+            variants = []
+            positions = set()
+            for var in f.fetch(self.contig, self.start, self.stop):
+                alleles = (var.ref,) + var.alts
+
+                if (var.stop - var.start == 1) and all(len(a) == 1 for a in alleles):
+                    # is a SNP
+                    snp = SNP(
+                        contig=var.contig,
+                        start=var.start,
+                        stop=var.stop,
+                        name=var.id if var.id else ".",
+                        alleles=alleles,
+                    )
+                    if snp.start in positions:
+                        # attempt to merge duplicates
+                        variants = [
+                            _merge_snps(s, snp) if s.start == snp.start else s
+                            for s in variants
+                        ]
+                    else:
+                        variants.append(snp)
+                        positions.add(snp.start)
+                else:
+                    pass
+
+            variants = tuple(variants)
+            locus = self.set(variants=variants)
+            if locus.sequence:
+                locus.validate_reference_alleles()
+            return locus
 
     def _template_sequence(self):
         chars = list(self.sequence)
-        ref_alleles = (tup[0] for tup in self.alleles)
-        for pos, string in zip(self.positions, ref_alleles):
+        for pos in self.positions:
             idx = pos - self.start
-            for offset, char in enumerate(string):
-                if chars[idx + offset] != char:
-                    message = (
-                        "Reference allele does not match sequence at position {}:{}"
-                    )
-                    raise ValueError(message.format(self.contig, pos + offset))
 
-                # remove chars
-                chars[idx + offset] = ""
+            # remove chars
+            chars[idx] = ""
 
             # add template position
             chars[idx] = "{}"
@@ -309,12 +354,6 @@ def read_bed4(bed, region=None):
                     yield _parse_bed4_line(line.decode())
 
 
-def _set_locus_sequence(locus, fasta_file):
-    sequence = fasta_file.fetch(locus.contig, locus.start, locus.stop).upper()
-    locus = locus.set(sequence=sequence)
-    return locus
-
-
 def _merge_snps(x, y):
     match = [
         x.contig == y.contig,
@@ -340,35 +379,3 @@ def _merge_snps(x, y):
         name=x.name,
         alleles=alleles,
     )
-
-
-def _set_locus_variants(locus, variant_file):
-    variants = []
-    positions = set()
-
-    for var in variant_file.fetch(locus.contig, locus.start, locus.stop):
-        alleles = (var.ref,) + var.alts
-
-        if (var.stop - var.start == 1) and all(len(a) == 1 for a in alleles):
-            # is a SNP
-            snp = SNP(
-                contig=var.contig,
-                start=var.start,
-                stop=var.stop,
-                name=var.id if var.id else ".",
-                alleles=alleles,
-            )
-            if snp.start in positions:
-                # attempt to merge duplicates
-                variants = [
-                    _merge_snps(s, snp) if s.start == snp.start else s for s in variants
-                ]
-            else:
-                variants.append(snp)
-                positions.add(snp.start)
-        else:
-            pass
-
-    variants = tuple(variants)
-    locus = locus.set(variants=variants)
-    return locus
