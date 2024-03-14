@@ -34,6 +34,13 @@ jobs:
       run: |
         python setup.py sdist
         pip install dist/mchap-*.tar.gz
+    - name: Test with pytest (bounds checked)
+      env:
+        NUMBA_BOUNDSCHECK: 1
+      run: |
+        pytest -vv
     - name: Test with pytest
+      env:
+        NUMBA_BOUNDSCHECK: 0
       run: |
         pytest -vv
