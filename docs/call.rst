@@ -3,7 +3,7 @@ MCHap call
 
 Calling genotypes from known haplotypes.
 
-*(Last updated for MCHap version 0.9.2)*
+*(Last updated for MCHap version 0.9.3)*
 
 Background
 ----------
@@ -341,7 +341,7 @@ at least ``1000`` steps should be kept to calculate posterior probabilities.
 Excluding input haplotypes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The speed of each MCMC step in ``mchap assemble`` is largely dependant on the
+The speed of each MCMC step in ``mchap call`` is largely dependant on the
 ploidy of an individual and the number of unique haplotypes in the input VCF file.
 Therefore, the speed of analysis can be improved by minimizing unnecessary
 haplotypes from the input VCF file.

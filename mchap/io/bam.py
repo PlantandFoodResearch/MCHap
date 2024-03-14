@@ -93,7 +93,7 @@ def extract_read_variants(
 
     """
 
-    assert id in {"ID", "SM"}
+    assert id in ID_TAGS
 
     # a single sample name may be given as a string
     if isinstance(samples, str):
@@ -182,7 +182,19 @@ def extract_read_variants(
                         idx = positions[ref_pos]
 
                         # references allele in bam should match reference allele in locus
-                        assert locus.alleles[idx][0].upper() == ref_char.upper()
+                        if locus.alleles[idx][0].upper() != ref_char.upper():
+                            path = alignment_file.filename.decode()
+                            locus_ref_char = locus.alleles[idx][0]
+                            locus_contig = locus.contig
+                            locus_name = locus.name
+                            vcf_pos = ref_pos + 1
+                            if locus_name:
+                                loc = f"'{locus_contig}:{vcf_pos}' in target '{locus_name}'"
+                            else:
+                                loc = f"'{locus_contig}:{vcf_pos}'"
+                            raise ValueError(
+                                f"Reference allele of variant '{locus_ref_char}' does not match alignment reference allele '{ref_char}' at position {loc} in '{path}'"
+                            )
 
                         char = read.seq[read_pos]
                         qual = util.qual_of_char(read.qual[read_pos])

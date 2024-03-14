@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
 
     steps:
     - uses: actions/checkout@v2
@@ -34,6 +34,13 @@ jobs:
       run: |
         python setup.py sdist
         pip install dist/mchap-*.tar.gz
+    - name: Test with pytest (bounds checked)
+      env:
+        NUMBA_BOUNDSCHECK: 1
+      run: |
+        pytest -vv
     - name: Test with pytest
+      env:
+        NUMBA_BOUNDSCHECK: 0
       run: |
         pytest -vv

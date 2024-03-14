@@ -101,6 +101,40 @@ def test_extract_read_variants():
     np.testing.assert_array_equal(actual[sample][1], expect_quals)
 
 
+def test_extract_read_variants__raise_on_ref():
+
+    sample = "SAMPLE1"
+    path = pathlib.Path(__file__).parent.absolute()
+    path = str(path / "data/simple.sample1.bam")
+
+    variants = (
+        loci.SNP("CHR1", 6, 7, ".", alleles=("A", "C")),
+        loci.SNP("CHR1", 15, 16, ".", alleles=("T", "G")),
+        loci.SNP("CHR1", 22, 23, ".", alleles=("A", "C", "T")),
+    )
+
+    locus = loci.Locus(
+        contig="CHR1",
+        start=5,
+        stop=25,
+        name="CHR1_05_25",
+        sequence="A" * 20,
+        variants=variants,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Reference allele of variant 'T' does not match alignment reference allele 'A' at position 'CHR1:16' in target 'CHR1_05_25' in",
+    ):
+        with pysam.AlignmentFile(path) as alignment_file:
+            bam.extract_read_variants(
+                locus,
+                alignment_file,
+                samples=sample,
+                id="SM",
+            )
+
+
 def test_encode_read_alleles():
     variants = (
         loci.SNP("CHR1", 6, 7, ".", alleles=("A", "C")),
