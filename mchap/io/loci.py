@@ -96,7 +96,16 @@ class Locus:
         with pysam.VariantFile(vcf) as f:
             variants = []
             positions = set()
-            for var in f.fetch(self.contig, self.start, self.stop):
+            try:
+                records = f.fetch(self.contig, self.start, self.stop)
+            except ValueError as e:
+                if "fetch requires an index" in e.args:
+                    raise ValueError(
+                        f"Could not fetch variants from file '{vcf}', the file is not indexed"
+                    ) from e
+                else:
+                    raise e
+            for var in records:
                 alleles = (var.ref,) + var.alts
 
                 if (var.stop - var.start == 1) and all(len(a) == 1 for a in alleles):
