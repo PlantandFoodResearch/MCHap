@@ -14,7 +14,14 @@ def main():
         "Bayesian assemby of micro-haplotypes in polyploids"
     )
 
-    subprograms = ["assemble", "call", "call-exact", "call-pedigree", "version", "find-snvs"]
+    subprograms = [
+        "assemble",
+        "call",
+        "call-exact",
+        "call-pedigree",
+        "version",
+        "find-snvs",
+    ]
     parser.add_argument(
         "program", nargs=1, choices=subprograms, help="Specify sub-program"
     )
