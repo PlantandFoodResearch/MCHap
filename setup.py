@@ -31,6 +31,7 @@ setup(
         "mchap/encoding/character",
         "mchap/io",
         "mchap/io/vcf",
+        "mchap/pedigree",
     ],
     python_requires=">3.7.0",
     keywords=["biology", "bioinformatics", "genetics", "genomics"],
