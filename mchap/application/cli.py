@@ -21,6 +21,7 @@ def main():
     )
 
     subprograms = ["assemble", "call", "call-exact", "call-pedigree", "find-snvs"]
+
     parser.add_argument(
         "program", nargs=1, choices=subprograms, help="Specify sub-program"
     )
