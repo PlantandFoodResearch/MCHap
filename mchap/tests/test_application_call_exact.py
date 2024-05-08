@@ -192,6 +192,9 @@ def test_Program__run_stdout(input_vcf, bams, cli_extra, output_vcf, n_cores):
         # file paths will make full line differ
         if act.startswith("##commandline"):
             assert exp.startswith("##commandline")
+        # versions will differ
+        elif act.startswith("##source=mchap"):
+            assert exp.startswith("##source=mchap")
         elif act.startswith("##fileDate"):
             # new date should be greater than test vcf date
             assert exp.startswith("##fileDate")

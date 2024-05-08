@@ -104,6 +104,9 @@ def test_main(bams, extra, output_vcf):
         # file paths will make full line differ
         if act.startswith("##commandline"):
             assert exp.startswith("##commandline")
+        # versions will differ
+        elif act.startswith("##source=mchap"):
+            assert exp.startswith("##source=mchap")
         elif act.startswith("##reference"):
             assert exp.startswith("##reference")
         elif act.startswith("##fileDate"):

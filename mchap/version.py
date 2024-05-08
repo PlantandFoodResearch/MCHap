@@ -1,1 +1,7 @@
-__version__ = "0.9.3"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("mchap")
+except PackageNotFoundError:
+    # package is not installed
+    pass

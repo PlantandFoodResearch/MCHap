@@ -398,6 +398,9 @@ def test_Program__run_stdout(bams, cli_extra, output_vcf, cache_threshold, n_cor
         # file paths will make full line differ
         if act.startswith("##commandline"):
             assert exp.startswith("##commandline")
+        # versions will differ
+        elif act.startswith("##source=mchap"):
+            assert exp.startswith("##source=mchap")
         elif act.startswith("##fileDate"):
             # new date should be greater than test vcf date
             assert exp.startswith("##fileDate")
@@ -503,6 +506,9 @@ def test_Program__run_stdout__region(region, region_id, cache_threshold):
         # file paths will make full line differ
         if act.startswith("##commandline"):
             assert exp.startswith("##commandline")
+        # versions will differ
+        elif act.startswith("##source=mchap"):
+            assert exp.startswith("##source=mchap")
         elif act.startswith("##fileDate"):
             # new date should be greater than test vcf date
             assert exp.startswith("##fileDate")

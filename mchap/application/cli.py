@@ -10,10 +10,16 @@ from mchap import __version__
 
 def main():
     parser = argparse.ArgumentParser(
-        "Bayesian assemby of micro-haplotypes in polyploids"
+        "Bayesian assembly of micro-haplotypes in polyploids"
+    )
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"mchap {__version__}",
     )
 
-    subprograms = ["assemble", "call", "call-exact", "version", "find-snvs"]
+    subprograms = ["assemble", "call", "call-exact", "find-snvs"]
     parser.add_argument(
         "program", nargs=1, choices=subprograms, help="Specify sub-program"
     )
@@ -34,7 +40,5 @@ def main():
             prog.cli(sys.argv).run_stdout()
         elif prog == "find-snvs":
             find_snvs.main(sys.argv)
-        elif prog == "version":
-            print(__version__)
         else:
             assert False

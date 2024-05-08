@@ -3,4 +3,3 @@ pandas
 scipy
 numba
 pysam
-pytest
