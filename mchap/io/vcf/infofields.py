@@ -34,6 +34,7 @@ AF = InfoField(id="AF", number="A", type="Float", descr="Allele Frequency")
 AFP = InfoField(
     id="AFP", number="R", type="Float", descr="Posterior mean allele frequencies"
 )
+ACP = InfoField(id="ACP", number="R", type="Float", descr="Posterior allele counts")
 AFPRIOR = InfoField(
     id="AFPRIOR", number="R", type="Float", descr="Prior allele frequencies"
 )
@@ -42,6 +43,12 @@ AOP = InfoField(
     number="R",
     type="Float",
     descr="Posterior probability of allele occurring across all samples",
+)
+AOPSUM = InfoField(
+    id="AOPSUM",
+    number="R",
+    type="Float",
+    descr="Posterior estimate of the number of samples containing an allele",
 )
 AA = InfoField(id="AA", number=1, type="String", descr="Ancestral allele")
 END = InfoField(id="END", number=1, type="Integer", descr="End position on CHROM")
@@ -81,16 +88,24 @@ REFMASKED = InfoField(
     type="Flag",
     descr="Reference allele is masked",
 )
+SNVDP = InfoField(
+    id="SNVDP",
+    number=".",
+    type="Integer",
+    descr="Read depth at each SNV position",
+)
 
 HEADER_INFO_FIELDS = dict(
     NS=NS,
     DP=DP,
     AC=AC,
+    ACP=ACP,
     AN=AN,
     AF=AF,
     AFP=AFP,
     AFPRIOR=AFPRIOR,
     AOP=AOP,
+    AOPSUM=AOPSUM,
     AA=AA,
     END=END,
     NVAR=NVAR,
@@ -98,4 +113,7 @@ HEADER_INFO_FIELDS = dict(
     AD=AD,
     RCOUNT=RCOUNT,
     REFMASKED=REFMASKED,
+    SNVDP=SNVDP,
 )
+
+OPTIONAL_INFO_FIELDS = [AFPRIOR, ACP, AFP, AOP, AOPSUM, SNVDP]

@@ -70,6 +70,7 @@ class program(call_baseclass.program):
             "MCI",
             "GL",
             "GP",
+            "ACP",
             "AFP",
             "AOP",
         ]:
@@ -114,6 +115,7 @@ class program(call_baseclass.program):
                 data.sampledata["PHPM"][sample] = np.nan
                 data.sampledata["PHQ"][sample] = np.nan
                 data.sampledata["MCI"][sample] = np.nan
+                data.sampledata["ACP"][sample] = np.array([np.nan])
                 data.sampledata["AFP"][sample] = np.array([np.nan])
                 data.sampledata["AOP"][sample] = np.array([np.nan])
                 data.sampledata["GP"][sample] = np.array([np.nan])
@@ -154,9 +156,12 @@ class program(call_baseclass.program):
                     phenotype_prob = phenotype_probs.sum()
 
                     # store specified arrays
-                    if ("AFP" in data.formatfields) or ("AOP" in data.formatfields):
-                        freqs, occur = posterior_allele_frequencies(
+                    if self.require_AFP():
+                        freqs, counts, occur = posterior_allele_frequencies(
                             probabilities, ploidy, len(haplotypes)
+                        )
+                        data.sampledata["ACP"][sample] = np.round(
+                            counts, self.precision
                         )
                         data.sampledata["AFP"][sample] = np.round(freqs, self.precision)
                         data.sampledata["AOP"][sample] = np.round(occur, self.precision)
@@ -179,17 +184,18 @@ class program(call_baseclass.program):
                         inbreeding=inbreeding,
                         frequencies=prior_frequencies,
                         return_phenotype_prob=True,
-                        return_posterior_frequencies="AFP" in data.formatfields,
-                        return_posterior_occurrence="AOP" in data.formatfields,
+                        return_posterior_frequencies=True,
+                        return_posterior_occurrence=True,
                     )
                     alleles, _, genotype_prob, phenotype_prob = mode_results[0:4]
-                    if "AOP" in data.formatfields:
-                        occur = np.round(mode_results[-1], self.precision)
-                        data.sampledata["AOP"][sample] = occur
-                        mode_results = mode_results[0:-1]
-                    if "AFP" in data.formatfields:
-                        freqs = np.round(mode_results[-1], self.precision)
-                        data.sampledata["AFP"][sample] = freqs
+
+                    freqs = np.round(mode_results[-2], self.precision)
+                    occur = np.round(mode_results[-1], self.precision)
+                    data.sampledata["ACP"][sample] = np.round(
+                        freqs * ploidy, self.precision
+                    )
+                    data.sampledata["AFP"][sample] = np.round(freqs, self.precision)
+                    data.sampledata["AOP"][sample] = np.round(occur, self.precision)
 
                 # store variables
                 data.sampledata["alleles"][sample] = alleles

@@ -15,8 +15,8 @@ from mchap.io import (
     encode_read_distributions,
     vcf,
 )
-from mchap.io.vcf.infofields import HEADER_INFO_FIELDS
-from mchap.io.vcf.formatfields import HEADER_FORMAT_FIELDS
+from mchap.io.vcf.infofields import HEADER_INFO_FIELDS, OPTIONAL_INFO_FIELDS
+from mchap.io.vcf.formatfields import HEADER_FORMAT_FIELDS, OPTIONAL_FORMAT_FIELDS
 
 import warnings
 
@@ -77,7 +77,11 @@ class program(object):
             "END",
             "NVAR",
             "SNVPOS",
-        ] + [f for f in ["AFPRIOR", "AFP", "AOP"] if f in self.report_fields]
+        ]
+        for f in OPTIONAL_INFO_FIELDS:
+            id = f.id
+            if (id in self.report_fields) or (f"INFO/{id}" in self.report_fields):
+                infofields.append(id)
         return infofields
 
     def format_fields(self):
@@ -93,8 +97,19 @@ class program(object):
             "GPM",
             "PHPM",
             "MCI",
-        ] + [f for f in ["AFP", "AOP", "DS", "GP", "GL"] if f in self.report_fields]
+        ]
+        for f in OPTIONAL_FORMAT_FIELDS:
+            id = f.id
+            if (id in self.report_fields) or (f"FORMAT/{id}" in self.report_fields):
+                formatfields.append(id)
         return formatfields
+
+    def require_AFP(self):
+        requested = set(self.info_fields()) | set(self.format_fields())
+        if {"ACP", "AFP", "AOP", "AOPSUM"} & requested:
+            return True
+        else:
+            return False
 
     def loci(self):
         raise NotImplementedError()
@@ -162,6 +177,7 @@ class program(object):
             "DP",
             "RCOUNT",
             "RCALLS",
+            "SNVDP",
             "read_calls",
             "read_dists_unique",
             "read_dist_counts",
@@ -200,12 +216,9 @@ class program(object):
                 data.sampledata["RCOUNT"][sample] = read_count
                 read_variant_depth = character.depth(read_chars)
                 if len(read_variant_depth) == 0:
-                    # no variants to score depth
-                    data.sampledata["DP"][sample] = np.nan
-                else:
-                    data.sampledata["DP"][sample] = np.round(
-                        np.mean(read_variant_depth)
-                    )
+                    read_variant_depth = np.array(np.nan)
+                data.sampledata["DP"][sample] = np.round(np.mean(read_variant_depth))
+                data.sampledata["SNVDP"][sample] = np.round(read_variant_depth)
 
                 # encode reads as alleles and probabilities
                 read_calls = encode_read_alleles(locus, read_chars)
@@ -318,22 +331,32 @@ class program(object):
             data.infodata["DP"] = np.nansum(list(data.sampledata["DP"].values()))
         # total read count
         data.infodata["RCOUNT"] = np.nansum(list(data.sampledata["RCOUNT"].values()))
-        # population mean posterior allele frequencies
+        n_allele = len(data.columndata["ALTS"]) + 1
+        null_length_R = np.full(n_allele, np.nan)
+        if "ACP" in data.infofields:
+            _ACP = sum(data.sampledata["AFP"].values())
+            _ACP = null_length_R if np.isnan(_ACP).all() else _ACP
+            data.infodata["ACP"] = _ACP.round(self.precision)
         if "AFP" in data.infofields:
-            # need to weight frequencies of each individual by ploidy
-            pop_ploidy = 0
-            pop_total = np.zeros(len(data.columndata["ALTS"]) + 1, float)
-            for sample, freqs in data.sampledata["AFP"].items():
-                ploidy = self.sample_ploidy[sample]
-                pop_ploidy += ploidy
-                pop_total += freqs * ploidy
-            data.infodata["AFP"] = (pop_total / pop_ploidy).round(self.precision)
+            # use ACP to weight frequencies of each individual by ploidy
+            _AFP = sum(data.sampledata["ACP"].values()) / sum(
+                data.sample_ploidy.values()
+            )
+            _AFP = null_length_R if np.isnan(_AFP).all() else _AFP
+            data.infodata["AFP"] = _AFP.round(self.precision)
+        if "AOPSUM" in data.infofields:
+            _AOPSUM = sum(data.sampledata["AOP"].values())
+            _AOPSUM = null_length_R if np.isnan(_AOPSUM).all() else _AOPSUM
+            data.infodata["AOPSUM"] = _AOPSUM.round(self.precision)
         if "AOP" in data.infofields:
             prob_not_occurring = np.ones(len(data.columndata["ALTS"]) + 1, float)
             for occur in data.sampledata["AOP"].values():
                 prob_not_occurring = prob_not_occurring * (1 - occur)
             prob_occurring = 1 - prob_not_occurring
             data.infodata["AOP"] = prob_occurring.round(self.precision)
+        if "SNVDP" in data.infofields:
+            _SNVDP = sum(data.sampledata["SNVDP"].values())
+            data.infodata["SNVDP"] = _SNVDP.round(self.precision)
         return data
 
     def call_locus(self, locus, sample_bams):

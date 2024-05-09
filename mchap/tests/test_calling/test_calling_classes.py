@@ -311,27 +311,6 @@ def test_PosteriorGenotypeAllelesDistribution__mode():
     assert phenotype_prob == observed_probabilities[1:4].sum()
 
 
-def test_PosteriorGenotypeAllelesDistribution__allele_frequencies():
-    observed_genotypes = np.array(
-        [
-            [0, 0, 0, 0],
-            [0, 0, 0, 2],
-            [0, 0, 2, 2],
-            [0, 2, 2, 2],
-            [0, 0, 1, 2],
-            [0, 1, 2, 2],
-        ]
-    )
-    observed_probabilities = np.array([0.05, 0.08, 0.22, 0.45, 0.05, 0.15])
-    posterior = PosteriorGenotypeAllelesDistribution(
-        observed_genotypes, observed_probabilities
-    )
-    actual_alleles, actual_freqs, actual_occur = posterior.allele_frequencies()
-    np.testing.assert_array_equal(actual_alleles, [0, 1, 2])
-    np.testing.assert_array_almost_equal(actual_freqs, [0.395, 0.05, 0.555])
-    np.testing.assert_array_almost_equal(actual_occur, [1.0, 0.2, 0.95])
-
-
 @pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 1)])
 def test_GenotypeAllelesMultiTrace__replicate_incongruence_1(threshold, expect):
     g0 = [0, 0, 1, 2]  # phenotype 1
@@ -345,7 +324,7 @@ def test_GenotypeAllelesMultiTrace__replicate_incongruence_1(threshold, expect):
     t2 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
     t3 = genotypes[[3, 3, 3, 3, 3, 3, 3, 2, 1, 2]]  # 3:7
     trace = GenotypeAllelesMultiTrace(
-        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10))
+        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10)), n_allele=3
     )
 
     actual = trace.replicate_incongruence(threshold)
@@ -367,7 +346,31 @@ def test_GenotypeAllelesMultiTrace__replicate_incongruence_2(threshold, expect):
     t2 = genotypes[[0, 3, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
     t3 = genotypes[[3, 3, 4, 4, 4, 3, 4, 4, 4, 4]]  # 3:7
     trace = GenotypeAllelesMultiTrace(
-        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10))
+        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10)), n_allele=5
     )
     actual = trace.replicate_incongruence(threshold)
     assert actual == expect
+
+
+def test_GenotypeAllelesMultiTrace__posterior_frequencies():
+    observed_genotypes = np.array(
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 2],
+            [0, 0, 2, 2],
+            [0, 2, 2, 2],
+            [0, 0, 1, 2],
+            [0, 1, 2, 2],
+        ]
+    )
+    observed_counts = np.array([5, 8, 22, 45, 5, 15])
+    idx = np.repeat(np.arange(len(observed_counts)), observed_counts)
+    genotypes = observed_genotypes[idx][None, ...]
+    llks = np.ones(genotypes.shape[0:2])
+    trace = GenotypeAllelesMultiTrace(genotypes, llks, 3)
+    actual_freqs, actual_counts, actual_occur = trace.posterior_frequencies()
+    np.testing.assert_array_almost_equal(actual_freqs, [0.395, 0.05, 0.555])
+    np.testing.assert_array_almost_equal(
+        actual_counts, [4 * 0.395, 4 * 0.05, 4 * 0.555]
+    )
+    np.testing.assert_array_almost_equal(actual_occur, [1.0, 0.2, 0.95])

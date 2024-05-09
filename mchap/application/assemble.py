@@ -113,6 +113,7 @@ class program(baseclass.program):
             "MCI",
             "GL",
             "GP",
+            "ACP",
             "AFP",
             "AOP",
         ]:
@@ -211,7 +212,7 @@ class program(baseclass.program):
                 data.sampledata["alleles"][sample] = alleles
 
                 # posterior allele frequencies/occurrences if requested
-                if ("AFP" in data.formatfields) or ("AOP" in data.formatfields):
+                if self.require_AFP():
                     frequencies = np.zeros(len(haplotypes))
                     occurrences = np.zeros(len(haplotypes))
                     haps, freqs, occur = sample_posteriors[sample].allele_frequencies()
@@ -223,6 +224,9 @@ class program(baseclass.program):
                     )
                     data.sampledata["AOP"][sample] = np.round(
                         occurrences, self.precision
+                    )
+                    data.sampledata["ACP"][sample] = np.round(
+                        frequencies * data.sample_ploidy[sample], self.precision
                     )
 
                 # encode posterior probabilities if requested

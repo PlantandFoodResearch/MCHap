@@ -319,7 +319,7 @@ def test_call_posterior_mode__fuzz(
         inbreeding=inbreeding,
         frequencies=prior_frequencies,
     )
-    freqs, occur = exact.posterior_allele_frequencies(
+    freqs, counts, occur = exact.posterior_allele_frequencies(
         post, ploidy=ploidy, n_alleles=n_haps
     )
     mode = np.argmax(post)
@@ -341,6 +341,7 @@ def test_call_posterior_mode__fuzz(
     np.testing.assert_almost_equal(llks[mode], mode_llk, 5)
     np.testing.assert_almost_equal(post[mode], mode_post, 5)
     np.testing.assert_array_almost_equal(freqs, mean_freqs, 5)
+    np.testing.assert_array_almost_equal(counts, mean_freqs * ploidy, 5)
     np.testing.assert_array_almost_equal(occur, mean_occur, 5)
 
 

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 from mchap.constant import PFEIFFER_ERROR
 from mchap.io import extract_sample_ids
+from mchap.io.vcf.infofields import OPTIONAL_INFO_FIELDS
+from mchap.io.vcf.formatfields import OPTIONAL_FORMAT_FIELDS
 
 
 @dataclass
@@ -288,6 +290,14 @@ filter_input_haplotypes = Parameter(
     ),
 )
 
+
+_optional_field_descriptions = [
+    "INFO/{} = {}".format(f.id, f.descr) for f in OPTIONAL_INFO_FIELDS
+]
+_optional_field_descriptions += [
+    "FORMAT/{}: {}".format(f.id, f.descr) for f in OPTIONAL_FORMAT_FIELDS
+]
+
 report = Parameter(
     "--report",
     dict(
@@ -295,13 +305,11 @@ report = Parameter(
         nargs="*",
         default=[],
         help=(
-            "Extra fields to report within the output VCF: "
-            "AFPRIOR = prior allele frequencies; "
-            "AFP = posterior mean allele frequencies; "
-            "AOP = posterior probability of allele occurring at any copy number; "
-            "GP = genotype posterior probabilities; "
-            "GL = genotype likelihoods."
-        ),
+            "Extra fields to report within the output VCF. "
+            "The INFO/FORMAT prefix may be omitted to return both "
+            "variations of the named field. Options include: "
+        )
+        + "; ".join(_optional_field_descriptions),
     ),
 )
 

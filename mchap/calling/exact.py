@@ -331,7 +331,7 @@ def genotype_posteriors(
 
 
 @njit(cache=True)
-def posterior_allele_frequencies(posteriors, ploidy, n_alleles, dosage=False):
+def posterior_allele_frequencies(posteriors, ploidy, n_alleles):
     """Calculate posterior mean allele frequencies of every allele
     for a given posteriors distribution.
 
@@ -343,33 +343,31 @@ def posterior_allele_frequencies(posteriors, ploidy, n_alleles, dosage=False):
         Ploidy of organism.
     n_alleles : int
         Total number of possible (haplotype) alleles at this locus.
-    dosage : bool
-        If true returns the posterior mean dosage rather than allele frequencies.
 
     Returns
     -------
     mean_allele_frequencies : ndarray, float, shape (n_alleles, )
         Posterior mean allele frequencies.
+    posterior_allele_counts : ndarray, float, shape (n_alleles, )
+        Posterior allele counts
     allele_occurrence_probability : ndarray, float, shape (n_alleles, )
         Posterior probability of alleles occurring at any dosage.
     """
     n_genotypes = len(posteriors)
-    freqs = np.zeros(n_alleles, dtype=np.float64)
+    counts = np.zeros(n_alleles, dtype=np.float64)
     occur = np.zeros(n_alleles, dtype=np.float64)
     genotype = np.zeros(ploidy, np.int64)
     for i in range(n_genotypes):
         p = posteriors[i]
         for j in range(ploidy):
             a = genotype[j]
-            freqs[a] += p
+            counts[a] += p
             if j == 0:
                 occur[a] += p
             elif a != genotype[j - 1]:
                 occur[a] += p
         increment_genotype(genotype)
-    if dosage is False:
-        freqs /= ploidy
-    return freqs, occur
+    return counts / ploidy, counts, occur
 
 
 def alternate_dosage_posteriors(genotype_alleles, probabilities):

@@ -67,6 +67,7 @@ class program(call_baseclass.program):
             "MCI",
             "GL",
             "GP",
+            "ACP",
             "AFP",
             "AOP",
         ]:
@@ -129,6 +130,7 @@ class program(call_baseclass.program):
                 data.sampledata["PHPM"][sample] = np.nan
                 data.sampledata["PHQ"][sample] = np.nan
                 data.sampledata["MCI"][sample] = np.nan
+                data.sampledata["ACP"][sample] = np.array([np.nan])
                 data.sampledata["AFP"][sample] = np.array([np.nan])
                 data.sampledata["AOP"][sample] = np.array([np.nan])
                 data.sampledata["GP"][sample] = np.array([np.nan])
@@ -178,22 +180,15 @@ class program(call_baseclass.program):
                 data.sampledata["PHQ"][sample] = qual_of_prob(phenotype_prob)
                 data.sampledata["MCI"][sample] = incongruence
 
-                # posterior allele frequencies if requested
-                if "AFP" in data.formatfields:
-                    frequencies = np.zeros(len(haplotypes))
-                    alleles, counts = np.unique(trace.genotypes, return_counts=True)
-                    frequencies[alleles] = counts / counts.sum()
+                # posterior allele frequencies/occurrence if requested
+                if self.require_AFP():
+                    frequencies, counts, occurrence = trace.posterior_frequencies()
+                    data.sampledata["ACP"][sample] = np.round(counts, self.precision)
                     data.sampledata["AFP"][sample] = np.round(
                         frequencies, self.precision
                     )
-
-                # posterior allele occurrence if requested
-                if "AOP" in data.formatfields:
-                    occurrences = np.zeros(len(haplotypes))
-                    alleles, _, occur = posterior.allele_frequencies()
-                    occurrences[alleles] = occur
                     data.sampledata["AOP"][sample] = np.round(
-                        occurrences, self.precision
+                        occurrence, self.precision
                     )
 
                 # genotype posteriors if requested

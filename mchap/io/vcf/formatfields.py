@@ -67,6 +67,7 @@ GL = FormatField(id="GL", number="G", type="Float", descr="Genotype likelihoods"
 GP = FormatField(
     id="GP", number="G", type="Float", descr="Genotype posterior probabilities"
 )
+ACP = FormatField(id="ACP", number="R", type="Float", descr="Posterior allele counts")
 AFP = FormatField(
     id="AFP", number="R", type="Float", descr="Posterior mean allele frequencies"
 )
@@ -94,6 +95,12 @@ MCAP = FormatField(
     type="Float",
     descr="Posterior probability of allele-presence from assembly MCMC",
 )
+SNVDP = FormatField(
+    id="SNVDP",
+    number=".",
+    type="Integer",
+    descr="Read depth at each SNV position",
+)
 
 HEADER_FORMAT_FIELDS = dict(
     GT=GT,
@@ -112,12 +119,16 @@ HEADER_FORMAT_FIELDS = dict(
     AD=AD,
     GL=GL,
     GP=GP,
+    ACP=ACP,
     AFP=AFP,
     AOP=AOP,
     MCI=MCI,
     KMERCOV=KMERCOV,
     MCAP=MCAP,
+    SNVDP=SNVDP,
 )
+
+OPTIONAL_FORMAT_FIELDS = [ACP, AFP, AOP, GP, GL, SNVDP]
 
 
 def haplotype_depth(variant_depths):
