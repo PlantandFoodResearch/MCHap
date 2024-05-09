@@ -102,33 +102,21 @@ SNVDP = FormatField(
     descr="Read depth at each SNV position",
 )
 
-HEADER_FORMAT_FIELDS = dict(
-    GT=GT,
-    GQ=GQ,
-    PHQ=PHQ,
-    DP=DP,
-    PS=PS,
-    FT=FT,
-    RCOUNT=RCOUNT,
-    RCALLS=RCALLS,
-    GPM=GPM,
-    PHPM=PHPM,
-    DOSEXP=DOSEXP,
-    MEC=MEC,
-    MECP=MECP,
-    AD=AD,
-    GL=GL,
-    GP=GP,
-    ACP=ACP,
-    AFP=AFP,
-    AOP=AOP,
-    MCI=MCI,
-    KMERCOV=KMERCOV,
-    MCAP=MCAP,
-    SNVDP=SNVDP,
-)
+DEFAULT_FIELDS = [
+    GT,
+    GQ,
+    PHQ,
+    DP,
+    RCOUNT,
+    RCALLS,
+    MEC,
+    MECP,
+    GPM,
+    PHPM,
+    MCI,
+]
 
-OPTIONAL_FORMAT_FIELDS = [ACP, AFP, AOP, GP, GL, SNVDP]
+OPTIONAL_FIELDS = [ACP, AFP, AOP, GP, GL, SNVDP]
 
 
 def haplotype_depth(variant_depths):

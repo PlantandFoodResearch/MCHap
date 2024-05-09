@@ -4,9 +4,13 @@ import numpy as np
 from dataclasses import dataclass
 import pysam
 
+import mchap.io.vcf.infofields as INFO
+import mchap.io.vcf.formatfields as FORMAT
+import mchap.io.vcf.columns as COLUMN
 from mchap import mset
 from mchap.application import baseclass
 from mchap.application.baseclass import SampleAssemblyError, SAMPLE_ASSEMBLY_ERROR
+from mchap.encoding.integer import minimum_error_correction
 
 from mchap import combinatorics
 from mchap.assemble import (
@@ -94,38 +98,21 @@ class program(baseclass.program):
         Parameters
         ----------
         data : LocusAssemblyData
-            With sampledata fields: "read_dists_unique", "read_dist_counts".
 
         Returns
         -------
         data : LocusAssemblyData
-            With columndata fields REF and ALTS, sampledata fields: "alleles",
-            "haplotypes", "GQ", "GPM", "PHPM", "PHQ", "MCI"
-            and "GL", "GP", "AFP" if specified and infodata flag "REFMASKED".
         """
-        for field in [
-            "alleles",
-            "haplotypes",
-            "GQ",
-            "GPM",
-            "PHPM",
-            "PHQ",
-            "MCI",
-            "GL",
-            "GP",
-            "ACP",
-            "AFP",
-            "AOP",
-        ]:
-            data.sampledata[field] = dict()
         # dict to temporarily store posteriors
+        sample_modes = dict()
         sample_posteriors = dict()
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
             try:
                 # assembly MCMC
-                reads = data.sampledata["read_dists_unique"][sample]
-                read_counts = data.sampledata["read_dist_counts"][sample]
+                read_calls = data.read_calls[sample]
+                read_dists = data.read_dists[sample]
+                read_counts = data.read_counts[sample]
                 trace = (
                     DenovoMCMC(
                         ploidy=data.sample_ploidy[sample],
@@ -142,7 +129,7 @@ class program(baseclass.program):
                         llk_cache_threshold=self.mcmc_llk_cache_threshold,
                     )
                     .fit(
-                        reads=reads,
+                        reads=read_dists,
                         read_counts=read_counts,
                     )
                     .burn(self.mcmc_burn)
@@ -153,22 +140,27 @@ class program(baseclass.program):
                 # phenotype results
                 phenotype = posterior.mode_phenotype()
                 phenotype_prob = phenotype.probabilities.sum()
-                data.sampledata["PHPM"][sample] = np.round(
-                    phenotype_prob, self.precision
-                )
-                data.sampledata["PHQ"][sample] = qual_of_prob(phenotype_prob)
+                data.sampledata[FORMAT.PHPM][sample] = phenotype_prob
+                data.sampledata[FORMAT.PHQ][sample] = qual_of_prob(phenotype_prob)
 
                 # genotype results
                 genotype, genotype_prob = phenotype.mode_genotype()
-                data.sampledata["haplotypes"][sample] = genotype
-                data.sampledata["GQ"][sample] = qual_of_prob(genotype_prob)
-                data.sampledata["GPM"][sample] = np.round(genotype_prob, self.precision)
+                sample_modes[sample] = genotype
+                data.sampledata[FORMAT.GQ][sample] = qual_of_prob(genotype_prob)
+                data.sampledata[FORMAT.GPM][sample] = genotype_prob
+
+                # MEC
+                mec = np.sum(minimum_error_correction(read_calls, genotype))
+                mec_denom = np.sum(read_calls >= 0)
+                mecp = mec / mec_denom if mec_denom > 0 else np.nan
+                data.sampledata[FORMAT.MEC][sample] = mec
+                data.sampledata[FORMAT.MECP][sample] = mecp
 
                 # chain incongruence
                 incongruence = trace.replicate_incongruence(
                     threshold=self.mcmc_incongruence_threshold
                 )
-                data.sampledata["MCI"][sample] = incongruence
+                data.sampledata[FORMAT.MCI][sample] = incongruence
 
             # end of try clause for specific sample
             except Exception as e:
@@ -184,21 +176,21 @@ class program(baseclass.program):
         haplotype_labels = {h.tobytes(): i for i, h in enumerate(haplotypes)}
 
         # record if reference allele was not observed
-        data.infodata["REFMASKED"] = not ref_called
+        data.infodata[INFO.REFMASKED] = not ref_called
         if not ref_called:
             # remove from labeling
             haplotype_labels.pop(haplotypes[0].tobytes())
             # filter for no observed alleles
             if len(haplotypes) == 1:
-                data.columndata["FILTER"].append(vcf.filters.NOA.id)
+                data.columndata[COLUMN.FILTER].append(vcf.filters.NOA.id)
 
         # decode and save alt alleles
         if len(haplotypes) > 1:
             alts = data.locus.format_haplotypes(haplotypes[1:])
         else:
             alts = []
-        data.columndata["REF"] = data.locus.sequence
-        data.columndata["ALTS"] = alts
+        data.columndata[COLUMN.REF] = data.locus.sequence
+        data.columndata[COLUMN.ALT] = alts
 
         # encode sample haplotypes as alleles
         for sample in data.samples:
@@ -206,10 +198,10 @@ class program(baseclass.program):
             try:
                 # encode sample haplotypes as alleles
                 alleles = _genotype_as_alleles(
-                    data.sampledata["haplotypes"][sample],
+                    sample_modes[sample],
                     haplotype_labels,
                 )
-                data.sampledata["alleles"][sample] = alleles
+                data.sampledata[FORMAT.GT][sample] = alleles
 
                 # posterior allele frequencies/occurrences if requested
                 if self.require_AFP():
@@ -219,39 +211,30 @@ class program(baseclass.program):
                     idx = mset.categorize(haplotypes, haps)
                     frequencies[idx >= 0] = freqs[idx[idx >= 0]]
                     occurrences[idx >= 0] = occur[idx[idx >= 0]]
-                    data.sampledata["AFP"][sample] = np.round(
-                        frequencies, self.precision
-                    )
-                    data.sampledata["AOP"][sample] = np.round(
-                        occurrences, self.precision
-                    )
-                    data.sampledata["ACP"][sample] = np.round(
-                        frequencies * data.sample_ploidy[sample], self.precision
+                    data.sampledata[FORMAT.AFP][sample] = frequencies
+                    data.sampledata[FORMAT.AOP][sample] = occurrences
+                    data.sampledata[FORMAT.ACP][sample] = (
+                        frequencies * data.sample_ploidy[sample]
                     )
 
                 # encode posterior probabilities if requested
-                if "GP" in data.formatfields:
+                if FORMAT.GP in data.formatfields:
                     probabilities = _genotype_posterior_as_array(
                         sample_posteriors[sample],
                         haplotype_labels,
                     )
-                    data.sampledata["GP"][sample] = np.round(
-                        probabilities, self.precision
-                    )
-
+                    data.sampledata[FORMAT.GP][sample] = probabilities
                 # genotype likelihoods if requested
-                if "GL" in data.formatfields:
-                    reads = data.sampledata["read_dists_unique"][sample]
-                    read_counts = data.sampledata["read_dist_counts"][sample]
+                if FORMAT.GL in data.formatfields:
+                    read_dists = data.read_dists[sample]
+                    read_counts = data.read_counts[sample]
                     llks = genotype_likelihoods(
-                        reads=reads,
+                        reads=read_dists,
                         read_counts=read_counts,
                         ploidy=data.sample_ploidy[sample],
                         haplotypes=haplotypes,
                     )
-                    data.sampledata["GL"][sample] = np.round(
-                        natural_log_to_log10(llks), self.precision
-                    )
+                    data.sampledata[FORMAT.GL][sample] = natural_log_to_log10(llks)
 
             # end of try clause for specific sample
             except Exception as e:

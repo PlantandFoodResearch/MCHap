@@ -95,25 +95,16 @@ SNVDP = InfoField(
     descr="Read depth at each SNV position",
 )
 
-HEADER_INFO_FIELDS = dict(
-    NS=NS,
-    DP=DP,
-    AC=AC,
-    ACP=ACP,
-    AN=AN,
-    AF=AF,
-    AFP=AFP,
-    AFPRIOR=AFPRIOR,
-    AOP=AOP,
-    AOPSUM=AOPSUM,
-    AA=AA,
-    END=END,
-    NVAR=NVAR,
-    SNVPOS=SNVPOS,
-    AD=AD,
-    RCOUNT=RCOUNT,
-    REFMASKED=REFMASKED,
-    SNVDP=SNVDP,
-)
+DEFAULT_FIELDS = [
+    AN,
+    AC,
+    REFMASKED,
+    NS,
+    DP,
+    RCOUNT,
+    END,
+    NVAR,
+    SNVPOS,
+]
 
-OPTIONAL_INFO_FIELDS = [AFPRIOR, ACP, AFP, AOP, AOPSUM, SNVDP]
+OPTIONAL_FIELDS = [AFPRIOR, ACP, AFP, AOP, AOPSUM, SNVDP]

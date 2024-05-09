@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 from mchap.constant import PFEIFFER_ERROR
 from mchap.io import extract_sample_ids
-from mchap.io.vcf.infofields import OPTIONAL_INFO_FIELDS
-from mchap.io.vcf.formatfields import OPTIONAL_FORMAT_FIELDS
+import mchap.io.vcf.infofields as INFO
+import mchap.io.vcf.formatfields as FORMAT
 
 
 @dataclass
@@ -292,10 +292,10 @@ filter_input_haplotypes = Parameter(
 
 
 _optional_field_descriptions = [
-    "INFO/{} = {}".format(f.id, f.descr) for f in OPTIONAL_INFO_FIELDS
+    "INFO/{} = {}".format(f.id, f.descr) for f in INFO.OPTIONAL_FIELDS
 ]
 _optional_field_descriptions += [
-    "FORMAT/{}: {}".format(f.id, f.descr) for f in OPTIONAL_FORMAT_FIELDS
+    "FORMAT/{}: {}".format(f.id, f.descr) for f in FORMAT.OPTIONAL_FIELDS
 ]
 
 report = Parameter(
@@ -876,6 +876,25 @@ def parse_sample_temperatures(mcmc_temperatures_argument, samples):
     return data
 
 
+def parse_report_fields(report_argument):
+    if report_argument is None:
+        report_argument = set()
+    else:
+        report_argument = set(report_argument)
+    info_fields = INFO.DEFAULT_FIELDS.copy()
+    for f in INFO.OPTIONAL_FIELDS:
+        id = f.id
+        if (id in report_argument) or (f"INFO/{id}" in report_argument):
+            info_fields.append(f)
+
+    format_fields = FORMAT.DEFAULT_FIELDS.copy()
+    for f in FORMAT.OPTIONAL_FIELDS:
+        id = f.id
+        if (id in report_argument) or (f"FORMAT/{id}" in report_argument):
+            format_fields.append(f)
+    return info_fields, format_fields
+
+
 def collect_default_program_arguments(arguments):
     # must have some source of error in reads
     if arguments.ignore_base_phred_scores:
@@ -900,6 +919,7 @@ def collect_default_program_arguments(arguments):
         samples,
         type=float,
     )
+    info_fields, format_fields = parse_report_fields(arguments.report)
     return dict(
         samples=samples,
         sample_bams=sample_bams,
@@ -913,7 +933,8 @@ def collect_default_program_arguments(arguments):
         skip_duplicates=arguments.skip_duplicates,
         skip_qcfail=arguments.skip_qcfail,
         skip_supplementary=arguments.skip_supplementary,
-        report_fields=arguments.report,
+        info_fields=info_fields,
+        format_fields=format_fields,
         n_cores=arguments.cores[0],
     )
 
