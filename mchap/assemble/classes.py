@@ -8,7 +8,7 @@ from mchap.encoding import integer
 
 __all__ = [
     "PosteriorGenotypeDistribution",
-    "PhenotypeDistribution",
+    "GenotypeSupportDistribution",
     "GenotypeMultiTrace",
 ]
 
@@ -84,49 +84,48 @@ class PosteriorGenotypeDistribution(object):
         idx = np.argmax(self.probabilities)
         return self.genotypes[idx], self.probabilities[idx]
 
-    def mode_phenotype(self):
-        """Return genotypes congruent with the posterior mode phenotype.
+    def mode_genotype_support(self):
+        """Return genotypes congruent with the posterior mode support.
 
         Returns
         -------
         mode_genotypes : ndarray, int, shape (n_genotypes, ploidy, n_positions)
             Genotypes which contain only the haplotypes found in the posterior
-            mode phenotype (at variable dosage levels).
+            mode support (at variable dosage levels).
         probabilities : ndarray, float, shape (n_genotypes, )
             The posterior probabilities asociated with each
             genotype which is congruent with the posterior
-            mode phenotype.
+            mode support.
 
         Notes
         -----
-        The term 'phenotype' is used here to describe a set of unique haplotypes
+        The term 'support' is used here to describe a set of unique haplotypes
         without dosage information.
-        Hence for a given phenotype and ploidy > 2 their are one or more congruent
+        Hence for a given support and ploidy > 2 their are one or more congruent
         genotypes that consist of the haplotypes of that genotype.
 
         """
         labels = np.zeros(len(self.genotypes), dtype=int)
-        phenotype_labels = {}  # string: int
+        support_labels = {}  # string: int
         probs = {}  # int: float
-        # phenotypes = {}  # int: array
+        # support = {}  # int: array
 
         for i, gen in enumerate(self.genotypes):
-            phenotype = mset.unique(gen)
-            string = phenotype.tobytes()
-            if string not in phenotype_labels:
+            support = mset.unique(gen)
+            string = support.tobytes()
+            if string not in support_labels:
                 label = i
-                phenotype_labels[string] = label
+                support_labels[string] = label
                 probs[label] = self.probabilities[i]
-                # phenotypes[label] = phenotype
             else:
-                label = phenotype_labels[string]
+                label = support_labels[string]
                 probs[label] += self.probabilities[i]
             labels[i] = label
 
-        phenotype_labels, probs = zip(*probs.items())
-        mode = phenotype_labels[np.argmax(probs)]
+        support_labels, probs = zip(*probs.items())
+        mode = support_labels[np.argmax(probs)]
         idx = labels == mode
-        return PhenotypeDistribution(self.genotypes[idx], self.probabilities[idx])
+        return GenotypeSupportDistribution(self.genotypes[idx], self.probabilities[idx])
 
     def allele_frequencies(self, dosage=False):
         """Calculate posterior frequency of haplotype alleles.
@@ -168,7 +167,7 @@ class PosteriorGenotypeDistribution(object):
 
 
 @dataclass
-class PhenotypeDistribution(object):
+class GenotypeSupportDistribution(object):
     """Distribution of genotypes with identical alleles differing
     only by dosage.
 
@@ -205,11 +204,11 @@ class PhenotypeDistribution(object):
         idx = np.argmax(self.probabilities)
         return self.genotypes[idx], self.probabilities[idx]
 
-    def call_phenotype(self, threshold=0.95):
+    def call_genotype_support(self, threshold=0.95):
         """Identifies the most complete set of alleles that
         exceeds a probability threshold.
         If the probability threshold cannot be exceeded the
-        phenotype will be returned with a probability of None
+        genotype support will be returned with a probability of None
         """
         # check mode genotype
         if np.max(self.probabilities) >= threshold:
@@ -361,7 +360,7 @@ class GenotypeMultiTrace(object):
         """
         out = 0
         posteriors = [trace.posterior() for trace in self.split()]
-        chain_modes = [dist.mode_phenotype() for dist in posteriors]
+        chain_modes = [dist.mode_genotype_support() for dist in posteriors]
         alleles = [
             mode.alleles()
             for mode in chain_modes

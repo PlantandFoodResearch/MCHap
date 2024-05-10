@@ -109,8 +109,8 @@ class program(call_baseclass.program):
                 data.sampledata[FORMAT.GT][sample] = np.full(ploidy, -1, int)
                 data.sampledata[FORMAT.GQ][sample] = np.nan
                 data.sampledata[FORMAT.GPM][sample] = np.nan
-                data.sampledata[FORMAT.PHPM][sample] = np.nan
-                data.sampledata[FORMAT.PHQ][sample] = np.nan
+                data.sampledata[FORMAT.SPM][sample] = np.nan
+                data.sampledata[FORMAT.SQ][sample] = np.nan
                 data.sampledata[FORMAT.MCI][sample] = np.nan
                 data.sampledata[FORMAT.ACP][sample] = np.array([np.nan])
                 data.sampledata[FORMAT.AFP][sample] = np.array([np.nan])
@@ -152,14 +152,16 @@ class program(call_baseclass.program):
                     threshold=self.mcmc_incongruence_threshold
                 )
                 posterior = trace.posterior()
-                alleles, genotype_prob, phenotype_prob = posterior.mode(phenotype=True)
+                alleles, genotype_prob, genotype_support_prob = posterior.mode(
+                    genotype_support=True
+                )
 
                 # store variables
                 data.sampledata[FORMAT.GT][sample] = alleles
                 data.sampledata[FORMAT.GQ][sample] = qual_of_prob(genotype_prob)
                 data.sampledata[FORMAT.GPM][sample] = genotype_prob
-                data.sampledata[FORMAT.PHPM][sample] = phenotype_prob
-                data.sampledata[FORMAT.PHQ][sample] = qual_of_prob(phenotype_prob)
+                data.sampledata[FORMAT.SPM][sample] = genotype_support_prob
+                data.sampledata[FORMAT.SQ][sample] = qual_of_prob(genotype_support_prob)
                 data.sampledata[FORMAT.MCI][sample] = incongruence
                 mec = np.sum(minimum_error_correction(read_calls, haplotypes[alleles]))
                 mec_denom = np.sum(read_calls >= 0)

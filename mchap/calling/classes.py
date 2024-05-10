@@ -249,7 +249,9 @@ class GenotypeAllelesMultiTrace(object):
         A non-replicated MCMC will always return 0.
         """
         out = 0
-        chain_modes = [chain.posterior().mode(phenotype=True) for chain in self.split()]
+        chain_modes = [
+            chain.posterior().mode(genotype_support=True) for chain in self.split()
+        ]
         alleles = [mode[0] for mode in chain_modes if mode[-1] >= threshold]
         # check for more than one mode
         mode_count = len({array.tobytes() for array in alleles})
@@ -317,15 +319,15 @@ class PosteriorGenotypeAllelesDistribution(object):
     genotypes: np.ndarray
     probabilities: np.ndarray
 
-    def mode(self, phenotype=False):
-        """Return the posterior mode genotype or allelic phenotype.
+    def mode(self, genotype_support=False):
+        """Return the posterior mode genotype or genotype support.
 
         Parameters
         ----------
-        phenotype : bool
+        genotype_support : bool
             If true then the most probable genotype of the mode
-            phenotype will be returned in addition with that
-            genotypes probability and the mode phenotype probability.
+            genotype support will be returned in addition with that
+            genotypes probability and the mode genotype support probability.
 
         Returns
         -------
@@ -333,34 +335,32 @@ class PosteriorGenotypeAllelesDistribution(object):
             The genotype with the highest posterior probability.
         genotype_probability : float
             The posterior probability of the posterior mode genotype
-        phenotype_probability : float
+        genotype_support_probability : float
             The posterior probability of the posterior mode genotype
 
         """
-        if phenotype is False:
+        if genotype_support is False:
             idx = np.argmax(self.probabilities)
             return self.genotypes[idx], self.probabilities[idx]
         else:
             labels = np.zeros(len(self.genotypes), dtype=int)
-            phenotype_labels = {}  # string: int
+            support_labels = {}  # string: int
             probs = {}  # int: float
-            # phenotypes = {}  # int: array
 
             for i, gen in enumerate(self.genotypes):
-                phenotype = mset.unique(gen)
-                string = phenotype.tobytes()
-                if string not in phenotype_labels:
+                genotype_support = mset.unique(gen)
+                string = genotype_support.tobytes()
+                if string not in support_labels:
                     label = i
-                    phenotype_labels[string] = label
+                    support_labels[string] = label
                     probs[label] = self.probabilities[i]
-                    # phenotypes[label] = phenotype
                 else:
-                    label = phenotype_labels[string]
+                    label = support_labels[string]
                     probs[label] += self.probabilities[i]
                 labels[i] = label
 
-            phenotype_labels, probs = zip(*probs.items())
-            mode = phenotype_labels[np.argmax(probs)]
+            support_labels, probs = zip(*probs.items())
+            mode = support_labels[np.argmax(probs)]
             idx = labels == mode
             genotypes = self.genotypes[idx]
             probs = self.probabilities[idx]

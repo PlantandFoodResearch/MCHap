@@ -137,14 +137,14 @@ class program(baseclass.program):
                 posterior = trace.posterior()
                 sample_posteriors[sample] = posterior
 
-                # phenotype results
-                phenotype = posterior.mode_phenotype()
-                phenotype_prob = phenotype.probabilities.sum()
-                data.sampledata[FORMAT.PHPM][sample] = phenotype_prob
-                data.sampledata[FORMAT.PHQ][sample] = qual_of_prob(phenotype_prob)
+                # genotype support results
+                genotype_support = posterior.mode_genotype_support()
+                genotype_support_prob = genotype_support.probabilities.sum()
+                data.sampledata[FORMAT.SPM][sample] = genotype_support_prob
+                data.sampledata[FORMAT.SQ][sample] = qual_of_prob(genotype_support_prob)
 
                 # genotype results
-                genotype, genotype_prob = phenotype.mode_genotype()
+                genotype, genotype_prob = genotype_support.mode_genotype()
                 sample_modes[sample] = genotype
                 data.sampledata[FORMAT.GQ][sample] = qual_of_prob(genotype_prob)
                 data.sampledata[FORMAT.GPM][sample] = genotype_prob

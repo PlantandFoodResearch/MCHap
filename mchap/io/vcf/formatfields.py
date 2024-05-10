@@ -23,7 +23,7 @@ class FormatField(object):
 # FORMAT fields
 GT = FormatField(id="GT", number=1, type="String", descr="Genotype")
 GQ = FormatField(id="GQ", number=1, type="Integer", descr="Genotype quality")
-PHQ = FormatField(id="PHQ", number=1, type="Integer", descr="Phenotype quality")
+SQ = FormatField(id="SQ", number=1, type="Integer", descr="Genotype support quality")
 DP = FormatField(id="DP", number=1, type="Integer", descr="Read depth")
 PS = FormatField(id="PS", number=1, type="Integer", descr="Phase set")
 FT = FormatField(
@@ -47,11 +47,14 @@ RCALLS = FormatField(
 GPM = FormatField(
     id="GPM", number=1, type="Float", descr="Genotype posterior mode probability"
 )
-PHPM = FormatField(
-    id="PHPM", number=1, type="Float", descr="Phenotype posterior mode probability"
+SPM = FormatField(
+    id="SPM",
+    number=1,
+    type="Float",
+    descr="Genotype support posterior mode probability",
 )
 DOSEXP = FormatField(
-    id="DOSEXP", number=".", type="Float", descr="Mode phenotype expected dosage"
+    id="DOSEXP", number=".", type="Float", descr="Mode genotype support expected dosage"
 )
 MEC = FormatField(id="MEC", number=1, type="Integer", descr="Minimum error correction")
 MECP = FormatField(
@@ -105,14 +108,14 @@ SNVDP = FormatField(
 DEFAULT_FIELDS = [
     GT,
     GQ,
-    PHQ,
+    SQ,
     DP,
     RCOUNT,
     RCALLS,
     MEC,
     MECP,
     GPM,
-    PHPM,
+    SPM,
     MCI,
 ]
 

@@ -480,7 +480,7 @@ mcmc_chain_incongruence_threshold = Parameter(
         nargs=1,
         default=[0.60],
         help=(
-            "Posterior phenotype probability threshold for identification of "
+            "Posterior probability threshold for identification of "
             "incongruent posterior modes (default = 0.60)."
         ),
     ),

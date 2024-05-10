@@ -94,8 +94,8 @@ class program(call_baseclass.program):
                 data.sampledata[FORMAT.GT][sample] = np.full(ploidy, -1, int)
                 data.sampledata[FORMAT.GQ][sample] = np.nan
                 data.sampledata[FORMAT.GPM][sample] = np.nan
-                data.sampledata[FORMAT.PHPM][sample] = np.nan
-                data.sampledata[FORMAT.PHQ][sample] = np.nan
+                data.sampledata[FORMAT.SPM][sample] = np.nan
+                data.sampledata[FORMAT.SQ][sample] = np.nan
                 data.sampledata[FORMAT.MCI][sample] = np.nan
                 data.sampledata[FORMAT.ACP][sample] = np.array([np.nan])
                 data.sampledata[FORMAT.AFP][sample] = np.array([np.nan])
@@ -135,10 +135,10 @@ class program(call_baseclass.program):
                     idx = np.argmax(probabilities)
                     alleles = index_as_genotype_alleles(idx, ploidy)
                     genotype_prob = probabilities[idx]
-                    _, phenotype_probs = alternate_dosage_posteriors(
+                    _, genotype_support_probs = alternate_dosage_posteriors(
                         alleles, probabilities
                     )
-                    phenotype_prob = phenotype_probs.sum()
+                    genotype_support_prob = genotype_support_probs.sum()
 
                     # store specified arrays
                     if self.require_AFP():
@@ -162,11 +162,11 @@ class program(call_baseclass.program):
                         ploidy=ploidy,
                         inbreeding=inbreeding,
                         frequencies=prior_frequencies,
-                        return_phenotype_prob=True,
+                        return_support_prob=True,
                         return_posterior_frequencies=True,
                         return_posterior_occurrence=True,
                     )
-                    alleles, _, genotype_prob, phenotype_prob = mode_results[0:4]
+                    alleles, _, genotype_prob, genotype_support_prob = mode_results[0:4]
 
                     freqs = mode_results[-2]
                     occur = mode_results[-1]
@@ -178,8 +178,8 @@ class program(call_baseclass.program):
                 data.sampledata[FORMAT.GT][sample] = alleles
                 data.sampledata[FORMAT.GQ][sample] = qual_of_prob(genotype_prob)
                 data.sampledata[FORMAT.GPM][sample] = genotype_prob
-                data.sampledata[FORMAT.PHPM][sample] = phenotype_prob
-                data.sampledata[FORMAT.PHQ][sample] = qual_of_prob(phenotype_prob)
+                data.sampledata[FORMAT.SPM][sample] = genotype_support_prob
+                data.sampledata[FORMAT.SQ][sample] = qual_of_prob(genotype_support_prob)
                 data.sampledata[FORMAT.MCI][sample] = np.nan
                 mec = np.sum(minimum_error_correction(read_calls, haplotypes[alleles]))
                 mec_denom = np.sum(read_calls >= 0)
