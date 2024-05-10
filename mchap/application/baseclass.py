@@ -268,7 +268,7 @@ class program(object):
         n_allele = len(data.columndata[COLUMN.ALT]) + 1
         null_length_R = np.full(n_allele, np.nan)
         if INFO.ACP in data.infofields:
-            _ACP = sum(data.sampledata[FORMAT.AFP].values())
+            _ACP = sum(data.sampledata[FORMAT.ACP].values())
             _ACP = null_length_R if np.isnan(_ACP).all() else _ACP
             data.infodata[INFO.ACP] = _ACP
         if INFO.AFP in data.infofields:

@@ -293,6 +293,11 @@ def test_Program__header():
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--report", "ACP"],
+            "simple.output.mixed_depth.assemble.counts.vcf",
+        ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             ["--report", "AOP", "AOPSUM"],
             "simple.output.mixed_depth.assemble.occurrence.vcf",
         ),
