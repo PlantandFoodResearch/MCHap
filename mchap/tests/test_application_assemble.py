@@ -283,7 +283,7 @@ def test_Program__header():
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            [],
+            ["--report", "SNVDP"],
             "simple.output.mixed_depth.assemble.vcf",
         ),
         (
@@ -472,6 +472,8 @@ def test_Program__run_stdout__region(region, region_id, cache_threshold):
         "11",
         "--mcmc-llk-cache-threshold",
         str(cache_threshold),
+        "--report",
+        "SNVDP",
     ]
 
     prog = program.cli(command)

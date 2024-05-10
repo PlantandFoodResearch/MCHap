@@ -35,7 +35,7 @@ def local_file_path(name):
         (
             "simple.output.mixed_depth.assemble.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            [],
+            ["--report", "SNVDP"],
             "simple.output.mixed_depth.call.vcf",
         ),
         (
