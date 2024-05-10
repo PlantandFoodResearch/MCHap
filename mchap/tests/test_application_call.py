@@ -53,6 +53,7 @@ def local_file_path(name):
             [
                 "--report",
                 "AOP",
+                "AOPSUM",
             ],
             "simple.output.mixed_depth.call.occurrence.vcf",
         ),
