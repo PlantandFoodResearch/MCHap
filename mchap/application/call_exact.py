@@ -180,7 +180,7 @@ class program(call_baseclass.program):
                 data.sampledata[FORMAT.GPM][sample] = genotype_prob
                 data.sampledata[FORMAT.PHPM][sample] = phenotype_prob
                 data.sampledata[FORMAT.PHQ][sample] = qual_of_prob(phenotype_prob)
-                data.sampledata[FORMAT.MCI][sample] = None
+                data.sampledata[FORMAT.MCI][sample] = np.nan
                 mec = np.sum(minimum_error_correction(read_calls, haplotypes[alleles]))
                 mec_denom = np.sum(read_calls >= 0)
                 mecp = mec / mec_denom if mec_denom > 0 else np.nan

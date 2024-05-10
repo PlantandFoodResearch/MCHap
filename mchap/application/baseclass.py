@@ -243,9 +243,15 @@ class program(object):
         data.infodata[INFO.AC] = allele_counts[1:]  # skip ref count
         # total number of alleles in called genotypes
         data.infodata[INFO.AN] = np.sum(allele_counts)
+        # total number of unique alleles in called genotypes
+        data.infodata[INFO.UAN] = np.sum(allele_counts > 0)
         # number of called samples
         data.infodata[INFO.NS] = sum(
             np.any(a >= 0) for a in data.sampledata[FORMAT.GT].values()
+        )
+        # number of samples with Markov chain incongruence
+        data.infodata[INFO.MCI] = sum(
+            mci > 0 for mci in data.sampledata[FORMAT.MCI].values()
         )
         # total read depth and allele depth
         if len(data.locus.variants) == 0:

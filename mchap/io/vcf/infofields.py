@@ -30,6 +30,18 @@ AN = InfoField(
     type="Integer",
     descr="Total number of alleles in called genotypes",
 )
+UAN = InfoField(
+    id="UAN",
+    number=1,
+    type="Integer",
+    descr="Total number of unique alleles in called genotypes",
+)
+MCI = InfoField(
+    id="MCI",
+    number=1,
+    type="Integer",
+    descr="Number of samples with incongruent Markov chain replicates",
+)
 AF = InfoField(id="AF", number="A", type="Float", descr="Allele Frequency")
 AFP = InfoField(
     id="AFP", number="R", type="Float", descr="Posterior mean allele frequencies"
@@ -97,9 +109,11 @@ SNVDP = InfoField(
 
 DEFAULT_FIELDS = [
     AN,
+    UAN,
     AC,
     REFMASKED,
     NS,
+    MCI,
     DP,
     RCOUNT,
     END,
