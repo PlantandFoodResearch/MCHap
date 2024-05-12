@@ -3,7 +3,7 @@ MCHap assemble
 
 De novo assembly of micro-haplotypes.
 
-*(Last updated for MCHap version 0.9.3)*
+*(Last updated for MCHap version 0.10.0)*
 
 Background
 ----------
@@ -254,17 +254,31 @@ Output parameters
 
 Output parameters are used to determine which data are reported by MCHap.
 These parameters have no effect on the assembly process itself, but may be important for 
-downstream analysis.
+downstream analysis. MCHap has a range of optional ``INFO`` and ``FORMAT`` parameters that
+can be reported with the ``--report`` argument:
 
-- ``--report``: Specify one or more optional fields to report in the output VCF file. 
-  The available options include:
+- Optional fields:
 
-  * ``AFP``: Posterior mean allele frequencies (One value per unique allele for each sample).
+  * ``INFO/AFPRIOR``: The prior allele frequencies used for genotype calls.
+  * ``INFO/ACP``: Posterior mean allele counts of the population (One value per unique allele).
+  * ``INFO/AFP``: Posterior mean allele frequencies of the population (One value per unique allele).
+  * ``INFO/AOP``: Posterior probability of allele occurring in the population (One value per unique allele).
+  * ``INFO/AOPSUM``: Posterior estimate of the number of samples containing an allele (One value per unique allele).
+  * ``INFO/SNVDP``: Total read depth at each SNV position withing the assembled locus (One value per SNV).
+  * ``FORMAT/ACP``: Posterior mean allele counts (One value per unique allele for each sample).
+  * ``FORMAT/AFP``: Posterior mean allele frequencies (One value per unique allele for each sample).
     The mean posterior allele frequency across all samples will be reported as an INFO field.
-  * ``AOP``: Posterior probability of allele occurring in a sample (One value per unique allele for each sample).
+  * ``FORMAT/AOP``: Posterior probability of allele occurring in a sample (One value per unique allele for each sample).
     The probability of each allele occurring across all samples will be reported as an INFO field.
-  * ``GP``: Genotype posterior probabilities (One value per possible genotype per sample).
-  * ``GL``: Genotype Likelihoods (One value per possible genotype per sample).
+  * ``FORMAT/GP``: Genotype posterior probabilities (One value per possible genotype per sample).
+  * ``FORMAT/GL``: Genotype Likelihoods (One value per possible genotype per sample).
+  * ``FORMAT/SNVDP``: Read depth at each SNV position withing the assembled locus (One value per SNV).
+
+- Examples:
+
+  * ``--report INFO/AFP``: will report the ``INFO/AFP`` field.
+  * ``--report AFP``: will report the ``INFO/AFP`` and ``FORMAT/AFP`` fields.
+  * ``--report INFO/AOP FORMAT/AFP``: will report the ``INFO/AOP`` and ``FORMAT/AFP`` fields.
 
   Note that reporting the ``GP`` or ``GL`` fields can result in exceptionally large VCF 
   files!
