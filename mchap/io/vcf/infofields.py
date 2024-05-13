@@ -18,6 +18,7 @@ class InfoField(object):
 # INFO fields
 NS = InfoField(id="NS", number=1, type="Integer", descr="Number of samples with data")
 DP = InfoField(id="DP", number=1, type="Integer", descr="Combined depth across samples")
+PS = InfoField(id="PS", number=1, type="Integer", descr="Phased set for all samples")
 AC = InfoField(
     id="AC",
     number="A",

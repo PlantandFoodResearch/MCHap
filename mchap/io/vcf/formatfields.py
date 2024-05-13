@@ -26,6 +26,8 @@ GQ = FormatField(id="GQ", number=1, type="Integer", descr="Genotype quality")
 SQ = FormatField(id="SQ", number=1, type="Integer", descr="Genotype support quality")
 DP = FormatField(id="DP", number=1, type="Integer", descr="Read depth")
 PS = FormatField(id="PS", number=1, type="Integer", descr="Phase set")
+PQ = FormatField(id="PQ", number=1, type="Integer", descr="Phasing quality")
+DS = FormatField(id="DS", number="A", type="Float", descr="Posterior mean dosage")
 FT = FormatField(
     id="FT",
     number=1,
