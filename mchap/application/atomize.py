@@ -64,6 +64,7 @@ def get_sample_snv_ACP(vcf_record, haplotype_idxs):
         if counts is None:
             freqs = vcf_record.samples[s].get(FORMAT.AFP.id)
             if freqs is None:
+                out[:, i, :] = np.nan
                 continue
             else:
                 ploidy = len(vcf_record.samples[s][FORMAT.AFP.id])
@@ -77,6 +78,13 @@ def get_sample_snv_ACP(vcf_record, haplotype_idxs):
 
 
 def format_allele_floats(array, alts_number, length="R", precision=3):
+    input_dims = array.ndim
+    if input_dims == 2:
+        array = array[:, None, :]
+    elif input_dims == 3:
+        pass
+    else:
+        raise ValueError("Number of dimensions not supported.")
     assert length in ("R", "A")
     formatted = []
     for limit, freqs in zip(alts_number, array):
@@ -95,8 +103,10 @@ def format_allele_floats(array, alts_number, length="R", precision=3):
             head = np.char.add(head, ",")
             head = np.char.add(head, t)
         formatted.append(head)
-    formated = np.array(formatted)
-    return formated
+    formatted = np.array(formatted)
+    if input_dims == 2:
+        formatted = np.squeeze(formatted, 1)
+    return formatted
 
 
 def get_sample_snv_DS(sample_snv_ACP, sample_ploidy):
@@ -112,19 +122,29 @@ def get_sample_snv_DS(sample_snv_ACP, sample_ploidy):
 
 
 def get_sample_snv_GT(vcf_record, haplotype_idxs, sep="|"):
-    _, n_pos = haplotype_idxs.shape
-    null = np.full(n_pos, -1, int)
-    ploidy = []
+    n_haps, n_pos = haplotype_idxs.shape
+    haplotype_counts = np.zeros(n_haps)
+    sample_ploidy = []
     out = []
     for s in vcf_record.samples:
-        gt = vcf_record.samples[s][FORMAT.GT.id]
-        ploidy.append(len(gt))
-        gts = np.array([haplotype_idxs[a] if a is not None else null for a in gt]).T
+        haplotype_gt = vcf_record.samples[s][FORMAT.GT.id]
+        ploidy = len(haplotype_gt)
+        sample_ploidy.append(ploidy)
+        snv_gts = np.full((ploidy, n_pos), -1, int)
+        for i, a in enumerate(haplotype_gt):
+            if a is not None:
+                haplotype_counts[a] += 1
+                snv_gts[i] = haplotype_idxs[a]
+        snv_gts = snv_gts.T
         out.append(
-            [sep.join([str(a) if a >= 0 else "." for a in call]) for call in gts]
+            [sep.join([str(a) if a >= 0 else "." for a in call]) for call in snv_gts]
         )
     out = np.array(out)
-    return np.array(ploidy), out.T  # variants * samples
+    snv_counts = np.zeros((n_pos, haplotype_idxs.max() + 1))
+    for hap, c in enumerate(haplotype_counts):
+        for p, a in enumerate(haplotype_idxs[hap]):
+            snv_counts[p, a] += c
+    return snv_counts, np.array(sample_ploidy), out.T  # variants * samples
 
 
 def get_sample_snv_PQ(vcf_record):
@@ -133,13 +153,13 @@ def get_sample_snv_PQ(vcf_record):
     return np.tile(pq, (n_pos, 1))
 
 
-def get_sample_snv_DP(vcf_record):
+def get_sample_snv_depth(vcf_record):
     p = len(vcf_record.info[INFO.SNVPOS.id])
-    null = (".") * p
+    null = np.full(p, np.nan)
     out = []
     for s in vcf_record.samples:
         dp = vcf_record.samples[s].get(FORMAT.SNVDP.id, null)
-        out.append(list(str(i) for i in dp))
+        out.append(list(dp))
     return np.array(out).T
 
 
@@ -157,7 +177,6 @@ def format_vcf_snv_block(vcf_record):
     ref_column, alts_column, alts_number = format_snv_alleles(haplotype_snvs)
     pos_column = np.array(vcf_record.info[INFO.SNVPOS.id]) - 1 + vcf_record.pos
     contig_column = np.repeat(vcf_record.contig, n_pos)
-    info_column = np.tile("PS={}".format(vcf_record.pos), n_pos)
     rec_id = vcf_record.id
     if rec_id:
         id_column = [rec_id + "_SNV{}".format(i + 1) for i in range(n_pos)]
@@ -171,24 +190,47 @@ def format_vcf_snv_block(vcf_record):
     block_data[COLUMN.ALT] = alts_column
     block_data[COLUMN.QUAL] = "."
     block_data[COLUMN.FILTER] = "."
-    block_data[COLUMN.INFO] = info_column
 
     # sample data
-    sample_ploidy, format_GT = get_sample_snv_GT(vcf_record, haplotype_idxs)
+    info_snv_count, sample_ploidy, format_GT = get_sample_snv_GT(
+        vcf_record, haplotype_idxs
+    )
     sample_snv_ACP = get_sample_snv_ACP(vcf_record, haplotype_idxs)
     sample_snv_dose = get_sample_snv_DS(sample_snv_ACP, sample_ploidy)
-    format_column = np.tile(":".join(["GT", "GQ", "PQ", "DP", "DS"]), n_pos)
-    block_data[COLUMN.FORMAT] = format_column
     format_DS = format_allele_floats(sample_snv_dose, alts_number, length="A")
     format_PQ = get_sample_snv_PQ(vcf_record)
     format_GQ = np.full_like(format_PQ, ".")
-    format_DP = get_sample_snv_DP(vcf_record)
+    sample_depth = get_sample_snv_depth(vcf_record)
+    format_DP = sample_depth.astype("U")
+    format_DP[format_DP == "nan"] = "."
     sample_data = format_GT
     for field in [format_GQ, format_PQ, format_DP, format_DS]:
         sample_data = np.char.add(sample_data, ":")
         sample_data = np.char.add(sample_data, field)
     sample_data = pd.DataFrame(sample_data)
     sample_data.columns = list(vcf_record.samples)
+
+    # info data
+    info_DP = sample_depth.sum(axis=1).astype("U")
+    info_DP[info_DP == "nan"] = "."
+    info_DP = ["{}={}".format(INFO.DP.id, counts) for counts in info_DP]
+    info_AC = format_allele_floats(info_snv_count[:, 1:], alts_number, length="A")
+    info_AC = ["{}={}".format(INFO.AC.id, counts) for counts in info_AC]
+    population_snv_ACP = sample_snv_ACP.sum(axis=1)
+    info_ACP = format_allele_floats(population_snv_ACP, alts_number, length="R")
+    info_ACP = ["{}={}".format(INFO.ACP.id, counts) for counts in info_ACP]
+    info_PS = np.tile("PS={}".format(vcf_record.pos), n_pos)
+    info_column = [";".join(tup) for tup in zip(info_AC, info_ACP, info_DP, info_PS)]
+    block_data[COLUMN.INFO] = info_column
+
+    # add sample data last
+    format_column = np.tile(
+        ":".join(
+            [FORMAT.GT.id, FORMAT.GQ.id, FORMAT.PQ.id, FORMAT.DP.id, FORMAT.DS.id]
+        ),
+        n_pos,
+    )
+    block_data[COLUMN.FORMAT] = format_column
 
     # merge
     block_data = pd.concat([block_data, sample_data], axis=1)
@@ -211,7 +253,13 @@ def atomize_vcf(path, command=None):
         sys.stdout.write(str(contig.header_record))
 
     # write info fields
-    sys.stdout.write(str(INFO.PS) + "\n")
+    for field in [
+        INFO.AC,
+        INFO.ACP,
+        INFO.DP,
+        INFO.PS,
+    ]:
+        sys.stdout.write(str(field) + "\n")
 
     # write format fields
     for field in [
