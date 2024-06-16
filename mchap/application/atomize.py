@@ -55,11 +55,12 @@ def get_haplotype_snv_indices(haplotype_snvs):
     return haplotype_idxs
 
 
-def get_sample_snv_ACP(vcf_record, haplotype_idxs):
+def get_sample_snv_ACP(vcf_record, haplotype_idxs, sample_ploidy):
     _, n_pos = haplotype_idxs.shape
     n_samples = len(vcf_record.samples)
     out = np.zeros((n_pos, n_samples, 4))
     for i, s in enumerate(vcf_record.samples):
+        ploidy = sample_ploidy[i]
         counts = vcf_record.samples[s].get(FORMAT.ACP.id)
         if counts is None:
             freqs = vcf_record.samples[s].get(FORMAT.AFP.id)
@@ -67,13 +68,17 @@ def get_sample_snv_ACP(vcf_record, haplotype_idxs):
                 out[:, i, :] = np.nan
                 continue
             else:
-                ploidy = len(vcf_record.samples[s][FORMAT.AFP.id])
                 counts = np.array(freqs) * ploidy
         else:
             counts = np.array(counts)
         for h, c in enumerate(counts):
             for p, a in enumerate(haplotype_idxs[h]):
                 out[p, i, a] += c
+    # normalise
+    denom = np.sum(out, axis=-1, keepdims=True)
+    denom = np.where(denom == 0.0, np.nan, denom)
+    out /= denom
+    out *= sample_ploidy[None, :, None]
     return out
 
 
@@ -107,18 +112,6 @@ def format_allele_floats(array, alts_number, length="R", precision=3):
     if input_dims == 2:
         formatted = np.squeeze(formatted, 1)
     return formatted
-
-
-def get_sample_snv_DS(sample_snv_ACP, sample_ploidy):
-    dose = sample_snv_ACP.copy()
-    # normalise
-    denom = np.nansum(dose, axis=-1, keepdims=True)
-    denom = np.where(denom == 0.0, np.nan, denom)
-    dose /= denom
-    dose *= sample_ploidy[None, :, None]
-    # remove reference allele
-    dose = dose[:, :, 1:]
-    return dose
 
 
 def get_sample_snv_GT(vcf_record, haplotype_idxs, sep="|"):
@@ -195,9 +188,10 @@ def format_vcf_snv_block(vcf_record):
     info_snv_count, sample_ploidy, format_GT = get_sample_snv_GT(
         vcf_record, haplotype_idxs
     )
-    sample_snv_ACP = get_sample_snv_ACP(vcf_record, haplotype_idxs)
-    sample_snv_dose = get_sample_snv_DS(sample_snv_ACP, sample_ploidy)
-    format_DS = format_allele_floats(sample_snv_dose, alts_number, length="A")
+    sample_snv_ACP = get_sample_snv_ACP(
+        vcf_record, haplotype_idxs, sample_ploidy=sample_ploidy
+    )
+    format_DS = format_allele_floats(sample_snv_ACP[:, :, 1:], alts_number, length="A")
     format_PQ = get_sample_snv_PQ(vcf_record)
     format_GQ = np.full_like(format_PQ, ".")
     sample_depth = get_sample_snv_depth(vcf_record)
@@ -219,7 +213,7 @@ def format_vcf_snv_block(vcf_record):
     population_snv_ACP = sample_snv_ACP.sum(axis=1)
     info_ACP = format_allele_floats(population_snv_ACP, alts_number, length="R")
     info_ACP = ["{}={}".format(INFO.ACP.id, counts) for counts in info_ACP]
-    info_PS = np.tile("PS={}".format(vcf_record.pos), n_pos)
+    info_PS = np.tile("{}={}".format(INFO.PS.id, vcf_record.pos), n_pos)
     info_column = [";".join(tup) for tup in zip(info_AC, info_ACP, info_DP, info_PS)]
     block_data[COLUMN.INFO] = info_column
 
@@ -287,7 +281,6 @@ def atomize_vcf(path, command=None):
 
 
 def main(command):
-    # TODO: add arguments to MCHap for integration
     parser = argparse.ArgumentParser("WARNING this tool is experimental")
     arguments.Parameter(
         "haplotypes",
@@ -298,8 +291,11 @@ def main(command):
             help=(
                 "VCF file containing haplotype variants to be atomized. "
                 "This file must contain INFO/SNVPOS. "
-                "The FORMAT/DP field will be reported if FORMAT/SNVDP is present in this file. "
-                "The FORMAT/DS field will be reported if FORMAT/ACP or FORMAT/AFP is present in this file."
+                "The INFO/DP and FORMAT/DP fields will be calculated from FORMAT/SNVDP if present in the input  VCF file. "
+                "The INFO/ACP and FORMAT/DS fields will be calculated from FORMAT/ACP or FORMAT/AFP if either is "
+                "present in the input VCF file. "
+                "Note that the FORMAT/ACP or FORMAT/AFP fields from the input VCF file will be normalized in the event "
+                "that they do not sum to ploidy or one respectively."
             ),
         ),
     ).add_to(parser)
