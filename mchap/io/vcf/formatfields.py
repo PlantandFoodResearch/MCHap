@@ -104,6 +104,7 @@ SNVDP = FormatField(
     number=".",
     type="Integer",
     descr="Read depth at each SNV position",
+)
 
 PEDERR = FormatField(
     id="PEDERR",
@@ -152,6 +153,10 @@ DEFAULT_FIELDS = [
 ]
 
 OPTIONAL_FIELDS = [ACP, AFP, AOP, GP, GL, SNVDP]
+
+PEDIGREE_FIELDS = [PEDERR]
+
+ALL_FIELDS = DEFAULT_FIELDS + OPTIONAL_FIELDS + PEDIGREE_FIELDS
 
 
 def haplotype_depth(variant_depths):

@@ -86,7 +86,7 @@ class PedigreeCallingMCMC(Assembler):
                 step_type=step_type,
                 swap_parental_alleles=self.swap_parental_alleles,
             )
-        return PedigreeAllelesMultiTrace(trace)
+        return PedigreeAllelesMultiTrace(trace, n_allele=len(self.haplotypes))
 
 
 @njit(cache=True)
@@ -138,9 +138,10 @@ def _trace_incongruence(
 @dataclass
 class PedigreeAllelesMultiTrace(object):
     genotypes: np.ndarray
+    n_allele: int
 
     def burn(self, n):
-        new = type(self)(self.genotypes[:, n:])
+        new = type(self)(self.genotypes[:, n:], n_allele=self.n_allele)
         return new
 
     def individual(self, index):
@@ -149,6 +150,7 @@ class PedigreeAllelesMultiTrace(object):
         return GenotypeAllelesMultiTrace(
             sample_trace[:, :, 0:ploidy],
             np.full(self.genotypes.shape[0:2], np.nan),
+            n_allele=self.n_allele,
         )
 
     def incongruence(self, sample_ploidy, sample_parents, gamete_tau, gamete_lambda):

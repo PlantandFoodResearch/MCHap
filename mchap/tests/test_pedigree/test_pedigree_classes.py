@@ -257,7 +257,7 @@ def test_PedigreeAllelesMultiTrace_burn():
         [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
         [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
     ]
-    trace = PedigreeAllelesMultiTrace(np.array([trace_0, trace_1]))
+    trace = PedigreeAllelesMultiTrace(np.array([trace_0, trace_1]), n_allele=4)
     actual = trace.burn(2).genotypes
     expect = [trace_0[2:], trace_1[2:]]
     np.testing.assert_array_equal(expect, actual)
@@ -278,7 +278,7 @@ def test_PedigreeAllelesMultiTrace_individual():
         [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
         [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
     ]
-    trace = PedigreeAllelesMultiTrace(np.array([trace_0, trace_1]))
+    trace = PedigreeAllelesMultiTrace(np.array([trace_0, trace_1]), n_allele=4)
     actual = trace.individual(2).genotypes
     expect = [np.array(trace_0)[:, 2], np.array(trace_1)[:, 2]]
     np.testing.assert_array_equal(expect, actual)
@@ -309,7 +309,7 @@ def test_PedigreeAllelesMultiTrace_incongruence():
         [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
         [[0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 1, 3]],
     ]
-    trace = PedigreeAllelesMultiTrace(np.array([trace_0, trace_1]))
+    trace = PedigreeAllelesMultiTrace(np.array([trace_0, trace_1]), n_allele=4)
     expect = [0.0, 0.0, 3 / 10]
     actual = trace.incongruence(
         sample_ploidy, sample_parents, gamete_tau, gamete_lambda

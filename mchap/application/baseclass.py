@@ -126,8 +126,8 @@ class program(object):
             infofields=self.info_fields.copy(),
             formatfields=self.format_fields.copy(),
             columndata=dict(FILTER=list()),
-            infodata={f: {} for f in INFO.DEFAULT_FIELDS + INFO.OPTIONAL_FIELDS},
-            sampledata={f: {} for f in FORMAT.DEFAULT_FIELDS + FORMAT.OPTIONAL_FIELDS},
+            infodata={f: {} for f in INFO.ALL_FIELDS},
+            sampledata={f: {} for f in FORMAT.ALL_FIELDS},
             precision=self.precision,
         )
 

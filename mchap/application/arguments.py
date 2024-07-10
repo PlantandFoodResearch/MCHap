@@ -1153,6 +1153,7 @@ def collect_default_program_arguments(arguments, skip_inbreeding=False):
             samples,
             type=float,
         )
+    info_fields, format_fields = parse_report_fields(arguments.report)
     return dict(
         samples=samples,
         sample_bams=sample_bams,
@@ -1203,6 +1204,7 @@ def collect_call_mcmc_program_arguments(arguments):
 def collect_call_pedigree_mcmc_program_arguments(arguments):
     # TODO: re-add the inbreeding option when supported
     data = collect_default_program_arguments(arguments, skip_inbreeding=True)
+    data["format_fields"] += FORMAT.PEDIGREE_FIELDS
     data.update(collect_default_mcmc_program_arguments(arguments))
     data["vcf"] = arguments.haplotypes[0]
     data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
