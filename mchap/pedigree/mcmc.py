@@ -476,7 +476,7 @@ def parental_pair_markov_blankets(sample_parents, sample_children):
             pass
         else:
             # new pair
-            in_blanket = np.zeros(n_samples, dtype=np.bool8)
+            in_blanket = np.zeros(n_samples, dtype=np.bool_)
             in_blanket[p] = True
             in_blanket[q] = True
             for j in range(max_children):

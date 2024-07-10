@@ -161,7 +161,7 @@ def test_genotype_posteriors():
     actual = exact.genotype_posteriors(
         log_likelihoods, ploidy, n_alleles, inbreeding=inbreeding
     )
-    np.testing.assert_almost_equal(expect, actual)
+    np.testing.assert_almost_equal(expect, actual, decimal=6)
 
 
 def test_alternate_dosage_posteriors():

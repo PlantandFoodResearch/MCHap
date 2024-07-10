@@ -49,10 +49,10 @@ def as_probabilistic(array, n_alleles=4, p=1.0, error_factor=3, dtype=float):
     will sum to less than 1.
     """
     # check inputs
-    array = np.array(array, copy=False)
-    n_alleles = np.array(n_alleles, copy=False)
-    error_factor = np.array(error_factor, copy=False)
-    p = np.array(p, copy=False)
+    array = np.asarray(array)
+    n_alleles = np.asarray(n_alleles)
+    error_factor = np.asarray(error_factor)
+    p = np.asarray(p)
 
     # special case for zero-length reads
     if array.shape[-1] == 0:
@@ -138,7 +138,7 @@ def from_strings(data, gaps="-", length=None, dtype=np.int8):
     if isinstance(data, np.ndarray):
         pass
     else:
-        data = np.array(data, copy=False)
+        data = np.asarray(data)
 
     sequences = data.ravel()
 
@@ -205,7 +205,7 @@ def as_strings(array, gap="-", alleles=None):
 
     """
     if not isinstance(array, np.ndarray):
-        array = np.array(array, copy=False)
+        array = np.asarray(array)
     if array.ndim == 1:
         return vector_as_string(array, gap=gap, alleles=alleles)
 
@@ -273,7 +273,7 @@ def as_characters(array, gap="-", alleles=None):
     """
 
     if not isinstance(array, np.ndarray):
-        array = np.array(array, copy=False)
+        array = np.asarray(array)
     if array.ndim == 1:
         return vector_as_characters(array, gap=gap, alleles=alleles)
 
