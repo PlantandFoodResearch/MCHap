@@ -1,0 +1,187 @@
+usage: MCMC haplotype calling via pedigree-annealing.  [-h]
+                                                       [--haplotypes HAPLOTYPES]
+                                                       [--prior-frequencies PRIOR_FREQUENCIES]
+                                                       [--filter-input-haplotypes FILTER_INPUT_HAPLOTYPES]
+                                                       [--bam BAM [BAM ...]]
+                                                       [--ploidy PLOIDY]
+                                                       [--sample-parents SAMPLE_PARENTS]
+                                                       [--gamete-ploidy GAMETE_PLOIDY]
+                                                       [--gamete-ibd GAMETE_IBD]
+                                                       [--gamete-error GAMETE_ERROR]
+                                                       [--sample-pool SAMPLE_POOL]
+                                                       [--reference REFERENCE]
+                                                       [--base-error-rate BASE_ERROR_RATE]
+                                                       [--use-base-phred-scores]
+                                                       [--mapping-quality MAPPING_QUALITY]
+                                                       [--keep-duplicate-reads]
+                                                       [--keep-qcfail-reads]
+                                                       [--keep-supplementary-reads]
+                                                       [--read-group-field READ_GROUP_FIELD]
+                                                       [--report [REPORT ...]]
+                                                       [--cores CORES]
+                                                       [--mcmc-chains MCMC_CHAINS]
+                                                       [--mcmc-steps MCMC_STEPS]
+                                                       [--mcmc-burn MCMC_BURN]
+                                                       [--mcmc-seed MCMC_SEED]
+                                                       [--mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD]
+
+options:
+  -h, --help            show this help message and exit
+  --haplotypes HAPLOTYPES
+                        Tabix indexed VCF file containing haplotype/MNP/SNP
+                        variants to be re-called among input samples.
+  --prior-frequencies PRIOR_FREQUENCIES
+                        Optionally specify an INFO field within the input VCF
+                        file to designate as prior allele frequencies for the
+                        input haplotypes. This can be any numerical field of
+                        length 'R' and these values will automatically be
+                        normalized.
+  --filter-input-haplotypes FILTER_INPUT_HAPLOTYPES
+                        Optionally filter input haplotypes using a string of
+                        the form '<field><operator><value>' where <field> is a
+                        numerical INFO field with length 'A' or 'R',
+                        <operator> is one of =|>|<|>=|<=|!=, and <value> is a
+                        numerical value.
+  --bam BAM [BAM ...]   Bam file(s) to use in analysis. This may be (1) a list
+                        of one or more bam filepaths, (2) a plain-text file
+                        containing a single bam filepath on each line, (3) a
+                        plain-text file containing a sample identifier and its
+                        corresponding bam filepath on each line separated by a
+                        tab. If options (1) or (2) are used then all samples
+                        within each bam will be used within the analysis. If
+                        option (3) is used then only the specified sample will
+                        be extracted from each bam file and An error will be
+                        raised if a sample is not found within its specified
+                        bam file.
+  --ploidy PLOIDY       Specify sample ploidy (default = 2).This may be (1) a
+                        single integer used to specify the ploidy of all
+                        samples or (2) a file containing a list of all samples
+                        and their ploidy. If option (2) is used then each line
+                        of the plaintext file must contain a single sample
+                        identifier and the ploidy of that sample separated by
+                        a tab.
+  --sample-parents SAMPLE_PARENTS
+                        A file containing a list of samples and their parents
+                        used to indicate pedigree structure. Each line should
+                        contain a sample identifier followed by both parent
+                        identifiers separated by tabs. A period '.' is used to
+                        indicate unknown parents.
+  --gamete-ploidy GAMETE_PLOIDY
+                        Ploidy of the gametes contributing to each sample. By
+                        default it is assumed that the ploidy of each gamete
+                        is equal to half the ploidy of the sample derived from
+                        that gamete. If all gametes have the same ploidy then
+                        a single number can be specified. If gametic ploidy is
+                        variable then these values must be specified with a
+                        file containing a list of samples and the ploidy of
+                        the gametes they were derived from. Each line of this
+                        file should contain a sample identifier followed by
+                        the ploidy of gametes derived from each parent in the
+                        same order as specified using the --sample-parents
+                        argument. For each sample, the ploidy of the two
+                        gametes must sum to the ploidy of that sample.
+  --gamete-ibd GAMETE_IBD
+                        Excess IBD/homozygosity due to meiotic processes. By
+                        default this variable is 0.0 for all gametes and non-
+                        zero values may only be specified for gametes with a
+                        ploidy of 2. This value must be in the interval [0, 1]
+                        with a value of 0.0 indicating no excess
+                        ibd/homozygosity and a value of 1.0 indicating that
+                        the gamete must be fully homozygous.If a single value
+                        is specified then this will be applied to all gametes.
+                        If this value varies between gametes then it must be
+                        specified with a file containing a list of samples and
+                        the value associated with each gamete those samples
+                        are derived from. Each line should contain a sample
+                        identifier followed by value of each gamete in the
+                        same order as specified using the --sample-parents
+                        argument.
+  --gamete-error GAMETE_ERROR
+                        An error term associated with each parent-child pair
+                        indicating the probability that that gamete was not
+                        derived from the specified parent. By default this
+                        variable is 0.01 for all parent-child pairs. This
+                        value must be in the interval [0, 1] and should
+                        generally be > 0 and < 1.If a single value is
+                        specified then this will be applied to all parent-
+                        child pairs. If this value varies between gametes then
+                        it must be specified with a file containing a list of
+                        samples and the value associated with each gamete
+                        those samples are derived from. Each line should
+                        contain a sample identifier followed by value of each
+                        gamete in the same order as specified using the
+                        --sample-parents argument.
+  --sample-pool SAMPLE_POOL
+                        WARNING: this is an experimental feature!!! Pool
+                        samples together into a single genotype. This may be
+                        (1) the name of a single pool for all samples or (2) a
+                        file containing a list of all samples and their
+                        assigned pool. If option (2) is used then each line of
+                        the plaintext file must contain a single sample
+                        identifier and the name of a pool separated by a
+                        tab.Samples may be assigned to multiple pools by using
+                        the same sample name on multiple lines.Each pool will
+                        treated as a single genotype by combining all reads
+                        from its constituent samples. Note that the pool names
+                        should be used in place of the samples names when
+                        assigning other per-sample parameters such as ploidy
+                        or inbreeding coefficients.
+  --reference REFERENCE
+                        Indexed fasta file containing the reference genome.
+  --base-error-rate BASE_ERROR_RATE
+                        Expected base error rate of read sequences (default =
+                        0.0024). The default value comes from Pfeiffer et al
+                        2018 and is a general estimate for Illumina short
+                        reads.
+  --use-base-phred-scores
+                        Flag: use base phred-scores as a source of base error
+                        rate. This will use the phred-encoded per base scores
+                        in addition to the general error rate specified by the
+                        --base-error-rate argument. Using this option can slow
+                        down assembly speed.
+  --mapping-quality MAPPING_QUALITY
+                        Minimum mapping quality of reads used in assembly
+                        (default = 20).
+  --keep-duplicate-reads
+                        Flag: Use reads marked as duplicates in the assembly
+                        (these are skipped by default).
+  --keep-qcfail-reads   Flag: Use reads marked as qcfail in the assembly
+                        (these are skipped by default).
+  --keep-supplementary-reads
+                        Flag: Use reads marked as supplementary in the
+                        assembly (these are skipped by default).
+  --read-group-field READ_GROUP_FIELD
+                        Read group field to use as sample id (default = "SM").
+                        The chosen field determines tha sample ids required in
+                        other input files e.g. the --sample-list argument.
+  --report [REPORT ...]
+                        Extra fields to report within the output VCF. The
+                        INFO/FORMAT prefix may be omitted to return both
+                        variations of the named field. Options include:
+                        INFO/AFPRIOR = Prior allele frequencies; INFO/ACP =
+                        Posterior allele counts; INFO/AFP = Posterior mean
+                        allele frequencies; INFO/AOP = Posterior probability
+                        of allele occurring across all samples; INFO/AOPSUM =
+                        Posterior estimate of the number of samples containing
+                        an allele; INFO/SNVDP = Read depth at each SNV
+                        position; FORMAT/ACP: Posterior allele counts;
+                        FORMAT/AFP: Posterior mean allele frequencies;
+                        FORMAT/AOP: Posterior probability of allele occurring;
+                        FORMAT/GP: Genotype posterior probabilities;
+                        FORMAT/GL: Genotype likelihoods; FORMAT/SNVDP: Read
+                        depth at each SNV position
+  --cores CORES         Number of cpu cores to use (default = 1).
+  --mcmc-chains MCMC_CHAINS
+                        Number of independent MCMC chains per assembly
+                        (default = 2).
+  --mcmc-steps MCMC_STEPS
+                        Number of steps to simulate in each MCMC chain
+                        (default = 2000).
+  --mcmc-burn MCMC_BURN
+                        Number of initial steps to discard from each MCMC
+                        chain (default = 1000).
+  --mcmc-seed MCMC_SEED
+                        Random seed for MCMC (default = 42).
+  --mcmc-chain-incongruence-threshold MCMC_CHAIN_INCONGRUENCE_THRESHOLD
+                        Posterior probability threshold for identification of
+                        incongruent posterior modes (default = 0.60).

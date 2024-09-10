@@ -10,6 +10,7 @@ from mchap.application.atomize import (
     format_snv_alleles,
     get_haplotype_snv_indices,
     format_allele_floats,
+    ExperimentalFeatureWarning,
 )
 
 
@@ -108,7 +109,8 @@ def test_main(input_vcf, output_vcf):
     _, out_filename = tempfile.mkstemp()
     stdout = sys.stdout
     sys.stdout = open(out_filename, "w")
-    main(command)
+    with pytest.warns(ExperimentalFeatureWarning):
+        main(command)
     sys.stdout.close()
 
     # replace stdout

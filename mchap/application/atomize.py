@@ -3,12 +3,17 @@ import argparse
 import pysam
 import numpy as np
 import pandas as pd
+import warnings
 
 from mchap.io.vcf import headermeta as HEADER
 from mchap.io.vcf import columns as COLUMN
 from mchap.io.vcf import infofields as INFO
 from mchap.io.vcf import formatfields as FORMAT
 from mchap.application import arguments
+
+
+class ExperimentalFeatureWarning(UserWarning):
+    pass
 
 
 def get_haplotype_snvs(vcf_record):
@@ -281,7 +286,10 @@ def atomize_vcf(path, command=None):
 
 
 def main(command):
-    parser = argparse.ArgumentParser("WARNING this tool is experimental")
+    warnings.warn("THIS PROGRAM IS EXPERIMENTAL!!!", ExperimentalFeatureWarning)
+    parser = argparse.ArgumentParser(
+        "Split MCHap haplotype calls into phased blocks of basis SNVs."
+    )
     arguments.Parameter(
         "haplotypes",
         dict(
