@@ -22,7 +22,14 @@ def main():
         version=f"mchap {__version__}",
     )
 
-    subprograms = ["assemble", "call", "call-exact", "call-pedigree", "find-snvs", "atomize"]
+    subprograms = [
+        "assemble",
+        "call",
+        "call-exact",
+        "call-pedigree",
+        "find-snvs",
+        "atomize",
+    ]
 
     parser.add_argument(
         "program", nargs=1, choices=subprograms, help="Specify sub-program"
