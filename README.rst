@@ -63,10 +63,11 @@ estimated from depths.
 The output is reported as a simple VCF file which includes allele depths and population allele
 frequencies (estimated from the mean of individual frequencies), but no genotype calls.
 
-Example notebook
-----------------
+Example notebooks
+-----------------
 
-An `example notebook`_ demonstrating genotype calling with MCHap in a bi-parental population.
+- An `example notebook`_ demonstrating genotype calling with MCHap in a bi-parental population.
+- A `second example notebook`_ demonstrating some experimental features of MCHap presented at the 2024 `Tools for Polyploids`_ workshop.
 
 Funding
 -------
@@ -80,3 +81,5 @@ The development of MCHap was partially funded by the "Tools for Polyploids" Spec
 .. _`MCHap assemble documentation`: docs/assemble.rst
 .. _`MCHap call documentation`: docs/call.rst
 .. _`example notebook`: docs/example/bi-parental.ipynb
+.. _`second example notebook`: docs/example/bi-parental-pedigree.ipynb
+.. _`Tools for Polyploids`: https://www.polyploids.org/
