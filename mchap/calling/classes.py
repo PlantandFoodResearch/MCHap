@@ -1,4 +1,5 @@
 import numpy as np
+from numba import njit
 from dataclasses import dataclass
 from mchap.assemble.classes import Assembler
 from mchap.combinatorics import count_unique_genotypes
@@ -82,7 +83,7 @@ class CallingMCMC(Assembler):
             assert len(self.haplotypes) == 1
             genotypes = np.zeros((self.chains, self.steps, self.ploidy), dtype=np.int8)
             llks = np.full((self.chains, self.steps), np.nan)
-            return GenotypeAllelesMultiTrace(genotypes, llks)
+            return GenotypeAllelesMultiTrace(genotypes, llks, len(self.haplotypes))
 
         # set random seed once for all chains
         if self.random_seed is not None:
@@ -124,7 +125,7 @@ class CallingMCMC(Assembler):
             genotype_traces.append(genotypes)
             llk_traces.append(llks)
         return GenotypeAllelesMultiTrace(
-            np.array(genotype_traces), np.array(llk_traces)
+            np.array(genotype_traces), np.array(llk_traces), len(self.haplotypes)
         )
 
 
@@ -140,10 +141,13 @@ class GenotypeAllelesMultiTrace(object):
     llks : ndarray, float, shape (n_chains, n_steps)
         The log-likelihood calculated for the genotype at each step of
         the Markov chain Monte Carlo simulation.
+    n_allele : int
+        Maximum number of alleles
     """
 
     genotypes: np.ndarray
     llks: np.ndarray
+    n_allele: int
 
     def relabel(self, labels):
         """Returns a new GenotypeTrace object with relabeled alleles.
@@ -161,6 +165,7 @@ class GenotypeAllelesMultiTrace(object):
         new = type(self)(
             labels[self.genotypes],
             self.llks,
+            labels.max() + 1,
         )
         return new
 
@@ -184,6 +189,7 @@ class GenotypeAllelesMultiTrace(object):
         new = type(self)(
             self.genotypes[:, n:],
             self.llks[:, n:],
+            self.n_allele,
         )
         return new
 
@@ -218,7 +224,11 @@ class GenotypeAllelesMultiTrace(object):
             An iterable of multitraces each containing a single chain.
         """
         for genotypes, llks in zip(self.genotypes, self.llks):
-            yield type(self)(genotypes[None, ...], llks[None, ...])
+            yield type(self)(
+                genotypes[None, ...],
+                llks[None, ...],
+                self.n_allele,
+            )
 
     def replicate_incongruence(self, threshold=0.6):
         """Identifies incongruence between replicate Markov chains.
@@ -239,7 +249,9 @@ class GenotypeAllelesMultiTrace(object):
         A non-replicated MCMC will always return 0.
         """
         out = 0
-        chain_modes = [chain.posterior().mode(phenotype=True) for chain in self.split()]
+        chain_modes = [
+            chain.posterior().mode(genotype_support=True) for chain in self.split()
+        ]
         alleles = [mode[0] for mode in chain_modes if mode[-1] >= threshold]
         # check for more than one mode
         mode_count = len({array.tobytes() for array in alleles})
@@ -251,6 +263,43 @@ class GenotypeAllelesMultiTrace(object):
             if allele_count > ploidy:
                 out = 2
         return out
+
+    def posterior_frequencies(self):
+        """Calculate posterior frequency of haplotype alleles.
+
+        Returns
+        -------
+        frequencies : ndarray, float, shape (n_alleles, )
+            Posterior frequencies of haplotype alleles.
+        counts : ndarray, float, shape (n_alleles, )
+            Posterior allele counts.
+        occurrence : ndarray, float, shape (n_alleles, )
+            Posterior probabilities of haplotype occurrence.
+        """
+        return _posterior_frequencies(self.genotypes, self.n_allele)
+
+
+@njit
+def _posterior_frequencies(genotypes, n_allele):
+    n_chain, n_step, ploidy = genotypes.shape
+    counts = np.zeros(n_allele)
+    occurrence = np.zeros(n_allele)
+    for c in range(n_chain):
+        for s in range(n_step):
+            for i in range(ploidy):
+                a = genotypes[c, s, i]
+                counts[a] += 1
+                first = True
+                for j in range(i):
+                    b = genotypes[c, s, j]
+                    if b == a:
+                        first = False
+                if first:
+                    occurrence[a] += 1
+    n_obs = n_chain * n_step
+    counts /= n_obs
+    occurrence /= n_obs
+    return counts / ploidy, counts, occurrence
 
 
 @dataclass
@@ -270,15 +319,15 @@ class PosteriorGenotypeAllelesDistribution(object):
     genotypes: np.ndarray
     probabilities: np.ndarray
 
-    def mode(self, phenotype=False):
-        """Return the posterior mode genotype or allelic phenotype.
+    def mode(self, genotype_support=False):
+        """Return the posterior mode genotype or genotype support.
 
         Parameters
         ----------
-        phenotype : bool
+        genotype_support : bool
             If true then the most probable genotype of the mode
-            phenotype will be returned in addition with that
-            genotypes probability and the mode phenotype probability.
+            genotype support will be returned in addition with that
+            genotypes probability and the mode genotype support probability.
 
         Returns
         -------
@@ -286,34 +335,32 @@ class PosteriorGenotypeAllelesDistribution(object):
             The genotype with the highest posterior probability.
         genotype_probability : float
             The posterior probability of the posterior mode genotype
-        phenotype_probability : float
+        genotype_support_probability : float
             The posterior probability of the posterior mode genotype
 
         """
-        if phenotype is False:
+        if genotype_support is False:
             idx = np.argmax(self.probabilities)
             return self.genotypes[idx], self.probabilities[idx]
         else:
             labels = np.zeros(len(self.genotypes), dtype=int)
-            phenotype_labels = {}  # string: int
+            support_labels = {}  # string: int
             probs = {}  # int: float
-            # phenotypes = {}  # int: array
 
             for i, gen in enumerate(self.genotypes):
-                phenotype = mset.unique(gen)
-                string = phenotype.tobytes()
-                if string not in phenotype_labels:
+                genotype_support = mset.unique(gen)
+                string = genotype_support.tobytes()
+                if string not in support_labels:
                     label = i
-                    phenotype_labels[string] = label
+                    support_labels[string] = label
                     probs[label] = self.probabilities[i]
-                    # phenotypes[label] = phenotype
                 else:
-                    label = phenotype_labels[string]
+                    label = support_labels[string]
                     probs[label] += self.probabilities[i]
                 labels[i] = label
 
-            phenotype_labels, probs = zip(*probs.items())
-            mode = phenotype_labels[np.argmax(probs)]
+            support_labels, probs = zip(*probs.items())
+            mode = support_labels[np.argmax(probs)]
             idx = labels == mode
             genotypes = self.genotypes[idx]
             probs = self.probabilities[idx]
@@ -324,26 +371,3 @@ class PosteriorGenotypeAllelesDistribution(object):
         _, ploidy = self.genotypes.shape
         u_genotypes = count_unique_genotypes(n_alleles, ploidy)
         return posterior_as_array(self.genotypes, self.probabilities, u_genotypes)
-
-    def allele_frequencies(self):
-        """Calculate posterior frequency of haplotype alleles.
-
-        Returns
-        -------
-        alleles : ndarray, int, shape (n_alleles, n_base)
-            Unique haplotypes.
-        frequencies : ndarray, float, shape (n_alleles, )
-            Posterior frequencies of haplotype alleles.
-        occurrence : ndarray, float, shape (n_alleles, )
-            Posterior probabilities of haplotype occurrence.
-        """
-        _, ploidy = self.genotypes.shape
-        n_allele = self.genotypes.max() + 1
-        alleles = np.arange(n_allele)
-        frequencies = np.zeros(n_allele)
-        occurrence = np.zeros(n_allele)
-        for gen, prob in zip(self.genotypes, self.probabilities):
-            idx, count = np.unique(gen, return_counts=True)
-            frequencies[idx] += (count / ploidy) * prob
-            occurrence[idx] += prob
-        return alleles, frequencies, occurrence

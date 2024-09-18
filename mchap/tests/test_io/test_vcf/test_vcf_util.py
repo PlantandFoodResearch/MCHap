@@ -17,7 +17,9 @@ from mchap.io.vcf import util
         pytest.param([1, None, 3], "1,.,3", id="list-mixed"),
         pytest.param([1.3, 0.7, 1.0], "1.3,0.7,1", id="list-floats"),
         pytest.param(
-            np.array([0.0321, np.nan, 1.0, 0.0]), "0.0321,.,1,0", id="array-floats"
+            np.array([0.0321, np.nan, 1.0, 0.0]),
+            "0.032,.,1,0",
+            id="array-floats",  # default precision of 3
         ),
     ],
 )

@@ -56,8 +56,8 @@ def test_CallingMCMC__gibbs_mh_equivalence(seed):
     model = CallingMCMC(
         ploidy=ploidy, haplotypes=haplotypes, inbreeding=inbreeding, steps=10050
     )
-    gibbs_genotype, gibbs_genotype_prob, gibbs_phenotype_prob = (
-        model.fit(reads, read_counts).burn(50).posterior().mode(phenotype=True)
+    gibbs_genotype, gibbs_genotype_prob, gibbs_genotype_support_prob = (
+        model.fit(reads, read_counts).burn(50).posterior().mode(genotype_support=True)
     )
 
     # MH sampler
@@ -68,8 +68,8 @@ def test_CallingMCMC__gibbs_mh_equivalence(seed):
         steps=10050,
         step_type="Metropolis-Hastings",
     )
-    mh_genotype, mh_genotype_prob, mh_phenotype_prob = (
-        model.fit(reads, read_counts).burn(50).posterior().mode(phenotype=True)
+    mh_genotype, mh_genotype_prob, mh_genotype_support_prob = (
+        model.fit(reads, read_counts).burn(50).posterior().mode(genotype_support=True)
     )
 
     # check results are equivalent
@@ -77,7 +77,9 @@ def test_CallingMCMC__gibbs_mh_equivalence(seed):
     # the random seed values is required
     np.testing.assert_array_equal(gibbs_genotype, mh_genotype)
     np.testing.assert_allclose(gibbs_genotype_prob, mh_genotype_prob, atol=0.01)
-    np.testing.assert_allclose(gibbs_phenotype_prob, mh_phenotype_prob, atol=0.01)
+    np.testing.assert_allclose(
+        gibbs_genotype_support_prob, mh_genotype_support_prob, atol=0.01
+    )
 
 
 @pytest.mark.parametrize(
@@ -122,13 +124,16 @@ def test_CallingMCMC__DenovoMCMC_equivalence(seed):
         inbreeding=inbreeding,
         fix_homozygous=1,
     )
-    denovo_phenotype = (
-        model.fit(reads, read_counts=read_counts).burn(500).posterior().mode_phenotype()
+    denovo_genotype_support = (
+        model.fit(reads, read_counts=read_counts)
+        .burn(500)
+        .posterior()
+        .mode_genotype_support()
     )
-    denovo_phen_prob = denovo_phenotype.probabilities.sum()
-    idx = np.argmax(denovo_phenotype.probabilities)
-    denovo_gen_prob = denovo_phenotype.probabilities[idx]
-    denovo_genotype = denovo_phenotype.genotypes[idx]
+    denovo_phen_prob = denovo_genotype_support.probabilities.sum()
+    idx = np.argmax(denovo_genotype_support.probabilities)
+    denovo_gen_prob = denovo_genotype_support.probabilities[idx]
+    denovo_genotype = denovo_genotype_support.genotypes[idx]
     denovo_alleles = [haplotype_labels[h.tobytes()] for h in denovo_genotype]
     denovo_alleles = np.sort(denovo_alleles)
 
@@ -136,8 +141,8 @@ def test_CallingMCMC__DenovoMCMC_equivalence(seed):
     model = CallingMCMC(
         ploidy=ploidy, haplotypes=haplotypes, inbreeding=inbreeding, steps=10500
     )
-    call_alleles, call_genotype_prob, call_phenotype_prob = (
-        model.fit(reads, read_counts).burn(500).posterior().mode(phenotype=True)
+    call_alleles, call_genotype_prob, call_genotype_support_prob = (
+        model.fit(reads, read_counts).burn(500).posterior().mode(genotype_support=True)
     )
 
     # check results are equivalent
@@ -145,7 +150,7 @@ def test_CallingMCMC__DenovoMCMC_equivalence(seed):
     # the random seed values is required
     np.testing.assert_array_equal(call_alleles, denovo_alleles)
     np.testing.assert_allclose(call_genotype_prob, denovo_gen_prob, atol=0.01)
-    np.testing.assert_allclose(call_phenotype_prob, denovo_phen_prob, atol=0.01)
+    np.testing.assert_allclose(call_genotype_support_prob, denovo_phen_prob, atol=0.01)
 
 
 def test_CallingMCMC__zero_reads():
@@ -180,14 +185,14 @@ def test_CallingMCMC__zero_reads():
         chains=n_chains,
     )
     trace = model.fit(reads, read_counts)
-    _, call_genotype_prob, call_phenotype_prob = (
-        trace.burn(n_burn).posterior().mode(phenotype=True)
+    _, call_genotype_prob, call_genotype_support_prob = (
+        trace.burn(n_burn).posterior().mode(genotype_support=True)
     )
 
     assert trace.genotypes.shape == (n_chains, n_steps, ploidy)
     assert trace.genotypes.max() < n_haps
     assert call_genotype_prob < 0.05
-    assert call_phenotype_prob < 0.05
+    assert call_genotype_support_prob < 0.05
 
 
 def test_CallingMCMC__zero_snps():
@@ -213,15 +218,15 @@ def test_CallingMCMC__zero_snps():
         chains=n_chains,
     )
     trace = model.fit(reads, read_counts)
-    _, call_genotype_prob, call_phenotype_prob = (
-        trace.burn(n_burn).posterior().mode(phenotype=True)
+    _, call_genotype_prob, call_genotype_support_prob = (
+        trace.burn(n_burn).posterior().mode(genotype_support=True)
     )
 
     assert trace.genotypes.shape == (n_chains, n_steps, ploidy)
     assert np.all(trace.genotypes == 0)
     assert np.all(np.isnan(trace.llks))
     assert call_genotype_prob == 1
-    assert call_phenotype_prob == 1
+    assert call_genotype_support_prob == 1
 
 
 def test_CallingMCMC__many_haplotype():
@@ -247,8 +252,8 @@ def test_CallingMCMC__many_haplotype():
         chains=n_chains,
     )
     trace = model.fit(reads, read_counts)
-    alleles, call_genotype_prob, call_phenotype_prob = (
-        trace.burn(n_burn).posterior().mode(phenotype=True)
+    alleles, call_genotype_prob, call_genotype_support_prob = (
+        trace.burn(n_burn).posterior().mode(genotype_support=True)
     )
     # test dtype inherited from greedy_caller function
     assert trace.genotypes.dtype == np.int32
@@ -256,7 +261,7 @@ def test_CallingMCMC__many_haplotype():
     assert np.all(trace.genotypes < n_haps)
     np.testing.assert_array_equal(true_alleles, alleles)
     assert call_genotype_prob > 0.1
-    assert call_phenotype_prob > 0.1
+    assert call_genotype_support_prob > 0.1
 
 
 def test_PosteriorGenotypeAllelesDistribution__as_array():
@@ -305,13 +310,56 @@ def test_PosteriorGenotypeAllelesDistribution__mode():
     np.testing.assert_array_equal(genotype, observed_genotypes[3])
     assert genotype_prob == observed_probabilities[3]
 
-    genotype, genotype_prob, phenotype_prob = posterior.mode(phenotype=True)
+    genotype, genotype_prob, genotype_support_prob = posterior.mode(
+        genotype_support=True
+    )
     np.testing.assert_array_equal(genotype, observed_genotypes[3])
     assert genotype_prob == observed_probabilities[3]
-    assert phenotype_prob == observed_probabilities[1:4].sum()
+    assert genotype_support_prob == observed_probabilities[1:4].sum()
 
 
-def test_PosteriorGenotypeAllelesDistribution__allele_frequencies():
+@pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 1)])
+def test_GenotypeAllelesMultiTrace__replicate_incongruence_1(threshold, expect):
+    g0 = [0, 0, 1, 2]  # support 1
+    g1 = [0, 1, 1, 2]  # support 1
+    g2 = [0, 1, 2, 2]  # support 1
+    g3 = [0, 0, 2, 2]  # support 2
+    genotypes = np.array([g0, g1, g2, g3])
+
+    t0 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
+    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t2 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
+    t3 = genotypes[[3, 3, 3, 3, 3, 3, 3, 2, 1, 2]]  # 3:7
+    trace = GenotypeAllelesMultiTrace(
+        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10)), n_allele=3
+    )
+
+    actual = trace.replicate_incongruence(threshold)
+    assert actual == expect
+
+
+@pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 2)])
+def test_GenotypeAllelesMultiTrace__replicate_incongruence_2(threshold, expect):
+
+    g0 = [0, 0, 1, 2]  # support 1
+    g1 = [0, 1, 1, 2]  # support 1
+    g2 = [0, 1, 2, 2]  # support 1
+    g3 = [0, 0, 2, 3]  # support 2
+    g4 = [0, 2, 3, 4]  # support 3
+    genotypes = np.array([g0, g1, g2, g3, g4])
+
+    t0 = genotypes[[3, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t2 = genotypes[[0, 3, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
+    t3 = genotypes[[3, 3, 4, 4, 4, 3, 4, 4, 4, 4]]  # 3:7
+    trace = GenotypeAllelesMultiTrace(
+        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10)), n_allele=5
+    )
+    actual = trace.replicate_incongruence(threshold)
+    assert actual == expect
+
+
+def test_GenotypeAllelesMultiTrace__posterior_frequencies():
     observed_genotypes = np.array(
         [
             [0, 0, 0, 0],
@@ -322,52 +370,14 @@ def test_PosteriorGenotypeAllelesDistribution__allele_frequencies():
             [0, 1, 2, 2],
         ]
     )
-    observed_probabilities = np.array([0.05, 0.08, 0.22, 0.45, 0.05, 0.15])
-    posterior = PosteriorGenotypeAllelesDistribution(
-        observed_genotypes, observed_probabilities
-    )
-    actual_alleles, actual_freqs, actual_occur = posterior.allele_frequencies()
-    np.testing.assert_array_equal(actual_alleles, [0, 1, 2])
+    observed_counts = np.array([5, 8, 22, 45, 5, 15])
+    idx = np.repeat(np.arange(len(observed_counts)), observed_counts)
+    genotypes = observed_genotypes[idx][None, ...]
+    llks = np.ones(genotypes.shape[0:2])
+    trace = GenotypeAllelesMultiTrace(genotypes, llks, 3)
+    actual_freqs, actual_counts, actual_occur = trace.posterior_frequencies()
     np.testing.assert_array_almost_equal(actual_freqs, [0.395, 0.05, 0.555])
+    np.testing.assert_array_almost_equal(
+        actual_counts, [4 * 0.395, 4 * 0.05, 4 * 0.555]
+    )
     np.testing.assert_array_almost_equal(actual_occur, [1.0, 0.2, 0.95])
-
-
-@pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 1)])
-def test_GenotypeAllelesMultiTrace__replicate_incongruence_1(threshold, expect):
-    g0 = [0, 0, 1, 2]  # phenotype 1
-    g1 = [0, 1, 1, 2]  # phenotype 1
-    g2 = [0, 1, 2, 2]  # phenotype 1
-    g3 = [0, 0, 2, 2]  # phenotype 2
-    genotypes = np.array([g0, g1, g2, g3])
-
-    t0 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
-    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
-    t2 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
-    t3 = genotypes[[3, 3, 3, 3, 3, 3, 3, 2, 1, 2]]  # 3:7
-    trace = GenotypeAllelesMultiTrace(
-        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10))
-    )
-
-    actual = trace.replicate_incongruence(threshold)
-    assert actual == expect
-
-
-@pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 2)])
-def test_GenotypeAllelesMultiTrace__replicate_incongruence_2(threshold, expect):
-
-    g0 = [0, 0, 1, 2]  # phenotype 1
-    g1 = [0, 1, 1, 2]  # phenotype 1
-    g2 = [0, 1, 2, 2]  # phenotype 1
-    g3 = [0, 0, 2, 3]  # phenotype 2
-    g4 = [0, 2, 3, 4]  # phenotype 3
-    genotypes = np.array([g0, g1, g2, g3, g4])
-
-    t0 = genotypes[[3, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
-    t1 = genotypes[[3, 2, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
-    t2 = genotypes[[0, 3, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
-    t3 = genotypes[[3, 3, 4, 4, 4, 3, 4, 4, 4, 4]]  # 3:7
-    trace = GenotypeAllelesMultiTrace(
-        genotypes=np.array([t0, t1, t2, t3]), llks=np.ones((4, 10))
-    )
-    actual = trace.replicate_incongruence(threshold)
-    assert actual == expect

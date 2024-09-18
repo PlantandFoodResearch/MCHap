@@ -8,7 +8,18 @@ from mchap.encoding import integer
 
 @pytest.mark.parametrize(
     "n,k",
-    [(0, 0), (20, 4), (100, 3), (30, 20), (1, 1), (2, 7), (7, 2), (87, 4)],
+    [
+        (0, 0),
+        (20, 4),
+        (100, 3),
+        (111, 5),
+        (30, 20),
+        (30, 21),
+        (1, 1),
+        (2, 7),
+        (7, 2),
+        (87, 4),
+    ],
 )
 def test_comb(n, k):
     assert jitutils.comb(n, k) == comb(n, k, exact=True)

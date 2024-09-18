@@ -1,0 +1,15 @@
+usage: Split MCHap haplotype calls into phased blocks of basis SNVs.
+       [-h] haplotypes
+
+positional arguments:
+  haplotypes  VCF file containing haplotype variants to be atomized. This file
+              must contain INFO/SNVPOS. The INFO/DP and FORMAT/DP fields will
+              be calculated from FORMAT/SNVDP if present in the input VCF
+              file. The INFO/ACP and FORMAT/DS fields will be calculated from
+              FORMAT/ACP or FORMAT/AFP if either is present in the input VCF
+              file. Note that the FORMAT/ACP or FORMAT/AFP fields from the
+              input VCF file will be normalized in the event that they do not
+              sum to ploidy or one respectively.
+
+options:
+  -h, --help  show this help message and exit

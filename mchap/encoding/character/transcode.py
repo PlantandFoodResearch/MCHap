@@ -23,7 +23,7 @@ def as_allelic(array, alleles=None, dtype=np.int8):
 
     """
     if not isinstance(array, np.ndarray):
-        array = np.array(array, copy=False)
+        array = np.asarray(array)
 
     if np.ndim(array) == 1:
         n_seq, n_pos = 1, len(array)

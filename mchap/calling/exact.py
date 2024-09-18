@@ -59,24 +59,24 @@ def _call_posterior_mode(
     return mode_genotype, mode_llk, mode_ljoint, total_ljoint
 
 
-def _phenotype_log_joint(
+def _genotype_support_log_joint(
     genotype, reads, haplotypes, read_counts=None, inbreeding=0, frequencies=None
 ):
-    """Calculate phenotype posterior probability from a genotype and a set of known haplotypes."""
+    """Calculate genotype support posterior probability from a genotype and a set of known haplotypes."""
     ploidy = len(genotype)
     # unique alleles
-    phenotype = np.unique(genotype)
-    n_genotype_alleles = len(phenotype)
+    support = np.unique(genotype)
+    n_genotype_alleles = len(support)
     remainder = ploidy - n_genotype_alleles
     # possible dosage configurations
-    options = list(combinations_with_replacement(phenotype, remainder))
+    options = list(combinations_with_replacement(support, remainder))
 
     tmp_genotype = np.zeros(ploidy, dtype=genotype.dtype)
 
-    phenotype_ljoint = -np.inf
+    support_ljoint = -np.inf
     for opt in options:
         # get sorted genotype alleles
-        tmp_genotype[0:n_genotype_alleles] = phenotype
+        tmp_genotype[0:n_genotype_alleles] = support
         tmp_genotype[n_genotype_alleles:ploidy] = opt
         tmp_genotype = np.sort(tmp_genotype)
         # log likelihood
@@ -95,9 +95,9 @@ def _phenotype_log_joint(
         # scaled log posterior
         ljoint = llk + lpr
 
-        # phenotype posterior is sum of its genotype posteriors
-        phenotype_ljoint = add_log_prob(phenotype_ljoint, ljoint)
-    return phenotype_ljoint
+        # support posterior is sum of its genotype posteriors
+        support_ljoint = add_log_prob(support_ljoint, ljoint)
+    return support_ljoint
 
 
 @njit(cache=True)
@@ -153,7 +153,7 @@ def posterior_mode(
     read_counts=None,
     inbreeding=0,
     frequencies=None,
-    return_phenotype_prob=False,
+    return_support_prob=False,
     return_posterior_frequencies=False,
     return_posterior_occurrence=False,
 ):
@@ -176,8 +176,8 @@ def posterior_mode(
         Expected inbreeding coefficient of genotype.
     frequencies : ndarray, float , shape (n_haplotypes, )
         Optional prior frequencies for each haplotype allele.
-    return_phenotype_prob : bool
-        Return the mode phenotype probability (default = false).
+    return_support_prob : bool
+        Return the mode genotype support probability (default = false).
     return_posterior_frequencies : bool
         Return posterior mean allele frequencies (default = false).
     return_posterior_occurrence : bool
@@ -191,8 +191,8 @@ def posterior_mode(
         Log likelihood of the mode genotype.
     mode_probability : float
         Posterior probability of the mode genotype.
-    mode_phenotype_probability : float
-        Sum posterior probability of all genotypes within the mode phenotype.
+    mode_support_probability : float
+        Sum posterior probability of all genotypes within the mode genotype support.
     mean_allele_frequencies : ndarray, float, shape (n_alleles, )
         Posterior mean allele frequencies.
     allele_occurrence_probability : ndarray, float, shape (n_alleles, )
@@ -217,8 +217,8 @@ def posterior_mode(
 
     result = [mode_genotype, mode_llk, mode_genotype_prob]
 
-    if return_phenotype_prob:
-        phenotype_ljoint = _phenotype_log_joint(
+    if return_support_prob:
+        support_ljoint = _genotype_support_log_joint(
             genotype=mode_genotype,
             reads=reads,
             haplotypes=haplotypes,
@@ -226,8 +226,8 @@ def posterior_mode(
             inbreeding=inbreeding,
             frequencies=frequencies,
         )
-        mode_phenotype_prob = np.exp(phenotype_ljoint - total_ljoint)
-        result.append(mode_phenotype_prob)
+        mode_support_prob = np.exp(support_ljoint - total_ljoint)
+        result.append(mode_support_prob)
 
     if return_posterior_frequencies or return_posterior_occurrence:
         mean_frequencies, occurrence = _posterior_allele_frequencies(
@@ -331,7 +331,7 @@ def genotype_posteriors(
 
 
 @njit(cache=True)
-def posterior_allele_frequencies(posteriors, ploidy, n_alleles, dosage=False):
+def posterior_allele_frequencies(posteriors, ploidy, n_alleles):
     """Calculate posterior mean allele frequencies of every allele
     for a given posteriors distribution.
 
@@ -343,37 +343,35 @@ def posterior_allele_frequencies(posteriors, ploidy, n_alleles, dosage=False):
         Ploidy of organism.
     n_alleles : int
         Total number of possible (haplotype) alleles at this locus.
-    dosage : bool
-        If true returns the posterior mean dosage rather than allele frequencies.
 
     Returns
     -------
     mean_allele_frequencies : ndarray, float, shape (n_alleles, )
         Posterior mean allele frequencies.
+    posterior_allele_counts : ndarray, float, shape (n_alleles, )
+        Posterior allele counts
     allele_occurrence_probability : ndarray, float, shape (n_alleles, )
         Posterior probability of alleles occurring at any dosage.
     """
     n_genotypes = len(posteriors)
-    freqs = np.zeros(n_alleles, dtype=np.float64)
+    counts = np.zeros(n_alleles, dtype=np.float64)
     occur = np.zeros(n_alleles, dtype=np.float64)
     genotype = np.zeros(ploidy, np.int64)
     for i in range(n_genotypes):
         p = posteriors[i]
         for j in range(ploidy):
             a = genotype[j]
-            freqs[a] += p
+            counts[a] += p
             if j == 0:
                 occur[a] += p
             elif a != genotype[j - 1]:
                 occur[a] += p
         increment_genotype(genotype)
-    if dosage is False:
-        freqs /= ploidy
-    return freqs, occur
+    return counts / ploidy, counts, occur
 
 
 def alternate_dosage_posteriors(genotype_alleles, probabilities):
-    """Extract alternate dosage probabilities based on allelic phenotype.
+    """Extract alternate dosage probabilities based on genotype support.
 
     Parameters
     ----------
@@ -384,22 +382,22 @@ def alternate_dosage_posteriors(genotype_alleles, probabilities):
 
     Returns
     -------
-    phenotype_posteriors : ndarray, float, shape (n_alternate_dosages, )
+    support_posteriors : ndarray, float, shape (n_alternate_dosages, )
         Posterior probability of each alternate dosage in order.
 
     """
     ploidy = len(genotype_alleles)
-    phenotype = np.unique(genotype_alleles)
-    n_alleles = len(phenotype)
+    support = np.unique(genotype_alleles)
+    n_alleles = len(support)
     array = np.zeros(ploidy, dtype=genotype_alleles.dtype)
     remainder = ploidy - n_alleles
-    options = list(combinations_with_replacement(phenotype, remainder))
+    options = list(combinations_with_replacement(support, remainder))
     n_options = len(options)
     probs = np.zeros(n_options, float)
     indices = np.zeros(n_options, int)
     genotypes = np.zeros((n_options, ploidy), int)
     for i, opt in enumerate(options):
-        array[0:n_alleles] = phenotype
+        array[0:n_alleles] = support
         array[n_alleles:ploidy] = opt
         array = np.sort(array)
         genotypes[i] = array.copy()

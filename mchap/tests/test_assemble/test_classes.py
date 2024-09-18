@@ -27,10 +27,10 @@ def test_PosteriorGenotypeDistribution():
     np.testing.assert_array_equal(expect_gen, actual_gen)
     assert expect_prob, actual_prob
 
-    # phenotype is combination of genotypes with same haplotypes
+    # support is combination of genotypes with same haplotypes
     expect_phen, expect_probs = genotypes[[1, 2]], probabilities[[1, 2]]
-    phenotype = dist.mode_phenotype()
-    actual_phen, actual_probs = phenotype.genotypes, phenotype.probabilities
+    support = dist.mode_genotype_support()
+    actual_phen, actual_probs = support.genotypes, support.probabilities
     np.testing.assert_array_equal(expect_phen, actual_phen)
     np.testing.assert_array_equal(expect_probs, actual_probs)
 
@@ -75,10 +75,10 @@ def test_GenotypeMultiTrace():
 @pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 1)])
 def test_GenotypeMultiTrace__replicate_incongruence(threshold, expect):
     haplotypes = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
-    g0 = haplotypes[[0, 0, 1, 2]]  # phenotype 1
-    g1 = haplotypes[[0, 1, 1, 2]]  # phenotype 1
-    g2 = haplotypes[[0, 1, 2, 2]]  # phenotype 1
-    g3 = haplotypes[[0, 0, 2, 2]]  # phenotype 2
+    g0 = haplotypes[[0, 0, 1, 2]]  # support 1
+    g1 = haplotypes[[0, 1, 1, 2]]  # support 1
+    g2 = haplotypes[[0, 1, 2, 2]]  # support 1
+    g3 = haplotypes[[0, 0, 2, 2]]  # support 2
     genotypes = np.array([g0, g1, g2, g3])
 
     t0 = genotypes[[0, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 10:0
@@ -105,11 +105,11 @@ def test_GenotypeMultiTrace__replicate_incongruence__cnv(threshold, expect):
         ]
     )
 
-    g0 = haplotypes[[0, 0, 1, 2]]  # phenotype 1
-    g1 = haplotypes[[0, 1, 1, 2]]  # phenotype 1
-    g2 = haplotypes[[0, 1, 2, 2]]  # phenotype 1
-    g3 = haplotypes[[0, 0, 2, 3]]  # phenotype 2
-    g4 = haplotypes[[0, 2, 3, 4]]  # phenotype 3
+    g0 = haplotypes[[0, 0, 1, 2]]  # support 1
+    g1 = haplotypes[[0, 1, 1, 2]]  # support 1
+    g2 = haplotypes[[0, 1, 2, 2]]  # support 1
+    g3 = haplotypes[[0, 0, 2, 3]]  # support 2
+    g4 = haplotypes[[0, 2, 3, 4]]  # support 3
     genotypes = np.array([g0, g1, g2, g3, g4])
 
     t0 = genotypes[[3, 1, 0, 1, 2, 0, 1, 1, 0, 1]]  # 9:1
@@ -123,7 +123,7 @@ def test_GenotypeMultiTrace__replicate_incongruence__cnv(threshold, expect):
     assert actual == expect
 
 
-def test_PhenotypeDistribution___mode_genotype():
+def test_GenotypeSupportDistribution___mode_genotype():
     array = np.array(
         [
             [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 1, 1]],
@@ -134,7 +134,7 @@ def test_PhenotypeDistribution___mode_genotype():
     )
     probs = np.array([0.65, 0.2, 0.1])
     expect = (array[0], probs[0])
-    dist = classes.PhenotypeDistribution(array, probs)
+    dist = classes.GenotypeSupportDistribution(array, probs)
     actual = dist.mode_genotype()
     np.testing.assert_array_equal(expect[0], actual[0])
     assert expect[1] == actual[1]
@@ -247,7 +247,7 @@ def test_PosteriorGenotypeDistribution__allele_frequencies():
         ),
     ],
 )
-def test_PhenotypeDistribution___call_phenotype(threshold, expect):
+def test_GenotypeSupportDistribution___call_genotype_support(threshold, expect):
     array = np.array(
         [
             [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 1, 1]],
@@ -257,7 +257,7 @@ def test_PhenotypeDistribution___call_phenotype(threshold, expect):
         dtype=np.int8,
     )
     probs = np.array([0.65, 0.2, 0.1])
-    dist = classes.PhenotypeDistribution(array, probs)
-    actual = dist.call_phenotype(threshold=threshold)
+    dist = classes.GenotypeSupportDistribution(array, probs)
+    actual = dist.call_genotype_support(threshold=threshold)
     np.testing.assert_array_equal(expect[0], actual[0])
     np.testing.assert_almost_equal(expect[1], actual[1])

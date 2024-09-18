@@ -3,6 +3,24 @@
 ## Unreleased 
 
 
+## Beta v0.10.0 
+
+New Features:
+- New experimental `atomize` tool for splitting haplotypes into basis SNVs #72. 
+- New experimental `call-pedigree` tool fo pedigree informed genotype calling.
+- Optionally specify just the `INFO` or `FORMAT` variant of a optional VCF field.
+- Use `setuptools_scm` for versioning #179.
+
+VCF Changes:
+- Renamed `PHQ` and `PHPM` to `SQ` and `SPM` for clarity.
+- Added `INFO/UAN` field for number of unique alleles called #174.
+- Added `INFO/MCI` field for proportion of sample with Markov Chain incongruence.
+- Added optional fields #174:
+    * `INFO/AOPSUM` (sum of `FORMAT/AOP`).
+    * `INFO/ACP` and `FORMAT/ACP`.
+    * `INFO/SNVDP` and `FORMAT/SNVDP`.
+
+
 ## Beta v0.9.3
 
 Bug Fixes:

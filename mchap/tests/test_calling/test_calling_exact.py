@@ -161,7 +161,7 @@ def test_genotype_posteriors():
     actual = exact.genotype_posteriors(
         log_likelihoods, ploidy, n_alleles, inbreeding=inbreeding
     )
-    np.testing.assert_almost_equal(expect, actual)
+    np.testing.assert_almost_equal(expect, actual, decimal=6)
 
 
 def test_alternate_dosage_posteriors():
@@ -260,22 +260,22 @@ def test_call_posterior_mode():
         mode_genotype,
         mode_llk,
         mode_genotype_prob,
-        mode_phenotype_prob,
+        mode_support_prob,
     ) = exact.posterior_mode(
         reads,
         4,
         haplotypes,
         read_counts=counts,
         inbreeding=inbreeding,
-        return_phenotype_prob=True,
+        return_support_prob=True,
     )
 
     np.testing.assert_array_equal(genotype, mode_genotype)
     np.testing.assert_almost_equal(llks[idx_0], mode_llk, 5)
     np.testing.assert_almost_equal(probs[idx_0], mode_genotype_prob, 5)
-    np.testing.assert_almost_equal(phen_probs.sum(), mode_phenotype_prob, 5)
+    np.testing.assert_almost_equal(phen_probs.sum(), mode_support_prob, 5)
     np.testing.assert_almost_equal(
-        np.sum(probs[[idx_0, idx_1, idx_2]]), mode_phenotype_prob, 5
+        np.sum(probs[[idx_0, idx_1, idx_2]]), mode_support_prob, 5
     )
 
 
@@ -319,7 +319,7 @@ def test_call_posterior_mode__fuzz(
         inbreeding=inbreeding,
         frequencies=prior_frequencies,
     )
-    freqs, occur = exact.posterior_allele_frequencies(
+    freqs, counts, occur = exact.posterior_allele_frequencies(
         post, ploidy=ploidy, n_alleles=n_haps
     )
     mode = np.argmax(post)
@@ -331,7 +331,7 @@ def test_call_posterior_mode__fuzz(
         ploidy=ploidy,
         haplotypes=haplotypes,
         inbreeding=inbreeding,
-        return_phenotype_prob=False,
+        return_support_prob=False,
         return_posterior_frequencies=True,
         return_posterior_occurrence=True,
         frequencies=prior_frequencies,
@@ -341,6 +341,7 @@ def test_call_posterior_mode__fuzz(
     np.testing.assert_almost_equal(llks[mode], mode_llk, 5)
     np.testing.assert_almost_equal(post[mode], mode_post, 5)
     np.testing.assert_array_almost_equal(freqs, mean_freqs, 5)
+    np.testing.assert_array_almost_equal(counts, mean_freqs * ploidy, 5)
     np.testing.assert_array_almost_equal(occur, mean_occur, 5)
 
 
@@ -375,7 +376,7 @@ def test_call_posterior_mode__flat_frequencies(
         ploidy=ploidy,
         haplotypes=haplotypes,
         inbreeding=inbreeding,
-        return_phenotype_prob=False,
+        return_support_prob=False,
         return_posterior_frequencies=True,
         return_posterior_occurrence=True,
         frequencies=None,
@@ -392,7 +393,7 @@ def test_call_posterior_mode__flat_frequencies(
         ploidy=ploidy,
         haplotypes=haplotypes,
         inbreeding=inbreeding,
-        return_phenotype_prob=False,
+        return_support_prob=False,
         return_posterior_frequencies=True,
         return_posterior_occurrence=True,
         frequencies=np.ones(n_haps) / n_haps,

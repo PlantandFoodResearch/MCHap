@@ -11,9 +11,11 @@
 ##FILTER=<ID=NOA,Description="No observed alleles at locus">
 ##FILTER=<ID=AF0,Description="All alleles have prior allele frequency of zero">
 ##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
+##INFO=<ID=UAN,Number=1,Type=Integer,Description="Total number of unique alleles in called genotypes">
 ##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
 ##INFO=<ID=REFMASKED,Number=0,Type=Flag,Description="Reference allele is masked">
 ##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of samples with data">
+##INFO=<ID=MCI,Number=1,Type=Integer,Description="Number of samples with incongruent Markov chain replicates">
 ##INFO=<ID=DP,Number=1,Type=Integer,Description="Combined depth across samples">
 ##INFO=<ID=RCOUNT,Number=1,Type=Integer,Description="Total number of observed reads across all samples">
 ##INFO=<ID=END,Number=1,Type=Integer,Description="End position on CHROM">
@@ -23,20 +25,20 @@
 ##INFO=<ID=AFP,Number=R,Type=Float,Description="Posterior mean allele frequencies">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality">
-##FORMAT=<ID=PHQ,Number=1,Type=Integer,Description="Phenotype quality">
+##FORMAT=<ID=SQ,Number=1,Type=Integer,Description="Genotype support quality">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">
 ##FORMAT=<ID=RCOUNT,Number=1,Type=Integer,Description="Total count of read pairs within haplotype interval">
 ##FORMAT=<ID=RCALLS,Number=1,Type=Integer,Description="Total count of read base calls matching a known variant">
 ##FORMAT=<ID=MEC,Number=1,Type=Integer,Description="Minimum error correction">
 ##FORMAT=<ID=MECP,Number=1,Type=Float,Description="Minimum error correction proportion">
 ##FORMAT=<ID=GPM,Number=1,Type=Float,Description="Genotype posterior mode probability">
-##FORMAT=<ID=PHPM,Number=1,Type=Float,Description="Phenotype posterior mode probability">
+##FORMAT=<ID=SPM,Number=1,Type=Float,Description="Genotype support posterior mode probability">
 ##FORMAT=<ID=MCI,Number=1,Type=Integer,Description="Replicate Markov-chain incongruence, 0 = none, 1 = incongruence, 2 = putative CNV">
 ##FORMAT=<ID=AFP,Number=R,Type=Float,Description="Posterior mean allele frequencies">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1	SAMPLE2	SAMPLE3
-CHR1	6	CHR1_05_25	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	PASS	AN=12;AC=3,2;NS=3;DP=159;RCOUNT=240;END=25;NVAR=3;SNVPOS=2,11,18;AFPRIOR=0.09,0.5,0.41;AFP=0.534,0.263,0.203	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/1/2:6:60:13:20:40:0:0:0.759:1:.:0.44,0.283,0.277	0/0/1/1:60:60:133:200:400:0:0:1:1:.:0.5,0.5,0	0/0/0/2:5:16:13:20:40:0:0:0.65:0.975:.:0.662,0.006,0.331
-CHR1	31	CHR1_30_50	AAAAAAAAAAAAAAAAAAAA	.	.	PASS	AN=12;AC=.;NS=3;DP=.;RCOUNT=288;END=50;NVAR=0;SNVPOS=.;AFPRIOR=1;AFP=1	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/0/0:60:60:.:24:0:0:.:1:1:.:1	0/0/0/0:60:60:.:240:0:0:.:1:1:.:1	0/0/0/0:60:60:.:24:0:0:.:1:1:.:1
-CHR2	11	CHR2_10_30	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAGAAAAAAAAAA,AAAAAAAAATAAAAAAAAAA,AAAATAAAAGAAAAAAAAAA	.	PASS	AN=12;AC=3,2,1;NS=3;DP=168;RCOUNT=288;END=30;NVAR=2;SNVPOS=5,10;AFPRIOR=0.487,0.238,0.18,0.094;AFP=0.504,0.237,0.172,0.087	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/0/2:11:18:14:24:28:0:0:0.922:0.985:.:0.731,0.003,0.266,0.001	0/0/1/2:60:60:140:240:280:0:0:1:1:.:0.5,0.25,0.25,0	0/1/1/3:8:22:14:24:28:0:0:0.827:0.994:.:0.281,0.457,0.001,0.26
-CHR3	21	CHR3_20_40	AAAAAAAAAAAAAAAAAAAA	.	.	PASS	AN=12;AC=.;NS=3;DP=.;RCOUNT=0;END=40;NVAR=0;SNVPOS=.;AFPRIOR=1;AFP=1	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	0/0/0/0:60:60:.:0:0:0:.:1:1:.:1	0/0/0/0:60:60:.:0:0:0:.:1:1:.:1	0/0/0/0:60:60:.:0:0:0:.:1:1:.:1
-CHR1	31	CHR1_30_50_MASK	AAAAAAAAAAAAAAAAAAAA	.	.	NOA	AN=0;AC=.;REFMASKED;NS=0;DP=.;RCOUNT=288;END=50;NVAR=0;SNVPOS=.;AFPRIOR=.;AFP=.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	./././.:.:.:.:24:0:0:.:.:.:.:.	./././.:.:.:.:240:0:0:.:.:.:.:.	./././.:.:.:.:24:0:0:.:.:.:.:.
-CHR1	6	CHR1_05_25_ZERO	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	AF0	AN=0;AC=0,0;NS=0;DP=159;RCOUNT=240;END=25;NVAR=3;SNVPOS=2,11,18;AFPRIOR=.,.,.;AFP=.,.,.	GT:GQ:PHQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:PHPM:MCI:AFP	./././.:.:.:13:20:40:40:1:.:.:.:.	./././.:.:.:133:200:400:400:1:.:.:.:.	./././.:.:.:13:20:40:40:1:.:.:.:.
+CHR1	6	CHR1_05_25	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	PASS	AN=12;UAN=3;AC=3,2;NS=3;MCI=0;DP=159;RCOUNT=240;END=25;NVAR=3;SNVPOS=2,11,18;AFPRIOR=0.09,0.5,0.41;AFP=0.534,0.263,0.203	GT:GQ:SQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:SPM:MCI:AFP	0/0/1/2:6:60:13:20:40:0:0:0.759:1:.:0.44,0.283,0.277	0/0/1/1:60:60:133:200:400:0:0:1:1:.:0.5,0.5,0	0/0/0/2:5:16:13:20:40:0:0:0.65:0.975:.:0.662,0.006,0.331
+CHR1	31	CHR1_30_50	AAAAAAAAAAAAAAAAAAAA	.	.	PASS	AN=12;UAN=1;AC=.;NS=3;MCI=0;DP=.;RCOUNT=288;END=50;NVAR=0;SNVPOS=.;AFPRIOR=1;AFP=1	GT:GQ:SQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:SPM:MCI:AFP	0/0/0/0:60:60:.:24:0:0:.:1:1:.:1	0/0/0/0:60:60:.:240:0:0:.:1:1:.:1	0/0/0/0:60:60:.:24:0:0:.:1:1:.:1
+CHR2	11	CHR2_10_30	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAGAAAAAAAAAA,AAAAAAAAATAAAAAAAAAA,AAAATAAAAGAAAAAAAAAA	.	PASS	AN=12;UAN=4;AC=3,2,1;NS=3;MCI=0;DP=168;RCOUNT=288;END=30;NVAR=2;SNVPOS=5,10;AFPRIOR=0.487,0.238,0.18,0.094;AFP=0.504,0.236,0.172,0.087	GT:GQ:SQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:SPM:MCI:AFP	0/0/0/2:11:18:14:24:28:0:0:0.922:0.985:.:0.731,0.003,0.266,0.001	0/0/1/2:60:60:140:240:280:0:0:1:1:.:0.5,0.25,0.25,0	0/1/1/3:8:22:14:24:28:0:0:0.827:0.994:.:0.281,0.457,0.001,0.26
+CHR3	21	CHR3_20_40	AAAAAAAAAAAAAAAAAAAA	.	.	PASS	AN=12;UAN=1;AC=.;NS=3;MCI=0;DP=.;RCOUNT=0;END=40;NVAR=0;SNVPOS=.;AFPRIOR=1;AFP=1	GT:GQ:SQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:SPM:MCI:AFP	0/0/0/0:60:60:.:0:0:0:.:1:1:.:1	0/0/0/0:60:60:.:0:0:0:.:1:1:.:1	0/0/0/0:60:60:.:0:0:0:.:1:1:.:1
+CHR1	31	CHR1_30_50_MASK	AAAAAAAAAAAAAAAAAAAA	.	.	NOA	AN=0;UAN=0;AC=.;REFMASKED;NS=0;MCI=0;DP=.;RCOUNT=288;END=50;NVAR=0;SNVPOS=.;AFPRIOR=.;AFP=.	GT:GQ:SQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:SPM:MCI:AFP	./././.:.:.:.:24:0:.:.:.:.:.:.	./././.:.:.:.:240:0:.:.:.:.:.:.	./././.:.:.:.:24:0:.:.:.:.:.:.
+CHR1	6	CHR1_05_25_ZERO	AAAAAAAAAAAAAAAAAAAA	AAAAAAAAAAGAAAAAATAA,ACAAAAAAAAGAAAAAACAA	.	AF0	AN=0;UAN=0;AC=0,0;NS=0;MCI=0;DP=159;RCOUNT=240;END=25;NVAR=3;SNVPOS=2,11,18;AFPRIOR=.,.,.;AFP=.,.,.	GT:GQ:SQ:DP:RCOUNT:RCALLS:MEC:MECP:GPM:SPM:MCI:AFP	./././.:.:.:13:20:40:.:.:.:.:.:.	./././.:.:.:133:200:400:.:.:.:.:.:.	./././.:.:.:13:20:40:.:.:.:.:.:.

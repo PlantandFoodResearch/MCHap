@@ -200,7 +200,7 @@ def _ord_to_index(a):
 
 
 def bases_to_indices(alleles):
-    alleles = np.array(alleles, copy=False, dtype="|S1")
+    alleles = np.asarray(alleles, dtype="|S1")
     alleles.dtype = np.int8
     return _ord_to_index(alleles)
 

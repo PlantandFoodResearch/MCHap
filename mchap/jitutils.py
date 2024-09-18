@@ -193,7 +193,11 @@ def _greatest_common_denominatior(x: int, y: int) -> int:
 
 
 @numba.njit(cache=True)
-def comb(n: int, k: int) -> int:
+def _comb(n: int, k: int) -> int:
+    if n < 0:
+        raise ValueError("n must be a non-negative integer")
+    if k < 0:
+        raise ValueError("k must be a non-negative integer")
     if k > n:
         return 0
     r = 1
@@ -206,10 +210,44 @@ def comb(n: int, k: int) -> int:
     return r
 
 
+_COMB_CACHE = np.zeros((100, 12), np.int64)
+for n in range(_COMB_CACHE.shape[0]):
+    for k in range(_COMB_CACHE.shape[1]):
+        _COMB_CACHE[n, k] = _comb(n, k)
+
+
 @numba.njit(cache=True)
-def comb_with_replacement(n: int, k: int) -> int:
+def comb(n: int, k: int) -> int:
+    cache_n, cache_k = _COMB_CACHE.shape
+    if (n < cache_n) and (k < cache_k):
+        return _COMB_CACHE[n, k]
+    else:
+        return _comb(n, k)
+
+
+@numba.njit(cache=True)
+def _comb_with_replacement(n: int, k: int) -> int:
+    if n < 0:
+        raise ValueError("n must be a non-negative integer")
+    if n == 0 and k == 0:
+        return 0
     n = n + k - 1
     return comb(n, k)
+
+
+_COMB_WITH_REPLACEMENT_CACHE = np.zeros((100, 12), np.int64)
+for n in range(_COMB_WITH_REPLACEMENT_CACHE.shape[0]):
+    for k in range(_COMB_WITH_REPLACEMENT_CACHE.shape[1]):
+        _COMB_WITH_REPLACEMENT_CACHE[n, k] = _comb_with_replacement(n, k)
+
+
+@numba.njit(cache=True)
+def comb_with_replacement(n: int, k: int) -> int:
+    cache_n, cache_k = _COMB_WITH_REPLACEMENT_CACHE.shape
+    if (n < cache_n) and (k < cache_k):
+        return _COMB_WITH_REPLACEMENT_CACHE[n, k]
+    else:
+        return _comb_with_replacement(n, k)
 
 
 @numba.njit(cache=True)

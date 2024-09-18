@@ -283,7 +283,7 @@ def test_Program__header():
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            [],
+            ["--report", "SNVDP"],
             "simple.output.mixed_depth.assemble.vcf",
         ),
         (
@@ -293,7 +293,12 @@ def test_Program__header():
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--report", "AOP"],
+            ["--report", "ACP"],
+            "simple.output.mixed_depth.assemble.counts.vcf",
+        ),
+        (
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            ["--report", "AOP", "AOPSUM"],
             "simple.output.mixed_depth.assemble.occurrence.vcf",
         ),
         (
@@ -398,6 +403,9 @@ def test_Program__run_stdout(bams, cli_extra, output_vcf, cache_threshold, n_cor
         # file paths will make full line differ
         if act.startswith("##commandline"):
             assert exp.startswith("##commandline")
+        # versions will differ
+        elif act.startswith("##source=mchap"):
+            assert exp.startswith("##source=mchap")
         elif act.startswith("##fileDate"):
             # new date should be greater than test vcf date
             assert exp.startswith("##fileDate")
@@ -469,6 +477,8 @@ def test_Program__run_stdout__region(region, region_id, cache_threshold):
         "11",
         "--mcmc-llk-cache-threshold",
         str(cache_threshold),
+        "--report",
+        "SNVDP",
     ]
 
     prog = program.cli(command)
@@ -503,6 +513,9 @@ def test_Program__run_stdout__region(region, region_id, cache_threshold):
         # file paths will make full line differ
         if act.startswith("##commandline"):
             assert exp.startswith("##commandline")
+        # versions will differ
+        elif act.startswith("##source=mchap"):
+            assert exp.startswith("##source=mchap")
         elif act.startswith("##fileDate"):
             # new date should be greater than test vcf date
             assert exp.startswith("##fileDate")

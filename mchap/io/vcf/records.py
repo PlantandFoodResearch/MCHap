@@ -2,7 +2,7 @@ import numpy as np
 from mchap.io.vcf.util import vcfstr
 
 
-def format_info_field(**kwargs):
+def format_info_field(precision=3, **kwargs):
     """Format key-value pairs into a VCF info field.
 
     Parameters
@@ -23,11 +23,11 @@ def format_info_field(**kwargs):
             if v is True:
                 parts.append(k)
         else:
-            parts.append(template.format(k, vcfstr(v)))
+            parts.append(template.format(k, vcfstr(v, precision=precision)))
     return ";".join(parts)
 
 
-def format_sample_field(**kwargs):
+def format_sample_field(precision=3, **kwargs):
     """Format key-value pairs into a VCF format field.
 
     Parameters
@@ -40,6 +40,8 @@ def format_sample_field(**kwargs):
     string : str
         VCF format and sample columns.
     """
+    genotypes = kwargs["GT"]
+    kwargs["GT"] = ["/".join([str(a) if a >= 0 else "." for a in g]) for g in genotypes]
     fields, arrays = zip(*kwargs.items())
     fields = ":".join(fields)
     lengths = np.array([len(a) for a in arrays])
@@ -47,22 +49,22 @@ def format_sample_field(**kwargs):
     assert np.all(lengths == length)
     sample_data = np.empty(length, dtype="O")
     for i in range(length):
-        sample_data[i] = ":".join((vcfstr(a[i]) for a in arrays))
+        sample_data[i] = ":".join((vcfstr(a[i], precision=precision) for a in arrays))
     sample_data = "\t".join(sample_data)
     return "{}\t{}".format(fields, sample_data)
 
 
 def format_record(
-    *,
-    chrom=None,
-    pos=None,
-    id=None,
-    ref=None,
-    alt=None,
-    qual=None,
-    filter=None,
-    info=None,
-    format=None,
+    chrom,
+    pos,
+    id,
+    ref,
+    alt,
+    qual,
+    filter,
+    info,
+    format,
+    precision=3,
 ):
     """Format a VCF record line.
 
@@ -93,4 +95,4 @@ def format_record(
         VCF record line.
     """
     fields = [chrom, pos, id, ref, alt, qual, filter, info, format]
-    return "\t".join(vcfstr(f) for f in fields)
+    return "\t".join(vcfstr(f, precision=precision) for f in fields)

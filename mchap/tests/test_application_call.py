@@ -35,7 +35,7 @@ def local_file_path(name):
         (
             "simple.output.mixed_depth.assemble.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            [],
+            ["--report", "SNVDP"],
             "simple.output.mixed_depth.call.vcf",
         ),
         (
@@ -52,7 +52,17 @@ def local_file_path(name):
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
                 "--report",
+                "ACP",
+            ],
+            "simple.output.mixed_depth.call.counts.vcf",
+        ),
+        (
+            "simple.output.mixed_depth.assemble.vcf",
+            ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
+            [
+                "--report",
                 "AOP",
+                "AOPSUM",
             ],
             "simple.output.mixed_depth.call.occurrence.vcf",
         ),
@@ -184,6 +194,9 @@ def test_Program__run_stdout(input_vcf, bams, cli_extra, output_vcf, n_cores):
         # file paths will make full line differ
         if act.startswith("##commandline"):
             assert exp.startswith("##commandline")
+        # versions will differ
+        elif act.startswith("##source=mchap"):
+            assert exp.startswith("##source=mchap")
         elif act.startswith("##fileDate"):
             # new date should be greater than test vcf date
             assert exp.startswith("##fileDate")

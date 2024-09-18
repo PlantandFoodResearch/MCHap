@@ -233,7 +233,7 @@ def compound_step(
     llk_cache=None,
     step_type=0,
 ):
-    """MCMC sampler compound step for calling sample alleles from a set of known genotypes.
+    """MCMC sampler compound step for calling sample alleles from a set of known haplotypes.
 
     Parameters
     ----------
@@ -337,7 +337,7 @@ def mcmc_sampler(
     cache=False,
     step_type=0,
 ):
-    """MCMC simulation for calling sample alleles from a set of known genotypes.
+    """MCMC simulation for calling sample alleles from a set of known haplotypes.
 
     Parameters
     ----------

@@ -3,11 +3,10 @@ import numpy as np
 from dataclasses import dataclass
 import pysam
 import multiprocessing as mp
-from collections import OrderedDict
 
 from mchap import mset
 from mchap.constant import PFEIFFER_ERROR
-from mchap.encoding import character, integer
+from mchap.encoding import character
 from mchap.io import (
     Locus,
     extract_read_variants,
@@ -15,8 +14,9 @@ from mchap.io import (
     encode_read_distributions,
     vcf,
 )
-from mchap.io.vcf.infofields import HEADER_INFO_FIELDS
-from mchap.io.vcf.formatfields import HEADER_FORMAT_FIELDS
+import mchap.io.vcf.infofields as INFO
+import mchap.io.vcf.formatfields as FORMAT
+import mchap.io.vcf.columns as COLUMN
 
 import warnings
 
@@ -27,6 +27,8 @@ LOCUS_ASSEMBLY_ERROR = (
     "Exception encountered at locus: '{name}', '{contig}:{start}-{stop}'."
 )
 SAMPLE_ASSEMBLY_ERROR = "Exception encountered when assembling sample '{sample}'."
+
+KILL_SIGNAL = "MCHAP_KILL_SIGNAL"
 
 
 class LocusAssemblyError(Exception):
@@ -52,7 +54,8 @@ class program(object):
     skip_duplicates: bool = True
     skip_qcfail: bool = True
     skip_supplementary: bool = True
-    report_fields: list = ()
+    info_fields: list = None
+    format_fields: list = None
     n_cores: int = 1
     precision: int = 3
     random_seed: int = 42
@@ -66,35 +69,12 @@ class program(object):
         """
         raise NotImplementedError()
 
-    def info_fields(self):
-        infofields = [
-            "AN",
-            "AC",
-            "REFMASKED",
-            "NS",
-            "DP",
-            "RCOUNT",
-            "END",
-            "NVAR",
-            "SNVPOS",
-        ] + [f for f in ["AFPRIOR", "AFP", "AOP"] if f in self.report_fields]
-        return infofields
-
-    def format_fields(self):
-        formatfields = [
-            "GT",
-            "GQ",
-            "PHQ",
-            "DP",
-            "RCOUNT",
-            "RCALLS",
-            "MEC",
-            "MECP",
-            "GPM",
-            "PHPM",
-            "MCI",
-        ] + [f for f in ["AFP", "AOP", "DS", "GP", "GL"] if f in self.report_fields]
-        return formatfields
+    def require_AFP(self):
+        if {INFO.ACP, INFO.AFP, INFO.AOP, INFO.AOPSUM} & set(self.info_fields):
+            return True
+        if {FORMAT.ACP, FORMAT.AFP, FORMAT.AOP} & set(self.format_fields):
+            return True
+        return False
 
     def loci(self):
         raise NotImplementedError()
@@ -119,29 +99,36 @@ class program(object):
             vcf.filters.NOA,
             vcf.filters.AF0,
         ]
-        info_fields = [HEADER_INFO_FIELDS[field] for field in self.info_fields()]
-        format_fields = [HEADER_FORMAT_FIELDS[field] for field in self.format_fields()]
         columns = [vcf.headermeta.columns(self.samples)]
-        header = meta_fields + contigs + filters + info_fields + format_fields + columns
+        header = (
+            meta_fields
+            + contigs
+            + filters
+            + self.info_fields
+            + self.format_fields
+            + columns
+        )
         return [str(line) for line in header]
 
     def _locus_data(self, locus, sample_bams):
         """Generate a LocusAssemblyData object for a given locus
         to be populated with data relating to a single vcf record.
         """
-        infofields = self.info_fields()
-        formatfields = self.format_fields()
         return LocusAssemblyData(
             locus=locus,
             samples=self.samples,
             sample_bams=sample_bams,
             sample_ploidy=self.sample_ploidy,
             sample_inbreeding=self.sample_inbreeding,
-            infofields=infofields,
-            formatfields=formatfields,
+            read_calls=dict(),
+            read_dists=dict(),
+            read_counts=dict(),
+            infofields=self.info_fields.copy(),
+            formatfields=self.format_fields.copy(),
             columndata=dict(FILTER=list()),
-            infodata=dict(),
-            sampledata=dict(),
+            infodata={f: {} for f in INFO.ALL_FIELDS},
+            sampledata={f: {} for f in FORMAT.ALL_FIELDS},
+            precision=self.precision,
         )
 
     def encode_sample_reads(self, data):
@@ -150,23 +137,12 @@ class program(object):
         Parameters
         ----------
         data : LocusAssemblyData
-            With relevant locus, samples, sample_bams, and sample_inbreeding attributes.
 
         Returns
         -------
         data : LocusAssemblyData
-            With sampledata fields: "read_calls", "read_dists_unique", "read_dist_counts",
-            "DP", "RCOUNT", "RCALLS".
+            With sample read data.
         """
-        for field in [
-            "DP",
-            "RCOUNT",
-            "RCALLS",
-            "read_calls",
-            "read_dists_unique",
-            "read_dist_counts",
-        ]:
-            data.sampledata[field] = dict()
         locus = data.locus
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
@@ -192,24 +168,31 @@ class program(object):
                         )[name]
                         read_chars.append(chars)
                         read_quals.append(quals)
-                read_chars = np.concatenate(read_chars)
-                read_quals = np.concatenate(read_quals)
+                # merge bams
+                if len(pairs) > 0:
+                    # one or more bam files
+                    read_chars = np.concatenate(read_chars)
+                    read_quals = np.concatenate(read_quals)
+                else:
+                    # handle case of no bams (empty list)
+                    shape = (0, len(locus.variants))
+                    read_chars = np.empty(shape, dtype="U1")
+                    read_quals = np.empty(shape, dtype=np.int16)
 
                 # get read stats
                 read_count = read_chars.shape[0]
-                data.sampledata["RCOUNT"][sample] = read_count
+                data.sampledata[FORMAT.RCOUNT][sample] = read_count
                 read_variant_depth = character.depth(read_chars)
                 if len(read_variant_depth) == 0:
-                    # no variants to score depth
-                    data.sampledata["DP"][sample] = np.nan
-                else:
-                    data.sampledata["DP"][sample] = np.round(
-                        np.mean(read_variant_depth)
-                    )
+                    read_variant_depth = np.array(np.nan)
+                data.sampledata[FORMAT.DP][sample] = np.round(
+                    np.mean(read_variant_depth)
+                )
+                data.sampledata[FORMAT.SNVDP][sample] = np.round(read_variant_depth)
 
                 # encode reads as alleles and probabilities
                 read_calls = encode_read_alleles(locus, read_chars)
-                data.sampledata["read_calls"][sample] = read_calls
+                data.read_calls[sample] = read_calls
                 if self.ignore_base_phred_scores:
                     read_quals = None
                 read_dists = encode_read_distributions(
@@ -218,12 +201,12 @@ class program(object):
                     read_quals,
                     error_rate=self.base_error_rate,
                 )
-                data.sampledata["RCALLS"][sample] = np.sum(read_calls >= 0)
+                data.sampledata[FORMAT.RCALLS][sample] = np.sum(read_calls >= 0)
 
                 # de-duplicate reads
                 read_dists_unique, read_dist_counts = mset.unique_counts(read_dists)
-                data.sampledata["read_dists_unique"][sample] = read_dists_unique
-                data.sampledata["read_dist_counts"][sample] = read_dist_counts
+                data.read_dists[sample] = read_dists_unique
+                data.read_counts[sample] = read_dist_counts
 
             # end of try clause for specific sample
             except Exception as e:
@@ -234,106 +217,88 @@ class program(object):
     def call_sample_genotypes(self, data):
         raise NotImplementedError()
 
-    def sumarise_sample_genotypes(self, data):
-        """Computes some statistics comparing called genotypes and haplotypes
-        to initial read sequences.
-
-        Parameters
-        ----------
-        data : LocusAssemblyData
-            With sampledata fields: "alleles", "haplotypes", "read_calls".
-
-        Returns
-        -------
-        data : LocusAssemblyData
-            With sampledata fields: "GT" "MEC" "MECP".
-        """
-        for field in ["GT", "MEC", "MECP"]:
-            data.sampledata[field] = dict()
-        for sample in data.samples:
-            # wrap in try clause to pass sample info back with any exception
-            try:
-                alleles = data.sampledata["alleles"][sample]
-                genotype = data.sampledata["haplotypes"][sample]
-                read_calls = data.sampledata["read_calls"][sample]
-                gt = "/".join([str(a) if a >= 0 else "." for a in alleles])
-                mec = np.sum(integer.minimum_error_correction(read_calls, genotype))
-                mec_denom = np.sum(read_calls >= 0)
-                mecp = (
-                    np.round(mec / mec_denom, self.precision)
-                    if mec_denom > 0
-                    else np.nan
-                )
-                data.sampledata["GT"][sample] = gt
-                data.sampledata["MEC"][sample] = mec
-                data.sampledata["MECP"][sample] = mecp
-            except Exception as e:
-                message = SAMPLE_ASSEMBLY_ERROR.format(sample=sample)
-                raise SampleAssemblyError(message) from e
-        return data
-
     def sumarise_vcf_record(self, data):
         """Generate VCF record fields.
 
         Parameters
         ----------
         data : LocusAssemblyData
-            With sampledata fields: .
 
         Returns
         -------
         data : LocusAssemblyData
-            With infodata fields:
-            "END", "NVAR", "SNVPOS", "AC", "AN", "NS", "DP", "RCOUNT"
-            and "AFP" or "AOP" if specified.
         """
+        data.columndata[COLUMN.CHROM] = data.locus.contig
+        data.columndata[COLUMN.POS] = data.locus.start + 1  # 0-based BED to 1-based VCF
+        data.columndata[COLUMN.ID] = data.locus.name
+        data.columndata[COLUMN.QUAL] = np.nan  # TODO: calculate locus level QUAL
         # postions
-        data.infodata["END"] = data.locus.stop
-        data.infodata["NVAR"] = len(data.locus.variants)
-        data.infodata["SNVPOS"] = (
+        data.infodata[INFO.END] = data.locus.stop
+        data.infodata[INFO.NVAR] = len(data.locus.variants)
+        data.infodata[INFO.SNVPOS] = (
             np.subtract(data.locus.positions, data.locus.start) + 1
         )
         # if no filters applied then locus passed
-        if len(data.columndata["FILTER"]) == 0:
-            data.columndata["FILTER"] = vcf.filters.PASS.id
+        if len(data.columndata[COLUMN.FILTER]) == 0:
+            data.columndata[COLUMN.FILTER] = vcf.filters.PASS.id
         # alt allele counts
-        allele_counts = np.zeros(len(data.columndata["ALTS"]) + 1, int)
-        for array in data.sampledata["alleles"].values():
+        allele_counts = np.zeros(len(data.columndata[COLUMN.ALT]) + 1, int)
+        for array in data.sampledata[FORMAT.GT].values():
             for a in array:
                 # don't count null alleles
                 if a >= 0:
                     allele_counts[a] += 1
-        data.infodata["AC"] = allele_counts[1:]  # skip ref count
+        data.infodata[INFO.AC] = allele_counts[1:]  # skip ref count
         # total number of alleles in called genotypes
-        data.infodata["AN"] = np.sum(allele_counts)
+        data.infodata[INFO.AN] = np.sum(allele_counts)
+        # total number of unique alleles in called genotypes
+        data.infodata[INFO.UAN] = np.sum(allele_counts > 0)
         # number of called samples
-        data.infodata["NS"] = sum(
-            np.any(a >= 0) for a in data.sampledata["alleles"].values()
+        data.infodata[INFO.NS] = sum(
+            np.any(a >= 0) for a in data.sampledata[FORMAT.GT].values()
+        )
+        # number of samples with Markov chain incongruence
+        data.infodata[INFO.MCI] = sum(
+            mci > 0 for mci in data.sampledata[FORMAT.MCI].values()
         )
         # total read depth and allele depth
         if len(data.locus.variants) == 0:
             # it will be misleading to return a depth of 0 in this case
-            data.infodata["DP"] = np.nan
+            data.infodata[INFO.DP] = np.nan
         else:
-            data.infodata["DP"] = np.nansum(list(data.sampledata["DP"].values()))
+            data.infodata[INFO.DP] = np.nansum(
+                list(data.sampledata[FORMAT.DP].values())
+            )
         # total read count
-        data.infodata["RCOUNT"] = np.nansum(list(data.sampledata["RCOUNT"].values()))
-        # population mean posterior allele frequencies
-        if "AFP" in data.infofields:
-            # need to weight frequencies of each individual by ploidy
-            pop_ploidy = 0
-            pop_total = np.zeros(len(data.columndata["ALTS"]) + 1, float)
-            for sample, freqs in data.sampledata["AFP"].items():
-                ploidy = self.sample_ploidy[sample]
-                pop_ploidy += ploidy
-                pop_total += freqs * ploidy
-            data.infodata["AFP"] = (pop_total / pop_ploidy).round(self.precision)
-        if "AOP" in data.infofields:
-            prob_not_occurring = np.ones(len(data.columndata["ALTS"]) + 1, float)
-            for occur in data.sampledata["AOP"].values():
+        data.infodata[INFO.RCOUNT] = np.nansum(
+            list(data.sampledata[FORMAT.RCOUNT].values())
+        )
+        n_allele = len(data.columndata[COLUMN.ALT]) + 1
+        null_length_R = np.full(n_allele, np.nan)
+        if INFO.ACP in data.infofields:
+            _ACP = sum(data.sampledata[FORMAT.ACP].values())
+            _ACP = null_length_R if np.isnan(_ACP).all() else _ACP
+            data.infodata[INFO.ACP] = _ACP
+        if INFO.AFP in data.infofields:
+            # use ACP to weight frequencies of each individual by ploidy
+            _AFP = sum(data.sampledata[FORMAT.ACP].values()) / sum(
+                data.sample_ploidy.values()
+            )
+            _AFP = null_length_R if np.isnan(_AFP).all() else _AFP
+            data.infodata[INFO.AFP] = _AFP
+        if INFO.AOPSUM in data.infofields:
+            _AOPSUM = sum(data.sampledata[FORMAT.AOP].values())
+            _AOPSUM = null_length_R if np.isnan(_AOPSUM).all() else _AOPSUM
+            data.infodata[INFO.AOPSUM] = _AOPSUM
+        if INFO.AOP in data.infofields:
+            prob_not_occurring = np.ones(len(data.columndata[COLUMN.ALT]) + 1, float)
+            for occur in data.sampledata[FORMAT.AOP].values():
                 prob_not_occurring = prob_not_occurring * (1 - occur)
             prob_occurring = 1 - prob_not_occurring
-            data.infodata["AOP"] = prob_occurring.round(self.precision)
+            data.infodata[INFO.AOP] = prob_occurring
+        if INFO.SNVDP in data.infofields:
+            _SNVDP = sum(data.sampledata[FORMAT.SNVDP].values())
+            data.infodata[INFO.SNVDP] = _SNVDP
         return data
 
     def call_locus(self, locus, sample_bams):
@@ -344,14 +309,8 @@ class program(object):
         ----------
         locus
             Assembly target locus.
-        samples : list
-            Sample identifiers.
         sample_bams : dict
             Map for sample identifiers to bam path.
-        sample_ploidy : dict
-            Map of sample identifiers to ploidy.
-        sample_inbreeding : dict
-            Map of sample identifiers to inbreeding.
 
         Returns
         -------
@@ -362,7 +321,6 @@ class program(object):
         data = self._locus_data(locus, sample_bams)
         self.encode_sample_reads(data)
         self.call_sample_genotypes(data)
-        self.sumarise_sample_genotypes(data)
         self.sumarise_vcf_record(data)
         return data.format_vcf_record()
 
@@ -394,7 +352,7 @@ class program(object):
     def _writer(self, queue):
         while True:
             line = queue.get()
-            if line == "KILL":
+            if line == KILL_SIGNAL:
                 break
             sys.stdout.write(line + "\n")
             sys.stdout.flush()
@@ -426,7 +384,7 @@ class program(object):
         for job in jobs:
             job.get()
 
-        queue.put("KILL")
+        queue.put(KILL_SIGNAL)
         pool.close()
         pool.join()
 
@@ -444,33 +402,34 @@ class LocusAssemblyData(object):
     sample_bams: dict
     sample_ploidy: dict
     sample_inbreeding: dict
+    read_calls: dict
+    read_dists: dict
+    read_counts: dict
     infofields: list
     formatfields: list
     columndata: dict
     infodata: dict
     sampledata: dict
+    precision: float = 3
 
     def _sampledata_as_list(self, field):
-        data = self.sampledata.get(field, dict())
+        data = self.sampledata[field]
         return [data.get(s) for s in self.samples]
 
     def format_vcf_record(self):
-        info_data = OrderedDict()
-        for field in self.infofields:
-            info_data[field] = self.infodata.get(field)
-        info_string = vcf.format_info_field(**info_data)
-        format_data = OrderedDict()
-        for field in self.formatfields:
-            format_data[field] = self._sampledata_as_list(field)
-        format_string = vcf.format_sample_field(**format_data)
+        kwargs = {f.id: self.infodata[f] for f in self.infofields}
+        info_string = vcf.format_info_field(precision=self.precision, **kwargs)
+        kwargs = {f.id: self._sampledata_as_list(f) for f in self.formatfields}
+        format_string = vcf.format_sample_field(precision=self.precision, **kwargs)
         return vcf.format_record(
-            chrom=self.locus.contig,
-            pos=self.locus.start + 1,  # 0-based BED to 1-based VCF
-            id=self.locus.name,
-            ref=self.columndata.get("REF"),
-            alt=self.columndata.get("ALTS"),
-            qual=self.columndata.get("QUAL"),
-            filter=self.columndata.get("FILTER"),
+            chrom=self.columndata[COLUMN.CHROM],
+            pos=self.columndata[COLUMN.POS],
+            id=self.columndata[COLUMN.ID],
+            ref=self.columndata[COLUMN.REF],
+            alt=self.columndata[COLUMN.ALT],
+            qual=self.columndata[COLUMN.QUAL],
+            filter=self.columndata[COLUMN.FILTER],
             info=info_string,
             format=format_string,
+            precision=self.precision,
         )

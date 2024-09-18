@@ -18,6 +18,7 @@ class InfoField(object):
 # INFO fields
 NS = InfoField(id="NS", number=1, type="Integer", descr="Number of samples with data")
 DP = InfoField(id="DP", number=1, type="Integer", descr="Combined depth across samples")
+PS = InfoField(id="PS", number=1, type="Integer", descr="Phased set for all samples")
 AC = InfoField(
     id="AC",
     number="A",
@@ -30,10 +31,23 @@ AN = InfoField(
     type="Integer",
     descr="Total number of alleles in called genotypes",
 )
+UAN = InfoField(
+    id="UAN",
+    number=1,
+    type="Integer",
+    descr="Total number of unique alleles in called genotypes",
+)
+MCI = InfoField(
+    id="MCI",
+    number=1,
+    type="Integer",
+    descr="Number of samples with incongruent Markov chain replicates",
+)
 AF = InfoField(id="AF", number="A", type="Float", descr="Allele Frequency")
 AFP = InfoField(
     id="AFP", number="R", type="Float", descr="Posterior mean allele frequencies"
 )
+ACP = InfoField(id="ACP", number="R", type="Float", descr="Posterior allele counts")
 AFPRIOR = InfoField(
     id="AFPRIOR", number="R", type="Float", descr="Prior allele frequencies"
 )
@@ -42,6 +56,12 @@ AOP = InfoField(
     number="R",
     type="Float",
     descr="Posterior probability of allele occurring across all samples",
+)
+AOPSUM = InfoField(
+    id="AOPSUM",
+    number="R",
+    type="Float",
+    descr="Posterior estimate of the number of samples containing an allele",
 )
 AA = InfoField(id="AA", number=1, type="String", descr="Ancestral allele")
 END = InfoField(id="END", number=1, type="Integer", descr="End position on CHROM")
@@ -81,21 +101,27 @@ REFMASKED = InfoField(
     type="Flag",
     descr="Reference allele is masked",
 )
-
-HEADER_INFO_FIELDS = dict(
-    NS=NS,
-    DP=DP,
-    AC=AC,
-    AN=AN,
-    AF=AF,
-    AFP=AFP,
-    AFPRIOR=AFPRIOR,
-    AOP=AOP,
-    AA=AA,
-    END=END,
-    NVAR=NVAR,
-    SNVPOS=SNVPOS,
-    AD=AD,
-    RCOUNT=RCOUNT,
-    REFMASKED=REFMASKED,
+SNVDP = InfoField(
+    id="SNVDP",
+    number=".",
+    type="Integer",
+    descr="Read depth at each SNV position",
 )
+
+DEFAULT_FIELDS = [
+    AN,
+    UAN,
+    AC,
+    REFMASKED,
+    NS,
+    MCI,
+    DP,
+    RCOUNT,
+    END,
+    NVAR,
+    SNVPOS,
+]
+
+OPTIONAL_FIELDS = [AFPRIOR, ACP, AFP, AOP, AOPSUM, SNVDP]
+
+ALL_FIELDS = DEFAULT_FIELDS + OPTIONAL_FIELDS

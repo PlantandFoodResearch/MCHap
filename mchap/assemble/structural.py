@@ -49,7 +49,7 @@ def random_breaks(breaks, n):
     if breaks >= n:
         raise ValueError("breaks must be smaller then n")
 
-    indicies = np.ones(n + 1, np.bool8)
+    indicies = np.ones(n + 1, np.bool_)
     indicies[0] = False
     indicies[-1] = False
 
@@ -383,9 +383,9 @@ def _interval_inverse_mask(interval, n):
 
     """
     if interval is None:
-        mask = np.zeros(n, np.bool8)
+        mask = np.zeros(n, np.bool_)
     else:
-        mask = np.ones(n, np.bool8)
+        mask = np.ones(n, np.bool_)
         mask[interval[0] : interval[1]] = 0
     return mask
 

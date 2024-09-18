@@ -1,0 +1,22 @@
+##fileformat=VCFv4.3
+##fileDate=20240512
+##source=mchap v0.9.x
+##commandline="mchap atomize simple.output.mixed_depth.assemble.counts.vcf"
+##contig=<ID=CHR1,length=60>
+##contig=<ID=CHR2,length=60>
+##contig=<ID=CHR3,length=60>
+##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=ACP,Number=R,Type=Float,Description="Posterior allele counts">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Combined depth across samples">
+##INFO=<ID=PS,Number=1,Type=Integer,Description="Phased set for all samples">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality">
+##FORMAT=<ID=PQ,Number=1,Type=Integer,Description="Phasing quality">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">
+##FORMAT=<ID=DS,Number=A,Type=Float,Description="Posterior mean dosage">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1	SAMPLE2	SAMPLE3
+CHR1	7	CHR1_05_25_SNV1	A	C	.	.	AC=2;ACP=9.767,2.233;DP=.;PS=6	GT:GQ:PQ:DP:DS	0|0|0|1:.:8:.:1.065	0|0|0|0:.:60:.:0	0|0|0|1:.:5:.:1.169
+CHR1	16	CHR1_05_25_SNV2	A	G	.	.	AC=5;ACP=6.687,5.313;DP=.;PS=6	GT:GQ:PQ:DP:DS	0|0|1|1:.:8:.:2.138	0|0|1|1:.:60:.:2	0|0|0|1:.:5:.:1.175
+CHR1	23	CHR1_05_25_SNV3	A	T,C	.	.	AC=3,2;ACP=6.687,3.08,2.233;DP=.;PS=6	GT:GQ:PQ:DP:DS	0|0|1|2:.:8:.:1.073,1.065	0|0|1|1:.:60:.:2,0	0|0|0|2:.:5:.:0.006,1.169
+CHR2	15	CHR2_10_30_SNV1	A	T	.	.	AC=1;ACP=10.866,1.134;DP=.;PS=11	GT:GQ:PQ:DP:DS	0|0|0|0:.:8:.:0.026	0|0|0|0:.:60:.:0	0|0|0|1:.:13:.:1.108
+CHR2	20	CHR2_10_30_SNV2	A	G,T	.	.	AC=4,2;ACP=5.864,3.967,2.17;DP=.;PS=11	GT:GQ:PQ:DP:DS	0|0|0|2:.:8:.:0.041,1.155	0|0|1|2:.:60:.:1,1	0|1|1|1:.:13:.:2.925,0.015
