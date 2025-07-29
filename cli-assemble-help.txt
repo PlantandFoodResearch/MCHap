@@ -1,16 +1,14 @@
-usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
-                               [--targets TARGETS] [--variants VARIANTS]
-                               [--bam BAM [BAM ...]] [--ploidy PLOIDY]
-                               [--inbreeding INBREEDING]
+usage: MCMC haplotype assembly [-h] [--bam BAM [BAM ...]] [--ploidy PLOIDY]
                                [--sample-pool SAMPLE_POOL]
-                               [--reference REFERENCE]
+                               [--reference REFERENCE] [--region REGION]
+                               [--region-id REGION_ID] [--targets TARGETS]
+                               [--variants VARIANTS]
                                [--base-error-rate BASE_ERROR_RATE]
                                [--use-base-phred-scores]
                                [--mapping-quality MAPPING_QUALITY]
                                [--keep-duplicate-reads] [--keep-qcfail-reads]
                                [--keep-supplementary-reads]
                                [--read-group-field READ_GROUP_FIELD]
-                               [--report [REPORT ...]] [--cores CORES]
                                [--mcmc-chains MCMC_CHAINS]
                                [--mcmc-steps MCMC_STEPS]
                                [--mcmc-burn MCMC_BURN] [--mcmc-seed MCMC_SEED]
@@ -22,27 +20,10 @@ usage: MCMC haplotype assembly [-h] [--region REGION] [--region-id REGION_ID]
                                [--mcmc-partial-dosage-step-probability MCMC_PARTIAL_DOSAGE_STEP_PROBABILITY]
                                [--mcmc-temperatures [MCMC_TEMPERATURES ...]]
                                [--haplotype-posterior-threshold HAPLOTYPE_POSTERIOR_THRESHOLD]
+                               [--report [REPORT ...]] [--cores CORES]
 
 options:
   -h, --help            show this help message and exit
-  --region REGION       Specify a single target region with the format
-                        contig:start-stop. This region will be a single
-                        variant in the output VCF. This argument can not be
-                        combined with the --targets argument.
-  --region-id REGION_ID
-                        Specify an identifier for the locus specified with the
-                        --region argument. This id will be reported in the
-                        output VCF.
-  --targets TARGETS     Bed file containing multiple genomic intervals for
-                        haplotype assembly. First three columns (contig,
-                        start, stop) are mandatory. If present, the fourth
-                        column (id) will be used as the variant id in the
-                        output VCF.This argument can not be combined with the
-                        --region argument.
-  --variants VARIANTS   Tabix indexed VCF file containing SNP variants to be
-                        used in assembly. Assembled haplotypes will only
-                        contain the reference and alternate alleles specified
-                        within this file.
   --bam BAM [BAM ...]   Bam file(s) to use in analysis. This may be (1) a list
                         of one or more bam filepaths, (2) a plain-text file
                         containing a single bam filepath on each line, (3) a
@@ -61,16 +42,6 @@ options:
                         of the plaintext file must contain a single sample
                         identifier and the ploidy of that sample separated by
                         a tab.
-  --inbreeding INBREEDING
-                        Specify expected sample inbreeding coefficient
-                        (default = 0.0).This may be (1) a single floating
-                        point value in the interval [0, 1] used to specify the
-                        inbreeding coefficient of all samples or (2) a file
-                        containing a list of all samples and their inbreeding
-                        coefficient. If option (2) is used then each line of
-                        the plaintext file must contain a single sample
-                        identifier and the inbreeding coefficient of that
-                        sample separated by a tab.
   --sample-pool SAMPLE_POOL
                         WARNING: this is an experimental feature!!! Pool
                         samples together into a single genotype. This may be
@@ -88,6 +59,24 @@ options:
                         or inbreeding coefficients.
   --reference REFERENCE
                         Indexed fasta file containing the reference genome.
+  --region REGION       Specify a single target region with the format
+                        contig:start-stop. This region will be a single
+                        variant in the output VCF. This argument can not be
+                        combined with the --targets argument.
+  --region-id REGION_ID
+                        Specify an identifier for the locus specified with the
+                        --region argument. This id will be reported in the
+                        output VCF.
+  --targets TARGETS     Bed file containing multiple genomic intervals for
+                        haplotype assembly. First three columns (contig,
+                        start, stop) are mandatory. If present, the fourth
+                        column (id) will be used as the variant id in the
+                        output VCF.This argument can not be combined with the
+                        --region argument.
+  --variants VARIANTS   Tabix indexed VCF file containing SNP variants to be
+                        used in assembly. Assembled haplotypes will only
+                        contain the reference and alternate alleles specified
+                        within this file.
   --base-error-rate BASE_ERROR_RATE
                         Expected base error rate of read sequences (default =
                         0.0024). The default value comes from Pfeiffer et al
@@ -114,23 +103,6 @@ options:
                         Read group field to use as sample id (default = "SM").
                         The chosen field determines tha sample ids required in
                         other input files e.g. the --sample-list argument.
-  --report [REPORT ...]
-                        Extra fields to report within the output VCF. The
-                        INFO/FORMAT prefix may be omitted to return both
-                        variations of the named field. Options include:
-                        INFO/AFPRIOR = Prior allele frequencies; INFO/ACP =
-                        Posterior allele counts; INFO/AFP = Posterior mean
-                        allele frequencies; INFO/AOP = Posterior probability
-                        of allele occurring across all samples; INFO/AOPSUM =
-                        Posterior estimate of the number of samples containing
-                        an allele; INFO/SNVDP = Read depth at each SNV
-                        position; FORMAT/ACP: Posterior allele counts;
-                        FORMAT/AFP: Posterior mean allele frequencies;
-                        FORMAT/AOP: Posterior probability of allele occurring;
-                        FORMAT/GP: Genotype posterior probabilities;
-                        FORMAT/GL: Genotype likelihoods; FORMAT/SNVDP: Read
-                        depth at each SNV position
-  --cores CORES         Number of cpu cores to use (default = 1).
   --mcmc-chains MCMC_CHAINS
                         Number of independent MCMC chains per assembly
                         (default = 2).
@@ -197,3 +169,20 @@ options:
                         record and hence the number of genotypes assessed when
                         recalculating likelihoods and posterior distributions
                         (default = 0.20).
+  --report [REPORT ...]
+                        Extra fields to report within the output VCF. The
+                        INFO/FORMAT prefix may be omitted to return both
+                        variations of the named field. Options include:
+                        INFO/AFPRIOR = Prior allele frequencies; INFO/ACP =
+                        Posterior allele counts; INFO/AFP = Posterior mean
+                        allele frequencies; INFO/AOP = Posterior probability
+                        of allele occurring across all samples; INFO/AOPSUM =
+                        Posterior estimate of the number of samples containing
+                        an allele; INFO/SNVDP = Read depth at each SNV
+                        position; FORMAT/ACP: Posterior allele counts;
+                        FORMAT/AFP: Posterior mean allele frequencies;
+                        FORMAT/AOP: Posterior probability of allele occurring;
+                        FORMAT/GP: Genotype posterior probabilities;
+                        FORMAT/GL: Genotype likelihoods; FORMAT/SNVDP: Read
+                        depth at each SNV position
+  --cores CORES         Number of cpu cores to use (default = 1).

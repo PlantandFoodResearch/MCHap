@@ -20,6 +20,7 @@ def base_step(
     j,
     n_alleles,
     log_unique_haplotypes,
+    flat_prior,
     inbreeding=0,
     temp=1,
     read_counts=None,
@@ -47,6 +48,9 @@ def base_step(
         Number of possible base alleles at this positions.
     log_unique_haplotypes : float
         The log of the total number of possible haplotypes.
+    flat_prior : bool
+        If true the inbreeding argument is ignored and a
+        flat prior is assumed across all genotypes
     inbreeding : float
         Expected inbreeding coefficient of the genotype.
     temp : float
@@ -117,13 +121,16 @@ def base_step(
             llk_ratio = llk_i - llk
 
             # calculate ratio of priors: ln(P(G')/P(G))
-            get_haplotype_dosage(dosage, genotype)
-            lprior_i = log_genotype_prior(
-                dosage=dosage,
-                log_unique_haplotypes=log_unique_haplotypes,
-                inbreeding=inbreeding,
-            )
-            lprior_ratio = lprior_i - lprior
+            if flat_prior:
+                lprior_ratio = 0.0
+            else:
+                get_haplotype_dosage(dosage, genotype)
+                lprior_i = log_genotype_prior(
+                    dosage=dosage,
+                    log_unique_haplotypes=log_unique_haplotypes,
+                    inbreeding=inbreeding,
+                )
+                lprior_ratio = lprior_i - lprior
 
             # calculate proposal ratio for detailed balance: ln(g(G|G')/g(G'|G))
             lhapcount_i = np.log(count_haplotype_copies(genotype, h))
@@ -159,6 +166,7 @@ def compound_step(
     llk,
     n_alleles,
     log_unique_haplotypes,
+    flat_prior,
     inbreeding=0,
     temp=1,
     read_counts=None,
@@ -181,6 +189,9 @@ def compound_step(
         The number of possible alleles at each base position.
     log_unique_haplotypes : float
         The log of the total number of possible haplotypes.
+    flat_prior : bool
+        If true the inbreeding argument is ignored and a
+        flat prior is assumed across all genotypes
     inbreeding : float
         Expected inbreeding coefficient of the genotype.
     temp : float
@@ -228,6 +239,7 @@ def compound_step(
             j=j,
             cache=cache,
             log_unique_haplotypes=log_unique_haplotypes,
+            flat_prior=flat_prior,
             inbreeding=inbreeding,
             n_alleles=n_alleles[j],
             temp=temp,

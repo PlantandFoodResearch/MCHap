@@ -26,7 +26,8 @@ class DenovoMCMC(Assembler):
 
     ploidy: int
     n_alleles: list
-    inbreeding: float = 0
+    flat_prior: bool = True
+    inbreeding: float = None
     steps: int = 1000
     chains: int = 2
     alpha: float = 1.0
@@ -49,6 +50,9 @@ class DenovoMCMC(Assembler):
     n_alleles : list, int
         Number of possible alleles at each position in the
         assembled locus.
+    flat_prior : bool
+        If true the inbreeding argument is ignored and a
+        flat prior is assumed across all genotypes
     inbreeding : float
         Expected inbreeding coefficient of genotype.
     steps : int, optional
@@ -162,6 +166,16 @@ class DenovoMCMC(Assembler):
 
     def _mcmc(self, reads, read_counts, initial=None):
         """Run a single MCMC simulation."""
+        if self.inbreeding is None and not self.flat_prior:
+            raise ValueError("Must specify inbreeding if not using a flat prior")
+        if self.inbreeding is not None and self.flat_prior:
+            raise ValueError("Cannot specify inbreeding when using a flat prior")
+        if self.flat_prior:
+            # avoid nuba typing error
+            inbreeding = 0.0
+        else:
+            inbreeding = self.inbreeding
+
         # identify base positions that are overwhelmingly likely
         # to be homozygous
         # these can be 'fixed' to reduce computational complexity
@@ -170,7 +184,8 @@ class DenovoMCMC(Assembler):
             reads,
             n_alleles,
             self.ploidy,
-            inbreeding=self.inbreeding,
+            flat_prior=self.flat_prior,
+            inbreeding=inbreeding,
             read_counts=read_counts,
         )
         fixed = hom_probs >= self.fix_homozygous
@@ -228,7 +243,8 @@ class DenovoMCMC(Assembler):
         # run the sampler on the heterozygous positions
         genotypes, llks = _denovo_assembler(
             genotype=genotype,
-            inbreeding=self.inbreeding,
+            flat_prior=self.flat_prior,
+            inbreeding=inbreeding,
             reads=reads_het,
             read_counts=read_counts,
             n_alleles=n_alleles,
@@ -269,6 +285,7 @@ class DenovoMCMC(Assembler):
 def _denovo_assembler(
     *,
     genotype,
+    flat_prior,
     inbreeding,
     reads,
     read_counts,
@@ -335,6 +352,7 @@ def _denovo_assembler(
             # mutation step
             llk, cache = mutation.compound_step(
                 genotype=genotype,
+                flat_prior=flat_prior,
                 inbreeding=inbreeding,
                 reads=reads,
                 llk=llk,
@@ -351,6 +369,7 @@ def _denovo_assembler(
                 intervals = structural.random_breaks(n_breaks, n_base)
                 llk, cache = structural.compound_step(
                     genotype=genotype,
+                    flat_prior=flat_prior,
                     inbreeding=inbreeding,
                     reads=reads,
                     llk=llk,
@@ -368,6 +387,7 @@ def _denovo_assembler(
                 intervals = structural.random_breaks(n_breaks, n_base)
                 llk, cache = structural.compound_step(
                     genotype=genotype,
+                    flat_prior=flat_prior,
                     inbreeding=inbreeding,
                     reads=reads,
                     llk=llk,
@@ -383,6 +403,7 @@ def _denovo_assembler(
             if np.random.rand() <= dosage_step_probability:
                 llk, cache = structural.compound_step(
                     genotype=genotype,
+                    flat_prior=flat_prior,
                     inbreeding=inbreeding,
                     reads=reads,
                     llk=llk,
@@ -406,6 +427,7 @@ def _denovo_assembler(
                     genotype_j=genotype_prev,
                     llk_j=llk_prev,
                     temp_j=temp_prev,
+                    flat_prior=flat_prior,
                     inbreeding=inbreeding,
                     log_unique_haplotypes=log_unique_haplotypes,
                 )
@@ -495,7 +517,7 @@ def _read_mean_dist(reads):
 
 @numba.njit(cache=True)
 def _homozygosity_probabilities(
-    reads, n_alleles, ploidy, inbreeding=0, read_counts=None
+    reads, n_alleles, ploidy, flat_prior, inbreeding=0, read_counts=None
 ):
     """Calculate posterior probabilities at each single SNP position to determine
     if an individual is homozygous for a single allele.
@@ -508,6 +530,9 @@ def _homozygosity_probabilities(
         Number of possible alleles for each SNP.
     ploidy : int
         Ploidy of organism.
+    flat_prior : bool
+        If true the inbreeding argument is ignored and a
+        flat prior is assumed across all genotypes
     inbreeding : float
         Expected inbreeding coefficient of organism.
     read_counts : ndarray, int, shape (n_reads, )
@@ -531,7 +556,7 @@ def _homozygosity_probabilities(
         # calculate posterior distribution
         n = n_alleles[i]
         _, probs = snp_posterior(
-            reads[:, i, :], n, ploidy, inbreeding, read_counts=read_counts
+            reads[:, i, :], n, ploidy, flat_prior, inbreeding, read_counts=read_counts
         )
         # find index of each homozygous genotype
         for a in range(n):

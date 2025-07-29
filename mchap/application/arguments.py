@@ -710,12 +710,35 @@ find_snvs_min_ind = Parameter(
 # )
 
 
-DEFAULT_PARSER_ARGUMENTS = [
+SAMPLE_FLATPRIOR_ARGUMENTS = [
+    bam,
+    ploidy,
+    sample_pool,
+]
+
+SAMPLE_DIRMUL_ARGUMENTS = [
     bam,
     ploidy,
     inbreeding,
     sample_pool,
+]
+
+LOCI_DENOVO_ARGUMENTS = [
     reference,
+    region,
+    region_id,
+    targets,
+    variants,
+]
+
+LOCI_KNOWN_ARGUMENTS = [
+    reference,
+    haplotypes,
+    prior_frequencies,
+    filter_input_haplotypes,
+]
+
+READ_ENCODING_ARGUMENTS = [
     base_error_rate,
     ignore_base_phred_scores,
     mapping_quality,
@@ -723,19 +746,9 @@ DEFAULT_PARSER_ARGUMENTS = [
     skip_qcfail,
     skip_supplementary,
     read_group_field,
-    report,
-    cores,
 ]
 
-KNOWN_HAPLOTYPES_ARGUMENTS = [
-    haplotypes,
-    prior_frequencies,
-    filter_input_haplotypes,
-]
-
-CALL_EXACT_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_PARSER_ARGUMENTS
-
-DEFAULT_MCMC_PARSER_ARGUMENTS = DEFAULT_PARSER_ARGUMENTS + [
+MCMC_ARGUMENTS = [
     mcmc_chains,
     mcmc_steps,
     mcmc_burn,
@@ -743,32 +756,19 @@ DEFAULT_MCMC_PARSER_ARGUMENTS = DEFAULT_PARSER_ARGUMENTS + [
     mcmc_chain_incongruence_threshold,
 ]
 
-PEDIGREE_PARSER_ARGUMENTS = [
-    sample_parents,
-    gamete_ploidy,
-    gamete_ibd,
-    gamete_error,
+OUTPUT_ARGUMENTS = [
+    report,
 ]
 
-CALL_MCMC_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_MCMC_PARSER_ARGUMENTS
-
-# insert pedigree arguments in appropriate place and remove inbreeding which is currently unsupported
-assert CALL_MCMC_PARSER_ARGUMENTS[5] == inbreeding
-CALL_PEDIGREE_MCMC_PARSER_ARGUMENTS = (
-    CALL_MCMC_PARSER_ARGUMENTS[0:5]
-    + PEDIGREE_PARSER_ARGUMENTS
-    + CALL_MCMC_PARSER_ARGUMENTS[6:]
-)
-
+CORES_ARGUMENTS = [
+    cores,
+]
 
 ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
-    [
-        region,
-        region_id,
-        targets,
-        variants,
-    ]
-    + DEFAULT_MCMC_PARSER_ARGUMENTS
+    SAMPLE_FLATPRIOR_ARGUMENTS
+    + LOCI_DENOVO_ARGUMENTS
+    + READ_ENCODING_ARGUMENTS
+    + MCMC_ARGUMENTS
     + [
         mcmc_fix_homozygous,
         mcmc_llk_cache_threshold,
@@ -778,6 +778,40 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
         mcmc_temperatures,
         haplotype_posterior_threshold,
     ]
+    + OUTPUT_ARGUMENTS
+    + CORES_ARGUMENTS
+)
+
+CALL_EXACT_PARSER_ARGUMENTS = (
+    SAMPLE_DIRMUL_ARGUMENTS
+    + LOCI_KNOWN_ARGUMENTS
+    + READ_ENCODING_ARGUMENTS
+    + OUTPUT_ARGUMENTS
+    + CORES_ARGUMENTS
+)
+
+CALL_MCMC_PARSER_ARGUMENTS = (
+    SAMPLE_DIRMUL_ARGUMENTS
+    + LOCI_KNOWN_ARGUMENTS
+    + READ_ENCODING_ARGUMENTS
+    + MCMC_ARGUMENTS
+    + OUTPUT_ARGUMENTS
+    + CORES_ARGUMENTS
+)
+
+CALL_PEDIGREE_MCMC_PARSER_ARGUMENTS = (
+    SAMPLE_FLATPRIOR_ARGUMENTS  # inbreeding is not supported yet
+    + [
+        sample_parents,
+        gamete_ploidy,
+        gamete_ibd,
+        gamete_error,
+    ]
+    + LOCI_KNOWN_ARGUMENTS
+    + READ_ENCODING_ARGUMENTS
+    + MCMC_ARGUMENTS
+    + OUTPUT_ARGUMENTS
+    + CORES_ARGUMENTS
 )
 
 
@@ -1228,7 +1262,9 @@ def collect_assemble_mcmc_program_arguments(arguments):
     # target and regions cant be combined
     if (arguments.targets[0] is not None) and (arguments.region[0] is not None):
         raise ValueError("Cannot combine --targets and --region arguments.")
-    data = collect_default_program_arguments(arguments)
+    data = collect_default_program_arguments(
+        arguments, skip_inbreeding=True
+    )  # flat prior
     data.update(collect_default_mcmc_program_arguments(arguments))
     sample_mcmc_temperatures = parse_sample_temperatures(
         arguments.mcmc_temperatures, samples=data["samples"]

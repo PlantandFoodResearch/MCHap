@@ -12,7 +12,9 @@ __all__ = ["snp_posterior"]
 
 
 @njit(cache=True)
-def snp_posterior(read_probs, n_alleles, ploidy, inbreeding=0, read_counts=None):
+def snp_posterior(
+    read_probs, n_alleles, ploidy, flat_prior, inbreeding=0, read_counts=None
+):
     """Brute-force the posterior probability across all possible
     genotypes for a single SNP position.
 
@@ -24,6 +26,9 @@ def snp_posterior(read_probs, n_alleles, ploidy, inbreeding=0, read_counts=None)
         Number of possible alleles for this SNP.
     ploidy : int
         Ploidy of organism.
+    flat_prior : bool
+        If true the inbreeding argument is ignored and a
+        flat prior is assumed across all genotypes
     inbreeding : float
         Expected inbreeding coefficient of organism.
     read_counts : ndarray, int, shape (n_reads, )
@@ -51,9 +56,12 @@ def snp_posterior(read_probs, n_alleles, ploidy, inbreeding=0, read_counts=None)
     log_probabilities[:] = -np.inf
     for i in range(u_gens):
         genotypes[i] = genotype
-        lprior = log_snp_prior(
-            genotype, unique_haplotypes=n_alleles, inbreeding=inbreeding
-        )
+        if flat_prior:
+            lprior = 0.0
+        else:
+            lprior = log_snp_prior(
+                genotype, unique_haplotypes=n_alleles, inbreeding=inbreeding
+            )
         llk = log_likelihood(
             np.expand_dims(read_probs, 1),
             np.expand_dims(genotype, -1),

@@ -117,7 +117,8 @@ class program(baseclass.program):
                     DenovoMCMC(
                         ploidy=data.sample_ploidy[sample],
                         n_alleles=data.locus.count_alleles(),
-                        inbreeding=data.sample_inbreeding[sample],
+                        flat_prior=True,
+                        inbreeding=None,  # now using flat prior over genotypes
                         steps=self.mcmc_steps,
                         chains=self.mcmc_chains,
                         fix_homozygous=self.mcmc_fix_homozygous,

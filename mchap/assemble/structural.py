@@ -436,6 +436,7 @@ def interval_step(
     reads,
     llk,
     log_unique_haplotypes,
+    flat_prior,
     inbreeding=0,
     interval=None,
     step_type=0,
@@ -460,6 +461,9 @@ def interval_step(
         simulation.
     log_unique_haplotypes : int
         Log of the total number of unique haplotypes possible at this locus.
+    flat_prior : bool
+        If true the inbreeding argument is ignored and a
+        flat prior is assumed across all genotypes
     inbreeding : float
         Expected inbreeding coefficient of the genotype.
     interval : ndarray, int, shape (2, )
@@ -536,13 +540,16 @@ def interval_step(
         llk_ratio = llk_i - llk
 
         # calculate ratio of priors: ln(P(G')/P(G))
-        get_haplotype_dosage(dosage, option_labels[i])
-        lprior_i = log_genotype_prior(
-            dosage=dosage,
-            log_unique_haplotypes=log_unique_haplotypes,
-            inbreeding=inbreeding,
-        )
-        lprior_ratio = lprior_i - lprior
+        if flat_prior:
+            lprior_ratio = 0.0
+        else:
+            get_haplotype_dosage(dosage, option_labels[i])
+            lprior_i = log_genotype_prior(
+                dosage=dosage,
+                log_unique_haplotypes=log_unique_haplotypes,
+                inbreeding=inbreeding,
+            )
+            lprior_ratio = lprior_i - lprior
 
         # balance proposal distribution
         if step_type == 0:
@@ -587,6 +594,7 @@ def compound_step(
     llk,
     intervals,
     log_unique_haplotypes,
+    flat_prior,
     inbreeding=0,
     step_type=0,
     randomize=True,
@@ -613,6 +621,9 @@ def compound_step(
         The interval constraining each sub-step within this step.
     log_unique_haplotypes : float
         The log of the total number of possible haplotypes.
+    flat_prior : bool
+        If true the inbreeding argument is ignored and a
+        flat prior is assumed across all genotypes
     inbreeding : float
         Expected inbreeding coefficient of the genotype.
     step_type : int
@@ -656,6 +667,7 @@ def compound_step(
             llk=llk,
             cache=cache,
             log_unique_haplotypes=log_unique_haplotypes,
+            flat_prior=flat_prior,
             inbreeding=inbreeding,
             interval=intervals[i],
             step_type=step_type,

@@ -36,6 +36,7 @@ from mchap import combinatorics
     [
         0.0,
         0.25,
+        None,  # flat prior
     ],
 )
 def test_base_step(use_cache, use_read_counts, inbreeding):
@@ -78,20 +79,24 @@ def test_base_step(use_cache, use_read_counts, inbreeding):
             log_likelihood(reads, genotype_2),
         ]
     )
-    lpriors = np.array(
-        [
-            log_genotype_prior(
-                np.array([2, 0]),
-                log_unique_haplotypes=log_unique_haplotypes,
-                inbreeding=inbreeding,
-            ),
-            log_genotype_prior(
-                np.array([1, 1]),
-                log_unique_haplotypes=log_unique_haplotypes,
-                inbreeding=inbreeding,
-            ),
-        ]
-    )
+    flat_prior = inbreeding is None
+    if flat_prior:
+        lpriors = np.zeros(2)
+    else:
+        lpriors = np.array(
+            [
+                log_genotype_prior(
+                    np.array([2, 0]),
+                    log_unique_haplotypes=log_unique_haplotypes,
+                    inbreeding=inbreeding,
+                ),
+                log_genotype_prior(
+                    np.array([1, 1]),
+                    log_unique_haplotypes=log_unique_haplotypes,
+                    inbreeding=inbreeding,
+                ),
+            ]
+        )
 
     # We are only allowing a single haplotype vary so the proposal
     # ratio calculated in `base_step` is biased and this needs to
@@ -141,7 +146,8 @@ def test_base_step(use_cache, use_read_counts, inbreeding):
             j=j,
             log_unique_haplotypes=log_unique_haplotypes,
             n_alleles=2,
-            inbreeding=inbreeding,
+            flat_prior=inbreeding is None,
+            inbreeding=inbreeding or 0.0,
             read_counts=read_counts,
             cache=cache,
         )
@@ -178,6 +184,7 @@ def test_base_step(use_cache, use_read_counts, inbreeding):
     [
         0.0,
         0.25,
+        None,  # flat prior
     ],
 )
 def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
@@ -220,12 +227,18 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
     # calculate expected posterior distribution over all genotypes
     log_expect = np.empty(unique_genotypes, float)
     dosage = np.empty(ploidy, int)
+    flat_prior = inbreeding is None
     for i, g in enumerate(genotypes):
         get_haplotype_dosage(dosage, g)
         llk = log_likelihood(reads, g)
-        lprior = log_genotype_prior(
-            dosage, log_unique_haplotypes=log_unique_haplotypes, inbreeding=inbreeding
-        )
+        if flat_prior:
+            lprior = 0.0
+        else:
+            lprior = log_genotype_prior(
+                dosage,
+                log_unique_haplotypes=log_unique_haplotypes,
+                inbreeding=inbreeding,
+            )
         log_expect[i] = llk + lprior
     expect = normalise_log_probs(log_expect)
 
@@ -253,7 +266,8 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
             llk,
             n_alleles=n_alleles,
             log_unique_haplotypes=log_unique_haplotypes,
-            inbreeding=inbreeding,
+            flat_prior=inbreeding is None,
+            inbreeding=inbreeding or 0.0,
             read_counts=read_counts,
             cache=cache,
         )
@@ -266,7 +280,14 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
     assert np.allclose(expect, actual, atol=1e-02)
 
 
-def test_genotype_compound_step__mask_ragged():
+@pytest.mark.parametrize(
+    "flat_prior",
+    [
+        False,
+        True,
+    ],
+)
+def test_genotype_compound_step__mask_ragged(flat_prior):
 
     # haps 0,1,0 and 0,0,0
     reads = np.array(
@@ -303,6 +324,7 @@ def test_genotype_compound_step__mask_ragged():
             llk,
             n_alleles=n_alleles,
             log_unique_haplotypes=log_unique_haplotypes,
+            flat_prior=flat_prior,
             cache=None,
         )
         trace[i] = genotype.copy()

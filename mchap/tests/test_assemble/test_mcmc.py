@@ -61,7 +61,10 @@ def test_homozygosity_probabilities():
         uniform_sample=True,
         errors=False,
     )
-    actual = mcmc._homozygosity_probabilities(reads, n_alleles, ploidy) > 0.999
+    actual = (
+        mcmc._homozygosity_probabilities(reads, n_alleles, ploidy, flat_prior=True)
+        > 0.999
+    )
     expect = np.zeros((6, 2), dtype=bool)
     np.testing.assert_array_equal(actual, expect)
 
@@ -72,7 +75,10 @@ def test_homozygosity_probabilities():
         uniform_sample=True,
         errors=False,
     )
-    actual = mcmc._homozygosity_probabilities(reads, n_alleles, ploidy) > 0.999
+    actual = (
+        mcmc._homozygosity_probabilities(reads, n_alleles, ploidy, flat_prior=True)
+        > 0.999
+    )
     expect = np.array(
         [
             [True, False],
@@ -418,6 +424,7 @@ def test_DenovoMCMC__fuzz():
         assert trace.llks.shape == (n_chains, n_steps)
 
 
+@pytest.mark.parametrize("flat_prior", [False, True])
 @pytest.mark.parametrize(
     "temperatures",
     [
@@ -427,7 +434,7 @@ def test_DenovoMCMC__fuzz():
         [0.001, 0.01, 0.1, 1.0],
     ],
 )
-def test_DenovoMCMC__temperatures_bias(temperatures):
+def test_DenovoMCMC__temperatures_bias(temperatures, flat_prior):
     """Test to ensure the implementation of parallel-tempering does
     not bias the MCMC results when tempering is not needed.
     """
@@ -457,7 +464,10 @@ def test_DenovoMCMC__temperatures_bias(temperatures):
 
     # calculate exact posteriors
     llks = np.array([log_likelihood(reads, g) for g in genotypes])
-    priors = np.array([1, 2, 2, 2, 1, 2, 2, 1, 2, 1])
+    if flat_prior:
+        priors = np.ones(10)
+    else:
+        priors = np.array([1, 2, 2, 2, 1, 2, 2, 1, 2, 1])
     priors = priors / priors.sum()
     exact_posteriors = np.exp(llks + np.log(priors))
     exact_posteriors = exact_posteriors / exact_posteriors.sum()
@@ -466,6 +476,8 @@ def test_DenovoMCMC__temperatures_bias(temperatures):
     model = mcmc.DenovoMCMC(
         ploidy=2,
         n_alleles=[2, 2],
+        flat_prior=flat_prior,
+        inbreeding=None if flat_prior else 0.0,
         steps=50000,
         chains=1,
         random_seed=11,
