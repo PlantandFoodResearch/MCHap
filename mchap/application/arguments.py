@@ -185,6 +185,25 @@ inbreeding = Parameter(
     ),
 )
 
+assembly_inbreeding = Parameter(
+    "--use-dirmul-inbreeding",
+    dict(
+        type=str,
+        nargs=1,
+        dest="inbreeding",
+        default=[None],
+        help=(
+            "WARNING: this option is not recommended and is only "
+            "provided for backwards compatibility with prior versions! "
+            "Using this option will replace the (new) default of a flat prior "
+            "over genotypes with Dirichlet-Multinomial prior which assumes "
+            "all possible haplotypes (SNV combinations) have equal probability "
+            "of occuring within the sample population. "
+            "In general, this will inflate the prior probability of heterozygous genotypes."
+        ),
+    ),
+)
+
 sample_parents = Parameter(
     "--sample-parents",
     dict(
@@ -766,6 +785,7 @@ CORES_ARGUMENTS = [
 
 ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
     SAMPLE_FLATPRIOR_ARGUMENTS
+    + [assembly_inbreeding]
     + LOCI_DENOVO_ARGUMENTS
     + READ_ENCODING_ARGUMENTS
     + MCMC_ARGUMENTS
@@ -1181,6 +1201,8 @@ def collect_default_program_arguments(arguments, skip_inbreeding=False):
     )
     if skip_inbreeding:
         sample_inbreeding = None
+    elif arguments.inbreeding[0] is None:
+        sample_inbreeding = None
     else:
         sample_inbreeding = parse_sample_value_map(
             arguments.inbreeding[0],
@@ -1262,9 +1284,7 @@ def collect_assemble_mcmc_program_arguments(arguments):
     # target and regions cant be combined
     if (arguments.targets[0] is not None) and (arguments.region[0] is not None):
         raise ValueError("Cannot combine --targets and --region arguments.")
-    data = collect_default_program_arguments(
-        arguments, skip_inbreeding=True
-    )  # flat prior
+    data = collect_default_program_arguments(arguments)
     data.update(collect_default_mcmc_program_arguments(arguments))
     sample_mcmc_temperatures = parse_sample_temperatures(
         arguments.mcmc_temperatures, samples=data["samples"]

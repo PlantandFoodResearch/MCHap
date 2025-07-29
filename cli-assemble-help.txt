@@ -1,5 +1,6 @@
 usage: MCMC haplotype assembly [-h] [--bam BAM [BAM ...]] [--ploidy PLOIDY]
                                [--sample-pool SAMPLE_POOL]
+                               [--use-dirmul-inbreeding INBREEDING]
                                [--reference REFERENCE] [--region REGION]
                                [--region-id REGION_ID] [--targets TARGETS]
                                [--variants VARIANTS]
@@ -57,6 +58,16 @@ options:
                         should be used in place of the samples names when
                         assigning other per-sample parameters such as ploidy
                         or inbreeding coefficients.
+  --use-dirmul-inbreeding INBREEDING
+                        WARNING: this option is not recommended and is only
+                        provided for backwards compatibility with prior
+                        versions! Using this option will replace the (new)
+                        default of a flat prior over genotypes with Dirichlet-
+                        Multinomial prior which assumes all possible
+                        haplotypes (SNV combinations) have equal probability
+                        of occuring within the sample population. In general,
+                        this will inflate the prior probability of
+                        heterozygous genotypes.
   --reference REFERENCE
                         Indexed fasta file containing the reference genome.
   --region REGION       Specify a single target region with the format

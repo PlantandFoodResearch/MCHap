@@ -106,6 +106,7 @@ class program(baseclass.program):
         # dict to temporarily store posteriors
         sample_modes = dict()
         sample_posteriors = dict()
+        use_flat_prior = data.sample_inbreeding is None
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
             try:
@@ -117,8 +118,10 @@ class program(baseclass.program):
                     DenovoMCMC(
                         ploidy=data.sample_ploidy[sample],
                         n_alleles=data.locus.count_alleles(),
-                        flat_prior=True,
-                        inbreeding=None,  # now using flat prior over genotypes
+                        flat_prior=use_flat_prior,
+                        inbreeding=None
+                        if use_flat_prior
+                        else data.sample_inbreeding[sample],
                         steps=self.mcmc_steps,
                         chains=self.mcmc_chains,
                         fix_homozygous=self.mcmc_fix_homozygous,
