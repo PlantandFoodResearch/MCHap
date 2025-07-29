@@ -260,6 +260,15 @@ def test_Program__header():
                 "simple.sample2.bam",
                 "simple.sample3.bam",
             ],
+            [],
+            "simple.output.assemble.flatprior.vcf",
+        ),
+        (
+            [
+                "simple.sample1.bam",
+                "simple.sample2.bam",
+                "simple.sample3.bam",
+            ],
             ["--use-dirmul-inbreeding", "0.0"],
             "simple.output.assemble.vcf",
         ),
