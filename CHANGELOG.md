@@ -2,6 +2,18 @@
 
 ## Unreleased 
 
+## Beta v0.11.0
+
+Breaking Change:
+- Changed the default prior used in `assemble` to a flat prior across genotypes.
+  This is a more sensible prior in almost all situations because the previous
+  Dirichlet-Multinomial prior had to assume that all possible haplotypes (i.e.,
+  combinations of SNVS) where equally likely to be present in the sample population.
+  In general, this inflated the prior probability of heterozygous genotypes.
+  Note that this is not a significant issue when using the `call` program with
+  known haplotypes (and a reasonable estimate of their frequencies).
+  The previous Dirichlet-Multinomial prior can still be used via the
+  `--use-dirmul-inbreeding` argument.
 
 ## Beta v0.10.0 
 
