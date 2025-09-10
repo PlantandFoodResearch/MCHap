@@ -125,12 +125,17 @@ class program(call_baseclass.program):
                 read_dists = data.read_dists[sample]
                 read_counts = data.read_counts[sample]
                 # call haplotypes
+                if data.sample_inbreeding is None:
+                    # flat prior over genotypes
+                    prior = None
+                else:
+                    # Dirichlet-multinomial prior
+                    prior = (data.sample_inbreeding[sample], mcmc_prior_frequencies)
                 trace = (
                     CallingMCMC(
                         ploidy=data.sample_ploidy[sample],
                         haplotypes=mcmc_haplotypes,
-                        inbreeding=data.sample_inbreeding[sample],
-                        frequencies=mcmc_prior_frequencies,
+                        prior=prior,
                         steps=self.mcmc_steps,
                         chains=self.mcmc_chains,
                         random_seed=self.random_seed,

@@ -28,6 +28,31 @@ def calculate_alphas(inbreeding, frequencies):
 
 
 @numba.njit(cache=True)
+def log_genotype_allele_flat_prior(genotype, variable_allele):
+    """Flat prior over genotypes for a Gibbs sampler of alleles.
+
+    This accounts for the proposal bias resulting from a sampling over alleles.
+
+    Parameters
+    ----------
+    genotype : ndarray, int, shape (ploidy, )
+        Integer encoded alleles in the proposed genotype.
+    variable_allele : int
+        Index of the allele that is not being held constant ( < ploidy).
+
+    Returns
+    -------
+    lprior : float
+        Log-probability of the variable allele given the observed alleles.
+    """
+    n = 0
+    a = genotype[variable_allele]
+    for i in range(len(genotype)):
+        n += genotype[i] == a
+    return np.log(n)
+
+
+@numba.njit(cache=True)
 def log_genotype_allele_prior(
     genotype, variable_allele, unique_haplotypes, inbreeding=0, frequencies=None
 ):

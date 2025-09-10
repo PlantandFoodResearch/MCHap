@@ -21,8 +21,7 @@ def _call_posterior_mode(
     haplotypes,
     n_genotypes,
     read_counts=None,
-    inbreeding=0,
-    frequencies=None,
+    prior=None,
 ):
     """Call posterior mode genotype from a set of known haplotypes."""
     n_alleles = len(haplotypes)
@@ -41,9 +40,12 @@ def _call_posterior_mode(
             read_counts=read_counts,
         )
         # log prior
-        lpr = log_genotype_prior(
-            genotype, n_alleles, inbreeding=inbreeding, frequencies=frequencies
-        )
+        if prior is None:
+            lpr = 0.0
+        else:
+            lpr = log_genotype_prior(
+                genotype, n_alleles, inbreeding=prior[0], frequencies=prior[1]
+            )
         # scaled log posterior
         ljoint = llk + lpr
         if ljoint > mode_ljoint:
@@ -60,7 +62,7 @@ def _call_posterior_mode(
 
 
 def _genotype_support_log_joint(
-    genotype, reads, haplotypes, read_counts=None, inbreeding=0, frequencies=None
+    genotype, reads, haplotypes, read_counts=None, prior=None
 ):
     """Calculate genotype support posterior probability from a genotype and a set of known haplotypes."""
     ploidy = len(genotype)
@@ -86,12 +88,15 @@ def _genotype_support_log_joint(
             read_counts=read_counts,
         )
         # log prior
-        lpr = log_genotype_prior(
-            tmp_genotype,
-            len(haplotypes),
-            inbreeding=inbreeding,
-            frequencies=frequencies,
-        )
+        if prior is None:
+            lpr = 0.0
+        else:
+            lpr = log_genotype_prior(
+                tmp_genotype,
+                len(haplotypes),
+                inbreeding=prior[0],
+                frequencies=prior[1],
+            )
         # scaled log posterior
         ljoint = llk + lpr
 
@@ -108,8 +113,7 @@ def _posterior_allele_frequencies(
     haplotypes,
     n_genotypes,
     read_counts=None,
-    inbreeding=0,
-    frequencies=None,
+    prior=None,
 ):
     """Calculate posterior mean allele frequencies."""
     n_alleles = len(haplotypes)
@@ -124,9 +128,12 @@ def _posterior_allele_frequencies(
             read_counts=read_counts,
         )
         # log prior
-        lpr = log_genotype_prior(
-            genotype, n_alleles, inbreeding=inbreeding, frequencies=frequencies
-        )
+        if prior is None:
+            lpr = 0.0
+        else:
+            lpr = log_genotype_prior(
+                genotype, n_alleles, inbreeding=prior[0], frequencies=prior[1]
+            )
         # scaled log posterior
         ljoint = llk + lpr
         # posterior prob
@@ -151,8 +158,7 @@ def posterior_mode(
     ploidy,
     haplotypes,
     read_counts=None,
-    inbreeding=0,
-    frequencies=None,
+    prior=None,
     return_support_prob=False,
     return_posterior_frequencies=False,
     return_posterior_occurrence=False,
@@ -172,10 +178,8 @@ def posterior_mode(
         Integer encoded haplotypes in VCF allele order.
     read_counts : ndarray, int, shape (n_reads, )
         Counts of each (unique) read.
-    inbreeding : float
-        Expected inbreeding coefficient of genotype.
-    frequencies : ndarray, float , shape (n_haplotypes, )
-        Optional prior frequencies for each haplotype allele.
+    prior : tuple[float, (ndarray, float , shape (n_haplotypes, ))]
+        Optional inbreeding and allele frequencies for Dirichlet-multinomial prior.
     return_support_prob : bool
         Return the mode genotype support probability (default = false).
     return_posterior_frequencies : bool
@@ -210,8 +214,7 @@ def posterior_mode(
         haplotypes=haplotypes,
         n_genotypes=n_genotypes,
         read_counts=read_counts,
-        inbreeding=inbreeding,
-        frequencies=frequencies,
+        prior=prior,
     )
     mode_genotype_prob = np.exp(mode_ljoint - total_ljoint)
 
@@ -223,8 +226,7 @@ def posterior_mode(
             reads=reads,
             haplotypes=haplotypes,
             read_counts=read_counts,
-            inbreeding=inbreeding,
-            frequencies=frequencies,
+            prior=prior,
         )
         mode_support_prob = np.exp(support_ljoint - total_ljoint)
         result.append(mode_support_prob)
@@ -237,8 +239,7 @@ def posterior_mode(
             haplotypes=haplotypes,
             n_genotypes=n_genotypes,
             read_counts=read_counts,
-            inbreeding=inbreeding,
-            frequencies=frequencies,
+            prior=prior,
         )
         if return_posterior_frequencies:
             result.append(mean_frequencies)
@@ -292,9 +293,7 @@ def genotype_likelihoods(reads, ploidy, haplotypes, read_counts=None):
 
 
 @njit(cache=True)
-def genotype_posteriors(
-    log_likelihoods, ploidy, n_alleles, inbreeding=0, frequencies=None
-):
+def genotype_posteriors(log_likelihoods, ploidy, n_alleles, prior=None):
     """Calculate posterior probability of every possible genotype
     for a given set of likelihoods, ploidy, and number of alleles.
 
@@ -306,11 +305,8 @@ def genotype_posteriors(
         Ploidy of organism.
     n_alleles : int
         Total number of possible (haplotype) alleles at this locus.
-    inbreeding : float
-        Inbreeding coefficient of organism used when calculating prior
-        probabilities.
-    frequencies : ndarray, float , shape (n_haplotypes, )
-        Optional prior frequencies for each haplotype allele.
+    prior : tuple[float, (ndarray, float , shape (n_haplotypes, ))]
+        Optional inbreeding and allele frequencies for Dirichlet-multinomial prior.
 
     Returns
     -------
@@ -322,9 +318,12 @@ def genotype_posteriors(
     genotype = np.zeros(ploidy, np.int64)
     for i in range(n_genotypes):
         llk = log_likelihoods[i]
-        lpr = log_genotype_prior(
-            genotype, n_alleles, inbreeding=inbreeding, frequencies=frequencies
-        )
+        if prior is None:
+            lpr = 0.0
+        else:
+            lpr = log_genotype_prior(
+                genotype, n_alleles, inbreeding=prior[0], frequencies=prior[1]
+            )
         posteriors[i] = llk + lpr
         increment_genotype(genotype)
     return normalise_log_probs(posteriors)
