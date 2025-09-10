@@ -14,7 +14,7 @@ or more samples.
 ``mchap call`` uses a Markov chain Monte-Carlo simulation (based on a 
 Gibbs-sampler algorithm) to propose genotypes composed of known micro-haplotypes.
 This algorithm approximates the posterior genotype distribution of each individual
-given its ploidy, inbreeding coefficient, and observed sequence alignments.
+given its ploidy and observed sequence alignments.
 Unlike ``mchap assemble`` which proposes genotypes from a prior distribution
 containing all *possible* haplotypes, ``mchap call`` proposes genotypes from
 a prior distribution constrained to a set of *known* haplotypes.
@@ -156,8 +156,7 @@ Sample parameters
 
 Sample parameters are used to specify information about each sample.
 Some of parameters such as ploidy have obvious importance when calling genotypes,
-however, other parameters such as expected inbreeding coefficients can have more subtle 
-effects on the results.
+however, other parameters can have more subtle effects on the results.
 
 - ``--reference``: Specify a reference genome. This is optional but highly recommended when
   working with CRAM files instead of BAM files. Specifying the reference genome speeds up
@@ -173,36 +172,14 @@ effects on the results.
   Each line of this file must contain the identifier of a sample and its ploidy separated
   by a tab.
 
-- ``--inbreeding``: The expected inbreeding coefficient of each sample (default = ``0``, 
-  must be less than ``1`` and greater than or equal to ``0``).
-
-  The inbreeding coefficient is used in combination with allelic variability in the input 
-  VCF to determine a prior distribution of genotypes.
-  A higher inbreeding coefficient will result in increased homozygosity of genotype
-  calls.
-  This effect is more pronounced with lower read depths and noisier sequencing data.
-
-  It is worth noting that the inbreeding coefficient is rarely ``0`` in real samples, 
-  particularly in autopolyploids.
-  This means that, by default, MCHap will be biased towards excessively heterozygous
-  genotype calls.
-  This bias is more pronounced in inbred samples and with lower sequencing depth.
-  If the genotype calls output by MCHap appear to be excessively heterozygous,
-  it is worth considering if the inbreeding coefficients have been underestimated.
-  
-  If samples have variable inbreeding coefficients then these can be specified within a
-  file and the location of that file is then passed to the ``--inbreeding`` argument.
-  Each line of this file must contain the identifier of a sample and its inbreeding 
-  coefficient separated by a tab.
-
 Sample pooling
 ~~~~~~~~~~~~~~
 
 MCHap allows you to define 'pools' of samples using the ``--sample-pools`` parameter.
 A sample pool will combine the reads of its constituent samples but otherwise is treated
 identically to a regular sample. Sample parameters relating to the sample pool including
-``--ploidy`` and ``--inbreeding`` must be set using the name of the sample pool rather
-than its constituent samples. Uses for sample pools include:
+``--ploidy`` and inbreeding parameter of ``--use-dirmul-prior`` must be set using the name
+of the sample pool rather than its constituent samples. Uses for sample pools include:
 
 - Combining the replicates into a single sample
 - Renaming samples (using a pool per sample)
@@ -214,6 +191,40 @@ all of the samples, or a tabular file assigning samples to pools. If a tabular f
 each line must contain the name of a sample followed by the name of the pool that sample is
 assigned to. All samples must be specified in this file but they can be assigned to a pool
 of the same name (i.e., a pool per sample). Samples may be assigned to more than one pool. 
+
+Prior distribution and inbreeding
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+From version ``0.11.0`` of MCHap, the ``mchap call`` tool defaults to a flat prior over genotypes.
+In previous versions of MCHap the default behavior was to use Dirichlet-multinomial prior
+which *optionally* incorporated the expected inbreeding coefficient of each genotype and a prior
+on allele frequencies. However, it is only reasonable to use a Dirichlet-multinomial prior when
+meaningful inbreeding coefficients and prior allele frequencies are specified. A flat prior over
+genotypes is generally a better choice if inbreeding coefficients and prior allele frequencies
+are unknown.
+
+A Dirichlet-multinomial prior can be specified with ``--use-dirmul-prior`` which expects two values.
+The first of these is the inbreeding coefficient and the second is the identifier of an INFO field
+in the input VCF file to be used as prior allele frequencies.
+The inbreeding coefficient may be a single floating point value to be used for all samples, or the
+name of a tabular file containing a inbreeding coefficient for each sample.
+Each line of this file must contain the identifier of a sample and its inbreeding 
+coefficient separated by a tab.
+The allele frequency INFO field must contain a single numerical value for each allele (including the
+reference allele) and those values will be normalized to ensure that they sum to 1. For example:
+
+.. code:: bash
+
+    $ mchap call \
+        --bam sample1.bam sample2.bam sample3.bam \
+        --haplotypes haplotypes.vcf.gz \
+        --ploidy 4 \
+        --use-dirmul-prior 0.1 AFP \
+        | bgzip > recalled-haplotypes.vcf.gz
+
+In the above example we specify the posterior allele frequencies (``AFP``) field that
+can be optionally output from ``mchap assemble`` is used as the prior allele frequency
+distribution for ``mchap call``.
 
 Output parameters
 ~~~~~~~~~~~~~~~~~
@@ -264,44 +275,6 @@ read sequences.
 - ``--keep-duplicate-reads``: Use reads marked as duplicates in the assembly (these are skipped by default).
 - ``--keep-qcfail-reads``: Use reads marked as qcfail in the assembly (these are skipped by default).
 - ``--keep-supplementary-reads``: Use reads marked as supplementary in the assembly (these are skipped by default).
-
-Prior allele frequencies
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-In ``mchap call`` the prior distribution for genotypes is controlled by four factors:
-
-- The ploidy of the organism.
-- The expected inbreeding coefficient of the organism.
-- The set of known haplotype alleles.
-- The prior frequencies of known haplotype alleles.
-
-The first two factors are controlled using the ``--ploidy`` and ``--inbreeding`` parameters 
-as described above.
-By default a flat prior is used for allele frequencies. 
-That is, an assumption that all of the haplotypes recorded in the input VCF file are equally
-frequent within the sample population.
-A different prior for allele frequencies can be specified by using the
-``--prior-frequencies`` parameter.
-The ``--prior-frequencies`` parameter is used to specify an INFO filed within the input VCF
-file that can be interpreted prior allele frequencies.
-This field must contain a single numerical value for each allele (including the reference allele)
-and those values will be normalized to sum to 1.
-
-An example of using these parameters to specify the prior distribution may look like:
-
-.. code:: bash
-
-    $ mchap call \
-        --bam sample1.bam sample2.bam sample3.bam \
-        --haplotypes haplotypes.vcf.gz \
-        --ploidy 4 \
-        --inbreeding 0.1 \
-        --prior-frequencies AFP \
-        | bgzip > recalled-haplotypes.vcf.gz
-
-In the above example we specify the posterior allele frequencies (``AFP``) field that
-can be optionally output from ``mchap assemble`` as the prior allele frequency
-distribution for ``mchap call``.
 
 Performance
 -----------
@@ -381,7 +354,6 @@ An example of using these parameters to exclude rare haplotypes may look like:
         --bam sample1.bam sample2.bam sample3.bam \
         --haplotypes haplotypes.vcf.gz \
         --ploidy 4 \
-        --inbreeding 0.1 \
         --filter-input-haplotypes 'AFP>=0.01' \
         | bgzip > recalled-haplotypes.vcf.gz
 

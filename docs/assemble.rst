@@ -232,9 +232,7 @@ genotypes. This inflation could be partially mitigated by setting an non-zero pr
 inbreeding coefficient of samples. However, it is not always possible to give a reasonable
 estimate of the inbreeding coefficient. Hence a flat prior over genotypes is considered to be
 more appropriate in the vast majority of use-cases. Note that the previous behavior can still be
-applied using the ``--use-dirmul-inbreeding`` argument. Furthermore, the ``mchap call`` tool
-still uses a Dirichlet-multinomial prior because it allows the incorporation of the expected
-frequencies of (known) haplotypes in addition to sample inbreeding. 
+applied using the ``--use-dirmul-prior`` argument.
 
 
 Output parameters
