@@ -189,7 +189,7 @@ dirmul_prior = Parameter(
     ),
 )
 
-assembly_inbreeding = Parameter(
+assembly_dirmul_prior = Parameter(
     "--use-dirmul-prior",
     dict(
         type=str,
@@ -210,6 +210,21 @@ assembly_inbreeding = Parameter(
             "sample identifier and the inbreeding coefficient of that sample separated by a tab."
             "The INFO field specifying prior allele frequencies must be a numerical field "
             "of length 'R' and these values will automatically be normalized. "
+        ),
+    ),
+)
+
+prior_frequencies = Parameter(
+    "--prior-frequencies",
+    dict(
+        type=str,
+        nargs=1,
+        default=[None],
+        help=(
+            "Optionally specify an INFO field within the input VCF file to "
+            "designate as prior allele frequencies for the input haplotypes. "
+            "This can be any numerical field of length 'R' and these "
+            "values will automatically be normalized. "
         ),
     ),
 )
@@ -779,7 +794,7 @@ CORES_ARGUMENTS = [
 
 ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
     SAMPLE_FLATPRIOR_ARGUMENTS
-    + [assembly_inbreeding]
+    + [assembly_dirmul_prior]
     + LOCI_DENOVO_ARGUMENTS
     + READ_ENCODING_ARGUMENTS
     + MCMC_ARGUMENTS
@@ -816,6 +831,7 @@ CALL_MCMC_PARSER_ARGUMENTS = (
 CALL_PEDIGREE_MCMC_PARSER_ARGUMENTS = (
     SAMPLE_FLATPRIOR_ARGUMENTS  # inbreeding is not supported yet
     + [
+        prior_frequencies,  # TODO: update default founder prior
         sample_parents,
         gamete_ploidy,
         gamete_ibd,
@@ -1251,6 +1267,7 @@ def collect_call_pedigree_mcmc_program_arguments(arguments):
     data["format_fields"] += FORMAT.PEDIGREE_FIELDS
     data.update(collect_default_mcmc_program_arguments(arguments))
     data["vcf"] = arguments.haplotypes[0]
+    data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
     data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
     assert data["sample_inbreeding"] is None
     data.update(

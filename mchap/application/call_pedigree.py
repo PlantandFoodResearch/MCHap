@@ -174,9 +174,6 @@ class program(call_baseclass.program):
         pedigree_trace = (
             PedigreeCallingMCMC(
                 sample_ploidy=sample_ploidy,
-                sample_inbreeding=np.array(
-                    [data.sample_inbreeding[s] for s in data.samples]
-                ),
                 sample_parents=parent_indices,
                 gamete_tau=gamete_tau,
                 gamete_lambda=gamete_lambda,

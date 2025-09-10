@@ -1,9 +1,8 @@
 usage: Exact haplotype calling [-h] [--bam BAM [BAM ...]] [--ploidy PLOIDY]
-                               [--inbreeding INBREEDING]
+                               [--use-dirmul-prior USE_DIRMUL_PRIOR USE_DIRMUL_PRIOR]
                                [--sample-pool SAMPLE_POOL]
                                [--reference REFERENCE]
                                [--haplotypes HAPLOTYPES]
-                               [--prior-frequencies PRIOR_FREQUENCIES]
                                [--filter-input-haplotypes FILTER_INPUT_HAPLOTYPES]
                                [--base-error-rate BASE_ERROR_RATE]
                                [--use-base-phred-scores]
@@ -33,16 +32,22 @@ options:
                         of the plaintext file must contain a single sample
                         identifier and the ploidy of that sample separated by
                         a tab.
-  --inbreeding INBREEDING
-                        Specify expected sample inbreeding coefficient
-                        (default = 0.0).This may be (1) a single floating
-                        point value in the interval [0, 1] used to specify the
-                        inbreeding coefficient of all samples or (2) a file
+  --use-dirmul-prior USE_DIRMUL_PRIOR USE_DIRMUL_PRIOR
+                        Specify Dirichlet-multinomial prior using expected
+                        inbreeding and allele frequencies. This arguments
+                        expects two values: (1) an inbreeding value or file
+                        and (2) an INFO field specifying prior allele
+                        frequencies. Inbreeding may be a single floating point
+                        value in the interval [0, 1] used to specify the
+                        inbreeding coefficient of all samples or a file
                         containing a list of all samples and their inbreeding
-                        coefficient. If option (2) is used then each line of
+                        coefficient. If a file is specified then each line of
                         the plaintext file must contain a single sample
                         identifier and the inbreeding coefficient of that
-                        sample separated by a tab.
+                        sample separated by a tab.The INFO field specifying
+                        prior allele frequencies must be a numerical field of
+                        length 'R' and these values will automatically be
+                        normalized.
   --sample-pool SAMPLE_POOL
                         WARNING: this is an experimental feature!!! Pool
                         samples together into a single genotype. This may be
@@ -63,12 +68,6 @@ options:
   --haplotypes HAPLOTYPES
                         Tabix indexed VCF file containing haplotype/MNP/SNP
                         variants to be re-called among input samples.
-  --prior-frequencies PRIOR_FREQUENCIES
-                        Optionally specify an INFO field within the input VCF
-                        file to designate as prior allele frequencies for the
-                        input haplotypes. This can be any numerical field of
-                        length 'R' and these values will automatically be
-                        normalized.
   --filter-input-haplotypes FILTER_INPUT_HAPLOTYPES
                         Optionally filter input haplotypes using a string of
                         the form '<field><operator><value>' where <field> is a

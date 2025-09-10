@@ -2,13 +2,13 @@ usage: MCMC haplotype calling via pedigree-annealing.  [-h]
                                                        [--bam BAM [BAM ...]]
                                                        [--ploidy PLOIDY]
                                                        [--sample-pool SAMPLE_POOL]
+                                                       [--prior-frequencies PRIOR_FREQUENCIES]
                                                        [--sample-parents SAMPLE_PARENTS]
                                                        [--gamete-ploidy GAMETE_PLOIDY]
                                                        [--gamete-ibd GAMETE_IBD]
                                                        [--gamete-error GAMETE_ERROR]
                                                        [--reference REFERENCE]
                                                        [--haplotypes HAPLOTYPES]
-                                                       [--prior-frequencies PRIOR_FREQUENCIES]
                                                        [--filter-input-haplotypes FILTER_INPUT_HAPLOTYPES]
                                                        [--base-error-rate BASE_ERROR_RATE]
                                                        [--use-base-phred-scores]
@@ -60,6 +60,12 @@ options:
                         should be used in place of the samples names when
                         assigning other per-sample parameters such as ploidy
                         or inbreeding coefficients.
+  --prior-frequencies PRIOR_FREQUENCIES
+                        Optionally specify an INFO field within the input VCF
+                        file to designate as prior allele frequencies for the
+                        input haplotypes. This can be any numerical field of
+                        length 'R' and these values will automatically be
+                        normalized.
   --sample-parents SAMPLE_PARENTS
                         A file containing a list of samples and their parents
                         used to indicate pedigree structure. Each line should
@@ -116,12 +122,6 @@ options:
   --haplotypes HAPLOTYPES
                         Tabix indexed VCF file containing haplotype/MNP/SNP
                         variants to be re-called among input samples.
-  --prior-frequencies PRIOR_FREQUENCIES
-                        Optionally specify an INFO field within the input VCF
-                        file to designate as prior allele frequencies for the
-                        input haplotypes. This can be any numerical field of
-                        length 'R' and these values will automatically be
-                        normalized.
   --filter-input-haplotypes FILTER_INPUT_HAPLOTYPES
                         Optionally filter input haplotypes using a string of
                         the form '<field><operator><value>' where <field> is a
