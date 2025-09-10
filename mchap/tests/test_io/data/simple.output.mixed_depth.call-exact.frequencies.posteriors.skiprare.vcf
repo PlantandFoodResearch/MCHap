@@ -1,8 +1,8 @@
 ##fileformat=VCFv4.3
-##fileDate=20220406
+##fileDate=20250909
 ##source=mchap v0.9.3
 ##phasing=None
-##commandline="/home/cfltxm/Software/miniconda3/envs/mchap/bin/mchap call-exact --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --haplotypes mock.input.frequencies.vcf --prior-frequencies AFP --filter-input-haplotypes AFP>=0.1 --report AFP GP"
+##commandline="mchap call-exact --bam simple.sample1.bam simple.sample2.deep.bam simple.sample3.bam --ploidy 4 --haplotypes mock.input.frequencies.vcf --prior-frequencies AFP --filter-input-haplotypes AFP>=0.1 --report AFP GP"
 ##randomseed=None
 ##contig=<ID=CHR1,length=60>
 ##contig=<ID=CHR2,length=60>

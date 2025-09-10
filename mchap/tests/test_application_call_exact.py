@@ -127,9 +127,6 @@ def local_file_path(name):
             [
                 "--report",
                 "GP",
-                "--base-error-rate",
-                "0.0",
-                "--use-base-phred-scores",
             ],
             "simple.output.mixed_depth.call-exact.posteriors.vcf",
         ),
