@@ -129,7 +129,7 @@ def test_Program__cli_lists():
         tmp_bam_list,
         "--ploidy",
         tmp_sample_ploidy,
-        "--use-dirmul-inbreeding",
+        "--use-dirmul-prior",
         tmp_sample_inbreeding,
         "--mcmc-temperatures",
         tmp_sample_mcmc_temperatures,
@@ -269,7 +269,7 @@ def test_Program__header():
                 "simple.sample2.bam",
                 "simple.sample3.bam",
             ],
-            ["--use-dirmul-inbreeding", "0.0"],
+            ["--use-dirmul-prior", "0.0"],
             "simple.output.assemble.vcf",
         ),
         (
@@ -278,7 +278,7 @@ def test_Program__header():
                 "simple.sample2.broken.cram",
                 "simple.sample3.broken.cram",
             ],
-            ["--use-dirmul-inbreeding", "0.0"],
+            ["--use-dirmul-prior", "0.0"],
             "simple.output.assemble.vcf",  # identical results from bam/cram
         ),
         (
@@ -287,33 +287,33 @@ def test_Program__header():
                 "simple.sample2.deep.bam",
                 "simple.sample3.deep.bam",
             ],
-            ["--use-dirmul-inbreeding", "0.0"],
+            ["--use-dirmul-prior", "0.0"],
             "simple.output.deep.assemble.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--use-dirmul-inbreeding", "0.0", "--report", "SNVDP"],
+            ["--use-dirmul-prior", "0.0", "--report", "SNVDP"],
             "simple.output.mixed_depth.assemble.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--use-dirmul-inbreeding", "0.0", "--report", "AFP"],
+            ["--use-dirmul-prior", "0.0", "--report", "AFP"],
             "simple.output.mixed_depth.assemble.frequencies.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--use-dirmul-inbreeding", "0.0", "--report", "ACP"],
+            ["--use-dirmul-prior", "0.0", "--report", "ACP"],
             "simple.output.mixed_depth.assemble.counts.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
-            ["--use-dirmul-inbreeding", "0.0", "--report", "AOP", "AOPSUM"],
+            ["--use-dirmul-prior", "0.0", "--report", "AOP", "AOPSUM"],
             "simple.output.mixed_depth.assemble.occurrence.vcf",
         ),
         (
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
-                "--use-dirmul-inbreeding",
+                "--use-dirmul-prior",
                 "0.0",
                 "--sample-pool",
                 "POOL",
@@ -325,7 +325,7 @@ def test_Program__header():
         (
             ["simple.sample1.bam", "simple.sample2.bam", "simple.sample3.bam"],
             [
-                "--use-dirmul-inbreeding",
+                "--use-dirmul-prior",
                 "0.0",
                 "--haplotype-posterior-threshold",
                 "1.0",
@@ -342,7 +342,7 @@ def test_Program__header():
                 "simple.sample3.deep.bam",
             ],
             [
-                "--use-dirmul-inbreeding",
+                "--use-dirmul-prior",
                 "0.0",
                 "--ploidy",
                 local_file_path("simple.pools-ploidy"),
@@ -481,7 +481,7 @@ def test_Program__run_stdout__region(region, region_id, cache_threshold):
         tmp_sample_bams,
         "--ploidy",
         "4",
-        "--use-dirmul-inbreeding",
+        "--use-dirmul-prior",
         "0.0",
         "--region",
         region,

@@ -62,7 +62,7 @@ def test_homozygosity_probabilities():
         errors=False,
     )
     actual = (
-        mcmc._homozygosity_probabilities(reads, n_alleles, ploidy, flat_prior=True)
+        mcmc._homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=None)
         > 0.999
     )
     expect = np.zeros((6, 2), dtype=bool)
@@ -76,7 +76,7 @@ def test_homozygosity_probabilities():
         errors=False,
     )
     actual = (
-        mcmc._homozygosity_probabilities(reads, n_alleles, ploidy, flat_prior=True)
+        mcmc._homozygosity_probabilities(reads, n_alleles, ploidy, inbreeding=None)
         > 0.999
     )
     expect = np.array(
@@ -476,7 +476,6 @@ def test_DenovoMCMC__temperatures_bias(temperatures, flat_prior):
     model = mcmc.DenovoMCMC(
         ploidy=2,
         n_alleles=[2, 2],
-        flat_prior=flat_prior,
         inbreeding=None if flat_prior else 0.0,
         steps=50000,
         chains=1,

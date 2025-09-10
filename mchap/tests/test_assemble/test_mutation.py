@@ -79,8 +79,8 @@ def test_base_step(use_cache, use_read_counts, inbreeding):
             log_likelihood(reads, genotype_2),
         ]
     )
-    flat_prior = inbreeding is None
-    if flat_prior:
+    if inbreeding is None:
+        # flat prior
         lpriors = np.zeros(2)
     else:
         lpriors = np.array(
@@ -146,8 +146,7 @@ def test_base_step(use_cache, use_read_counts, inbreeding):
             j=j,
             log_unique_haplotypes=log_unique_haplotypes,
             n_alleles=2,
-            flat_prior=inbreeding is None,
-            inbreeding=inbreeding or 0.0,
+            inbreeding=inbreeding,
             read_counts=read_counts,
             cache=cache,
         )
@@ -227,11 +226,10 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
     # calculate expected posterior distribution over all genotypes
     log_expect = np.empty(unique_genotypes, float)
     dosage = np.empty(ploidy, int)
-    flat_prior = inbreeding is None
     for i, g in enumerate(genotypes):
         get_haplotype_dosage(dosage, g)
         llk = log_likelihood(reads, g)
-        if flat_prior:
+        if inbreeding is None:
             lprior = 0.0
         else:
             lprior = log_genotype_prior(
@@ -266,8 +264,7 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
             llk,
             n_alleles=n_alleles,
             log_unique_haplotypes=log_unique_haplotypes,
-            flat_prior=inbreeding is None,
-            inbreeding=inbreeding or 0.0,
+            inbreeding=inbreeding,
             read_counts=read_counts,
             cache=cache,
         )
@@ -281,13 +278,13 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
 
 
 @pytest.mark.parametrize(
-    "flat_prior",
+    "inbreeding",
     [
-        False,
-        True,
+        0.0,
+        None,  # flat prior
     ],
 )
-def test_genotype_compound_step__mask_ragged(flat_prior):
+def test_genotype_compound_step__mask_ragged(inbreeding):
 
     # haps 0,1,0 and 0,0,0
     reads = np.array(
@@ -324,7 +321,7 @@ def test_genotype_compound_step__mask_ragged(flat_prior):
             llk,
             n_alleles=n_alleles,
             log_unique_haplotypes=log_unique_haplotypes,
-            flat_prior=flat_prior,
+            inbreeding=inbreeding,
             cache=None,
         )
         trace[i] = genotype.copy()

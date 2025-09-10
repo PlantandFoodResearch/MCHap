@@ -20,8 +20,7 @@ def base_step(
     j,
     n_alleles,
     log_unique_haplotypes,
-    flat_prior,
-    inbreeding=0,
+    inbreeding=None,
     temp=1,
     read_counts=None,
     cache=None,
@@ -48,11 +47,9 @@ def base_step(
         Number of possible base alleles at this positions.
     log_unique_haplotypes : float
         The log of the total number of possible haplotypes.
-    flat_prior : bool
-        If true the inbreeding argument is ignored and a
-        flat prior is assumed across all genotypes
     inbreeding : float
-        Expected inbreeding coefficient of the genotype.
+        Expected inbreeding coefficient of the genotype used in
+        Dirichlet-multinomial prior, None indicates flat prior.
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
@@ -91,11 +88,15 @@ def base_step(
     # ratio of prior probabilities
     dosage = np.empty(ploidy, dtype=np.int8)
     get_haplotype_dosage(dosage, genotype)
-    lprior = log_genotype_prior(
-        dosage=dosage,
-        log_unique_haplotypes=log_unique_haplotypes,
-        inbreeding=inbreeding,
-    )
+    if inbreeding is None:
+        # flat prior
+        lprior = 0.0
+    else:
+        lprior = log_genotype_prior(
+            dosage=dosage,
+            log_unique_haplotypes=log_unique_haplotypes,
+            inbreeding=inbreeding,
+        )
 
     current_nucleotide = genotype[h, j]
     n_options = 0
@@ -121,7 +122,8 @@ def base_step(
             llk_ratio = llk_i - llk
 
             # calculate ratio of priors: ln(P(G')/P(G))
-            if flat_prior:
+            if inbreeding is None:
+                # flat prior
                 lprior_ratio = 0.0
             else:
                 get_haplotype_dosage(dosage, genotype)
@@ -166,8 +168,7 @@ def compound_step(
     llk,
     n_alleles,
     log_unique_haplotypes,
-    flat_prior,
-    inbreeding=0,
+    inbreeding=None,
     temp=1,
     read_counts=None,
     cache=None,
@@ -189,11 +190,9 @@ def compound_step(
         The number of possible alleles at each base position.
     log_unique_haplotypes : float
         The log of the total number of possible haplotypes.
-    flat_prior : bool
-        If true the inbreeding argument is ignored and a
-        flat prior is assumed across all genotypes
     inbreeding : float
-        Expected inbreeding coefficient of the genotype.
+        Expected inbreeding coefficient of the genotype used in
+        Dirichlet-multinomial prior, None indicates flat prior.
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
@@ -239,7 +238,6 @@ def compound_step(
             j=j,
             cache=cache,
             log_unique_haplotypes=log_unique_haplotypes,
-            flat_prior=flat_prior,
             inbreeding=inbreeding,
             n_alleles=n_alleles[j],
             temp=temp,

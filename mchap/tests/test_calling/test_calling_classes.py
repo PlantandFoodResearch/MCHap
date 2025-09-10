@@ -121,7 +121,6 @@ def test_CallingMCMC__DenovoMCMC_equivalence(seed):
         ploidy=ploidy,
         n_alleles=n_alleles,
         steps=10500,
-        flat_prior=False,
         inbreeding=inbreeding,
         fix_homozygous=1,
     )

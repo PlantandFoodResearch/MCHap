@@ -433,11 +433,10 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
     # calculate exact posteriors for reachable genotypes
     log_expect = np.empty(len(genotypes))
     dosage = np.empty(ploidy, int)
-    flat_prior = inbreeding is None
     for i, g in enumerate(genotypes):
         get_haplotype_dosage(dosage, g)
         llk = log_likelihood(reads, g)
-        if flat_prior:
+        if inbreeding is None:
             lprior = 0.0
         else:
             lprior = log_genotype_prior(
@@ -483,8 +482,7 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
             log_unique_haplotypes=log_unique_haplotypes,
             interval=interval,
             step_type=0,
-            flat_prior=inbreeding is None,
-            inbreeding=inbreeding or 0.0,
+            inbreeding=inbreeding,
             cache=cache,
             read_counts=read_counts,
         )
@@ -590,11 +588,10 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
     llks = np.empty(len(genotypes))
     lpriors = np.zeros(len(genotypes))
     dosage = np.empty(ploidy, int)
-    flat_prior = inbreeding is None
     for i, g in enumerate(genotypes):
         get_haplotype_dosage(dosage, g)
         llks[i] = log_likelihood(reads, g)
-        if not flat_prior:
+        if inbreeding is not None:
             lpriors[i] = log_genotype_prior(
                 dosage,
                 log_unique_haplotypes=log_unique_haplotypes,
@@ -654,8 +651,7 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
             log_unique_haplotypes=log_unique_haplotypes,
             interval=interval,
             step_type=1,
-            flat_prior=inbreeding is None,
-            inbreeding=inbreeding or 0.0,
+            inbreeding=inbreeding,
             read_counts=read_counts,
             cache=cache,
         )

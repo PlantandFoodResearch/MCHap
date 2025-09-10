@@ -436,8 +436,7 @@ def interval_step(
     reads,
     llk,
     log_unique_haplotypes,
-    flat_prior,
-    inbreeding=0,
+    inbreeding=None,
     interval=None,
     step_type=0,
     temp=1,
@@ -461,11 +460,9 @@ def interval_step(
         simulation.
     log_unique_haplotypes : int
         Log of the total number of unique haplotypes possible at this locus.
-    flat_prior : bool
-        If true the inbreeding argument is ignored and a
-        flat prior is assumed across all genotypes
     inbreeding : float
-        Expected inbreeding coefficient of the genotype.
+        Expected inbreeding coefficient of the genotype used in
+        Dirichlet-multinomial prior, None indicates flat prior.
     interval : ndarray, int, shape (2, )
         The interval constraining the step.
     step_type : int
@@ -513,11 +510,15 @@ def interval_step(
     ploidy = len(genotype)
     dosage = np.empty(ploidy, dtype=np.int8)
     get_haplotype_dosage(dosage, genotype)
-    lprior = log_genotype_prior(
-        dosage=dosage,
-        log_unique_haplotypes=log_unique_haplotypes,
-        inbreeding=inbreeding,
-    )
+    if inbreeding is None:
+        # flat prior
+        lprior = 0.0
+    else:
+        lprior = log_genotype_prior(
+            dosage=dosage,
+            log_unique_haplotypes=log_unique_haplotypes,
+            inbreeding=inbreeding,
+        )
 
     # store values for all options and current genotype
     llks = np.empty(n_options + 1)
@@ -540,7 +541,7 @@ def interval_step(
         llk_ratio = llk_i - llk
 
         # calculate ratio of priors: ln(P(G')/P(G))
-        if flat_prior:
+        if inbreeding is None:
             lprior_ratio = 0.0
         else:
             get_haplotype_dosage(dosage, option_labels[i])
@@ -594,8 +595,7 @@ def compound_step(
     llk,
     intervals,
     log_unique_haplotypes,
-    flat_prior,
-    inbreeding=0,
+    inbreeding=None,
     step_type=0,
     randomize=True,
     temp=1,
@@ -621,11 +621,9 @@ def compound_step(
         The interval constraining each sub-step within this step.
     log_unique_haplotypes : float
         The log of the total number of possible haplotypes.
-    flat_prior : bool
-        If true the inbreeding argument is ignored and a
-        flat prior is assumed across all genotypes
     inbreeding : float
-        Expected inbreeding coefficient of the genotype.
+        Expected inbreeding coefficient of the genotype used in
+        Dirichlet-multinomial prior, None indicates flat prior.
     step_type : int
         0 for recombination or 1 for dosage swap.
     randomize : bool, optional
@@ -667,7 +665,6 @@ def compound_step(
             llk=llk,
             cache=cache,
             log_unique_haplotypes=log_unique_haplotypes,
-            flat_prior=flat_prior,
             inbreeding=inbreeding,
             interval=intervals[i],
             step_type=step_type,

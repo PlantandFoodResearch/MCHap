@@ -16,7 +16,7 @@ def test_snp_posterior__zero_reads():
     expect_probs = np.array([0.0625, 0.25, 0.375, 0.25, 0.0625])
 
     actual_genotypes, actual_probs = snp_posterior(
-        reads[:, 0, :], n_alleles=2, ploidy=4, flat_prior=False, inbreeding=0.0
+        reads[:, 0, :], n_alleles=2, ploidy=4, inbreeding=0.0
     )
 
     np.testing.assert_almost_equal(expect_genotypes, actual_genotypes)
@@ -35,7 +35,7 @@ def test_snp_posterior__zero_reads__inbred():
     expect_probs = np.array([0.1015625, 0.24375, 0.309375, 0.24375, 0.1015625])
 
     actual_genotypes, actual_probs = snp_posterior(
-        reads[:, 0, :], n_alleles=2, ploidy=4, flat_prior=False, inbreeding=0.1
+        reads[:, 0, :], n_alleles=2, ploidy=4, inbreeding=0.1
     )
 
     np.testing.assert_almost_equal(expect_genotypes, actual_genotypes)
@@ -64,7 +64,7 @@ def test_snp_posterior__nan_reads():
     expect_probs = np.array([0.0625, 0.25, 0.375, 0.25, 0.0625])
 
     actual_genotypes, actual_probs = snp_posterior(
-        reads[:, 0, :], n_alleles=2, ploidy=4, flat_prior=False, inbreeding=0.0
+        reads[:, 0, :], n_alleles=2, ploidy=4, inbreeding=0.0
     )
 
     np.testing.assert_almost_equal(expect_genotypes, actual_genotypes)
@@ -93,7 +93,7 @@ def test_snp_posterior__nan_reads__inbred():
     expect_probs = np.array([0.1015625, 0.24375, 0.309375, 0.24375, 0.1015625])
 
     actual_genotypes, actual_probs = snp_posterior(
-        reads[:, 0, :], n_alleles=2, ploidy=4, flat_prior=False, inbreeding=0.1
+        reads[:, 0, :], n_alleles=2, ploidy=4, inbreeding=0.1
     )
 
     np.testing.assert_almost_equal(expect_genotypes, actual_genotypes)
@@ -126,7 +126,7 @@ def test_snp_posterior__novel_allele():
     expect_probs = np.array([0.0625, 0.25, 0.375, 0.25, 0.0625])
 
     actual_genotypes, actual_probs = snp_posterior(
-        reads[:, 0, :], n_alleles=2, ploidy=4, flat_prior=False, inbreeding=0.0
+        reads[:, 0, :], n_alleles=2, ploidy=4, inbreeding=0.0
     )
 
     np.testing.assert_almost_equal(expect_genotypes, actual_genotypes)
@@ -170,7 +170,6 @@ def test_snp_posterior__homozygous_deep(use_read_counts):
         reads[:, 0, :],
         n_alleles=2,
         ploidy=4,
-        flat_prior=False,
         inbreeding=0.0,
         read_counts=read_counts,
     )
@@ -218,7 +217,6 @@ def test_snp_posterior__homozygous_shallow(use_read_counts):
         reads[:, 0, :],
         n_alleles=2,
         ploidy=4,
-        flat_prior=False,
         inbreeding=0.0,
         read_counts=read_counts,
     )

@@ -190,20 +190,26 @@ dirmul_prior = Parameter(
 )
 
 assembly_inbreeding = Parameter(
-    "--use-dirmul-inbreeding",
+    "--use-dirmul-prior",
     dict(
         type=str,
         nargs=1,
-        dest="inbreeding",
         default=[None],
         help=(
             "WARNING: this option is not recommended and is only "
             "provided for backwards compatibility with prior versions! "
-            "Using this option will replace the (new) default of a flat prior "
+            "Using this option will replace the default of a flat prior "
             "over genotypes with Dirichlet-Multinomial prior which assumes "
             "all possible haplotypes (SNV combinations) have equal probability "
-            "of occuring within the sample population. "
+            "of occurring within the sample population. "
             "In general, this will inflate the prior probability of heterozygous genotypes."
+            "This option expects a single floating point value in the interval [0, 1] "
+            "used to specify the inbreeding coefficient of all samples or "
+            "a file containing a list of all samples and their inbreeding coefficient. "
+            "If a file is specified then each line of the plaintext file must contain a single "
+            "sample identifier and the inbreeding coefficient of that sample separated by a tab."
+            "The INFO field specifying prior allele frequencies must be a numerical field "
+            "of length 'R' and these values will automatically be normalized. "
         ),
     ),
 )
