@@ -3,6 +3,7 @@ import pytest
 
 from mchap.calling.prior import (
     calculate_alphas,
+    log_genotype_allele_flat_prior,
     log_genotype_allele_prior,
     log_genotype_prior,
 )
@@ -51,6 +52,22 @@ def test_calculate_alphas(inbreeding, frequencies, alphas):
 def test_calculate_alphas__flat_frequency(inbreeding, unique_haplotypes, dispersion):
     actual = calculate_alphas(inbreeding, 1 / unique_haplotypes)
     assert actual == dispersion
+
+
+@pytest.mark.parametrize(
+    "genotype,variable_allele,expect",
+    [
+        ([0, 0, 1, 2], 0, np.log(2)),
+        ([0, 0, 1, 2], 1, np.log(2)),
+        ([0, 0, 1, 2], 2, np.log(1)),
+        ([0, 0, 1, 2], 3, np.log(1)),
+        ([0, 1, 0, 2], 2, np.log(2)),
+        ([1, 1, 1, 2], 2, np.log(3)),
+    ],
+)
+def test_log_genotype_allele_flat_prior(genotype, variable_allele, expect):
+    actual = log_genotype_allele_flat_prior(genotype, variable_allele)
+    np.testing.assert_almost_equal(actual, expect)
 
 
 @pytest.mark.parametrize("use_frequencies", [False, True])

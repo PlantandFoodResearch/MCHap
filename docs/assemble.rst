@@ -3,7 +3,7 @@ MCHap assemble
 
 De novo assembly of micro-haplotypes.
 
-*(Last updated for MCHap version 0.10.0)*
+*(Last updated for MCHap version 0.11.0)*
 
 Background
 ----------
@@ -19,7 +19,7 @@ and genotype calls (some genotype calls may be incomplete).
 ``mchap assemble`` uses a Markov chain Monte-Carlo simulation (based on the 
 Metropolis-Hastings algorithm) to propose genotypes composed of micro-haplotypes.
 This algorithm approximates the posterior genotype distribution of each individual
-given its ploidy, inbreeding coefficient, and observed sequence alignments.
+given its ploidy and observed sequence alignments.
 The posterior mode genotype is then reported as the genotype call within the
 output VCF file.
 Note that the genotype calls of different samples are completely independent of
@@ -189,8 +189,7 @@ Sample parameters
 
 Sample parameters are used to specify information about each sample.
 Some of parameters (e.g., ploidy) have obvious importance when calling genotypes.
-However, other parameters such as expected inbreeding coefficients can have more subtle 
-effects on the results.
+However, other parameters can have more subtle effects on the results.
 
 - ``--ploidy``: The ploidy of all samples in the analysis (default = ``2``, must be a 
   positive integer).
@@ -201,42 +200,14 @@ effects on the results.
   Each line of this file must contain the identifier of a sample and its ploidy separated
   by a tab.
 
-- ``--inbreeding``: The expected inbreeding coefficient of each sample (default = ``0``, 
-  must be less than ``1`` and greater than or equal to ``0``).
-
-  The inbreeding coefficient is used in combination with allelic variability in the input 
-  VCF to determine a prior distribution of genotypes.
-  A higher inbreeding coefficient will result in increased homozygosity of genotype
-  calls.
-  This effect is more pronounced with lower read depths and noisier sequencing data.
-
-  It is worth noting that the inbreeding coefficient is rarely ``0`` in real samples, 
-  particularly in autopolyploids.
-  This means that, by default, MCHap will be biased towards excessively heterozygous
-  genotype calls.
-  This bias is more pronounced in inbred samples and with lower sequencing depth.
-  If the genotype calls output by MCHap appear to be excessively heterozygous,
-  it is worth considering if the inbreeding coefficients have been underestimated.
-
-  With ``mchap assemble`` in particular, it usually better to slightly over-estimate the 
-  inbreeding coefficient rather than underestimating it.
-  This is because the ``mchap assemble`` program assumes that samples are derived from a 
-  population in which all *possible* micro-haplotypes are present.
-  This assumption is unrealistic for real populations, but is currently unavoidable. 
-  
-  If samples have variable inbreeding coefficients then these can be specified within a
-  file and the location of that file is then passed to the ``--inbreeding`` argument.
-  Each line of this file must contain the identifier of a sample and its inbreeding 
-  coefficient separated by a tab.
-
 Sample pooling
 ~~~~~~~~~~~~~~
 
 MCHap allows you to define 'pools' of samples using the ``--sample-pools`` parameter.
 A sample pool will combine the reads of its constituent samples but otherwise is treated
 identically to a regular sample. Sample parameters relating to the sample pool including
-``--ploidy`` and ``--inbreeding`` must be set using the name of the sample pool rather
-than its constituent samples. Uses for sample pools include:
+``--ploidy`` must be set using the name of the sample pool rather than its constituent
+samples. Uses for sample pools include:
 
 - Combining the replicates into a single sample
 - Renaming samples (using a pool per sample)
@@ -248,6 +219,21 @@ all of the samples, or a tabular file assigning samples to pools. If a tabular f
 each line must contain the name of a sample followed by the name of the pool that sample is
 assigned to. All samples must be specified in this file but they can be assigned to a pool
 of the same name (i.e., a pool per sample). Samples may be assigned to more than one pool. 
+
+Prior distribution and inbreeding
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+From version ``0.11.0`` of MCHap, the ``mchap assemble`` tool uses a flat prior over genotypes.
+In previous versions of MCHap the default behavior was to use Dirichlet-multinomial prior
+which could incorporate the expected inbreeding coefficient of each genotype. This approach
+assumed that all possible haplotypes (combinations of SNVs) had equal probability of occurring
+within each genotype which, in practice, inflated the prior probability to heterozygous
+genotypes. This inflation could be partially mitigated by setting an non-zero prior on the
+inbreeding coefficient of samples. However, it is not always possible to give a reasonable
+estimate of the inbreeding coefficient. Hence a flat prior over genotypes is considered to be
+more appropriate in the vast majority of use-cases. Note that the previous behavior can still be
+applied using the ``--use-dirmul-prior`` argument.
+
 
 Output parameters
 ~~~~~~~~~~~~~~~~~

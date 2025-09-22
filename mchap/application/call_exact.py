@@ -110,10 +110,17 @@ class program(call_baseclass.program):
             # wrap in try clause to pass sample info back with any exception
             try:
                 ploidy = data.sample_ploidy[sample]
-                inbreeding = data.sample_inbreeding[sample]
                 read_calls = data.read_calls[sample]
                 read_dists = data.read_dists[sample]
                 read_counts = data.read_counts[sample]
+
+                # prior
+                if data.sample_inbreeding is None:
+                    # flat prior over genotypes
+                    prior = None
+                else:
+                    # Dirichlet-multinomial prior
+                    prior = (data.sample_inbreeding[sample], prior_frequencies)
 
                 # call haplotypes
                 if (FORMAT.GL in data.formatfields) or (FORMAT.GP in data.formatfields):
@@ -129,8 +136,7 @@ class program(call_baseclass.program):
                         log_likelihoods=llks,
                         ploidy=ploidy,
                         n_alleles=len(haplotypes),
-                        inbreeding=inbreeding,
-                        frequencies=prior_frequencies,
+                        prior=prior,
                     )
                     idx = np.argmax(probabilities)
                     alleles = index_as_genotype_alleles(idx, ploidy)
@@ -160,8 +166,7 @@ class program(call_baseclass.program):
                         read_counts=read_counts,
                         haplotypes=haplotypes,
                         ploidy=ploidy,
-                        inbreeding=inbreeding,
-                        frequencies=prior_frequencies,
+                        prior=prior,
                         return_support_prob=True,
                         return_posterior_frequencies=True,
                         return_posterior_occurrence=True,

@@ -67,7 +67,7 @@ def chain_swap_step(
     llk_j,
     temp_j,
     log_unique_haplotypes,
-    inbreeding=0,
+    inbreeding=None,
 ):
     """Exchange-swap step for exchanging genotypes between chains
     of different temperatures.
@@ -89,7 +89,8 @@ def chain_swap_step(
     log_unique_haplotypes : float
         Log of the total number of possible unique haplotypes in both chains.
     inbreeding : float
-        Expected inbreeding coefficient of organism.
+        Expected inbreeding coefficient of the genotype used in
+        Dirichlet-multinomial prior, None indicates flat prior.
 
     Returns
     -------
@@ -107,20 +108,26 @@ def chain_swap_step(
     dosage = np.zeros(ploidy, dtype=np.int8)
 
     # prior for genotype i dosage
-    get_haplotype_dosage(dosage, genotype_i)
-    prior_i = log_genotype_prior(
-        dosage=dosage,
-        log_unique_haplotypes=log_unique_haplotypes,
-        inbreeding=inbreeding,
-    )
+    if inbreeding is None:
+        prior_i = 0.0
+    else:
+        get_haplotype_dosage(dosage, genotype_i)
+        prior_i = log_genotype_prior(
+            dosage=dosage,
+            log_unique_haplotypes=log_unique_haplotypes,
+            inbreeding=inbreeding,
+        )
 
     # prior for genotype j dosage
-    get_haplotype_dosage(dosage, genotype_j)
-    prior_j = log_genotype_prior(
-        dosage=dosage,
-        log_unique_haplotypes=log_unique_haplotypes,
-        inbreeding=inbreeding,
-    )
+    if inbreeding is None:
+        prior_j = 0.0
+    else:
+        get_haplotype_dosage(dosage, genotype_j)
+        prior_j = log_genotype_prior(
+            dosage=dosage,
+            log_unique_haplotypes=log_unique_haplotypes,
+            inbreeding=inbreeding,
+        )
 
     acceptance = chain_swap_acceptance(
         llk_i,

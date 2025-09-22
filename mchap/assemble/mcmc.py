@@ -26,7 +26,7 @@ class DenovoMCMC(Assembler):
 
     ploidy: int
     n_alleles: list
-    inbreeding: float = 0
+    inbreeding: float = None
     steps: int = 1000
     chains: int = 2
     alpha: float = 1.0
@@ -50,7 +50,8 @@ class DenovoMCMC(Assembler):
         Number of possible alleles at each position in the
         assembled locus.
     inbreeding : float
-        Expected inbreeding coefficient of genotype.
+        Expected inbreeding coefficient of the genotype used in
+        Dirichlet-multinomial prior, None indicates flat prior.
     steps : int, optional
         Number of steps to run in each MCMC simulation
         (default = 1000).
@@ -508,8 +509,10 @@ def _homozygosity_probabilities(
         Number of possible alleles for each SNP.
     ploidy : int
         Ploidy of organism.
+
     inbreeding : float
-        Expected inbreeding coefficient of organism.
+        Expected inbreeding coefficient of the genotype used in
+        Dirichlet-multinomial prior, None indicates flat prior.
     read_counts : ndarray, int, shape (n_reads, )
         Count of each read.
 

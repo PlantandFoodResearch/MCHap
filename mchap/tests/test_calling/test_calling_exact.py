@@ -159,7 +159,7 @@ def test_genotype_posteriors():
         expect[i] = log_likelihoods[i] + log_prior
     expect = normalise_log_probs(expect)
     actual = exact.genotype_posteriors(
-        log_likelihoods, ploidy, n_alleles, inbreeding=inbreeding
+        log_likelihoods, ploidy, n_alleles, prior=(inbreeding, None)
     )
     np.testing.assert_almost_equal(expect, actual, decimal=6)
 
@@ -252,7 +252,7 @@ def test_call_posterior_mode():
 
     llks = exact.genotype_likelihoods(reads, ploidy, haplotypes, read_counts=counts)
     probs = exact.genotype_posteriors(
-        llks, ploidy, len(haplotypes), inbreeding=inbreeding
+        llks, ploidy, len(haplotypes), prior=(inbreeding, None)
     )
     _, phen_probs = exact.alternate_dosage_posteriors(genotype, probs)
 
@@ -266,7 +266,7 @@ def test_call_posterior_mode():
         4,
         haplotypes,
         read_counts=counts,
-        inbreeding=inbreeding,
+        prior=(inbreeding, None),
         return_support_prob=True,
     )
 
@@ -316,8 +316,7 @@ def test_call_posterior_mode__fuzz(
         llks,
         ploidy=ploidy,
         n_alleles=n_haps,
-        inbreeding=inbreeding,
-        frequencies=prior_frequencies,
+        prior=(inbreeding, prior_frequencies),
     )
     freqs, counts, occur = exact.posterior_allele_frequencies(
         post, ploidy=ploidy, n_alleles=n_haps
@@ -330,11 +329,10 @@ def test_call_posterior_mode__fuzz(
         reads=reads,
         ploidy=ploidy,
         haplotypes=haplotypes,
-        inbreeding=inbreeding,
         return_support_prob=False,
         return_posterior_frequencies=True,
         return_posterior_occurrence=True,
-        frequencies=prior_frequencies,
+        prior=(inbreeding, prior_frequencies),
     )
 
     np.testing.assert_array_equal(alleles, mode_alleles)
@@ -375,11 +373,10 @@ def test_call_posterior_mode__flat_frequencies(
         reads=reads,
         ploidy=ploidy,
         haplotypes=haplotypes,
-        inbreeding=inbreeding,
         return_support_prob=False,
         return_posterior_frequencies=True,
         return_posterior_occurrence=True,
-        frequencies=None,
+        prior=(inbreeding, None),
     )
 
     (
@@ -392,11 +389,10 @@ def test_call_posterior_mode__flat_frequencies(
         reads=reads,
         ploidy=ploidy,
         haplotypes=haplotypes,
-        inbreeding=inbreeding,
         return_support_prob=False,
         return_posterior_frequencies=True,
         return_posterior_occurrence=True,
-        frequencies=np.ones(n_haps) / n_haps,
+        prior=(inbreeding, np.ones(n_haps) / n_haps),
     )
 
     np.testing.assert_array_equal(mode_alleles_x, mode_alleles_y)

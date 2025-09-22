@@ -20,7 +20,7 @@ def base_step(
     j,
     n_alleles,
     log_unique_haplotypes,
-    inbreeding=0,
+    inbreeding=None,
     temp=1,
     read_counts=None,
     cache=None,
@@ -48,7 +48,8 @@ def base_step(
     log_unique_haplotypes : float
         The log of the total number of possible haplotypes.
     inbreeding : float
-        Expected inbreeding coefficient of the genotype.
+        Expected inbreeding coefficient of the genotype used in
+        Dirichlet-multinomial prior, None indicates flat prior.
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.
@@ -87,11 +88,15 @@ def base_step(
     # ratio of prior probabilities
     dosage = np.empty(ploidy, dtype=np.int8)
     get_haplotype_dosage(dosage, genotype)
-    lprior = log_genotype_prior(
-        dosage=dosage,
-        log_unique_haplotypes=log_unique_haplotypes,
-        inbreeding=inbreeding,
-    )
+    if inbreeding is None:
+        # flat prior
+        lprior = 0.0
+    else:
+        lprior = log_genotype_prior(
+            dosage=dosage,
+            log_unique_haplotypes=log_unique_haplotypes,
+            inbreeding=inbreeding,
+        )
 
     current_nucleotide = genotype[h, j]
     n_options = 0
@@ -117,13 +122,17 @@ def base_step(
             llk_ratio = llk_i - llk
 
             # calculate ratio of priors: ln(P(G')/P(G))
-            get_haplotype_dosage(dosage, genotype)
-            lprior_i = log_genotype_prior(
-                dosage=dosage,
-                log_unique_haplotypes=log_unique_haplotypes,
-                inbreeding=inbreeding,
-            )
-            lprior_ratio = lprior_i - lprior
+            if inbreeding is None:
+                # flat prior
+                lprior_ratio = 0.0
+            else:
+                get_haplotype_dosage(dosage, genotype)
+                lprior_i = log_genotype_prior(
+                    dosage=dosage,
+                    log_unique_haplotypes=log_unique_haplotypes,
+                    inbreeding=inbreeding,
+                )
+                lprior_ratio = lprior_i - lprior
 
             # calculate proposal ratio for detailed balance: ln(g(G|G')/g(G'|G))
             lhapcount_i = np.log(count_haplotype_copies(genotype, h))
@@ -159,7 +168,7 @@ def compound_step(
     llk,
     n_alleles,
     log_unique_haplotypes,
-    inbreeding=0,
+    inbreeding=None,
     temp=1,
     read_counts=None,
     cache=None,
@@ -182,7 +191,8 @@ def compound_step(
     log_unique_haplotypes : float
         The log of the total number of possible haplotypes.
     inbreeding : float
-        Expected inbreeding coefficient of the genotype.
+        Expected inbreeding coefficient of the genotype used in
+        Dirichlet-multinomial prior, None indicates flat prior.
     temp : float
         An inverse temperature in the interval 0, 1 to adjust
         the sampled distribution by.

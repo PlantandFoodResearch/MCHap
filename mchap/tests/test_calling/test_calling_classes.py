@@ -54,7 +54,7 @@ def test_CallingMCMC__gibbs_mh_equivalence(seed):
 
     # Gibbs sampler
     model = CallingMCMC(
-        ploidy=ploidy, haplotypes=haplotypes, inbreeding=inbreeding, steps=10050
+        ploidy=ploidy, haplotypes=haplotypes, prior=(inbreeding, None), steps=10050
     )
     gibbs_genotype, gibbs_genotype_prob, gibbs_genotype_support_prob = (
         model.fit(reads, read_counts).burn(50).posterior().mode(genotype_support=True)
@@ -64,7 +64,7 @@ def test_CallingMCMC__gibbs_mh_equivalence(seed):
     model = CallingMCMC(
         ploidy=ploidy,
         haplotypes=haplotypes,
-        inbreeding=inbreeding,
+        prior=(inbreeding, None),
         steps=10050,
         step_type="Metropolis-Hastings",
     )
@@ -139,7 +139,7 @@ def test_CallingMCMC__DenovoMCMC_equivalence(seed):
 
     # gibbs base calling
     model = CallingMCMC(
-        ploidy=ploidy, haplotypes=haplotypes, inbreeding=inbreeding, steps=10500
+        ploidy=ploidy, haplotypes=haplotypes, prior=(inbreeding, None), steps=10500
     )
     call_alleles, call_genotype_prob, call_genotype_support_prob = (
         model.fit(reads, read_counts).burn(500).posterior().mode(genotype_support=True)
@@ -180,7 +180,7 @@ def test_CallingMCMC__zero_reads():
     model = CallingMCMC(
         ploidy=ploidy,
         haplotypes=haplotypes,
-        inbreeding=inbreeding,
+        prior=(inbreeding, None),
         steps=n_steps,
         chains=n_chains,
     )
@@ -213,7 +213,7 @@ def test_CallingMCMC__zero_snps():
     model = CallingMCMC(
         ploidy=ploidy,
         haplotypes=haplotypes,
-        inbreeding=inbreeding,
+        prior=(inbreeding, None),
         steps=n_steps,
         chains=n_chains,
     )
@@ -247,7 +247,7 @@ def test_CallingMCMC__many_haplotype():
     model = CallingMCMC(
         ploidy=ploidy,
         haplotypes=haplotypes,
-        inbreeding=inbreeding,
+        prior=(inbreeding, None),
         steps=n_steps,
         chains=n_chains,
     )

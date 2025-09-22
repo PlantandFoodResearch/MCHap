@@ -372,6 +372,7 @@ def test_dosage_step_options(labels, answer):
     [
         0.0,
         0.25,
+        None,  # flat prior
     ],
 )
 def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
@@ -435,9 +436,14 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
     for i, g in enumerate(genotypes):
         get_haplotype_dosage(dosage, g)
         llk = log_likelihood(reads, g)
-        lprior = log_genotype_prior(
-            dosage, log_unique_haplotypes=log_unique_haplotypes, inbreeding=inbreeding
-        )
+        if inbreeding is None:
+            lprior = 0.0
+        else:
+            lprior = log_genotype_prior(
+                dosage,
+                log_unique_haplotypes=log_unique_haplotypes,
+                inbreeding=inbreeding,
+            )
         log_expect[i] = llk + lprior
     expect = normalise_log_probs(log_expect)
 
@@ -517,6 +523,7 @@ def test_interval_step__recombination(use_cache, use_read_counts, inbreeding):
     [
         0.0,
         0.25,
+        None,  # flat prior
     ],
 )
 def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
@@ -579,14 +586,17 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
 
     # calculate exact posteriors for reachable genotypes
     llks = np.empty(len(genotypes))
-    lpriors = np.empty(len(genotypes))
+    lpriors = np.zeros(len(genotypes))
     dosage = np.empty(ploidy, int)
     for i, g in enumerate(genotypes):
         get_haplotype_dosage(dosage, g)
         llks[i] = log_likelihood(reads, g)
-        lpriors[i] = log_genotype_prior(
-            dosage, log_unique_haplotypes=log_unique_haplotypes, inbreeding=inbreeding
-        )
+        if inbreeding is not None:
+            lpriors[i] = log_genotype_prior(
+                dosage,
+                log_unique_haplotypes=log_unique_haplotypes,
+                inbreeding=inbreeding,
+            )
     exact_posteriors = normalise_log_probs(llks + lpriors)
 
     # now calculate posteriors using a full transition matrix
@@ -633,7 +643,7 @@ def test_interval_step__dosage_swap(use_cache, use_read_counts, inbreeding):
     counts = {}
     for g in genotypes:
         counts[g.tobytes()] = 0
-    for i in range(25_000):
+    for i in range(50_000):
         llk, cache = structural.interval_step(
             genotype,
             reads,

@@ -5,7 +5,11 @@ from mchap.jitutils import random_choice, normalise_log_probs
 
 from .utils import count_allele
 from .likelihood import log_likelihood_alleles, log_likelihood_alleles_cached
-from .prior import log_genotype_allele_prior, log_genotype_prior
+from .prior import (
+    log_genotype_allele_flat_prior,
+    log_genotype_allele_prior,
+    log_genotype_prior,
+)
 
 
 @njit(cache=True)
@@ -15,11 +19,10 @@ def mh_options(
     haplotypes,
     reads,
     read_counts,
-    inbreeding,
     llks_array,
     lpriors_array,
     probabilities_array,
-    frequencies=None,
+    prior=None,
     llk_cache=None,
 ):
     """Calculate transition probabilities for a Metropolis-Hastings step.
@@ -36,16 +39,14 @@ def mh_options(
         Probabilistic reads.
     read_counts : ndarray, int, shape (n_reads, )
         Count of each read.
-    inbreeding : float
-        Expected inbreeding coefficient of sample.
     llks_array : ndarray, float , shape (n_haplotypes, )
         Array to be populated with log-likelihood of each step option.
     lpriors_array : ndarray, float , shape (n_haplotypes, )
         Array to be populated with log-prior of each step option.
     probabilities_array : ndarray, float , shape (n_haplotypes, )
         Array to be populated with transition probability of each step option.
-    frequencies : ndarray, float , shape (n_haplotypes, )
-        Optional prior frequencies for each haplotype allele.
+    prior : tuple[float, (ndarray, float , shape (n_haplotypes, ))]
+        Optional inbreeding and allele frequencies for Dirichlet-multinomial prior.
     llk_cache : dict
         Cache of log-likelihoods mapping genotype index (int) to llk (float).
 
@@ -65,12 +66,15 @@ def mh_options(
     # stats of current genotype
     n_alleles = len(haplotypes)
     allele_copies = count_allele(genotype_alleles, genotype_alleles[variable_allele])
-    lprior = log_genotype_prior(
-        genotype=genotype_alleles,
-        unique_haplotypes=n_alleles,
-        inbreeding=inbreeding,
-        frequencies=frequencies,
-    )
+    if prior is None:
+        lprior = 0.0
+    else:
+        lprior = log_genotype_prior(
+            genotype=genotype_alleles,
+            unique_haplotypes=n_alleles,
+            inbreeding=prior[0],
+            frequencies=prior[1],
+        )
     llk = log_likelihood_alleles_cached(
         reads=reads,
         read_counts=read_counts,
@@ -99,12 +103,15 @@ def mh_options(
             genotype_alleles[variable_allele] = a
 
             # calculate prior
-            lpriors_array[a] = log_genotype_prior(
-                genotype=genotype_alleles,
-                unique_haplotypes=n_alleles,
-                inbreeding=inbreeding,
-                frequencies=frequencies,
-            )
+            if prior is None:
+                lpriors_array[a] = 0.0
+            else:
+                lpriors_array[a] = log_genotype_prior(
+                    genotype=genotype_alleles,
+                    unique_haplotypes=n_alleles,
+                    inbreeding=prior[0],
+                    frequencies=prior[1],
+                )
 
             # calculate likelihood
             llks_array[a] = log_likelihood_alleles_cached(
@@ -142,11 +149,10 @@ def gibbs_options(
     haplotypes,
     reads,
     read_counts,
-    inbreeding,
     llks_array,
     lpriors_array,
     probabilities_array,
-    frequencies=None,
+    prior=None,
     llk_cache=None,
 ):
     """Calculate transition probabilities for a Gibbs step.
@@ -163,16 +169,14 @@ def gibbs_options(
         Probabilistic reads.
     read_counts : ndarray, int, shape (n_reads, )
         Count of each read.
-    inbreeding : float
-        Expected inbreeding coefficient of sample.
     llks_array : ndarray, float , shape (n_haplotypes, )
         Array to be populated with log-likelihood of each step option.
     lpriors_array : ndarray, float , shape (n_haplotypes, )
         Array to be populated with log-prior of each step option.
     probabilities_array : ndarray, float , shape (n_haplotypes, )
         Array to be populated with transition probability of each step option.
-    frequencies : ndarray, float , shape (n_haplotypes, )
-        Optional prior frequencies for each haplotype allele.
+    prior : tuple[float, (ndarray, float , shape (n_haplotypes, ))]
+        Optional inbreeding and allele frequencies for Dirichlet-multinomial prior.
     llk_cache : dict
         Cache of log-likelihoods mapping genotype index (int) to llk (float).
 
@@ -197,13 +201,19 @@ def gibbs_options(
         genotype_alleles[variable_allele] = a
 
         # genotype prior
-        lpriors_array[a] = log_genotype_allele_prior(
-            genotype=genotype_alleles,
-            variable_allele=variable_allele,
-            unique_haplotypes=unique_haplotypes,
-            inbreeding=inbreeding,
-            frequencies=frequencies,
-        )
+        if prior is None:
+            lpriors_array[a] = log_genotype_allele_flat_prior(
+                genotype=genotype_alleles,
+                variable_allele=variable_allele,
+            )
+        else:
+            lpriors_array[a] = log_genotype_allele_prior(
+                genotype=genotype_alleles,
+                variable_allele=variable_allele,
+                unique_haplotypes=unique_haplotypes,
+                inbreeding=prior[0],
+                frequencies=prior[1],
+            )
 
         # genotype likelihood
         llks_array[a] = log_likelihood_alleles_cached(
@@ -228,8 +238,7 @@ def compound_step(
     haplotypes,
     reads,
     read_counts,
-    inbreeding,
-    frequencies=None,
+    prior=None,
     llk_cache=None,
     step_type=0,
 ):
@@ -245,10 +254,8 @@ def compound_step(
         Probabilistic reads.
     read_counts : ndarray, int, shape (n_reads, )
         Count of each read.
-    inbreeding : float
-        Expected inbreeding coefficient of sample.
-    frequencies : ndarray, float , shape (n_haplotypes, )
-        Optional prior frequencies for each haplotype allele.
+    prior : tuple[float, (ndarray, float , shape (n_haplotypes, ))]
+        Optional inbreeding and allele frequencies for Dirichlet-multinomial prior.
     llk_cache : dict
         Cache of log-likelihoods mapping genotype index (int) to llk (float).
     step_type : int
@@ -290,11 +297,10 @@ def compound_step(
                 haplotypes=haplotypes,
                 reads=reads,
                 read_counts=read_counts,
-                inbreeding=inbreeding,
                 llks_array=llks,
                 lpriors_array=lpriors,
                 probabilities_array=probabilities,
-                frequencies=frequencies,
+                prior=prior,
                 llk_cache=llk_cache,
             )
         elif step_type == 1:
@@ -304,11 +310,10 @@ def compound_step(
                 haplotypes=haplotypes,
                 reads=reads,
                 read_counts=read_counts,
-                inbreeding=inbreeding,
                 llks_array=llks,
                 lpriors_array=lpriors,
                 probabilities_array=probabilities,
-                frequencies=frequencies,
+                prior=prior,
                 llk_cache=llk_cache,
             )
         else:
@@ -331,8 +336,7 @@ def mcmc_sampler(
     haplotypes,
     reads,
     read_counts,
-    inbreeding,
-    frequencies=None,
+    prior=None,
     n_steps=1000,
     cache=False,
     step_type=0,
@@ -349,12 +353,8 @@ def mcmc_sampler(
         Probabilistic reads.
     read_counts : ndarray, int, shape (n_reads, )
         Count of each read.
-    inbreeding : float
-        Expected inbreeding coefficient of sample.
-    frequencies : ndarray, float , shape (n_haplotypes, )
-        Optional prior frequencies for each haplotype allele.
-    frequencies : ndarray, float , shape (n_haplotypes, )
-        Optional prior frequencies for each haplotype allele.
+    prior : tuple[float, (ndarray, float , shape (n_haplotypes, ))]
+        Optional inbreeding and allele frequencies for Dirichlet-multinomial prior.
     n_steps : int
         Number of (compound) steps to simulate.
     step_type : int
@@ -384,8 +384,7 @@ def mcmc_sampler(
             haplotypes=haplotypes,
             reads=reads,
             read_counts=read_counts,
-            inbreeding=inbreeding,
-            frequencies=frequencies,
+            prior=prior,
             llk_cache=llk_cache,
             step_type=step_type,
         )
@@ -395,9 +394,7 @@ def mcmc_sampler(
 
 
 @njit(cache=True)
-def greedy_caller(
-    haplotypes, ploidy, reads, read_counts, inbreeding=0.0, frequencies=None
-):
+def greedy_caller(haplotypes, ploidy, reads, read_counts, prior=None):
     """Greedy method for calling genotype from known haplotypes.
 
     Parameters
@@ -410,10 +407,8 @@ def greedy_caller(
         Probabilistic reads.
     read_counts : ndarray, int, shape (n_reads, )
         Count of each read.
-    inbreeding : float
-        Expected inbreeding coefficient of sample.
-    frequencies : ndarray, float , shape (n_haplotypes, )
-        Optional prior frequencies for each haplotype allele.
+    prior : tuple[float, (ndarray, float , shape (n_haplotypes, ))]
+        Optional inbreeding and allele frequencies for Dirichlet-multinomial prior.
 
     Returns
     -------
@@ -440,12 +435,15 @@ def greedy_caller(
                 haplotypes=haplotypes,
                 genotype_alleles=genotype,
             )
-            lprior = log_genotype_prior(
-                genotype=genotype,
-                unique_haplotypes=len(haplotypes),
-                inbreeding=inbreeding,
-                frequencies=frequencies,
-            )
+            if prior is None:
+                lprior = 0.0
+            else:
+                lprior = log_genotype_prior(
+                    genotype=genotype,
+                    unique_haplotypes=len(haplotypes),
+                    inbreeding=prior[0],
+                    frequencies=prior[1],
+                )
             lprob = llk + lprior
             if lprob > best_lprob:
                 # update best

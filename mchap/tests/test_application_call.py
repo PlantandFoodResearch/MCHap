@@ -70,7 +70,8 @@ def local_file_path(name):
             "mock.input.frequencies.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
-                "--prior-frequencies",
+                "--use-dirmul-prior",
+                "0.0",
                 "AFP",
                 "--filter-input-haplotypes",
                 "AFP>=0.1",
@@ -84,7 +85,8 @@ def local_file_path(name):
             "mock.input.frequencies.vcf",
             ["simple.sample1.bam", "simple.sample2.deep.bam", "simple.sample3.bam"],
             [
-                "--prior-frequencies",
+                "--use-dirmul-prior",
+                "0.0",
                 "AFP",
                 "--report",
                 "AFPRIOR",
@@ -110,9 +112,6 @@ def local_file_path(name):
             [
                 "--report",
                 "GP",
-                "--base-error-rate",
-                "0.0",
-                "--use-base-phred-scores",
             ],
             "simple.output.mixed_depth.call.posteriors.vcf",
         ),

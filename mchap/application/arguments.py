@@ -168,19 +168,63 @@ ploidy = Parameter(
 )
 
 
-inbreeding = Parameter(
-    "--inbreeding",
+dirmul_prior = Parameter(
+    "--use-dirmul-prior",
+    dict(
+        type=str,
+        nargs=2,
+        default=[None, None],
+        help=(
+            "Specify Dirichlet-multinomial prior using expected inbreeding and allele frequencies. "
+            "This arguments expects two values: (1) an inbreeding value or file and "
+            "(2) an INFO field specifying prior allele frequencies. "
+            "Inbreeding may be a single floating point value in the interval [0, 1] "
+            "used to specify the inbreeding coefficient of all samples or "
+            "a file containing a list of all samples and their inbreeding coefficient. "
+            "If a file is specified then each line of the plaintext file must contain a single "
+            "sample identifier and the inbreeding coefficient of that sample separated by a tab."
+            "The INFO field specifying prior allele frequencies must be a numerical field "
+            "of length 'R' and these values will automatically be normalized. "
+        ),
+    ),
+)
+
+assembly_dirmul_prior = Parameter(
+    "--use-dirmul-prior",
     dict(
         type=str,
         nargs=1,
-        default=["0.0"],
+        default=[None],
         help=(
-            "Specify expected sample inbreeding coefficient (default = 0.0)."
-            "This may be (1) a single floating point value in the interval [0, 1] "
+            "WARNING: this option is not recommended and is only "
+            "provided for backwards compatibility with prior versions! "
+            "Using this option will replace the default of a flat prior "
+            "over genotypes with Dirichlet-Multinomial prior which assumes "
+            "all possible haplotypes (SNV combinations) have equal probability "
+            "of occurring within the sample population. "
+            "In general, this will inflate the prior probability of heterozygous genotypes."
+            "This option expects a single floating point value in the interval [0, 1] "
             "used to specify the inbreeding coefficient of all samples or "
-            "(2) a file containing a list of all samples and their inbreeding coefficient. "
-            "If option (2) is used then each line of the plaintext file must "
-            "contain a single sample identifier and the inbreeding coefficient of that sample separated by a tab."
+            "a file containing a list of all samples and their inbreeding coefficient. "
+            "If a file is specified then each line of the plaintext file must contain a single "
+            "sample identifier and the inbreeding coefficient of that sample separated by a tab."
+            "The INFO field specifying prior allele frequencies must be a numerical field "
+            "of length 'R' and these values will automatically be normalized. "
+        ),
+    ),
+)
+
+prior_frequencies = Parameter(
+    "--prior-frequencies",
+    dict(
+        type=str,
+        nargs=1,
+        default=[None],
+        help=(
+            "Optionally specify an INFO field within the input VCF file to "
+            "designate as prior allele frequencies for the input haplotypes. "
+            "This can be any numerical field of length 'R' and these "
+            "values will automatically be normalized. "
         ),
     ),
 )
@@ -338,21 +382,6 @@ haplotype_posterior_threshold = Parameter(
             "alternate alleles in ech VCF record and hence the number of genotypes "
             "assessed when recalculating likelihoods and posterior distributions "
             "(default = 0.20)."
-        ),
-    ),
-)
-
-prior_frequencies = Parameter(
-    "--prior-frequencies",
-    dict(
-        type=str,
-        nargs=1,
-        default=[None],
-        help=(
-            "Optionally specify an INFO field within the input VCF file to "
-            "designate as prior allele frequencies for the input haplotypes. "
-            "This can be any numerical field of length 'R' and these "
-            "values will automatically be normalized. "
         ),
     ),
 )
@@ -710,12 +739,34 @@ find_snvs_min_ind = Parameter(
 # )
 
 
-DEFAULT_PARSER_ARGUMENTS = [
+SAMPLE_FLATPRIOR_ARGUMENTS = [
     bam,
     ploidy,
-    inbreeding,
     sample_pool,
+]
+
+SAMPLE_DIRMUL_ARGUMENTS = [
+    bam,
+    ploidy,
+    dirmul_prior,
+    sample_pool,
+]
+
+LOCI_DENOVO_ARGUMENTS = [
     reference,
+    region,
+    region_id,
+    targets,
+    variants,
+]
+
+LOCI_KNOWN_ARGUMENTS = [
+    reference,
+    haplotypes,
+    filter_input_haplotypes,
+]
+
+READ_ENCODING_ARGUMENTS = [
     base_error_rate,
     ignore_base_phred_scores,
     mapping_quality,
@@ -723,19 +774,9 @@ DEFAULT_PARSER_ARGUMENTS = [
     skip_qcfail,
     skip_supplementary,
     read_group_field,
-    report,
-    cores,
 ]
 
-KNOWN_HAPLOTYPES_ARGUMENTS = [
-    haplotypes,
-    prior_frequencies,
-    filter_input_haplotypes,
-]
-
-CALL_EXACT_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_PARSER_ARGUMENTS
-
-DEFAULT_MCMC_PARSER_ARGUMENTS = DEFAULT_PARSER_ARGUMENTS + [
+MCMC_ARGUMENTS = [
     mcmc_chains,
     mcmc_steps,
     mcmc_burn,
@@ -743,32 +784,20 @@ DEFAULT_MCMC_PARSER_ARGUMENTS = DEFAULT_PARSER_ARGUMENTS + [
     mcmc_chain_incongruence_threshold,
 ]
 
-PEDIGREE_PARSER_ARGUMENTS = [
-    sample_parents,
-    gamete_ploidy,
-    gamete_ibd,
-    gamete_error,
+OUTPUT_ARGUMENTS = [
+    report,
 ]
 
-CALL_MCMC_PARSER_ARGUMENTS = KNOWN_HAPLOTYPES_ARGUMENTS + DEFAULT_MCMC_PARSER_ARGUMENTS
-
-# insert pedigree arguments in appropriate place and remove inbreeding which is currently unsupported
-assert CALL_MCMC_PARSER_ARGUMENTS[5] == inbreeding
-CALL_PEDIGREE_MCMC_PARSER_ARGUMENTS = (
-    CALL_MCMC_PARSER_ARGUMENTS[0:5]
-    + PEDIGREE_PARSER_ARGUMENTS
-    + CALL_MCMC_PARSER_ARGUMENTS[6:]
-)
-
+CORES_ARGUMENTS = [
+    cores,
+]
 
 ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
-    [
-        region,
-        region_id,
-        targets,
-        variants,
-    ]
-    + DEFAULT_MCMC_PARSER_ARGUMENTS
+    SAMPLE_FLATPRIOR_ARGUMENTS
+    + [assembly_dirmul_prior]
+    + LOCI_DENOVO_ARGUMENTS
+    + READ_ENCODING_ARGUMENTS
+    + MCMC_ARGUMENTS
     + [
         mcmc_fix_homozygous,
         mcmc_llk_cache_threshold,
@@ -778,6 +807,41 @@ ASSEMBLE_MCMC_PARSER_ARGUMENTS = (
         mcmc_temperatures,
         haplotype_posterior_threshold,
     ]
+    + OUTPUT_ARGUMENTS
+    + CORES_ARGUMENTS
+)
+
+CALL_EXACT_PARSER_ARGUMENTS = (
+    SAMPLE_DIRMUL_ARGUMENTS
+    + LOCI_KNOWN_ARGUMENTS
+    + READ_ENCODING_ARGUMENTS
+    + OUTPUT_ARGUMENTS
+    + CORES_ARGUMENTS
+)
+
+CALL_MCMC_PARSER_ARGUMENTS = (
+    SAMPLE_DIRMUL_ARGUMENTS
+    + LOCI_KNOWN_ARGUMENTS
+    + READ_ENCODING_ARGUMENTS
+    + MCMC_ARGUMENTS
+    + OUTPUT_ARGUMENTS
+    + CORES_ARGUMENTS
+)
+
+CALL_PEDIGREE_MCMC_PARSER_ARGUMENTS = (
+    SAMPLE_FLATPRIOR_ARGUMENTS  # inbreeding is not supported yet
+    + [
+        prior_frequencies,  # TODO: update default founder prior
+        sample_parents,
+        gamete_ploidy,
+        gamete_ibd,
+        gamete_error,
+    ]
+    + LOCI_KNOWN_ARGUMENTS
+    + READ_ENCODING_ARGUMENTS
+    + MCMC_ARGUMENTS
+    + OUTPUT_ARGUMENTS
+    + CORES_ARGUMENTS
 )
 
 
@@ -943,8 +1007,6 @@ def parse_pedigree_arguments(
         Dict mapping sample names to bam filepaths.
     ploidy_argument : str
         Filepath or default value for for ploidy.
-    inbreeding_argument : str
-        Filepath or default value for for inbreeding.
     sample_parents_argument : str
         Filepath to tab-separated values describing pedigree.
     gamete_ploidy_argument : str
@@ -961,7 +1023,6 @@ def parse_pedigree_arguments(
         - 'samples': list of ordered samples.
         - 'sample_bams': dict mapping sample names to bam filepaths.
         - 'sample_ploidy' dict mapping sample names to ploidy.
-        - 'sample_inbreeding' dict mapping sample names to inbreeding.
         - 'sample_parents': dict mapping sample names to parent sample names.
         - 'gamete_ploidy': dict mapping sample names to ploidy of contributing gametes.
         - 'gamete_ibd': dict mapping sample names to excess IBD of contributing gametes.
@@ -988,13 +1049,12 @@ def parse_pedigree_arguments(
             q = None if q == "." else q
             sample_parents[sample] = (p, q)
 
-    # parse ploidy and inbreeding to ensure any additional samples are included
+    # parse ploidy to ensure any additional samples are included
     sample_ploidy = parse_sample_value_map(
         ploidy_argument,
         samples,
         type=int,
     )
-    sample_inbreeding = {s: 0.0 for s in samples}
 
     # gamete ploidy
     gamete_ploidy = dict()
@@ -1052,7 +1112,6 @@ def parse_pedigree_arguments(
         samples=samples,
         sample_bams=sample_bams,
         sample_ploidy=sample_ploidy,
-        sample_inbreeding=sample_inbreeding,
         sample_parents=sample_parents,
         gamete_ploidy=gamete_ploidy,
         gamete_ibd=gamete_ibd,
@@ -1147,9 +1206,11 @@ def collect_default_program_arguments(arguments, skip_inbreeding=False):
     )
     if skip_inbreeding:
         sample_inbreeding = None
+    elif arguments.use_dirmul_prior[0] is None:
+        sample_inbreeding = None
     else:
         sample_inbreeding = parse_sample_value_map(
-            arguments.inbreeding[0],
+            arguments.use_dirmul_prior[0],
             samples,
             type=float,
         )
@@ -1177,7 +1238,7 @@ def collect_call_exact_program_arguments(arguments):
     data = collect_default_program_arguments(arguments)
     data["vcf"] = arguments.haplotypes[0]
     data["random_seed"] = None
-    data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
+    data["prior_frequencies_tag"] = arguments.use_dirmul_prior[1]
     data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
     return data
 
@@ -1196,13 +1257,12 @@ def collect_call_mcmc_program_arguments(arguments):
     data = collect_default_program_arguments(arguments)
     data.update(collect_default_mcmc_program_arguments(arguments))
     data["vcf"] = arguments.haplotypes[0]
-    data["prior_frequencies_tag"] = arguments.prior_frequencies[0]
+    data["prior_frequencies_tag"] = arguments.use_dirmul_prior[1]
     data["filter_input_haplotypes"] = arguments.filter_input_haplotypes[0]
     return data
 
 
 def collect_call_pedigree_mcmc_program_arguments(arguments):
-    # TODO: re-add the inbreeding option when supported
     data = collect_default_program_arguments(arguments, skip_inbreeding=True)
     data["format_fields"] += FORMAT.PEDIGREE_FIELDS
     data.update(collect_default_mcmc_program_arguments(arguments))

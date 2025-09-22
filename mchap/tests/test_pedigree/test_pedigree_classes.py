@@ -207,7 +207,6 @@ def test_PedigreeCallingMCMC__exact(read_depth, step_type, seed, tolerance):
     # approximate with MCMC model
     model = PedigreeCallingMCMC(
         sample_ploidy=sample_ploidy,
-        sample_inbreeding=np.zeros(n_samples),
         sample_parents=sample_parent,
         gamete_tau=gamete_tau,
         gamete_lambda=gamete_lambda,
@@ -421,7 +420,6 @@ def test_PedigreeCallingMCMC__swap_parental_alleles_example():
     # check that disabling the parental allele swap results in being stuck in the incorrect mode
     model_a = PedigreeCallingMCMC(
         sample_ploidy=sample_ploidy,
-        sample_inbreeding=np.zeros(n_samples),
         sample_parents=sample_parent,
         gamete_tau=gamete_tau,
         gamete_lambda=gamete_lambda,
@@ -448,7 +446,6 @@ def test_PedigreeCallingMCMC__swap_parental_alleles_example():
     # check that enabling the parental allele swap has allowed a transition to the correct genotypes
     model_b = PedigreeCallingMCMC(
         sample_ploidy=sample_ploidy,
-        sample_inbreeding=np.zeros(n_samples),
         sample_parents=sample_parent,
         gamete_tau=gamete_tau,
         gamete_lambda=gamete_lambda,
@@ -546,7 +543,6 @@ def test_PedigreeCallingMCMC__swap_parental_alleles_bias(
     # without allele swapping
     model_1 = PedigreeCallingMCMC(
         sample_ploidy=sample_ploidy,
-        sample_inbreeding=np.zeros(n_samples),
         sample_parents=sample_parent,
         gamete_tau=gamete_tau,
         gamete_lambda=gamete_lambda,
@@ -565,7 +561,6 @@ def test_PedigreeCallingMCMC__swap_parental_alleles_bias(
     # with allele swapping
     model_2 = PedigreeCallingMCMC(
         sample_ploidy=sample_ploidy,
-        sample_inbreeding=np.zeros(n_samples),
         sample_parents=sample_parent,
         gamete_tau=gamete_tau,
         gamete_lambda=gamete_lambda,

@@ -14,7 +14,6 @@ from .validation import duo_valid, trio_valid
 @dataclass
 class PedigreeCallingMCMC(Assembler):
     sample_ploidy: np.ndarray
-    sample_inbreeding: np.ndarray
     sample_parents: np.ndarray
     gamete_tau: np.ndarray
     gamete_lambda: np.ndarray
@@ -45,7 +44,7 @@ class PedigreeCallingMCMC(Assembler):
                     ploidy=self.sample_ploidy[i],
                     reads=sample_reads[i],
                     read_counts=sample_read_counts[i],
-                    inbreeding=self.sample_inbreeding[i],
+                    prior=None,
                 )
                 initial[i][0 : self.sample_ploidy[i]] = genotype
         else:

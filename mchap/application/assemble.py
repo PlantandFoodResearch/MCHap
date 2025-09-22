@@ -109,6 +109,13 @@ class program(baseclass.program):
         for sample in data.samples:
             # wrap in try clause to pass sample info back with any exception
             try:
+                # prior
+                if data.sample_inbreeding is None:
+                    # flat prior over genotypes
+                    inbreeding = None
+                else:
+                    # Dirichlet-multinomial with flat prior of allele frequencies
+                    inbreeding = data.sample_inbreeding[sample]
                 # assembly MCMC
                 read_calls = data.read_calls[sample]
                 read_dists = data.read_dists[sample]
@@ -117,7 +124,7 @@ class program(baseclass.program):
                     DenovoMCMC(
                         ploidy=data.sample_ploidy[sample],
                         n_alleles=data.locus.count_alleles(),
-                        inbreeding=data.sample_inbreeding[sample],
+                        inbreeding=inbreeding,
                         steps=self.mcmc_steps,
                         chains=self.mcmc_chains,
                         fix_homozygous=self.mcmc_fix_homozygous,

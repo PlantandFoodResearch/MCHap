@@ -8,14 +8,14 @@ from mchap.calling.exact import genotype_likelihoods, genotype_posteriors
 
 
 @pytest.mark.parametrize(
-    "random_frequencies",
-    [False, True],
+    "prior",
+    [None, "flat_freqs", "rand_freqs"],
 )
 @pytest.mark.parametrize(
     "seed",
     [11, 42, 13, 0, 12234, 213, 45436, 1312, 374645],
 )
-def test_gibbs_mh_transition_equivalence(seed, random_frequencies):
+def test_gibbs_mh_transition_equivalence(seed, prior):
     """Tests that transition matrices of gibbs and
     metropolis-hastings methods are equivalent.
     """
@@ -30,11 +30,15 @@ def test_gibbs_mh_transition_equivalence(seed, random_frequencies):
     # de-duplicate haplotypes
     haplotypes = np.unique(haplotypes, axis=0)
     n_haps = len(haplotypes)
-    if random_frequencies:
+    if prior == "rand_freqs":
         prior_frequencies = np.random.rand(n_haps)
         prior_frequencies /= prior_frequencies.sum()
-    else:
+        prior = (inbreeding, prior_frequencies)
+    elif prior == "flat_freqs":
         prior_frequencies = None
+        prior = (inbreeding, prior_frequencies)
+    elif prior is None:
+        prior = None
     genotype_alleles = np.random.randint(0, n_haps, size=ploidy)
     genotype_alleles.sort()
     genotype_haplotypes = haplotypes[genotype_alleles]
@@ -60,8 +64,7 @@ def test_gibbs_mh_transition_equivalence(seed, random_frequencies):
         haplotypes=haplotypes,
         reads=reads,
         read_counts=read_counts,
-        inbreeding=inbreeding,
-        frequencies=prior_frequencies,
+        prior=prior,
         llks_array=gibbs_llks_array,
         lpriors_array=gibbs_lpriors_array,
         probabilities_array=gibbs_probabilities_array,
@@ -83,8 +86,7 @@ def test_gibbs_mh_transition_equivalence(seed, random_frequencies):
             haplotypes=haplotypes,
             reads=reads,
             read_counts=read_counts,
-            inbreeding=inbreeding,
-            frequencies=prior_frequencies,
+            prior=prior,
             llks_array=mh_llks_array,
             lpriors_array=mh_lpriors_array,
             probabilities_array=mh_probabilities_array,
@@ -103,19 +105,21 @@ def test_gibbs_mh_transition_equivalence(seed, random_frequencies):
 
 
 @pytest.mark.parametrize(
-    "seed,inbred,random_frequencies",
+    "seed,inbred,prior",
     [
-        (11, False, False),
-        (42, True, False),
-        (13, False, True),
-        (0, True, True),
-        (12234, False, False),
-        (213, True, False),
-        (4536, False, True),
-        (2345, True, True),
+        (11, False, None),
+        (42, False, None),
+        (11, False, "flat_freqs"),
+        (42, True, "flat_freqs"),
+        (13, False, "rand_freqs"),
+        (0, True, "rand_freqs"),
+        (12234, False, "flat_freqs"),
+        (213, True, "flat_freqs"),
+        (4536, False, "rand_freqs"),
+        (2345, True, "rand_freqs"),
     ],
 )
-def test_gibbs_mh_mcmc_equivalence(seed, inbred, random_frequencies):
+def test_gibbs_mh_mcmc_equivalence(seed, inbred, prior):
     np.random.seed(seed)
     inbreeding = np.random.rand() * inbred
     n_pos = np.random.randint(3, 13)
@@ -126,11 +130,15 @@ def test_gibbs_mh_mcmc_equivalence(seed, inbred, random_frequencies):
     # de-duplicate haplotypes
     haplotypes = np.unique(haplotypes, axis=0)
     n_haps = len(haplotypes)
-    if random_frequencies:
+    if prior == "rand_freqs":
         prior_frequencies = np.random.rand(n_haps)
         prior_frequencies /= prior_frequencies.sum()
-    else:
+        prior = (inbreeding, prior_frequencies)
+    elif prior == "flat_freqs":
         prior_frequencies = None
+        prior = (inbreeding, prior_frequencies)
+    elif prior is None:
+        prior = None
     genotype_alleles = np.random.randint(0, n_haps, size=ploidy)
     genotype_alleles.sort()
     genotype_haplotypes = haplotypes[genotype_alleles]
@@ -149,8 +157,7 @@ def test_gibbs_mh_mcmc_equivalence(seed, inbred, random_frequencies):
         CallingMCMC(
             ploidy=ploidy,
             haplotypes=haplotypes,
-            frequencies=prior_frequencies,
-            inbreeding=inbreeding,
+            prior=prior,
             steps=steps,
             random_seed=seed,
             step_type="Gibbs",
@@ -166,8 +173,7 @@ def test_gibbs_mh_mcmc_equivalence(seed, inbred, random_frequencies):
         CallingMCMC(
             ploidy=ploidy,
             haplotypes=haplotypes,
-            frequencies=prior_frequencies,
-            inbreeding=inbreeding,
+            prior=prior,
             steps=steps,
             random_seed=seed,
             step_type="Metropolis-Hastings",
@@ -189,8 +195,7 @@ def test_gibbs_mh_mcmc_equivalence(seed, inbred, random_frequencies):
         llks,
         ploidy=ploidy,
         n_alleles=len(haplotypes),
-        inbreeding=inbreeding,
-        frequencies=prior_frequencies,
+        prior=prior,
     )
 
     np.testing.assert_array_almost_equal(gibbs_posterior, mh_posterior, decimal=2)
