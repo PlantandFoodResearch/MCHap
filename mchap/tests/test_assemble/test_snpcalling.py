@@ -43,7 +43,6 @@ def test_snp_posterior__zero_reads__inbred():
 
 
 def test_snp_posterior__nan_reads():
-
     read = np.array(
         [
             [
@@ -72,7 +71,6 @@ def test_snp_posterior__nan_reads():
 
 
 def test_snp_posterior__nan_reads__inbred():
-
     read = np.array(
         [
             [
@@ -141,7 +139,6 @@ def test_snp_posterior__novel_allele():
     ],
 )
 def test_snp_posterior__homozygous_deep(use_read_counts):
-
     read = np.array(
         [
             [
@@ -186,7 +183,6 @@ def test_snp_posterior__homozygous_deep(use_read_counts):
     ],
 )
 def test_snp_posterior__homozygous_shallow(use_read_counts):
-
     read = np.array(
         [
             [

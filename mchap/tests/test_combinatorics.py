@@ -6,7 +6,6 @@ from mchap import combinatorics
 
 
 def test_count_unique_haplotypes():
-
     u_alleles = [2, 2, 2, 3, 2, 4]
 
     # the number of unique haplotypes is the product of
@@ -31,7 +30,6 @@ def test_count_unique_haplotypes():
     ],
 )
 def test_count_unique_genotypes(u_haps, ploidy, answer):
-
     query = combinatorics.count_unique_genotypes(u_haps, ploidy)
 
     if answer is None:
@@ -49,7 +47,6 @@ def test_count_unique_genotypes(u_haps, ploidy, answer):
 
 
 def test_count_unique_genotype_permutations():
-
     # this is simply the number of unique haplotypes to the power of ploidy
 
     u_haps = 1024  # 10 biallelic SNPs

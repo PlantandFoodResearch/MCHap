@@ -31,7 +31,6 @@ from mchap import mset
     ],
 )
 def test_random_breaks(breaks, n):
-
     # intervals are of random length but should be within several constraints
     # so test that they
     intervals = structural.random_breaks(breaks, n)
@@ -166,7 +165,6 @@ def test_random_breaks(breaks, n):
     ],
 )
 def test_structural_change(genotype, haplotype_indices, interval, answer):
-
     genotype = np.array(genotype, dtype=np.int8)
     haplotype_indices = np.array(haplotype_indices, dtype=np.int8)
     answer = np.array(answer, dtype=int)
@@ -231,7 +229,6 @@ def test_structural_change(genotype, haplotype_indices, interval, answer):
     ],
 )
 def test_haplotype_segment_labels(genotype, interval, answer):
-
     genotype = np.array(genotype, dtype=np.int8)
     answer = np.array(answer, dtype=int)
 
@@ -283,7 +280,6 @@ def test_haplotype_segment_labels(genotype, interval, answer):
     ],
 )
 def test_recombination_step_options(labels, answer):
-
     labels = np.array(labels)
     answer = np.array(answer)
 
@@ -342,7 +338,6 @@ def test_recombination_step_options(labels, answer):
     ],
 )
 def test_dosage_step_options(labels, answer):
-
     labels = np.array(labels)
     answer = np.array(answer)
 

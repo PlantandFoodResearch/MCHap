@@ -263,9 +263,7 @@ class GenotypeMultiTrace(object):
     llks: np.ndarray
 
     def __post_init__(self):
-
         if (self.genotypes is not None) and (self.genotypes.shape[-1] != 0):
-
             self.genotypes = self.genotypes.copy()
             self.llks = self.llks.copy()
 

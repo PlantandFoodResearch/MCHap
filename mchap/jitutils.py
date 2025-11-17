@@ -452,14 +452,10 @@ def set_haplotype_dosage(genotype, dosage):
     h_y = 0
 
     for h_x in range(ploidy):
-
         while dosage[h_x] > 1:
-
             # don't iter over dosages we know are no longer 0
             for h_y in range(h_y, ploidy):
-
                 if dosage[h_y] == 0:
-
                     genotype[h_y] = genotype[h_x]
                     dosage[h_x] -= 1
                     dosage[h_y] += 1
@@ -539,7 +535,6 @@ def structural_change(genotype, haplotype_indices, interval=None):
         r = range(interval[0], interval[1])
 
     for j in r:
-
         # copy to cache
         for h in range(ploidy):
             cache[h] = genotype[h, j]

@@ -23,7 +23,6 @@ __all__ = ["DenovoMCMC"]
 
 @dataclass
 class DenovoMCMC(Assembler):
-
     ploidy: int
     n_alleles: list
     inbreeding: float = None
@@ -322,9 +321,7 @@ def _denovo_assembler(
         llk_trace = np.empty((1, steps), np.float64)
 
     for i in range(steps):
-
         for t in range(n_temps):
-
             # get genotype and likelihood of state this temp
             llk = llks[t]
             genotype = genotypes[t]

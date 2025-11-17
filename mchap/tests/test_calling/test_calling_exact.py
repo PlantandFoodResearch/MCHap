@@ -225,7 +225,6 @@ def test_alternate_dosage_posteriors():
 
 
 def test_call_posterior_mode():
-
     ploidy = 4
     inbreeding = 0.01
     haplotypes = np.array(

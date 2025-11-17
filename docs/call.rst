@@ -3,7 +3,7 @@ MCHap call
 
 Calling genotypes from known haplotypes.
 
-*(Last updated for MCHap version 0.11.0)*
+*(Last updated for MCHap version 0.11.1)*
 
 Background
 ----------
@@ -109,7 +109,7 @@ These files are often not necessary when a single value is suitable for all samp
 within the dataset.
 For example, the ploidy of all samples can be specified using the ``--ploidy`` argument.
 However, if there are samples with differing levels of ploidy then ``--ploidy`` 
-argument can be a path to a plaintext file containing a list of sample identifiers 
+argument can be the path to a plaintext file containing a list of sample identifiers 
 and corresponding ploidy levels.
 
 The built-in help menu for ``mchap call`` will automatically be displayed if 
@@ -151,11 +151,10 @@ a list of bam file location as described in the documentation for `mchap assembl
 Common parameters
 -----------------
 
-Sample parameters
+Basic parameters
 ~~~~~~~~~~~~~~~~~
 
-Sample parameters are used to specify information about each sample.
-Some of parameters such as ploidy have obvious importance when calling genotypes,
+Some parameters such as ploidy have obvious importance when calling genotypes,
 however, other parameters can have more subtle effects on the results.
 
 - ``--reference``: Specify a reference genome. This is optional but highly recommended when
@@ -359,6 +358,6 @@ An example of using these parameters to exclude rare haplotypes may look like:
 
 which will exclude any haplotypes with a frequency of less than ``0.01``.
 
-.. _`full list of arguments`: ../cli-call-help.txt
+.. _`full list of arguments`: ./cli-call-help.txt
 .. _`mchap assemble`: assemble.rst
 .. _`Pfeiffer et al (2018)`: https://www.doi.org/10.1038/s41598-018-29325-6

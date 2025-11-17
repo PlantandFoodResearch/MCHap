@@ -527,7 +527,6 @@ def interval_step(
     log_accept[-1] = -np.inf
 
     for i in range(n_options):
-
         # log likelihood ratio
         llk_i, cache = log_likelihood_structural_change_cached(
             reads=reads,

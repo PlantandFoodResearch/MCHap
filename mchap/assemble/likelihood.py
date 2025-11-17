@@ -43,7 +43,6 @@ def log_likelihood(reads, genotype, read_counts=None):
     llk = 0.0
 
     for r in range(n_reads):
-
         read_prob = 0
 
         for h in range(ploidy):
@@ -113,14 +112,12 @@ def log_likelihood_structural_change(
     llk = 0.0
 
     for r in range(n_reads):
-
         read_prob = 0
 
         for h in range(ploidy):
             read_hap_prod = 1.0
 
             for j in range(n_base):
-
                 # check if in the altered region
                 if j in intvl:
                     # use base from alternate hap

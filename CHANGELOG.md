@@ -2,6 +2,14 @@
 
 ## Unreleased 
 
+## Beta v0.11.1
+
+Maintenance:
+- Switch to `pyproject.toml` #188
+- Set versions manually without SCM #188
+- Update to Numpy 2 and Pandas 2
+- Add Python 3.13 to build matrix
+
 ## Beta v0.11.0
 
 Breaking Change:

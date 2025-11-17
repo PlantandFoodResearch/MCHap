@@ -41,7 +41,6 @@ def test_extract_sample_ids(id):
 
 
 def test_extract_read_variants():
-
     sample = "SAMPLE1"
     path = pathlib.Path(__file__).parent.absolute()
     path = str(path / "data/simple.sample1.bam")
@@ -102,7 +101,6 @@ def test_extract_read_variants():
 
 
 def test_extract_read_variants__raise_on_ref():
-
     sample = "SAMPLE1"
     path = pathlib.Path(__file__).parent.absolute()
     path = str(path / "data/simple.sample1.bam")
@@ -261,7 +259,6 @@ def test_encode_read_distributions():
 
 
 def test_encode_read_distributions__zero_reads():
-
     variants = (
         loci.SNP("CHR1", 6, 7, ".", alleles=("A", "C")),
         loci.SNP("CHR1", 15, 16, ".", alleles=("A", "G")),
@@ -291,7 +288,6 @@ def test_encode_read_distributions__zero_reads():
 
 
 def test_encode_read_distributions__zero_snps():
-
     variants = ()
 
     locus = loci.Locus(
@@ -315,7 +311,6 @@ def test_encode_read_distributions__zero_snps():
 
 
 def test_encode_read_distributions__zero_reads_or_snps():
-
     variants = ()
 
     locus = loci.Locus(

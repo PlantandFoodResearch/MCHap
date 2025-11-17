@@ -13,7 +13,6 @@ from .utils import posterior_as_array
 
 @dataclass
 class CallingMCMC(Assembler):
-
     ploidy: int
     haplotypes: np.ndarray
     prior: tuple = None

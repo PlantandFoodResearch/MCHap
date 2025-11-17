@@ -340,7 +340,6 @@ def test_GenotypeAllelesMultiTrace__replicate_incongruence_1(threshold, expect):
 
 @pytest.mark.parametrize("threshold,expect", [(0.99, 0), (0.8, 0), (0.6, 2)])
 def test_GenotypeAllelesMultiTrace__replicate_incongruence_2(threshold, expect):
-
     g0 = [0, 0, 1, 2]  # support 1
     g1 = [0, 1, 1, 2]  # support 1
     g2 = [0, 1, 2, 2]  # support 1

@@ -40,7 +40,6 @@ from mchap import combinatorics
     ],
 )
 def test_base_step(use_cache, use_read_counts, inbreeding):
-
     h = 0
     j = 1
 
@@ -285,7 +284,6 @@ def test_genotype_compound_step(use_cache, use_read_counts, inbreeding):
     ],
 )
 def test_genotype_compound_step__mask_ragged(inbreeding):
-
     # haps 0,1,0 and 0,0,0
     reads = np.array(
         [
