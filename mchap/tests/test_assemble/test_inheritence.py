@@ -5,7 +5,6 @@ from mchap.assemble import inheritence
 
 
 def test_gamete_probabilities__hom():
-
     genotypes = np.array([[[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]], np.int8)
     probabilities = np.array([1])
 
@@ -21,7 +20,6 @@ def test_gamete_probabilities__hom():
 
 
 def test_gamete_probabilities__het():
-
     genotypes = np.array([[[0, 0, 0], [0, 0, 0], [1, 1, 1], [1, 1, 1]]], np.int8)
     probabilities = np.array([1])
 
@@ -80,7 +78,6 @@ def test_gamete_probabilities__distribution():
 
 
 def test_cross_probabilities__hom_x_het():
-
     maternal_gametes = np.array([[[0, 0, 0], [0, 0, 0]]], np.int8)
     maternal_probs = np.array([1])
     maternal_probs = np.array([1])

@@ -358,7 +358,6 @@ class program(object):
             sys.stdout.flush()
 
     def _run_stdout_multi_core(self):
-
         header = self.header()
 
         for line in header:

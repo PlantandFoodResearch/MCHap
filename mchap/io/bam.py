@@ -110,7 +110,6 @@ def extract_read_variants(
     # sample_keys is a map of RG ID to ID or SM
     sample_keys = {}
     for dictionary in alignment_file.header["RG"]:
-
         # sample key based on a user defined readgroup field
         sample_key = dictionary[id]
 
@@ -128,7 +127,6 @@ def extract_read_variants(
     # iterate through reads
     reads = alignment_file.fetch(locus.contig, locus.start, locus.stop)
     for read in reads:
-
         if read.is_unmapped:
             # skip read
             pass
@@ -150,7 +148,6 @@ def extract_read_variants(
             pass
 
         else:
-
             # look up sample identifier based on RG ID
             sample_key = sample_keys[read.get_tag("RG")]
 
@@ -176,7 +173,6 @@ def extract_read_variants(
                 for read_pos, ref_pos, ref_char in read.get_aligned_pairs(
                     matches_only=True, with_seq=True
                 ):
-
                     # if this is a variant position then extract the call and qual
                     if ref_pos in positions:
                         idx = positions[ref_pos]

@@ -29,7 +29,6 @@ def test_comb(n, k):
 
 
 def test_add_log_prob():
-
     for _ in range(10):
         p1 = np.random.rand()
         p2 = np.random.rand()
@@ -44,7 +43,6 @@ def test_add_log_prob():
 
 
 def test_sum_log_probs():
-
     for _ in range(10):
         length = np.random.randint(2, 10)
         p = np.random.rand(length)
@@ -57,7 +55,6 @@ def test_sum_log_probs():
 
 
 def test_normalise_log_probs():
-
     for _ in range(10):
         # a vector of likelihoods that don't sum to 1
         length = np.random.randint(2, 10)
@@ -75,7 +72,6 @@ def test_normalise_log_probs():
 
 
 def test_normalise_log_probs_zeros():
-
     # a vector of likelihoods that don't sum to 1
     lks = np.random.rand(10)
 
@@ -117,7 +113,6 @@ def test_normalise_log_probs_zeros():
     ],
 )
 def test_array_equal(x, y, interval, answer):
-
     x = np.array(x, dtype=int)
     y = np.array(y, dtype=int)
 
@@ -153,7 +148,6 @@ def test_array_equal(x, y, interval, answer):
     ],
 )
 def test_get_haplotype_dosage(genotype, interval, answer):
-
     genotype = np.array(genotype, dtype=np.int8)
     answer = np.array(answer)
 
@@ -166,7 +160,6 @@ def test_get_haplotype_dosage(genotype, interval, answer):
 
 
 def test_set_haplotype_dosage():
-
     # initial dosage = [1, 2, 0, 1]
     genotype = np.array(
         [[0, 1, 0, 1], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 0, 0]], dtype=np.int8
@@ -206,7 +199,6 @@ def test_ln_equivalent_permutations(dosage, answer):
 
 
 def test_sample_snv_alleles():
-
     array = np.array(
         [[[0.7, 0.3, 0.0], [0.5, 0.5, 0.0]], [[0.9, 0.1, 0.0], [0.4, 0.3, 0.3]]]
     )

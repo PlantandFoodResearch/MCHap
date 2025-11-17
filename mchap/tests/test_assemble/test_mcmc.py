@@ -10,7 +10,6 @@ from mchap import mset
 
 
 def test_point_beta_probabilities():
-
     probs = mcmc._point_beta_probabilities(6, 1, 1)
     assert np.allclose(probs.sum(), 1.0)
     assert np.allclose(probs[0], probs)
@@ -249,7 +248,6 @@ def test_DenovoMCMC__non_variable():
 
 
 def test_DenovoMCMC__diploid():
-
     np.random.seed(42)
 
     haplotypes = np.array(
@@ -284,7 +282,6 @@ def test_DenovoMCMC__diploid():
 
 
 def test_DenovoMCMC__tetraploid():
-
     haplotypes = np.array(
         [
             [0, 0, 0, 0, 0, 0],
@@ -355,7 +352,6 @@ def test_DenovoMCMC__tetraploid():
 
 
 def test_DenovoMCMC__seed():
-
     haplotypes = np.array(
         [
             [0, 0, 0, 0, 0, 0],

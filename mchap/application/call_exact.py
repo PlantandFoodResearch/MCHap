@@ -124,7 +124,6 @@ class program(call_baseclass.program):
 
                 # call haplotypes
                 if (FORMAT.GL in data.formatfields) or (FORMAT.GP in data.formatfields):
-
                     # calculate full arrays
                     llks = genotype_likelihoods(
                         reads=read_dists,

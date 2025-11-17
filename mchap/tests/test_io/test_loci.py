@@ -262,7 +262,6 @@ def test_Locus__set_variants__duplicate():
 
 
 def test_Locus__attributes():
-
     variants = (
         loci.SNP("CHR2", 14, 15, ".", alleles=("A", "T")),
         loci.SNP("CHR2", 19, 20, ".", alleles=("A", "C", "G", "T")),
@@ -283,7 +282,6 @@ def test_Locus__attributes():
 
 
 def test_Locus__format_haplotypes():
-
     variants = (
         loci.SNP("CHR1", 6, 7, ".", alleles=("A", "C")),
         loci.SNP("CHR1", 15, 16, ".", alleles=("A", "G")),
@@ -322,7 +320,6 @@ def test_Locus__format_haplotypes():
 
 
 def test_Locus__format_variants():
-
     variants = (
         loci.SNP("CHR1", 6, 7, ".", alleles=("A", "C")),
         loci.SNP("CHR1", 15, 16, ".", alleles=("A", "G")),

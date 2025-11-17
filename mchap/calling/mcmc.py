@@ -88,7 +88,6 @@ def mh_options(
 
     # iterate over allele options
     for a in range(n_alleles):
-
         # handle case of current allele
         if genotype_alleles[variable_allele] == a:
             # proposed the same allele
@@ -98,7 +97,6 @@ def mh_options(
 
         # proposed new allele
         else:
-
             # set new allele
             genotype_alleles[variable_allele] = a
 
@@ -196,7 +194,6 @@ def gibbs_options(
     # iterate over allele options
     unique_haplotypes = len(haplotypes)
     for a in range(unique_haplotypes):
-
         # set genotype allele
         genotype_alleles[variable_allele] = a
 

@@ -80,7 +80,6 @@ def metropolis_hastings_probabilities(
 
     for i in range(n_alleles):
         if i == current_allele:
-
             # store current likelihood
             log_accept[i] = -np.inf  # log(0)
         else:

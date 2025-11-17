@@ -28,7 +28,6 @@ class SNP:
 
 @dataclass(frozen=True, order=True)
 class Locus:
-
     contig: str
     start: int
     stop: int
@@ -336,7 +335,6 @@ def _parse_bed4_line(line):
 
 
 def read_bed4(bed, region=None):
-
     if region:
         # must be gzipped and tabix indexed
         if isinstance(region, str):

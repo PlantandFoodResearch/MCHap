@@ -176,7 +176,6 @@ def test_log_likelihood_cache__fuzz(ploidy, n_base, n_reps):
 def test_log_likelihood_structural_change(
     reads, genotype, haplotype_indices, interval, final_genotype
 ):
-
     reads = np.array(reads, dtype=float)
     genotype = np.array(genotype, dtype=np.int8)
     haplotype_indices = np.array(haplotype_indices, dtype=int)

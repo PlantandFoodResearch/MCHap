@@ -232,7 +232,6 @@ HAMILTON_KERR_PEDIGREE_INCONGRUENT["genotype"] = [
     ],
 )
 def test_gibbs_mh_probabilities_equivalence(pedigree, read_depth, gamete_error):
-
     haplotypes = np.array(
         [
             [0, 0, 0, 0, 0, 0, 0],

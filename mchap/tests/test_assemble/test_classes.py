@@ -6,7 +6,6 @@ from mchap.assemble import classes
 
 
 def test_PosteriorGenotypeDistribution():
-
     genotypes = np.array(
         [
             [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
@@ -36,7 +35,6 @@ def test_PosteriorGenotypeDistribution():
 
 
 def test_GenotypeMultiTrace():
-
     genotypes = np.array(
         [
             [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 1, 1]],
