@@ -13,9 +13,7 @@ From the root directory of this repository run:
 
 .. code:: bash
 
-    pip install -r requirements.txt
-    python setup.py sdist
-    pip install dist/mchap-*.tar.gz
+    pip install .
 
 You should then be able to use the command line tool ``mchap`` which is a wrapper
 around ``mchap assemble`` and ``mchap call``.

@@ -3,7 +3,7 @@ MCHap assemble
 
 De novo assembly of micro-haplotypes.
 
-*(Last updated for MCHap version 0.11.0)*
+*(Last updated for MCHap version 0.11.1)*
 
 Background
 ----------
@@ -28,7 +28,7 @@ one another.
 Micro-haplotype alleles are reported in the output VCF file if there is reasonable
 confidence that they occur within one or more samples (this threshold is configurable).
 Note that the exclusion of low confidence micro-haplotypes can result in some
-(low quality) genotype calls with "unknown" alleles.
+(low quality) genotype calls with "unknown" alleles indicated with ``.`` in the VCF file.
 
 Most MCHap workflows will start by using ``mchap assemble`` for de novo micro-haplotype
 assembly.
@@ -92,7 +92,7 @@ specify an input parameter per each sample.
 These files are often not necessary when a single value is suitable for all samples 
 within the dataset.
 For example, the **ploidy** of all samples can be specified using the ``--ploidy`` argument.
-However, the ``--ploidy`` argument can also be the location plaintext file containing
+However, the ``--ploidy`` argument can also be the location of a plaintext file containing
 a list of sample identifiers and their corresponding ploidy levels to accommodate
 mixed-ploidy datasets.
 Each line of this file contains a single sample identifier and its ploidy separated by a
@@ -184,12 +184,16 @@ aren't specified.
 However, the default parameters will not represent a sensible choice for every 
 situation and it is worth considering what a sensible value should be.
 
-Sample parameters
+Basic parameters
 ~~~~~~~~~~~~~~~~~
 
-Sample parameters are used to specify information about each sample.
-Some of parameters (e.g., ploidy) have obvious importance when calling genotypes.
+Some parameters (e.g., ploidy) have obvious importance when calling genotypes.
 However, other parameters can have more subtle effects on the results.
+
+- ``--reference``: Specify a reference genome. This is optional but highly recommended when
+  working with CRAM files instead of BAM files. Specifying the reference genome speeds up
+  reading data from CRAM files. It also may be necessary if the CRAM files link to a missing
+  reference genome.
 
 - ``--ploidy``: The ploidy of all samples in the analysis (default = ``2``, must be a 
   positive integer).
@@ -432,6 +436,6 @@ to ensure that the founding alleles are identified without using
 parallel-tempering for all of the progeny derived from those founders.
 
 
-.. _`full list of arguments`: ../cli-assemble-help.txt
+.. _`full list of arguments`: ./cli-assemble-help.txt
 .. _`Pfeiffer et al (2018)`: https://www.doi.org/10.1038/s41598-018-29325-6
 .. _`asub`: https://github.com/lh3/asub
