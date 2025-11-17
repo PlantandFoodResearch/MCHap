@@ -4,7 +4,7 @@
 
 ## Beta v0.11.1
 
-Maintinance:
+Maintenance:
 - Switch to `pyproject.toml` #188
 - Set versions manually without SCM #188
 - Update to Numpy 2 and Pandas 2
