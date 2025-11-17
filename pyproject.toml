@@ -34,7 +34,6 @@ dev = [
 ]
 test = [
     "pytest",
-    "tomllib",
 ]
 
 [project.urls]
